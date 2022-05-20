@@ -7,7 +7,7 @@ type Spec struct {
 	SlotsPerEpoch              uint64
 }
 
-func (s *Spec) update(spec map[string]interface{}) error {
+func (s *Spec) update(spec map[string]interface{}) {
 	if safeSlotsToUpdateJustified, exists := spec["SAFE_SLOTS_TO_UPDATE_JUSTIFIED"]; exists {
 		s.SafeSlotsToUpdateJustified = cast.ToUint64(safeSlotsToUpdateJustified)
 	}
@@ -15,6 +15,4 @@ func (s *Spec) update(spec map[string]interface{}) error {
 	if slotsPerEpoch, exists := spec["SLOTS_PER_EPOCH"]; exists {
 		s.SlotsPerEpoch = cast.ToUint64(slotsPerEpoch)
 	}
-
-	return nil
 }

@@ -19,11 +19,11 @@ type ConsensusCheckpointIsProgressing struct {
 var _ Runnable = (*ConsensusCheckpointIsProgressing)(nil)
 
 const (
-	NameConsensusCheckpointIsProgressing = "consensus_is_healthy"
+	NameConsensusCheckpointIsProgressing = "consensus_checkpoint_is_progressing"
 )
 
 func NewConsensusCheckpointIsProgressing(ctx context.Context, bundle Bundle, checkpoint consensus.CheckpointName) *ConsensusCheckpointIsProgressing {
-	bundle.log = bundle.log.WithField("task", NameConsensusCheckpointIsProgressing)
+	bundle.log = bundle.log.WithField("task", NameConsensusCheckpointIsProgressing).WithField("checkpoint_name", checkpoint)
 
 	return &ConsensusCheckpointIsProgressing{
 		bundle: bundle,

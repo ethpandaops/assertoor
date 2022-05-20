@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/sirupsen/logrus"
@@ -56,36 +55,6 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) Start(ctx context.Context) {
-	if err := c.tick(ctx); err != nil {
-		c.log.WithError(err).Error("tick failed")
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(time.Second * 5):
-			if err := c.tick(ctx); err != nil {
-				c.log.WithError(err).Error("tick failed")
-			}
-		}
-	}
-}
-
-func (c *Client) tick(ctx context.Context) error {
-	if _, err := c.IsHealthy(ctx); err != nil {
-		c.log.WithError(err).Error("health check failed")
-		return err
-	}
-
-	if _, err := c.GetSyncStatus(ctx); err != nil {
-		c.log.WithError(err).Error("get sync status failed")
-	}
-
-	return nil
-}
-
 func (c *Client) IsHealthy(ctx context.Context) (bool, error) {
 	err := c.GetNodeVersion(ctx)
 	if err != nil {
@@ -126,16 +95,14 @@ func (c *Client) GetSpec(ctx context.Context) (*Spec, error) {
 		return nil, err
 	}
 
-	err = c.state.Spec.update(spec)
-	if err != nil {
-		return nil, err
-	}
+	c.state.Spec.update(spec)
 
 	return &c.state.Spec, nil
 }
 
 func (c *Client) GetChainState(ctx context.Context) (ChainState, error) {
 	state := NewChainState()
+
 	for _, name := range CheckpointNames {
 		checkpoint, err := c.GetCheckpoint(ctx, name)
 		if err != nil {

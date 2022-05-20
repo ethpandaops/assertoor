@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"time"
 
 	"github.com/samcm/sync-test-coordinator/pkg/coordinator/clients/consensus"
 	"github.com/samcm/sync-test-coordinator/pkg/coordinator/task"
@@ -22,10 +23,20 @@ func NewBothSynced(ctx context.Context, bundle Bundle) Runnable {
 	return &BothSynced{
 		bundle: bundle,
 		Tasks: []task.Runnable{
+			// Initialize
+			task.NewSleep(ctx, *bundle.AsTaskBundle(), time.Second*1),
+
+			// Check the clients for liveliness.
+			task.NewExecutionIsHealthy(ctx, *bundle.AsTaskBundle()),
 			task.NewConsensusIsHealthy(ctx, *bundle.AsTaskBundle()),
-			// task.NewConsensusIsSynced(ctx, *bundle.AsTaskBundle()),
+
+			// Wait until synced.
+			task.NewBothAreSynced(ctx, *bundle.AsTaskBundle()),
+
+			// Check the chains are progressing.
 			task.NewConsensusCheckpointIsProgressing(ctx, *bundle.AsTaskBundle(), consensus.Head),
 			task.NewConsensusCheckpointIsProgressing(ctx, *bundle.AsTaskBundle(), consensus.Finalized),
+			task.NewExecutionIsProgressing(ctx, *bundle.AsTaskBundle()),
 		},
 	}
 }
@@ -40,13 +51,9 @@ func (b *BothSynced) Init(ctx context.Context) error {
 
 func (b *BothSynced) Run(ctx context.Context) error {
 	for _, t := range b.Tasks {
-		b.bundle.Log.WithField("task", t.Name()).Info("running task")
-
 		if err := RunTaskUntilCompletionOrError(ctx, b.bundle.Log, t); err != nil {
 			return err
 		}
-
-		b.bundle.Log.WithField("task", t.Name()).Info("task complete")
 	}
 
 	return nil
