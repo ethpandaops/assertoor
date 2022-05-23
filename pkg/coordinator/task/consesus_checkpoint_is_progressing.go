@@ -9,7 +9,7 @@ import (
 )
 
 type ConsensusCheckpointIsProgressing struct {
-	bundle Bundle
+	bundle *Bundle
 	client *consensus.Client
 
 	checkpointName consensus.CheckpointName
@@ -22,12 +22,11 @@ const (
 	NameConsensusCheckpointIsProgressing = "consensus_checkpoint_is_progressing"
 )
 
-func NewConsensusCheckpointIsProgressing(ctx context.Context, bundle Bundle, checkpoint consensus.CheckpointName) *ConsensusCheckpointIsProgressing {
+func NewConsensusCheckpointIsProgressing(ctx context.Context, bundle *Bundle, checkpoint consensus.CheckpointName) *ConsensusCheckpointIsProgressing {
 	bundle.log = bundle.log.WithField("task", NameConsensusCheckpointIsProgressing).WithField("checkpoint_name", checkpoint)
 
 	return &ConsensusCheckpointIsProgressing{
 		bundle: bundle,
-		client: bundle.GetConsensusClient(ctx),
 
 		checkpointName: checkpoint,
 		checkpoint:     -1,
@@ -43,6 +42,8 @@ func (c *ConsensusCheckpointIsProgressing) PollingInterval() time.Duration {
 }
 
 func (c *ConsensusCheckpointIsProgressing) Start(ctx context.Context) error {
+	c.client = c.bundle.GetConsensusClient(ctx)
+
 	return nil
 }
 

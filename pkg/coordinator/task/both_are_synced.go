@@ -8,7 +8,7 @@ import (
 )
 
 type BothAreSynced struct {
-	bundle    Bundle
+	bundle    *Bundle
 	execution *ExecutionIsSynced
 	consensus *ConsensusIsSynced
 }
@@ -19,7 +19,7 @@ const (
 	NameBothAreSynced = "both_are_synced"
 )
 
-func NewBothAreSynced(ctx context.Context, bundle Bundle) *BothAreSynced {
+func NewBothAreSynced(ctx context.Context, bundle *Bundle) *BothAreSynced {
 	bundle.log = bundle.log.WithField("task", NameBothAreSynced)
 
 	consensus := NewConsensusIsSynced(ctx, bundle)

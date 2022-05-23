@@ -9,7 +9,7 @@ import (
 )
 
 type ExecutionIsProgressing struct {
-	bundle Bundle
+	bundle *Bundle
 	client *execution.Client
 
 	headBlockNumber uint64
@@ -21,7 +21,7 @@ const (
 	NameExecutionIsProgressing = "execution_is_progressing"
 )
 
-func NewExecutionIsProgressing(ctx context.Context, bundle Bundle) *ExecutionIsProgressing {
+func NewExecutionIsProgressing(ctx context.Context, bundle *Bundle) *ExecutionIsProgressing {
 	bundle.log = bundle.log.WithField("task", NameExecutionIsProgressing)
 
 	return &ExecutionIsProgressing{

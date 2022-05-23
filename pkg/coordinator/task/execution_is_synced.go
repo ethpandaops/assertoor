@@ -9,7 +9,7 @@ import (
 )
 
 type ExecutionIsSynced struct {
-	bundle Bundle
+	bundle *Bundle
 	client *execution.Client
 }
 
@@ -19,7 +19,7 @@ const (
 	NameExecutionIsSynced = "execution_is_synced"
 )
 
-func NewExecutionIsSynced(ctx context.Context, bundle Bundle) *ExecutionIsSynced {
+func NewExecutionIsSynced(ctx context.Context, bundle *Bundle) *ExecutionIsSynced {
 	bundle.log = bundle.log.WithField("task", NameExecutionIsSynced)
 
 	return &ExecutionIsSynced{

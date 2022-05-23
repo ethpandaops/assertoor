@@ -1,4 +1,4 @@
-package task //nolint:dupl // false positive
+package task
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 )
 
 type ConsensusIsUnhealthy struct {
-	bundle Bundle
+	bundle *Bundle
 	client *consensus.Client
 }
 
@@ -19,12 +19,11 @@ const (
 	NameConsensusIsUnhealthy = "consensus_is_unhealthy"
 )
 
-func NewConsensusIsUnhealthy(ctx context.Context, bundle Bundle) *ConsensusIsUnhealthy {
+func NewConsensusIsUnhealthy(ctx context.Context, bundle *Bundle) *ConsensusIsUnhealthy {
 	bundle.log = bundle.log.WithField("task", NameConsensusIsUnhealthy)
 
 	return &ConsensusIsUnhealthy{
 		bundle: bundle,
-		client: bundle.GetConsensusClient(ctx),
 	}
 }
 
@@ -33,10 +32,15 @@ func (c *ConsensusIsUnhealthy) Name() string {
 }
 
 func (c *ConsensusIsUnhealthy) PollingInterval() time.Duration {
-	return time.Second * 5
+	return time.Second * 1
 }
 
 func (c *ConsensusIsUnhealthy) Start(ctx context.Context) error {
+	client := consensus.NewConsensusClient(c.bundle.log, c.bundle.ConsensusURL)
+	if err := client.Bootstrap(ctx); err != nil {
+		return nil
+	}
+
 	return nil
 }
 

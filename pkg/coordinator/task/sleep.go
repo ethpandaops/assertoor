@@ -8,7 +8,7 @@ import (
 )
 
 type Sleep struct {
-	bundle   Bundle
+	bundle   *Bundle
 	duration time.Duration
 }
 
@@ -18,7 +18,7 @@ const (
 	NameSleep = "sleep"
 )
 
-func NewSleep(ctx context.Context, bundle Bundle, duration time.Duration) *Sleep {
+func NewSleep(ctx context.Context, bundle *Bundle, duration time.Duration) *Sleep {
 	bundle.log = bundle.log.WithField("task", NameSleep)
 
 	return &Sleep{

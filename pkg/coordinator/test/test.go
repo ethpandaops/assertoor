@@ -20,7 +20,7 @@ var (
 	ErrTestNotFound = errors.New("test not found")
 )
 
-func NewTestByName(ctx context.Context, name string, bundle Bundle) (Runnable, error) {
+func NewTestByName(ctx context.Context, name string, bundle *Bundle) (Runnable, error) {
 	bundle.Log = bundle.Log.WithField("test", name)
 
 	switch name {
@@ -41,6 +41,10 @@ func RunUntilCompletionOrError(ctx context.Context, test Runnable) error {
 
 func RunTaskUntilCompletionOrError(ctx context.Context, log logrus.FieldLogger, runnable task.Runnable) error {
 	log = log.WithField("task", runnable.Name())
+
+	if err := runnable.Start(ctx); err != nil {
+		return err
+	}
 
 	if complete := tickTask(ctx, log, runnable); complete {
 		return nil

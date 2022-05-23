@@ -9,7 +9,7 @@ import (
 )
 
 type ExecutionIsHealthy struct {
-	bundle Bundle
+	bundle *Bundle
 	client *execution.Client
 }
 
@@ -19,7 +19,7 @@ const (
 	NameExecutionIsHealthy = "execution_is_healthy"
 )
 
-func NewExecutionIsHealthy(ctx context.Context, bundle Bundle) *ExecutionIsHealthy {
+func NewExecutionIsHealthy(ctx context.Context, bundle *Bundle) *ExecutionIsHealthy {
 	bundle.log = bundle.log.WithField("task", NameExecutionIsHealthy)
 
 	return &ExecutionIsHealthy{
@@ -33,7 +33,7 @@ func (c *ExecutionIsHealthy) Name() string {
 }
 
 func (c *ExecutionIsHealthy) PollingInterval() time.Duration {
-	return time.Second * 5
+	return time.Second * 1
 }
 
 func (c *ExecutionIsHealthy) Start(ctx context.Context) error {

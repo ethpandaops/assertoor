@@ -1,0 +1,18 @@
+test: both_synced
+
+execution:
+  url: localhost:8545
+
+consensus:
+  url: localhost:5052
+
+task_config:
+  kill_consensus:
+    command: 
+    - "pkill"
+    - "prysm"
+  
+  kill_execution:
+    command:
+    - "pkill"
+    - "geth"
