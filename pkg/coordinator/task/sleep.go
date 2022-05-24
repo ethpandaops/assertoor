@@ -20,9 +20,8 @@ const (
 )
 
 func NewSleep(ctx context.Context, bundle *Bundle, duration time.Duration) *Sleep {
-	bundle.log = bundle.log.WithField("task", NameSleep)
-
 	return &Sleep{
+		log:      bundle.log.WithField("task", NameSleep),
 		bundle:   bundle,
 		duration: duration,
 	}
@@ -45,7 +44,7 @@ func (s *Sleep) Logger() logrus.FieldLogger {
 }
 
 func (s *Sleep) IsComplete(ctx context.Context) (bool, error) {
-	s.Logger().Info("sleeping for", s.duration)
+	s.log.Info("sleeping for ", s.duration)
 
 	time.Sleep(s.duration)
 
