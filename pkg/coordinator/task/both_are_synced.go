@@ -41,6 +41,14 @@ func (b *BothAreSynced) PollingInterval() time.Duration {
 }
 
 func (b *BothAreSynced) Start(ctx context.Context) error {
+	if err := b.consensus.Start(ctx); err != nil {
+		return err
+	}
+
+	if err := b.execution.Start(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 

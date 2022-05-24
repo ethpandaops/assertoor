@@ -7,6 +7,10 @@ consensus:
   url: localhost:5052
 
 task_config:
+  finish_job:
+    - "sh"
+    - "-c"
+    - "echo 'Done!'"
   kill_consensus:
     command: 
     - "pkill"

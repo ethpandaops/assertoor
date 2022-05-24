@@ -47,7 +47,7 @@ func (c *ExecutionIsUnhealthy) Logger() logrus.FieldLogger {
 func (c *ExecutionIsUnhealthy) IsComplete(ctx context.Context) (bool, error) {
 	healthy, err := c.client.IsHealthy(ctx)
 	if err != nil {
-		return true, err
+		return true, nil
 	}
 
 	return healthy, nil

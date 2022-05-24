@@ -4,6 +4,7 @@ package task
 type Config struct {
 	KillConsensus KillConsensusConfig `yaml:"kill_consensus"`
 	KillExecution KillExecutionConfig `yaml:"kill_execution"`
+	FinishJob     FinishJobConfig     `yaml:"finish_job"`
 }
 
 var (
@@ -19,12 +20,19 @@ type KillExecutionConfig struct {
 	Command []string `yaml:"command"`
 }
 
+type FinishJobConfig struct {
+	Command []string `yaml:"command"`
+}
+
 func DefaultConfig() Config {
 	return Config{
 		KillConsensus: KillConsensusConfig{
 			Command: []string{},
 		},
 		KillExecution: KillExecutionConfig{
+			Command: []string{},
+		},
+		FinishJob: FinishJobConfig{
 			Command: []string{},
 		},
 	}

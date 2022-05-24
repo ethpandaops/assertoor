@@ -37,9 +37,16 @@ func (b *RunCommand) PollingInterval() time.Duration {
 }
 
 func (b *RunCommand) Start(ctx context.Context) error {
-	b.Logger().WithField("cmd", b.cmd).Info("running command")
+	com := b.cmd[0]
+	args := []string{}
 
-	command := exec.CommandContext(ctx, b.cmd[0], b.cmd[0:]...) //nolint:gosec // We know what we're doing here
+	if len(b.cmd) > 1 {
+		args = b.cmd[1:]
+	}
+
+	b.Logger().WithField("cmd", com).WithField("args", args).Info("running command")
+
+	command := exec.CommandContext(ctx, com, args...)
 
 	stdOut, err := command.CombinedOutput()
 	if err != nil {

@@ -49,6 +49,10 @@ func (c *ConsensusIsUnhealthy) Logger() logrus.FieldLogger {
 }
 
 func (c *ConsensusIsUnhealthy) IsComplete(ctx context.Context) (bool, error) {
+	if c.client == nil {
+		return true, nil
+	}
+
 	_, err := c.client.IsHealthy(ctx)
 	if err != nil {
 		return true, err
