@@ -41,6 +41,10 @@ func (s *Sleep) Name() string {
 	return NameSleep
 }
 
+func (c *Sleep) Config() interface{} {
+	return c.config
+}
+
 func (s *Sleep) PollingInterval() time.Duration {
 	return time.Second * 5
 }

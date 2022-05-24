@@ -47,6 +47,10 @@ func (c *ConsensusIsSynced) Name() string {
 	return NameConsensusIsSynced
 }
 
+func (c *ConsensusIsSynced) Config() interface{} {
+	return c.config
+}
+
 func (c *ConsensusIsSynced) PollingInterval() time.Duration {
 	return time.Second * 5
 }

@@ -49,6 +49,10 @@ func (c *ConsensusCheckpointHasProgressed) Name() string {
 	return NameConsensusCheckpointHasProgressed
 }
 
+func (c *ConsensusCheckpointHasProgressed) Config() interface{} {
+	return c.config
+}
+
 func (c *ConsensusCheckpointHasProgressed) PollingInterval() time.Duration {
 	return time.Second * 5
 }

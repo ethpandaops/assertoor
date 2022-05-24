@@ -40,6 +40,10 @@ func (c *ConsensusIsUnhealthy) Name() string {
 	return NameConsensusIsUnhealthy
 }
 
+func (c *ConsensusIsUnhealthy) Config() interface{} {
+	return c.config
+}
+
 func (c *ConsensusIsUnhealthy) PollingInterval() time.Duration {
 	return time.Second * 1
 }

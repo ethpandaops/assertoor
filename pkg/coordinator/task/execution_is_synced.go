@@ -47,6 +47,10 @@ func (c *ExecutionIsSynced) Name() string {
 	return NameExecutionIsSynced
 }
 
+func (c *ExecutionIsSynced) Config() interface{} {
+	return c.config
+}
+
 func (c *ExecutionIsSynced) PollingInterval() time.Duration {
 	return time.Second * 5
 }

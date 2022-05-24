@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/imdario/mergo"
@@ -16,6 +17,7 @@ type Runnable interface {
 	IsComplete(ctx context.Context) (bool, error)
 
 	Name() string
+	Config() interface{}
 	PollingInterval() time.Duration
 	Logger() logrus.FieldLogger
 }
@@ -26,8 +28,6 @@ var (
 
 //nolint:gocyclo // unavoidable
 func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, config *helper.RawMessage) (Runnable, error) {
-	bundle.log.WithField("task", taskName).Info("creating task")
-
 	switch taskName {
 	case NameSleep:
 		conf := SleepConfig{}
@@ -232,5 +232,5 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 		return NewRunCommand(ctx, bundle, base), nil
 	}
 
-	return nil, errors.New("unknown task type")
+	return nil, fmt.Errorf("unknown task: %s", taskName)
 }

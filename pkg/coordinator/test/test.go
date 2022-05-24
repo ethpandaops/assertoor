@@ -28,7 +28,7 @@ type Test struct {
 var _ Runnable = (*Test)(nil)
 
 func CreateTest(ctx context.Context, bundle *Bundle, config Config) (Runnable, error) {
-	runnable := Test{
+	runnable := &Test{
 		name:      config.Name,
 		tasks:     []task.Runnable{},
 		log:       bundle.Log.WithField("test", config.Name),
@@ -41,17 +41,19 @@ func CreateTest(ctx context.Context, bundle *Bundle, config Config) (Runnable, e
 			return nil, err
 		}
 
+		bundle.Log.WithField("config", t.Config()).WithField("task", t.Name()).Info("created task")
+
 		runnable.tasks = append(runnable.tasks, t)
 	}
 
 	return runnable, nil
 }
 
-func (t Test) Name() string {
+func (t *Test) Name() string {
 	return t.name
 }
 
-func (t Test) Run(ctx context.Context) error {
+func (t *Test) Run(ctx context.Context) error {
 	for _, task := range t.tasks {
 		t.log.WithField("task", task.Name()).Info("starting task")
 
@@ -71,15 +73,15 @@ func (t Test) Run(ctx context.Context) error {
 	return nil
 }
 
-func (t Test) Percent() float64 {
+func (t *Test) Percent() float64 {
 	return float64(t.currIndex) / float64(len(t.tasks))
 }
 
-func (t Test) Tasks() []task.Runnable {
+func (t *Test) Tasks() []task.Runnable {
 	return t.tasks
 }
 
-func (t Test) ActiveTask() task.Runnable {
+func (t *Test) ActiveTask() task.Runnable {
 	return t.activeTask
 }
 

@@ -41,6 +41,10 @@ func (c *ExecutionIsUnhealthy) Name() string {
 	return NameExecutionIsUnhealthy
 }
 
+func (c *ExecutionIsUnhealthy) Config() interface{} {
+	return c.config
+}
+
 func (c *ExecutionIsUnhealthy) PollingInterval() time.Duration {
 	return time.Second * 1
 }

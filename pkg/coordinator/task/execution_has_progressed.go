@@ -48,6 +48,10 @@ func (c *ExecutionHasProgressed) Name() string {
 	return NameExecutionHasProgressed
 }
 
+func (c *ExecutionHasProgressed) Config() interface{} {
+	return c.config
+}
+
 func (c *ExecutionHasProgressed) PollingInterval() time.Duration {
 	return time.Second * 5
 }
