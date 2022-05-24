@@ -14,15 +14,13 @@ type Bundle struct {
 	log          logrus.FieldLogger
 	ConsensusURL string
 	ExecutionURL string
-	TaskConfig   Config
 }
 
-func NewBundle(log logrus.FieldLogger, consensusURL, executionURL string, config Config) *Bundle {
+func NewBundle(log logrus.FieldLogger, consensusURL, executionURL string) *Bundle {
 	return &Bundle{
 		log:          log,
 		ConsensusURL: consensusURL,
 		ExecutionURL: executionURL,
-		TaskConfig:   config,
 	}
 }
 

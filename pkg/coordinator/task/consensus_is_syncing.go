@@ -8,10 +8,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type ConsensusIsSyncingConfig struct {
+}
+
 type ConsensusIsSyncing struct {
 	bundle *Bundle
 	client *consensus.Client
 	log    logrus.FieldLogger
+	config ConsensusIsSyncingConfig
 }
 
 var _ Runnable = (*ConsensusIsSyncing)(nil)
@@ -20,11 +24,16 @@ const (
 	NameConsensusIsSyncing = "consensus_is_syncing"
 )
 
-func NewConsensusIsSyncing(ctx context.Context, bundle *Bundle) *ConsensusIsSyncing {
+func NewConsensusIsSyncing(ctx context.Context, bundle *Bundle, config ConsensusIsSyncingConfig) *ConsensusIsSyncing {
 	return &ConsensusIsSyncing{
 		bundle: bundle,
 		log:    bundle.log.WithField("task", NameConsensusIsSyncing),
+		config: config,
 	}
+}
+
+func DefaultConsensusIsSyncingConfig() ConsensusIsSyncingConfig {
+	return ConsensusIsSyncingConfig{}
 }
 
 func (c *ConsensusIsSyncing) Name() string {

@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/samcm/sync-test-coordinator/pkg/coordinator/test"
 	"github.com/sirupsen/logrus"
@@ -28,13 +29,14 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		Log:          c.log,
 		ConsensusURL: c.Config.Consensus.URL,
 		ExecutionURL: c.Config.Execution.URL,
-		TaskConfig:   c.Config.TaskConfig,
 	}
 
-	testToRun, err := test.NewTestByName(ctx, c.Config.Test, bundle)
+	testToRun, err := test.CreateTest(ctx, bundle, c.Config.Test)
 	if err != nil {
 		return err
 	}
+
+	c.log.Info(fmt.Sprintf("starting test '%s' which contains %v tasks", testToRun.Name(), len(testToRun.Tasks())))
 
 	if err := testToRun.Run(ctx); err != nil {
 		return err

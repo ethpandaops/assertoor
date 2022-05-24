@@ -8,10 +8,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type ConsensusIsUnhealthyConfig struct {
+}
+
 type ConsensusIsUnhealthy struct {
 	bundle *Bundle
 	client *consensus.Client
 	log    logrus.FieldLogger
+	config ConsensusIsUnhealthyConfig
 }
 
 var _ Runnable = (*ConsensusIsUnhealthy)(nil)
@@ -20,11 +24,16 @@ const (
 	NameConsensusIsUnhealthy = "consensus_is_unhealthy"
 )
 
-func NewConsensusIsUnhealthy(ctx context.Context, bundle *Bundle) *ConsensusIsUnhealthy {
+func NewConsensusIsUnhealthy(ctx context.Context, bundle *Bundle, config ConsensusIsUnhealthyConfig) *ConsensusIsUnhealthy {
 	return &ConsensusIsUnhealthy{
 		bundle: bundle,
 		log:    bundle.log.WithField("task", NameConsensusIsUnhealthy),
+		config: config,
 	}
+}
+
+func DefaultConsensusIsUnhealthyConfig() ConsensusIsUnhealthyConfig {
+	return ConsensusIsUnhealthyConfig{}
 }
 
 func (c *ConsensusIsUnhealthy) Name() string {
@@ -36,7 +45,7 @@ func (c *ConsensusIsUnhealthy) PollingInterval() time.Duration {
 }
 
 func (c *ConsensusIsUnhealthy) Start(ctx context.Context) error {
-	client := consensus.NewConsensusClient(c.bundle.log, c.bundle.ConsensusURL)
+	client := consensus.NewConsensusClient(c.log, c.bundle.ConsensusURL)
 	if err := client.Bootstrap(ctx); err != nil {
 		return nil
 	}

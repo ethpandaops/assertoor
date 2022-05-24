@@ -7,10 +7,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type SleepConfig struct {
+	Duration time.Duration `yaml:"duration"`
+}
+
 type Sleep struct {
-	bundle   *Bundle
-	duration time.Duration
-	log      logrus.FieldLogger
+	bundle *Bundle
+	config SleepConfig
+	log    logrus.FieldLogger
 }
 
 var _ Runnable = (*Sleep)(nil)
@@ -19,11 +23,17 @@ const (
 	NameSleep = "sleep"
 )
 
-func NewSleep(ctx context.Context, bundle *Bundle, duration time.Duration) *Sleep {
+func NewSleep(ctx context.Context, bundle *Bundle, config SleepConfig) *Sleep {
 	return &Sleep{
-		log:      bundle.log.WithField("task", NameSleep),
-		bundle:   bundle,
-		duration: duration,
+		log:    bundle.log.WithField("task", NameSleep),
+		bundle: bundle,
+		config: config,
+	}
+}
+
+func DefaultSleepConfig() SleepConfig {
+	return SleepConfig{
+		Duration: time.Second * 5,
 	}
 }
 
@@ -44,9 +54,9 @@ func (s *Sleep) Logger() logrus.FieldLogger {
 }
 
 func (s *Sleep) IsComplete(ctx context.Context) (bool, error) {
-	s.log.Info("sleeping for ", s.duration)
+	s.log.Info("sleeping for ", s.config.Duration)
 
-	time.Sleep(s.duration)
+	time.Sleep(s.config.Duration)
 
 	return true, nil
 }

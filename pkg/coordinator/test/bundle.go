@@ -10,9 +10,8 @@ type Bundle struct {
 	Log          logrus.FieldLogger
 	ConsensusURL string
 	ExecutionURL string
-	TaskConfig   task.Config
 }
 
 func (b *Bundle) AsTaskBundle() *task.Bundle {
-	return task.NewBundle(b.Log, b.ConsensusURL, b.ExecutionURL, b.TaskConfig)
+	return task.NewBundle(b.Log, b.ConsensusURL, b.ExecutionURL)
 }

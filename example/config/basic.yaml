@@ -1,22 +1,29 @@
-test: both_synced
+test:
+  name: "basic"
+
+  tasks:
+  - name: run_command
+    config:
+      command:
+      - "echo"
+      - "hello!"
+  - name: execution_is_healthy
+  - name: consensus_is_healthy
+  - name: both_are_synced
+    config:
+      consensus:
+        percent: 100
+      execution:
+        percent: 100
+  - name: run_command
+    config:
+      command:
+      - "echo"
+      - "done!"
+    
 
 execution:
-  url: localhost:8545
+  url: http://localhost:8545
 
 consensus:
-  url: localhost:5052
-
-task_config:
-  finish_job:
-    - "sh"
-    - "-c"
-    - "echo 'Done!'"
-  kill_consensus:
-    command: 
-    - "pkill"
-    - "prysm"
-  
-  kill_execution:
-    command:
-    - "pkill"
-    - "geth"
+  url: http://localhost:5052

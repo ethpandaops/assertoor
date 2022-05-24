@@ -7,10 +7,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type BothAreSyncedConfig struct {
+	ConsensusIsSyncedConfig ConsensusIsSyncedConfig `yaml:"consensus"`
+	ExecutionIsSyncedConfig ExecutionIsSyncedConfig `yaml:"execution"`
+}
+
 type BothAreSynced struct {
 	log       logrus.FieldLogger
 	execution *ExecutionIsSynced
 	consensus *ConsensusIsSynced
+	config    BothAreSyncedConfig
 }
 
 var _ Runnable = (*BothAreSynced)(nil)
@@ -19,14 +25,22 @@ const (
 	NameBothAreSynced = "both_are_synced"
 )
 
-func NewBothAreSynced(ctx context.Context, bundle *Bundle) *BothAreSynced {
-	consensus := NewConsensusIsSynced(ctx, bundle)
-	execution := NewExecutionIsSynced(ctx, bundle)
+func NewBothAreSynced(ctx context.Context, bundle *Bundle, config BothAreSyncedConfig) *BothAreSynced {
+	consensus := NewConsensusIsSynced(ctx, bundle, config.ConsensusIsSyncedConfig)
+	execution := NewExecutionIsSynced(ctx, bundle, config.ExecutionIsSyncedConfig)
 
 	return &BothAreSynced{
 		log:       bundle.log.WithField("task", NameBothAreSynced),
 		consensus: consensus,
 		execution: execution,
+		config:    config,
+	}
+}
+
+func DefaultBothAreSyncedConfig() BothAreSyncedConfig {
+	return BothAreSyncedConfig{
+		ConsensusIsSyncedConfig: DefaultConsensusIsSyncedConfig(),
+		ExecutionIsSyncedConfig: DefaultExecutionIsSyncedConfig(),
 	}
 }
 

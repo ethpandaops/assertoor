@@ -8,9 +8,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type RunCommandConfig struct {
+	Command []string `yaml:"command"`
+}
+
 type RunCommand struct {
 	bundle *Bundle
-	cmd    []string
+	config RunCommandConfig
 	log    logrus.FieldLogger
 }
 
@@ -20,11 +24,17 @@ const (
 	NameRunCommand = "run_command"
 )
 
-func NewRunCommand(ctx context.Context, bundle *Bundle, cmd ...string) *RunCommand {
+func NewRunCommand(ctx context.Context, bundle *Bundle, config RunCommandConfig) *RunCommand {
 	return &RunCommand{
 		bundle: bundle,
-		cmd:    cmd,
+		config: config,
 		log:    bundle.log.WithField("task", NameRunCommand),
+	}
+}
+
+func DefaultRunCommandConfig() RunCommandConfig {
+	return RunCommandConfig{
+		Command: []string{},
 	}
 }
 
@@ -37,11 +47,15 @@ func (b *RunCommand) PollingInterval() time.Duration {
 }
 
 func (b *RunCommand) Start(ctx context.Context) error {
-	com := b.cmd[0]
+	if len(b.config.Command) == 0 {
+		return nil
+	}
+
+	com := b.config.Command[0]
 	args := []string{}
 
-	if len(b.cmd) > 1 {
-		args = b.cmd[1:]
+	if len(b.config.Command) > 1 {
+		args = b.config.Command[1:]
 	}
 
 	b.Logger().WithField("cmd", com).WithField("args", args).Info("running command")

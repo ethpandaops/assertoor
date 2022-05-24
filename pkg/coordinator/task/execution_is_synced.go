@@ -8,10 +8,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type ExecutionIsSyncedConfig struct {
+	Percent                 float64 `yaml:"percent"`
+	WaitForChainProgression bool    `yaml:"wait_for_chain_progression"`
+	MinBlockHeight          int     `yaml:"min_block_height"`
+}
+
 type ExecutionIsSynced struct {
 	bundle *Bundle
 	client *execution.Client
 	log    logrus.FieldLogger
+	config ExecutionIsSyncedConfig
 }
 
 var _ Runnable = (*ExecutionIsSynced)(nil)
@@ -20,12 +27,19 @@ const (
 	NameExecutionIsSynced = "execution_is_synced"
 )
 
-func NewExecutionIsSynced(ctx context.Context, bundle *Bundle) *ExecutionIsSynced {
-	bundle.log = bundle.log.WithField("task", NameExecutionIsSynced)
-
+func NewExecutionIsSynced(ctx context.Context, bundle *Bundle, config ExecutionIsSyncedConfig) *ExecutionIsSynced {
 	return &ExecutionIsSynced{
 		bundle: bundle,
 		client: bundle.GetExecutionClient(ctx),
+		log:    bundle.log.WithField("task", NameExecutionIsSynced),
+	}
+}
+
+func DefaultExecutionIsSyncedConfig() ExecutionIsSyncedConfig {
+	return ExecutionIsSyncedConfig{
+		Percent:                 100,
+		WaitForChainProgression: true,
+		MinBlockHeight:          10,
 	}
 }
 
@@ -53,12 +67,12 @@ func (c *ExecutionIsSynced) IsComplete(ctx context.Context) (bool, error) {
 
 	c.log.WithField("percent", status.Percent()).Info("Sync status")
 
-	if status.IsSyncing {
+	if status.Percent() <= c.config.Percent {
 		return false, nil
 	}
 
-	if status.Percent() != 100 {
-		return false, nil
+	if !c.config.WaitForChainProgression {
+		return true, nil
 	}
 
 	// Double check we've got some blocks just in case the node has only just booted up
@@ -68,7 +82,7 @@ func (c *ExecutionIsSynced) IsComplete(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 
-	if blockNumber < 5 {
+	if blockNumber < uint64(c.config.MinBlockHeight) {
 		return false, nil
 	}
 

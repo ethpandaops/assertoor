@@ -8,10 +8,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type ConsensusIsHealthyConfig struct {
+}
+
 type ConsensusIsHealthy struct {
 	bundle *Bundle
 	log    logrus.FieldLogger
 	client *consensus.Client
+	config ConsensusIsHealthyConfig
 }
 
 var _ Runnable = (*ConsensusIsHealthy)(nil)
@@ -20,11 +24,16 @@ const (
 	NameConsensusIsHealthy = "consensus_is_healthy"
 )
 
-func NewConsensusIsHealthy(ctx context.Context, bundle *Bundle) *ConsensusIsHealthy {
+func NewConsensusIsHealthy(ctx context.Context, bundle *Bundle, config ConsensusIsHealthyConfig) *ConsensusIsHealthy {
 	return &ConsensusIsHealthy{
 		bundle: bundle,
 		log:    bundle.log.WithField("task", NameConsensusIsHealthy),
+		config: config,
 	}
+}
+
+func DefaultConsensusIsHealthyConfig() ConsensusIsHealthyConfig {
+	return ConsensusIsHealthyConfig{}
 }
 
 func (c *ConsensusIsHealthy) Name() string {

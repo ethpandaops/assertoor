@@ -8,10 +8,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type ExecutionIsHealthyConfig struct {
+}
+
 type ExecutionIsHealthy struct {
 	bundle *Bundle
 	client *execution.Client
 	log    logrus.FieldLogger
+	config ExecutionIsHealthyConfig
 }
 
 var _ Runnable = (*ExecutionIsHealthy)(nil)
@@ -20,12 +24,17 @@ const (
 	NameExecutionIsHealthy = "execution_is_healthy"
 )
 
-func NewExecutionIsHealthy(ctx context.Context, bundle *Bundle) *ExecutionIsHealthy {
+func NewExecutionIsHealthy(ctx context.Context, bundle *Bundle, config ExecutionIsHealthyConfig) *ExecutionIsHealthy {
 	return &ExecutionIsHealthy{
 		bundle: bundle,
 		client: bundle.GetExecutionClient(ctx),
 		log:    bundle.Logger().WithField("task", NameExecutionIsHealthy),
+		config: config,
 	}
+}
+
+func DefaultExecutionIsHealthyConfig() ExecutionIsHealthyConfig {
+	return ExecutionIsHealthyConfig{}
 }
 
 func (c *ExecutionIsHealthy) Name() string {
