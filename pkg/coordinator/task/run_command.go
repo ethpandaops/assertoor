@@ -42,8 +42,8 @@ func (b *RunCommand) Name() string {
 	return NameRunCommand
 }
 
-func (c *RunCommand) Config() interface{} {
-	return c.config
+func (b *RunCommand) Config() interface{} {
+	return b.config
 }
 
 func (b *RunCommand) PollingInterval() time.Duration {

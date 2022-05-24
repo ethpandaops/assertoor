@@ -44,8 +44,8 @@ func DefaultBothAreSyncedConfig() BothAreSyncedConfig {
 	}
 }
 
-func (c *BothAreSynced) Config() interface{} {
-	return c.config
+func (b *BothAreSynced) Config() interface{} {
+	return b.config
 }
 
 func (b *BothAreSynced) Name() string {
