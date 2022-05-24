@@ -9,8 +9,9 @@ import (
 )
 
 type ConsensusIsSynced struct {
-	bundle Bundle
+	bundle *Bundle
 	client *consensus.Client
+	log    logrus.FieldLogger
 }
 
 var _ Runnable = (*ConsensusIsSynced)(nil)
@@ -19,12 +20,10 @@ const (
 	NameConsensusIsSynced = "consensus_is_synced"
 )
 
-func NewConsensusIsSynced(ctx context.Context, bundle Bundle) *ConsensusIsSynced {
-	bundle.log = bundle.log.WithField("task", NameConsensusIsSynced)
-
+func NewConsensusIsSynced(ctx context.Context, bundle *Bundle) *ConsensusIsSynced {
 	return &ConsensusIsSynced{
 		bundle: bundle,
-		client: bundle.GetConsensusClient(ctx),
+		log:    bundle.Logger().WithField("task", NameConsensusIsSynced),
 	}
 }
 
@@ -37,11 +36,13 @@ func (c *ConsensusIsSynced) PollingInterval() time.Duration {
 }
 
 func (c *ConsensusIsSynced) Start(ctx context.Context) error {
+	c.client = c.bundle.GetConsensusClient(ctx)
+
 	return nil
 }
 
 func (c *ConsensusIsSynced) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *ConsensusIsSynced) IsComplete(ctx context.Context) (bool, error) {
@@ -50,7 +51,7 @@ func (c *ConsensusIsSynced) IsComplete(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	c.bundle.log.WithField("percent", status.Percent()).Info("Sync status")
+	c.log.WithField("percent", status.Percent()).Info("Sync status")
 
 	if status.IsSyncing {
 		return false, nil

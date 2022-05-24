@@ -9,8 +9,9 @@ import (
 )
 
 type ExecutionIsSynced struct {
-	bundle Bundle
+	bundle *Bundle
 	client *execution.Client
+	log    logrus.FieldLogger
 }
 
 var _ Runnable = (*ExecutionIsSynced)(nil)
@@ -19,7 +20,7 @@ const (
 	NameExecutionIsSynced = "execution_is_synced"
 )
 
-func NewExecutionIsSynced(ctx context.Context, bundle Bundle) *ExecutionIsSynced {
+func NewExecutionIsSynced(ctx context.Context, bundle *Bundle) *ExecutionIsSynced {
 	bundle.log = bundle.log.WithField("task", NameExecutionIsSynced)
 
 	return &ExecutionIsSynced{
@@ -41,7 +42,7 @@ func (c *ExecutionIsSynced) Start(ctx context.Context) error {
 }
 
 func (c *ExecutionIsSynced) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *ExecutionIsSynced) IsComplete(ctx context.Context) (bool, error) {
@@ -50,7 +51,7 @@ func (c *ExecutionIsSynced) IsComplete(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	c.bundle.log.WithField("percent", status.Percent()).Info("Sync status")
+	c.log.WithField("percent", status.Percent()).Info("Sync status")
 
 	if status.IsSyncing {
 		return false, nil

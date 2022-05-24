@@ -1,4 +1,4 @@
-package task //nolint:dupl // false positive
+package task
 
 import (
 	"context"
@@ -9,7 +9,8 @@ import (
 )
 
 type ConsensusIsHealthy struct {
-	bundle Bundle
+	bundle *Bundle
+	log    logrus.FieldLogger
 	client *consensus.Client
 }
 
@@ -19,12 +20,10 @@ const (
 	NameConsensusIsHealthy = "consensus_is_healthy"
 )
 
-func NewConsensusIsHealthy(ctx context.Context, bundle Bundle) *ConsensusIsHealthy {
-	bundle.log = bundle.log.WithField("task", NameConsensusIsHealthy)
-
+func NewConsensusIsHealthy(ctx context.Context, bundle *Bundle) *ConsensusIsHealthy {
 	return &ConsensusIsHealthy{
 		bundle: bundle,
-		client: bundle.GetConsensusClient(ctx),
+		log:    bundle.log.WithField("task", NameConsensusIsHealthy),
 	}
 }
 
@@ -33,15 +32,17 @@ func (c *ConsensusIsHealthy) Name() string {
 }
 
 func (c *ConsensusIsHealthy) PollingInterval() time.Duration {
-	return time.Second * 5
+	return time.Second * 1
 }
 
 func (c *ConsensusIsHealthy) Start(ctx context.Context) error {
+	c.client = c.bundle.GetConsensusClient(ctx)
+
 	return nil
 }
 
 func (c *ConsensusIsHealthy) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *ConsensusIsHealthy) IsComplete(ctx context.Context) (bool, error) {

@@ -8,8 +8,9 @@ import (
 )
 
 type Sleep struct {
-	bundle   Bundle
+	bundle   *Bundle
 	duration time.Duration
+	log      logrus.FieldLogger
 }
 
 var _ Runnable = (*Sleep)(nil)
@@ -18,10 +19,9 @@ const (
 	NameSleep = "sleep"
 )
 
-func NewSleep(ctx context.Context, bundle Bundle, duration time.Duration) *Sleep {
-	bundle.log = bundle.log.WithField("task", NameSleep)
-
+func NewSleep(ctx context.Context, bundle *Bundle, duration time.Duration) *Sleep {
 	return &Sleep{
+		log:      bundle.log.WithField("task", NameSleep),
 		bundle:   bundle,
 		duration: duration,
 	}
@@ -40,11 +40,11 @@ func (s *Sleep) Start(ctx context.Context) error {
 }
 
 func (s *Sleep) Logger() logrus.FieldLogger {
-	return s.bundle.Logger()
+	return s.log
 }
 
 func (s *Sleep) IsComplete(ctx context.Context) (bool, error) {
-	s.Logger().Info("sleeping for", s.duration)
+	s.log.Info("sleeping for ", s.duration)
 
 	time.Sleep(s.duration)
 

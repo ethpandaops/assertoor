@@ -14,10 +14,15 @@ var rootCmd = &cobra.Command{
 	Use:   "sync-test-coordinator",
 	Short: "Runs a configured test until completion or error",
 	Run: func(cmd *cobra.Command, args []string) {
+		config, err := coordinator.NewConfig(cfgFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		logr := logrus.New()
 		logr.SetFormatter(&logrus.JSONFormatter{})
 
-		coord := coordinator.NewCoordinator(*coordinator.DefaultConfig(), logr)
+		coord := coordinator.NewCoordinator(config, logr)
 
 		if err := coord.Run(cmd.Context()); err != nil {
 			log.Fatal(err)
@@ -26,6 +31,10 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+var (
+	cfgFile string
+)
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -33,13 +42,11 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+
+	os.Exit(0)
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ethereum-metrics-exporter.yaml)")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

@@ -9,8 +9,9 @@ import (
 )
 
 type ExecutionIsProgressing struct {
-	bundle Bundle
+	bundle *Bundle
 	client *execution.Client
+	log    logrus.FieldLogger
 
 	headBlockNumber uint64
 }
@@ -21,12 +22,11 @@ const (
 	NameExecutionIsProgressing = "execution_is_progressing"
 )
 
-func NewExecutionIsProgressing(ctx context.Context, bundle Bundle) *ExecutionIsProgressing {
-	bundle.log = bundle.log.WithField("task", NameExecutionIsProgressing)
-
+func NewExecutionIsProgressing(ctx context.Context, bundle *Bundle) *ExecutionIsProgressing {
 	return &ExecutionIsProgressing{
 		bundle: bundle,
 		client: bundle.GetExecutionClient(ctx),
+		log:    bundle.log.WithField("task", NameExecutionIsProgressing),
 
 		headBlockNumber: 0,
 	}
@@ -45,7 +45,7 @@ func (c *ExecutionIsProgressing) Start(ctx context.Context) error {
 }
 
 func (c *ExecutionIsProgressing) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *ExecutionIsProgressing) IsComplete(ctx context.Context) (bool, error) {

@@ -9,7 +9,7 @@ import (
 )
 
 type BothSynced struct {
-	bundle Bundle
+	bundle *Bundle
 	Tasks  []task.Runnable
 }
 
@@ -19,24 +19,38 @@ const (
 	NameBothSynced = "both_synced"
 )
 
-func NewBothSynced(ctx context.Context, bundle Bundle) Runnable {
+func NewBothSynced(ctx context.Context, bundle *Bundle) Runnable {
 	return &BothSynced{
 		bundle: bundle,
 		Tasks: []task.Runnable{
 			// Initialize
-			task.NewSleep(ctx, *bundle.AsTaskBundle(), time.Second*1),
+			task.NewSleep(ctx, bundle.AsTaskBundle(), time.Second*15),
 
 			// Check the clients for liveliness.
-			task.NewExecutionIsHealthy(ctx, *bundle.AsTaskBundle()),
-			task.NewConsensusIsHealthy(ctx, *bundle.AsTaskBundle()),
+			task.NewExecutionIsHealthy(ctx, bundle.AsTaskBundle()),
+			task.NewConsensusIsHealthy(ctx, bundle.AsTaskBundle()),
 
 			// Wait until synced.
-			task.NewBothAreSynced(ctx, *bundle.AsTaskBundle()),
+			task.NewBothAreSynced(ctx, bundle.AsTaskBundle()),
 
-			// Check the chains are progressing.
-			task.NewConsensusCheckpointIsProgressing(ctx, *bundle.AsTaskBundle(), consensus.Head),
-			task.NewConsensusCheckpointIsProgressing(ctx, *bundle.AsTaskBundle(), consensus.Finalized),
-			task.NewExecutionIsProgressing(ctx, *bundle.AsTaskBundle()),
+			// // Check the chains are progressing.
+			task.NewConsensusCheckpointIsProgressing(ctx, bundle.AsTaskBundle(), consensus.Head),
+			task.NewConsensusCheckpointIsProgressing(ctx, bundle.AsTaskBundle(), consensus.Finalized),
+			task.NewExecutionIsProgressing(ctx, bundle.AsTaskBundle()),
+
+			// Kill the clients.
+			task.NewKillConsensus(ctx, bundle.AsTaskBundle()),
+			task.NewKillExecution(ctx, bundle.AsTaskBundle()),
+
+			// Ensure they're dead.
+			task.NewConsensusIsUnhealthy(ctx, bundle.AsTaskBundle()),
+			task.NewExecutionIsUnhealthy(ctx, bundle.AsTaskBundle()),
+
+			// Run any cleanup.
+			task.NewFinishJob(ctx, bundle.AsTaskBundle()),
+
+			// Sleep for a little while to give time for metrics to be reported.
+			task.NewSleep(ctx, bundle.AsTaskBundle(), time.Second*30),
 		},
 	}
 }
