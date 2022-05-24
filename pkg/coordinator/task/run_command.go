@@ -11,6 +11,7 @@ import (
 type RunCommand struct {
 	bundle *Bundle
 	cmd    []string
+	log    logrus.FieldLogger
 }
 
 var _ Runnable = (*RunCommand)(nil)
@@ -20,11 +21,10 @@ const (
 )
 
 func NewRunCommand(ctx context.Context, bundle *Bundle, cmd ...string) *RunCommand {
-	bundle.log = bundle.log.WithField("task", NameRunCommand)
-
 	return &RunCommand{
 		bundle: bundle,
 		cmd:    cmd,
+		log:    bundle.log.WithField("task", NameRunCommand),
 	}
 }
 
@@ -60,7 +60,7 @@ func (b *RunCommand) Start(ctx context.Context) error {
 }
 
 func (b *RunCommand) Logger() logrus.FieldLogger {
-	return b.bundle.Logger()
+	return b.log
 }
 
 func (b *RunCommand) IsComplete(ctx context.Context) (bool, error) {

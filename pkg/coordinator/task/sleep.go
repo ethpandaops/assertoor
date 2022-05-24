@@ -10,6 +10,7 @@ import (
 type Sleep struct {
 	bundle   *Bundle
 	duration time.Duration
+	log      logrus.FieldLogger
 }
 
 var _ Runnable = (*Sleep)(nil)
@@ -40,7 +41,7 @@ func (s *Sleep) Start(ctx context.Context) error {
 }
 
 func (s *Sleep) Logger() logrus.FieldLogger {
-	return s.bundle.Logger()
+	return s.log
 }
 
 func (s *Sleep) IsComplete(ctx context.Context) (bool, error) {

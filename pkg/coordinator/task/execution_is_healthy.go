@@ -1,4 +1,4 @@
-package task //nolint:dupl // false positive
+package task
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 type ExecutionIsHealthy struct {
 	bundle *Bundle
 	client *execution.Client
+	log    logrus.FieldLogger
 }
 
 var _ Runnable = (*ExecutionIsHealthy)(nil)
@@ -20,11 +21,10 @@ const (
 )
 
 func NewExecutionIsHealthy(ctx context.Context, bundle *Bundle) *ExecutionIsHealthy {
-	bundle.log = bundle.log.WithField("task", NameExecutionIsHealthy)
-
 	return &ExecutionIsHealthy{
 		bundle: bundle,
 		client: bundle.GetExecutionClient(ctx),
+		log:    bundle.Logger().WithField("task", NameExecutionIsHealthy),
 	}
 }
 
@@ -41,7 +41,7 @@ func (c *ExecutionIsHealthy) Start(ctx context.Context) error {
 }
 
 func (c *ExecutionIsHealthy) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *ExecutionIsHealthy) IsComplete(ctx context.Context) (bool, error) {

@@ -8,7 +8,7 @@ import (
 )
 
 type BothAreSynced struct {
-	bundle    *Bundle
+	log       logrus.FieldLogger
 	execution *ExecutionIsSynced
 	consensus *ConsensusIsSynced
 }
@@ -20,13 +20,11 @@ const (
 )
 
 func NewBothAreSynced(ctx context.Context, bundle *Bundle) *BothAreSynced {
-	bundle.log = bundle.log.WithField("task", NameBothAreSynced)
-
 	consensus := NewConsensusIsSynced(ctx, bundle)
 	execution := NewExecutionIsSynced(ctx, bundle)
 
 	return &BothAreSynced{
-		bundle:    bundle,
+		log:       bundle.log.WithField("task", NameBothAreSynced),
 		consensus: consensus,
 		execution: execution,
 	}
@@ -53,7 +51,7 @@ func (b *BothAreSynced) Start(ctx context.Context) error {
 }
 
 func (b *BothAreSynced) Logger() logrus.FieldLogger {
-	return b.bundle.Logger()
+	return b.log
 }
 
 func (b *BothAreSynced) IsComplete(ctx context.Context) (bool, error) {

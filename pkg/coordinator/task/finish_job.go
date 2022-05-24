@@ -1,4 +1,4 @@
-package task //nolint:dupl // false positive
+package task
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 )
 
 type FinishJob struct {
+	log    logrus.FieldLogger
+	config FinishJobConfig
 	bundle *Bundle
 }
 
@@ -18,10 +20,9 @@ const (
 )
 
 func NewFinishJob(ctx context.Context, bundle *Bundle) *FinishJob {
-	bundle.log = bundle.log.WithField("task", NameFinishJob)
-
 	return &FinishJob{
-		bundle: bundle,
+		log:    bundle.log.WithField("task", NameFinishJob),
+		config: bundle.TaskConfig.FinishJob,
 	}
 }
 
@@ -34,8 +35,8 @@ func (c *FinishJob) PollingInterval() time.Duration {
 }
 
 func (c *FinishJob) Start(ctx context.Context) error {
-	if len(c.bundle.TaskConfig.FinishJob.Command) != 0 {
-		cmd := NewRunCommand(ctx, c.bundle, c.bundle.TaskConfig.FinishJob.Command...)
+	if len(c.config.Command) != 0 {
+		cmd := NewRunCommand(ctx, c.bundle, c.config.Command...)
 
 		if err := cmd.Start(ctx); err != nil {
 			return err
@@ -48,7 +49,7 @@ func (c *FinishJob) Start(ctx context.Context) error {
 }
 
 func (c *FinishJob) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *FinishJob) IsComplete(ctx context.Context) (bool, error) {

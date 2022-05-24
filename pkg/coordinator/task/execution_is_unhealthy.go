@@ -1,4 +1,4 @@
-package task //nolint:dupl // false positive
+package task
 
 import (
 	"context"

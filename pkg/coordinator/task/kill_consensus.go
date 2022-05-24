@@ -9,6 +9,8 @@ import (
 
 type KillConsensus struct {
 	bundle *Bundle
+	log    logrus.FieldLogger
+	config KillConsensusConfig
 }
 
 var _ Runnable = (*KillConsensus)(nil)
@@ -18,10 +20,10 @@ const (
 )
 
 func NewKillConsensus(ctx context.Context, bundle *Bundle) *KillConsensus {
-	bundle.log = bundle.log.WithField("task", NameKillConsensus)
-
 	return &KillConsensus{
 		bundle: bundle,
+		log:    bundle.log.WithField("task", NameKillConsensus),
+		config: bundle.TaskConfig.KillConsensus,
 	}
 }
 
@@ -34,8 +36,8 @@ func (c *KillConsensus) PollingInterval() time.Duration {
 }
 
 func (c *KillConsensus) Start(ctx context.Context) error {
-	if len(c.bundle.TaskConfig.KillConsensus.Command) != 0 {
-		cmd := NewRunCommand(ctx, c.bundle, c.bundle.TaskConfig.KillConsensus.Command...)
+	if len(c.config.Command) != 0 {
+		cmd := NewRunCommand(ctx, c.bundle, c.config.Command...)
 
 		if err := cmd.Start(ctx); err != nil {
 			return err
@@ -48,7 +50,7 @@ func (c *KillConsensus) Start(ctx context.Context) error {
 		cmd := NewRunCommand(ctx, c.bundle, "pkill", client)
 
 		if err := cmd.Start(ctx); err != nil {
-			c.bundle.log.WithError(err).Error("Failed to run kill consensus command")
+			c.log.WithError(err).Error("Failed to run kill consensus command")
 		}
 	}
 
@@ -56,7 +58,7 @@ func (c *KillConsensus) Start(ctx context.Context) error {
 }
 
 func (c *KillConsensus) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *KillConsensus) IsComplete(ctx context.Context) (bool, error) {

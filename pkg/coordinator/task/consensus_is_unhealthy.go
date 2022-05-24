@@ -11,6 +11,7 @@ import (
 type ConsensusIsUnhealthy struct {
 	bundle *Bundle
 	client *consensus.Client
+	log    logrus.FieldLogger
 }
 
 var _ Runnable = (*ConsensusIsUnhealthy)(nil)
@@ -20,10 +21,9 @@ const (
 )
 
 func NewConsensusIsUnhealthy(ctx context.Context, bundle *Bundle) *ConsensusIsUnhealthy {
-	bundle.log = bundle.log.WithField("task", NameConsensusIsUnhealthy)
-
 	return &ConsensusIsUnhealthy{
 		bundle: bundle,
+		log:    bundle.log.WithField("task", NameConsensusIsUnhealthy),
 	}
 }
 
@@ -45,7 +45,7 @@ func (c *ConsensusIsUnhealthy) Start(ctx context.Context) error {
 }
 
 func (c *ConsensusIsUnhealthy) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *ConsensusIsUnhealthy) IsComplete(ctx context.Context) (bool, error) {

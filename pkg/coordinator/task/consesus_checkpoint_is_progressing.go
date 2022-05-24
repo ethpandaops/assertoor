@@ -11,6 +11,7 @@ import (
 type ConsensusCheckpointIsProgressing struct {
 	bundle *Bundle
 	client *consensus.Client
+	log    logrus.FieldLogger
 
 	checkpointName consensus.CheckpointName
 	checkpoint     int64
@@ -23,10 +24,9 @@ const (
 )
 
 func NewConsensusCheckpointIsProgressing(ctx context.Context, bundle *Bundle, checkpoint consensus.CheckpointName) *ConsensusCheckpointIsProgressing {
-	bundle.log = bundle.log.WithField("task", NameConsensusCheckpointIsProgressing).WithField("checkpoint_name", checkpoint)
-
 	return &ConsensusCheckpointIsProgressing{
 		bundle: bundle,
+		log:    bundle.log.WithField("task", NameConsensusCheckpointIsProgressing).WithField("checkpoint_name", checkpoint),
 
 		checkpointName: checkpoint,
 		checkpoint:     -1,
@@ -48,7 +48,7 @@ func (c *ConsensusCheckpointIsProgressing) Start(ctx context.Context) error {
 }
 
 func (c *ConsensusCheckpointIsProgressing) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *ConsensusCheckpointIsProgressing) IsComplete(ctx context.Context) (bool, error) {
@@ -61,7 +61,7 @@ func (c *ConsensusCheckpointIsProgressing) IsComplete(ctx context.Context) (bool
 		return false, err
 	}
 
-	c.bundle.log.WithFields(logrus.Fields{
+	c.log.WithFields(logrus.Fields{
 		"checkpoint":          checkpoint,
 		"internal_checkpoint": c.checkpoint,
 		"checkpoint_name":     c.checkpointName,

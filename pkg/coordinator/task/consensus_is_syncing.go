@@ -11,6 +11,7 @@ import (
 type ConsensusIsSyncing struct {
 	bundle *Bundle
 	client *consensus.Client
+	log    logrus.FieldLogger
 }
 
 var _ Runnable = (*ConsensusIsSyncing)(nil)
@@ -20,10 +21,9 @@ const (
 )
 
 func NewConsensusIsSyncing(ctx context.Context, bundle *Bundle) *ConsensusIsSyncing {
-	bundle.log = bundle.log.WithField("task", NameConsensusIsSyncing)
-
 	return &ConsensusIsSyncing{
 		bundle: bundle,
+		log:    bundle.log.WithField("task", NameConsensusIsSyncing),
 	}
 }
 
@@ -42,7 +42,7 @@ func (c *ConsensusIsSyncing) Start(ctx context.Context) error {
 }
 
 func (c *ConsensusIsSyncing) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *ConsensusIsSyncing) IsComplete(ctx context.Context) (bool, error) {

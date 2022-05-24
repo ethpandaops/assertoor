@@ -9,6 +9,8 @@ import (
 
 type KillExecution struct {
 	bundle *Bundle
+	log    logrus.FieldLogger
+	config KillExecutionConfig
 }
 
 var _ Runnable = (*KillExecution)(nil)
@@ -18,10 +20,10 @@ const (
 )
 
 func NewKillExecution(ctx context.Context, bundle *Bundle) *KillExecution {
-	bundle.log = bundle.log.WithField("task", NameKillExecution)
-
 	return &KillExecution{
 		bundle: bundle,
+		log:    bundle.log.WithField("task", NameKillExecution),
+		config: bundle.TaskConfig.KillExecution,
 	}
 }
 
@@ -34,8 +36,8 @@ func (c *KillExecution) PollingInterval() time.Duration {
 }
 
 func (c *KillExecution) Start(ctx context.Context) error {
-	if len(c.bundle.TaskConfig.KillExecution.Command) != 0 {
-		cmd := NewRunCommand(ctx, c.bundle, c.bundle.TaskConfig.KillExecution.Command...)
+	if len(c.config.Command) != 0 {
+		cmd := NewRunCommand(ctx, c.bundle, c.config.Command...)
 
 		if err := cmd.Start(ctx); err != nil {
 			return err
@@ -48,7 +50,7 @@ func (c *KillExecution) Start(ctx context.Context) error {
 		cmd := NewRunCommand(ctx, c.bundle, "pkill", client)
 
 		if err := cmd.Start(ctx); err != nil {
-			c.bundle.log.WithError(err).Error("Failed to run kill execution command")
+			c.log.WithError(err).Error("Failed to run kill execution command")
 		}
 	}
 
@@ -56,7 +58,7 @@ func (c *KillExecution) Start(ctx context.Context) error {
 }
 
 func (c *KillExecution) Logger() logrus.FieldLogger {
-	return c.bundle.Logger()
+	return c.log
 }
 
 func (c *KillExecution) IsComplete(ctx context.Context) (bool, error) {
