@@ -25,14 +25,12 @@ func NewCoordinator(config *Config, log logrus.FieldLogger) *Coordinator {
 func (c *Coordinator) Run(ctx context.Context) error {
 	c.log.WithField("config", c.Config).Info("starting coordinator")
 
-	bundle := &test.Bundle{
-		Log:          c.log,
-		ConsensusURL: c.Config.Consensus.URL,
-		ExecutionURL: c.Config.Execution.URL,
+	testToRun, err := test.CreateTest(ctx, c.log, c.Config.Execution.URL, c.Config.Execution.URL, c.Config.Test)
+	if err != nil {
+		return err
 	}
 
-	testToRun, err := test.CreateTest(ctx, bundle, c.Config.Test)
-	if err != nil {
+	if err := testToRun.Validate(); err != nil {
 		return err
 	}
 

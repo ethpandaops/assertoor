@@ -8,6 +8,18 @@ import (
 
 	"github.com/imdario/mergo"
 	"github.com/samcm/sync-test-coordinator/pkg/coordinator/helper"
+	botharesynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/both_are_synced"
+	consensuscheckpointhasprogressed "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_checkpoint_has_progressed"
+	consensusishealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_healthy"
+	consensusissynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_synced"
+	consensusissyncing "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_syncing"
+	consensusisunhealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_unhealthy"
+	executionhasprogressed "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_has_progressed"
+	executionishealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_healthy"
+	executionissynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_synced"
+	executionisunhealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_unhealthy"
+	runcommand "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/run_command"
+	"github.com/samcm/sync-test-coordinator/pkg/coordinator/task/sleep"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,7 +27,9 @@ import (
 type Runnable interface {
 	Start(ctx context.Context) error
 	IsComplete(ctx context.Context) (bool, error)
+	ValidateConfig() error
 
+	Description() string
 	Name() string
 	Config() interface{}
 	PollingInterval() time.Duration
@@ -27,10 +41,10 @@ var (
 )
 
 //nolint:gocyclo // unavoidable
-func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, config *helper.RawMessage) (Runnable, error) {
+func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL, consensusURL, taskName string, config *helper.RawMessage) (Runnable, error) {
 	switch taskName {
-	case NameSleep:
-		conf := SleepConfig{}
+	case sleep.Name:
+		conf := sleep.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -38,15 +52,15 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultSleepConfig()
+		base := sleep.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewSleep(ctx, bundle, base), nil
-	case NameBothAreSynced:
-		conf := BothAreSyncedConfig{}
+		return sleep.NewTask(ctx, log, base), nil
+	case botharesynced.Name:
+		conf := botharesynced.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -54,15 +68,15 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultBothAreSyncedConfig()
+		base := botharesynced.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewBothAreSynced(ctx, bundle, base), nil
-	case NameConsensusIsHealthy:
-		conf := ConsensusIsHealthyConfig{}
+		return botharesynced.NewTask(ctx, log, consensusURL, executionURL, base), nil
+	case consensusishealthy.Name:
+		conf := consensusishealthy.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -70,16 +84,16 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultConsensusIsHealthyConfig()
+		base := consensusishealthy.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewConsensusIsHealthy(ctx, bundle, base), nil
+		return consensusishealthy.NewTask(ctx, log, consensusURL, base), nil
 
-	case NameConsensusIsSynced:
-		conf := ConsensusIsSyncedConfig{}
+	case consensusissynced.Name:
+		conf := consensusissynced.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -87,16 +101,16 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultConsensusIsSyncedConfig()
+		base := consensusissynced.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewConsensusIsSynced(ctx, bundle, base), nil
+		return consensusissynced.NewTask(ctx, log, consensusURL, base), nil
 
-	case NameConsensusIsSyncing:
-		conf := ConsensusIsSyncedConfig{}
+	case consensusissyncing.Name:
+		conf := consensusissyncing.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -104,16 +118,16 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultConsensusIsSyncingConfig()
+		base := consensusissyncing.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewConsensusIsSyncing(ctx, bundle, base), nil
+		return consensusissyncing.NewTask(ctx, log, consensusURL, base), nil
 
-	case NameConsensusIsUnhealthy:
-		conf := ConsensusIsUnhealthyConfig{}
+	case consensusisunhealthy.Name:
+		conf := consensusisunhealthy.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -121,16 +135,16 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultConsensusIsUnhealthyConfig()
+		base := consensusisunhealthy.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewConsensusIsUnhealthy(ctx, bundle, base), nil
+		return consensusisunhealthy.NewTask(ctx, log, consensusURL, base), nil
 
-	case NameConsensusCheckpointHasProgressed:
-		conf := ConsensusCheckpointHasProgressedConfig{}
+	case consensuscheckpointhasprogressed.Name:
+		conf := consensuscheckpointhasprogressed.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -138,16 +152,16 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultConsensusCheckpointHasProgressed()
+		base := consensuscheckpointhasprogressed.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewConsensusCheckpointHasProgressed(ctx, bundle, base), nil
+		return consensuscheckpointhasprogressed.NewTask(ctx, log, consensusURL, base), nil
 
-	case NameExecutionHasProgressed:
-		conf := ExecutionHasProgressedConfig{}
+	case executionhasprogressed.Name:
+		conf := executionhasprogressed.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -155,16 +169,16 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultExecutionHasProgressedConfig()
+		base := executionhasprogressed.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewExecutionHasProgressed(ctx, bundle, base), nil
+		return executionhasprogressed.NewTask(ctx, log, executionURL, base), nil
 
-	case NameExecutionIsHealthy:
-		conf := ExecutionIsHealthyConfig{}
+	case executionishealthy.Name:
+		conf := executionishealthy.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -172,16 +186,16 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultExecutionIsHealthyConfig()
+		base := executionishealthy.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewExecutionIsHealthy(ctx, bundle, base), nil
+		return executionishealthy.NewTask(ctx, log, executionURL, base), nil
 
-	case NameExecutionIsSynced:
-		conf := ExecutionIsSyncedConfig{}
+	case executionissynced.Name:
+		conf := executionissynced.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -189,16 +203,16 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultExecutionIsSyncedConfig()
+		base := executionissynced.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewExecutionIsSynced(ctx, bundle, base), nil
+		return executionissynced.NewTask(ctx, log, executionURL, base), nil
 
-	case NameExecutionIsUnhealthy:
-		conf := ExecutionIsUnhealthyConfig{}
+	case executionisunhealthy.Name:
+		conf := executionisunhealthy.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -206,16 +220,16 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultExecutionIsUnhealthyConfig()
+		base := executionisunhealthy.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewExecutionIsUnhealthy(ctx, bundle, base), nil
+		return executionisunhealthy.NewTask(ctx, log, executionURL, base), nil
 
-	case NameRunCommand:
-		conf := RunCommandConfig{}
+	case runcommand.Name:
+		conf := runcommand.Config{}
 
 		if config != nil {
 			if err := config.Unmarshal(&conf); err != nil {
@@ -223,13 +237,13 @@ func NewRunnableByName(ctx context.Context, bundle *Bundle, taskName string, con
 			}
 		}
 
-		base := DefaultRunCommandConfig()
+		base := runcommand.DefaultConfig()
 
 		if err := mergo.Merge(&base, conf); err != nil {
 			return nil, err
 		}
 
-		return NewRunCommand(ctx, bundle, base), nil
+		return runcommand.NewTask(ctx, log, base), nil
 	}
 
 	return nil, fmt.Errorf("unknown task: %s", taskName)

@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/samcm/sync-test-coordinator/pkg/coordinator/task"
@@ -9,6 +10,7 @@ import (
 )
 
 type Runnable interface {
+	Validate() error
 	Run(ctx context.Context) error
 	Name() string
 	Percent() float64
@@ -27,21 +29,25 @@ type Test struct {
 
 var _ Runnable = (*Test)(nil)
 
-func CreateTest(ctx context.Context, bundle *Bundle, config Config) (Runnable, error) {
+func AvailableTasks() task.MapOfRunnableInfo {
+	return task.AvailableTasks()
+}
+
+func CreateTest(ctx context.Context, log logrus.FieldLogger, executionURL, consensusURL string, config Config) (Runnable, error) {
 	runnable := &Test{
 		name:      config.Name,
 		tasks:     []task.Runnable{},
-		log:       bundle.Log.WithField("test", config.Name),
+		log:       log.WithField("test", config.Name),
 		currIndex: 1,
 	}
 
 	for _, taskConfig := range config.Tasks {
-		t, err := task.NewRunnableByName(ctx, bundle.AsTaskBundle(), taskConfig.Name, taskConfig.Config)
+		t, err := task.NewRunnableByName(ctx, log, executionURL, consensusURL, taskConfig.Name, taskConfig.Config)
 		if err != nil {
 			return nil, err
 		}
 
-		bundle.Log.WithField("config", t.Config()).WithField("task", t.Name()).Info("created task")
+		log.WithField("config", t.Config()).WithField("task", t.Name()).Info("created task")
 
 		runnable.tasks = append(runnable.tasks, t)
 	}
@@ -51,6 +57,20 @@ func CreateTest(ctx context.Context, bundle *Bundle, config Config) (Runnable, e
 
 func (t *Test) Name() string {
 	return t.name
+}
+
+func (t *Test) Validate() error {
+	for _, task := range t.tasks {
+		if err := task.ValidateConfig(); err != nil {
+			return fmt.Errorf("task %s config validation failed: %s", task.Name(), err)
+		}
+	}
+
+	if len(t.tasks) == 0 {
+		return fmt.Errorf("test %s has no tasks", t.name)
+	}
+
+	return nil
 }
 
 func (t *Test) Run(ctx context.Context) error {
