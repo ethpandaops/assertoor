@@ -18,11 +18,11 @@ type Execution struct {
 
 type Config struct {
 	// Execution is the execution node to use.
-	Execution Execution `yaml:"execution"`
+	Execution Execution `yaml:"execution" json:"execution"`
 	// Consensus is the consensus node to use.
-	Consensus Consensus `yaml:"consensus"`
+	Consensus Consensus `yaml:"consensus" json:"consensus"`
 	// Test is the test configuration.
-	Test test.Config `yaml:"test"`
+	Test test.Config `yaml:"test" json:"test"`
 }
 
 // DefaultConfig represents a sane-default configuration.

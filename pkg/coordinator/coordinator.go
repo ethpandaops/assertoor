@@ -25,7 +25,7 @@ func NewCoordinator(config *Config, log logrus.FieldLogger) *Coordinator {
 func (c *Coordinator) Run(ctx context.Context) error {
 	c.log.WithField("config", c.Config).Info("starting coordinator")
 
-	testToRun, err := test.CreateTest(ctx, c.log, c.Config.Execution.URL, c.Config.Execution.URL, c.Config.Test)
+	testToRun, err := test.CreateTest(ctx, c.log, c.Config.Execution.URL, c.Config.Consensus.URL, c.Config.Test)
 	if err != nil {
 		return err
 	}
