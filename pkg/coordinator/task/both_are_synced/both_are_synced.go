@@ -79,9 +79,22 @@ func (t *Task) ValidateConfig() error {
 }
 
 func (t *Task) IsComplete(ctx context.Context) (bool, error) {
-	execution, _ := t.execution.IsComplete(ctx)
+	execution, err := t.execution.IsComplete(ctx)
+	if err != nil {
+		t.log.WithError(err).Error("failed to check execution client")
+	}
 
-	consensus, _ := t.consensus.IsComplete(ctx)
+	consensus, err := t.consensus.IsComplete(ctx)
+	if err != nil {
+		t.log.WithError(err).Error("failed to check consensus client")
+	}
+
+	t.log.WithFields(
+		logrus.Fields{
+			"execution": execution,
+			"consensus": consensus,
+		},
+	).Info("checked both clients")
 
 	if !consensus || !execution {
 		return false, nil

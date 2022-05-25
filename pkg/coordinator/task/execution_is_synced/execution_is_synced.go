@@ -69,7 +69,7 @@ func (t *Task) IsComplete(ctx context.Context) (bool, error) {
 
 	t.log.WithField("percent", status.Percent()).Info("Sync status")
 
-	if status.Percent() <= t.config.Percent {
+	if status.Percent() < t.config.Percent {
 		return false, nil
 	}
 
@@ -77,12 +77,16 @@ func (t *Task) IsComplete(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 
+	t.log.Info("Waiting for chain progression")
+
 	// Double check we've got some blocks just in case the node has only just booted up
 	// and is still searching for peers that know the canonical chain.
 	blockNumber, err := t.client.EthClient().BlockNumber(ctx)
 	if err != nil {
 		return false, nil
 	}
+
+	t.log.WithField("block_number", blockNumber).WithField("required_height", t.config.MinBlockHeight).Info("sync status block number")
 
 	if blockNumber < uint64(t.config.MinBlockHeight) {
 		return false, nil

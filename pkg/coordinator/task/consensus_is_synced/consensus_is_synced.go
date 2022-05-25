@@ -78,12 +78,17 @@ func (t *Task) IsComplete(ctx context.Context) (bool, error) {
 
 	t.log.WithField("percent", status.Percent()).Info("Sync status")
 
-	if status.Percent() >= t.config.Percent {
-		return true, nil
+	if status.Percent() < t.config.Percent {
+		return false, nil
 	}
 
 	if !t.config.WaitForChainProgression {
 		return true, nil
+	}
+
+	_, err = t.client.GetSpec(ctx)
+	if err != nil {
+		return false, err
 	}
 
 	// Check that our head slot is greater than the min slot height just to be sure.
@@ -92,6 +97,8 @@ func (t *Task) IsComplete(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
+	t.log.WithField("current_slot", checkpoint.Slot).WithField("min_slot_height", t.config.MinSlotHeight).Info("waiting for chain progression")
 
 	return int(checkpoint.Slot) > t.config.MinSlotHeight, nil
 }

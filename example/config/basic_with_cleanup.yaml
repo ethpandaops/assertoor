@@ -1,0 +1,27 @@
+consensus:
+  url: http://localhost:5052
+execution:
+  url: http://localhost:8545
+test:
+  name: basic
+  tasks:
+  - name: execution_is_healthy
+  - name: consensus_is_healthy
+  - config:
+      consensus:
+        percent: 100
+      execution:
+        percent: 100
+    name: both_are_synced
+  - config:
+      command:
+      - sh
+      - -c
+      - pkill $CONSENSUS_CLIENT_NAME
+    name: run_command
+  - config:
+      command:
+      - sh
+      - -c
+      - pkill $EXECUTION_CLIENT_NAME
+    name: run_command
