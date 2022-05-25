@@ -3,7 +3,7 @@ package coordinator
 import (
 	"os"
 
-	"github.com/samcm/sync-test-coordinator/pkg/coordinator/task"
+	"github.com/samcm/sync-test-coordinator/pkg/coordinator/test"
 	"gopkg.in/yaml.v2"
 )
 
@@ -17,27 +17,24 @@ type Execution struct {
 }
 
 type Config struct {
-	// Test is the name of the test to run.
-	Test string
 	// Execution is the execution node to use.
 	Execution Execution `yaml:"execution"`
 	// Consensus is the consensus node to use.
 	Consensus Consensus `yaml:"consensus"`
-	// Tasks drives the configuration for the individual tasks.
-	TaskConfig task.Config `yaml:"task_config"`
+	// Test is the test configuration.
+	Test test.Config `yaml:"test"`
 }
 
 // DefaultConfig represents a sane-default configuration.
 func DefaultConfig() *Config {
 	return &Config{
-		Test: "both_synced",
+		Test: test.BasicSynced(),
 		Execution: Execution{
 			URL: "http://localhost:8545",
 		},
 		Consensus: Consensus{
 			URL: "http://localhost:5052",
 		},
-		TaskConfig: task.DefaultConfig(),
 	}
 }
 

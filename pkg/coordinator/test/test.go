@@ -2,7 +2,7 @@ package test
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/samcm/sync-test-coordinator/pkg/coordinator/task"
@@ -10,43 +10,107 @@ import (
 )
 
 type Runnable interface {
-	Init(ctx context.Context) error
+	Validate() error
 	Run(ctx context.Context) error
-
 	Name() string
+	Percent() float64
+	Tasks() []task.Runnable
+	ActiveTask() task.Runnable
 }
 
-var (
-	ErrTestNotFound = errors.New("test not found")
-)
+type Test struct {
+	name  string
+	tasks []task.Runnable
+	log   logrus.FieldLogger
 
-func NewTestByName(ctx context.Context, name string, bundle *Bundle) (Runnable, error) {
-	bundle.Log = bundle.Log.WithField("test", name)
+	activeTask task.Runnable
+	currIndex  int
+}
 
-	switch name {
-	case NameBothSynced:
-		return NewBothSynced(ctx, bundle), nil
-	default:
-		return nil, ErrTestNotFound
+var _ Runnable = (*Test)(nil)
+
+func AvailableTasks() task.MapOfRunnableInfo {
+	return task.AvailableTasks()
+}
+
+func CreateTest(ctx context.Context, log logrus.FieldLogger, executionURL, consensusURL string, config Config) (Runnable, error) {
+	runnable := &Test{
+		name:      config.Name,
+		tasks:     []task.Runnable{},
+		log:       log.WithField("test", config.Name),
+		currIndex: 1,
 	}
+
+	for _, taskConfig := range config.Tasks {
+		t, err := task.NewRunnableByName(ctx, log, executionURL, consensusURL, taskConfig.Name, taskConfig.Config)
+		if err != nil {
+			return nil, err
+		}
+
+		log.WithField("config", t.Config()).WithField("task", t.Name()).Info("created task")
+
+		runnable.tasks = append(runnable.tasks, t)
+	}
+
+	return runnable, nil
 }
 
-func RunUntilCompletionOrError(ctx context.Context, test Runnable) error {
-	if err := test.Init(ctx); err != nil {
+func (t *Test) Name() string {
+	return t.name
+}
+
+func (t *Test) Validate() error {
+	for _, task := range t.tasks {
+		if err := task.ValidateConfig(); err != nil {
+			return fmt.Errorf("task %s config validation failed: %s", task.Name(), err)
+		}
+	}
+
+	if len(t.tasks) == 0 {
+		return fmt.Errorf("test %s has no tasks", t.name)
+	}
+
+	return nil
+}
+
+func (t *Test) Run(ctx context.Context) error {
+	for _, task := range t.tasks {
+		t.log.WithField("task", task.Name()).Info("starting task")
+
+		t.activeTask = task
+
+		if err := t.runTask(ctx, task); err != nil {
+			return err
+		}
+
+		t.currIndex++
+
+		t.log.WithField("task", task.Name()).Info("task completed!")
+	}
+
+	t.log.Info("test completed!")
+
+	return nil
+}
+
+func (t *Test) Percent() float64 {
+	return float64(t.currIndex) / float64(len(t.tasks))
+}
+
+func (t *Test) Tasks() []task.Runnable {
+	return t.tasks
+}
+
+func (t *Test) ActiveTask() task.Runnable {
+	return t.activeTask
+}
+
+func (t *Test) runTask(ctx context.Context, ta task.Runnable) error {
+	if err := ta.Start(ctx); err != nil {
 		return err
 	}
 
-	return test.Run(ctx)
-}
-
-func RunTaskUntilCompletionOrError(ctx context.Context, log logrus.FieldLogger, runnable task.Runnable) error {
-	log = log.WithField("task", runnable.Name())
-
-	if err := runnable.Start(ctx); err != nil {
-		return err
-	}
-
-	if complete := tickTask(ctx, log, runnable); complete {
+	if complete := t.tickTask(ctx, ta); complete {
 		return nil
 	}
 
@@ -54,29 +118,35 @@ func RunTaskUntilCompletionOrError(ctx context.Context, log logrus.FieldLogger, 
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-time.After(runnable.PollingInterval()):
-			if complete := tickTask(ctx, log, runnable); complete {
+		case <-time.After(ta.PollingInterval()):
+			if complete := t.tickTask(ctx, ta); complete {
 				return nil
 			}
 		}
 	}
 }
 
-func tickTask(ctx context.Context, log logrus.FieldLogger, runnable task.Runnable) bool {
+func (t *Test) tickTask(ctx context.Context, ta task.Runnable) bool {
+	log := t.log.WithField("task", ta.Name())
+
 	log.Info("checking task for completion")
 
-	complete, err := runnable.IsComplete(ctx)
+	complete, err := ta.IsComplete(ctx)
 
 	log.WithFields(logrus.Fields{
 		"complete": complete,
 		"err":      err,
 	}).Info("task status check")
 
-	if err != nil || !complete {
+	if err != nil {
 		return false
 	}
 
-	log.Info("task is complete")
+	if !complete {
+		return false
+	}
+
+	t.log.Info("task is complete")
 
 	return true
 }
