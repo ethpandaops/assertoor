@@ -54,7 +54,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := sleep.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -70,7 +70,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := botharesynced.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -86,7 +86,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := consensusishealthy.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -103,7 +103,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := consensusissynced.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -120,7 +120,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := consensusissyncing.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -137,7 +137,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := consensusisunhealthy.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -154,7 +154,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := consensuscheckpointhasprogressed.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -171,7 +171,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := executionhasprogressed.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -188,7 +188,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := executionishealthy.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -205,7 +205,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := executionissynced.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -222,7 +222,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := executionisunhealthy.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 
@@ -239,7 +239,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 
 		base := runcommand.DefaultConfig()
 
-		if err := mergo.Merge(&base, conf); err != nil {
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
 			return nil, err
 		}
 

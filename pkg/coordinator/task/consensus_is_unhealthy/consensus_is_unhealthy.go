@@ -72,7 +72,7 @@ func (t *Task) IsComplete(ctx context.Context) (bool, error) {
 
 	_, err := t.client.IsHealthy(ctx)
 	if err != nil {
-		return true, err
+		return true, nil
 	}
 
 	return false, nil
