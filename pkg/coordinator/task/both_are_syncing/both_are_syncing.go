@@ -4,27 +4,27 @@ import (
 	"context"
 	"time"
 
-	consensusissynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_synced"
-	executionissynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_synced"
+	consensusissyncing "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_syncing"
+	executionissyncing "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_syncing"
 	"github.com/sirupsen/logrus"
 )
 
 type Task struct {
 	log       logrus.FieldLogger
-	execution *executionissynced.Task
-	consensus *consensusissynced.Task
+	execution *executionissyncing.Task
+	consensus *consensusissyncing.Task
 	config    Config
 }
 
 const (
-	Name        = "both_are_synced"
-	Description = "Waits until both consensus and execution clients are considered syncing."
+	Name        = "both_are_syncing"
+	Description = "Waits until both consensus and execution clients are considered synced."
 )
 
 // NewTask returns a new BothAreSynced task.
 func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL, executionURL string, config Config) *Task {
-	consensus := consensusissynced.NewTask(ctx, log, consensusURL, config.ConsensusIsSyncedConfig)
-	execution := executionissynced.NewTask(ctx, log, executionURL, config.ExecutionIsSyncedConfig)
+	consensus := consensusissyncing.NewTask(ctx, log, consensusURL, config.ConsensusissyncingConfig)
+	execution := executionissyncing.NewTask(ctx, log, executionURL, config.ExecutionissyncingConfig)
 
 	return &Task{
 		log:       log.WithField("task", Name),
