@@ -23,7 +23,7 @@ func (c *Config) Validate() error {
 func DefaultConfig() Config {
 	return Config{
 		Percent:                 100,
-		WaitForChainProgression: true,
+		WaitForChainProgression: false,
 		MinBlockHeight:          10,
 	}
 }

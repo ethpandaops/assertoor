@@ -59,7 +59,7 @@ func (t *Task) Logger() logrus.FieldLogger {
 func (t *Task) IsComplete(ctx context.Context) (bool, error) {
 	t.log.Info("sleeping for ", t.config.Duration)
 
-	time.Sleep(t.config.Duration)
+	time.Sleep(t.config.Duration.Duration)
 
 	return true, nil
 }

@@ -47,7 +47,7 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 }
 
 func (c *Client) IsHealthy(ctx context.Context) (bool, error) {
-	_, err := c.SyncStatus(ctx)
+	_, err := c.ethClient.SyncProgress(ctx)
 	if err != nil {
 		return false, err
 	}

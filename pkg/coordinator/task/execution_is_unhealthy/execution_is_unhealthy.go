@@ -60,10 +60,10 @@ func (t *Task) Logger() logrus.FieldLogger {
 }
 
 func (t *Task) IsComplete(ctx context.Context) (bool, error) {
-	healthy, err := t.client.IsHealthy(ctx)
+	_, err := t.client.IsHealthy(ctx)
 	if err != nil {
-		return false, err
+		return true, nil
 	}
 
-	return healthy, nil
+	return false, nil
 }

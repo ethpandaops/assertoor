@@ -61,13 +61,18 @@ func (t *Task) Start(ctx context.Context) error {
 		args = t.config.Command[1:]
 	}
 
-	t.Logger().WithField("cmd", com).WithField("args", args).Info("running command")
+	t.Logger().WithField("cmd", com).WithField("args", args).WithField("allowed_to_failed", t.config.AllowedToFail).Info("running command")
 
 	command := exec.CommandContext(ctx, com, args...)
 
 	stdOut, err := command.CombinedOutput()
 	if err != nil {
 		t.Logger().WithField("stdout", string(stdOut)).WithError(err).Error("failed to run command")
+
+		if t.config.AllowedToFail {
+			return nil
+		}
+
 		return err
 	}
 

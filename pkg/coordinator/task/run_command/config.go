@@ -3,12 +3,14 @@ package runcommand
 import "errors"
 
 type Config struct {
-	Command []string `yaml:"command" json:"command"`
+	AllowedToFail bool     `yaml:"allowed_to_fail" json:"allowed_to_fail"`
+	Command       []string `yaml:"command" json:"command"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Command: []string{},
+		Command:       []string{},
+		AllowedToFail: false,
 	}
 }
 
