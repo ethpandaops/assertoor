@@ -9,6 +9,7 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/samcm/sync-test-coordinator/pkg/coordinator/helper"
 	botharesynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/both_are_synced"
+	botharesyncing "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/both_are_syncing"
 	consensuscheckpointhasprogressed "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_checkpoint_has_progressed"
 	consensusishealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_healthy"
 	consensusissynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_synced"
@@ -17,6 +18,7 @@ import (
 	executionhasprogressed "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_has_progressed"
 	executionishealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_healthy"
 	executionissynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_synced"
+	executionissyncing "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_syncing"
 	executionisunhealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_unhealthy"
 	runcommand "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/run_command"
 	"github.com/samcm/sync-test-coordinator/pkg/coordinator/task/sleep"
@@ -75,6 +77,24 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 		}
 
 		return botharesynced.NewTask(ctx, log, consensusURL, executionURL, base), nil
+
+	case botharesyncing.Name:
+		conf := botharesyncing.Config{}
+
+		if config != nil {
+			if err := config.Unmarshal(&conf); err != nil {
+				return nil, err
+			}
+		}
+
+		base := botharesyncing.DefaultConfig()
+
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
+			return nil, err
+		}
+
+		return botharesyncing.NewTask(ctx, log, consensusURL, executionURL, base), nil
+
 	case consensusishealthy.Name:
 		conf := consensusishealthy.Config{}
 
@@ -210,6 +230,23 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 		}
 
 		return executionissynced.NewTask(ctx, log, executionURL, base), nil
+
+	case executionissyncing.Name:
+		conf := executionissyncing.Config{}
+
+		if config != nil {
+			if err := config.Unmarshal(&conf); err != nil {
+				return nil, err
+			}
+		}
+
+		base := executionissyncing.DefaultConfig()
+
+		if err := mergo.Merge(&base, conf, mergo.WithOverride); err != nil {
+			return nil, err
+		}
+
+		return executionissyncing.NewTask(ctx, log, executionURL, base), nil
 
 	case executionisunhealthy.Name:
 		conf := executionisunhealthy.Config{}

@@ -1,12 +1,13 @@
+execution:
+  url: http://localhost:8545
+
+consensus:
+  url: http://localhost:5052
+
 test:
   name: "basic"
 
   tasks:
-  - name: run_command
-    config:
-      command:
-      - "echo"
-      - "hello!"
   - name: execution_is_healthy
   - name: consensus_is_healthy
   - name: both_are_synced
@@ -15,14 +16,4 @@ test:
         percent: 100
       execution:
         percent: 100
-  - name: run_command
-    config:
-      command:
-      - "echo"
-      - "done!"
 
-execution:
-  url: http://localhost:8545
-
-consensus:
-  url: http://localhost:5052

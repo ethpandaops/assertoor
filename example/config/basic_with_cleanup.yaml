@@ -2,6 +2,7 @@ consensus:
   url: http://localhost:5052
 execution:
   url: http://localhost:8545
+
 test:
   name: basic
   tasks:
