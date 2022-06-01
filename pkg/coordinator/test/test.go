@@ -55,7 +55,7 @@ func CreateTest(ctx context.Context, log logrus.FieldLogger, executionURL, conse
 		}
 
 		log.WithField("config", t.Config()).WithField("task", t.Name()).Info("created task")
-		runnable.metrics.SetTaskInfo(t.Name(), "", fmt.Sprintf("%d", index))
+		runnable.metrics.SetTaskInfo(t.Name(), "", index)
 
 		runnable.tasks = append(runnable.tasks, t)
 	}

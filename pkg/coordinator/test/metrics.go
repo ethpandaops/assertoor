@@ -111,6 +111,6 @@ func (m *Metrics) SetTaskDuration(name, index string, duration float64) {
 	m.TaskDuration.WithLabelValues(m.testName, name, index).Set(duration)
 }
 
-func (m *Metrics) SetTaskInfo(name, description, index string) {
-	m.TaskInfo.WithLabelValues(m.testName, name, description, index).Set(1)
+func (m *Metrics) SetTaskInfo(name, description string, index int) {
+	m.TaskInfo.WithLabelValues(m.testName, name, description, fmt.Sprintf("%d", index)).Set(float64(index))
 }
