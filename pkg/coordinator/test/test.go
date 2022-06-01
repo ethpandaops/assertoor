@@ -25,6 +25,7 @@ type Test struct {
 
 	activeTask task.Runnable
 	currIndex  int
+	metrics    Metrics
 }
 
 var _ Runnable = (*Test)(nil)
@@ -37,17 +38,24 @@ func CreateTest(ctx context.Context, log logrus.FieldLogger, executionURL, conse
 	runnable := &Test{
 		name:      config.Name,
 		tasks:     []task.Runnable{},
-		log:       log.WithField("test", config.Name),
+		log:       log.WithField("component", "test").WithField("test", config.Name),
 		currIndex: 1,
+		metrics:   NewMetrics("sync_test_coordinator", config.Name),
 	}
 
-	for _, taskConfig := range config.Tasks {
-		t, err := task.NewRunnableByName(ctx, log, executionURL, consensusURL, taskConfig.Name, taskConfig.Config)
+	runnable.metrics.Register()
+
+	runnable.metrics.SetTestInfo(config.Name)
+	runnable.metrics.SetTotalTasks(float64(len(config.Tasks)))
+
+	for index, taskConfig := range config.Tasks {
+		t, err := task.NewRunnableByName(ctx, log.WithField("component", "task"), executionURL, consensusURL, taskConfig.Name, taskConfig.Config)
 		if err != nil {
 			return nil, err
 		}
 
 		log.WithField("config", t.Config()).WithField("task", t.Name()).Info("created task")
+		runnable.metrics.SetTaskInfo(t.Name(), "", fmt.Sprintf("%d", index))
 
 		runnable.tasks = append(runnable.tasks, t)
 	}
@@ -74,19 +82,17 @@ func (t *Test) Validate() error {
 }
 
 func (t *Test) Run(ctx context.Context) error {
-	for _, task := range t.tasks {
-		t.log.WithField("task", task.Name()).Info("starting task")
+	now := time.Now()
 
-		t.activeTask = task
+	for index, task := range t.tasks {
+		t.metrics.SetCurrentTask(task.Name(), index)
 
-		if err := t.runTask(ctx, task); err != nil {
+		if err := t.startTaskLoop(ctx, task, index); err != nil {
 			return err
 		}
-
-		t.currIndex++
-
-		t.log.WithField("task", task.Name()).Info("task completed!")
 	}
+
+	t.metrics.SetTestDuration(float64(time.Since(now).Milliseconds()))
 
 	t.log.Info("test completed!")
 
@@ -103,6 +109,28 @@ func (t *Test) Tasks() []task.Runnable {
 
 func (t *Test) ActiveTask() task.Runnable {
 	return t.activeTask
+}
+
+func (t *Test) startTaskLoop(ctx context.Context, ta task.Runnable, index int) error {
+	t.log.WithField("task", ta.Name()).Info("starting task")
+
+	now := time.Now()
+
+	defer func() {
+		t.metrics.SetTaskDuration(ta.Name(), fmt.Sprintf("%d", index), float64(time.Since(now).Milliseconds()))
+	}()
+
+	t.activeTask = ta
+
+	if err := t.runTask(ctx, ta); err != nil {
+		return err
+	}
+
+	t.currIndex++
+
+	t.log.WithField("task", ta.Name()).Info("task completed!")
+
+	return nil
 }
 
 func (t *Test) runTask(ctx context.Context, ta task.Runnable) error {
