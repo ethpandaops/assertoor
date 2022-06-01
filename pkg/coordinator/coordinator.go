@@ -47,6 +47,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 
 	c.log.Info(fmt.Sprintf("starting test '%s' which contains %v tasks", testToRun.Name(), len(testToRun.Tasks())))
 
+	//nolint:errcheck // ignore
 	go c.startMetrics()
 
 	if err := testToRun.Run(ctx); err != nil {
