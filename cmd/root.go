@@ -20,9 +20,15 @@ var rootCmd = &cobra.Command{
 		}
 
 		logr := logrus.New()
-		logr.SetFormatter(&logrus.JSONFormatter{})
+		if logFormat == "json" {
+			logr.SetFormatter(&logrus.JSONFormatter{})
+			logr.Info("Log format set to json")
+		} else if logFormat == "text" {
+			logr.SetFormatter(&logrus.TextFormatter{})
+			logr.Info("Log format set to text")
+		}
 
-		coord := coordinator.NewCoordinator(config, logr)
+		coord := coordinator.NewCoordinator(config, logr, metricsPort, lameDuckSeconds)
 
 		if err := coord.Run(cmd.Context()); err != nil {
 			log.Fatal(err)
@@ -32,7 +38,10 @@ var rootCmd = &cobra.Command{
 }
 
 var (
-	cfgFile string
+	cfgFile         string
+	logFormat       string
+	metricsPort     int
+	lameDuckSeconds int
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -48,5 +57,9 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ethereum-metrics-exporter.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "log-format", "json", "log format (default is text). Valid values are 'text', 'json'")
+
+	rootCmd.Flags().IntVarP(&metricsPort, "metrics-port", "", 9090, "Port to serve Prometheus metrics on")
+	rootCmd.Flags().IntVarP(&lameDuckSeconds, "lame-duck-seconds", "", 30, "Lame duck period in seconds (wait for this long after completion before terminating")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
