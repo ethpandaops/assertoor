@@ -6,7 +6,7 @@ consensus:
 
 test:
   name: "basic"
-  timeout: 5s
+  timeout: 48h
   tasks:
   - name: execution_is_healthy
     title: "Execution client is healthy"
