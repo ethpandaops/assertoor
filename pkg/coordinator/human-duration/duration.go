@@ -1,4 +1,4 @@
-package human_duration
+package human
 
 import (
 	"encoding/json"
