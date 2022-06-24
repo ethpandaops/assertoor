@@ -9,9 +9,11 @@ import (
 )
 
 type Task struct {
-	client *execution.Client
-	log    logrus.FieldLogger
-	config Config
+	client  *execution.Client
+	log     logrus.FieldLogger
+	config  Config
+	timeout time.Duration
+	title   string
 
 	initialBlockHeight uint64
 }
@@ -21,11 +23,13 @@ const (
 	Description = "Finishes when the execution client has progressed the chain."
 )
 
-func NewTask(ctx context.Context, log logrus.FieldLogger, executionURL string, config Config) *Task {
+func NewTask(ctx context.Context, log logrus.FieldLogger, executionURL string, config Config, title string, timeout time.Duration) *Task {
 	return &Task{
-		client: execution.GetExecutionClient(ctx, log, executionURL),
-		log:    log.WithField("task", Name),
-		config: config,
+		client:  execution.GetExecutionClient(ctx, log, executionURL),
+		log:     log.WithField("task", Name),
+		config:  config,
+		title:   title,
+		timeout: timeout,
 
 		initialBlockHeight: 0,
 	}
@@ -37,6 +41,14 @@ func (t *Task) Name() string {
 
 func (t *Task) Description() string {
 	return Description
+}
+
+func (t *Task) Timeout() time.Duration {
+	return t.timeout
+}
+
+func (t *Task) Title() string {
+	return t.title
 }
 
 func (t *Task) Config() interface{} {

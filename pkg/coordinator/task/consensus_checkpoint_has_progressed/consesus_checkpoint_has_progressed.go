@@ -12,6 +12,8 @@ type Task struct {
 	client       *consensus.Client
 	log          logrus.FieldLogger
 	config       Config
+	title        string
+	timeout      time.Duration
 	consensusURL string
 
 	checkpoint int64
@@ -22,11 +24,13 @@ const (
 	Description = "Checks if a consensus checkpoint has progressed (i.e. if the `head` slot has advanced by 3)."
 )
 
-func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL string, config Config) *Task {
+func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL string, config Config, title string, timeout time.Duration) *Task {
 	return &Task{
 		consensusURL: consensusURL,
 		log:          log.WithField("task", Name).WithField("checkpoint_name", config.CheckpointName),
 		config:       config,
+		title:        title,
+		timeout:      timeout,
 
 		checkpoint: -1,
 	}
@@ -38,6 +42,14 @@ func (t *Task) Name() string {
 
 func (t *Task) Config() interface{} {
 	return t.config
+}
+
+func (t *Task) Timeout() time.Duration {
+	return t.timeout
+}
+
+func (t *Task) Title() string {
+	return t.title
 }
 
 func (t *Task) Description() string {

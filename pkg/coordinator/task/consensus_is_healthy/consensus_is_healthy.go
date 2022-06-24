@@ -13,6 +13,8 @@ type Task struct {
 	client       *consensus.Client
 	consensusURL string
 	config       Config
+	title        string
+	timeout      time.Duration
 }
 
 const (
@@ -20,11 +22,13 @@ const (
 	Description = "Performs a health check against the consensus client."
 )
 
-func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL string, config Config) *Task {
+func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL string, config Config, title string, timeout time.Duration) *Task {
 	return &Task{
 		consensusURL: consensusURL,
 		log:          log.WithField("task", Name),
 		config:       config,
+		title:        title,
+		timeout:      timeout,
 	}
 }
 
@@ -32,8 +36,16 @@ func (t *Task) Name() string {
 	return Name
 }
 
+func (t *Task) Timeout() time.Duration {
+	return t.timeout
+}
+
 func (t *Task) Description() string {
 	return Description
+}
+
+func (t *Task) Title() string {
+	return t.title
 }
 
 func (t *Task) Config() interface{} {

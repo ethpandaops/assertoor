@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/samcm/sync-test-coordinator/pkg/coordinator/task"
 )
 
 type Metrics struct {
@@ -76,7 +77,7 @@ func NewMetrics(namespace, testName string) Metrics {
 				Name:      "task_info",
 				Help:      "The tasks that will be run",
 			},
-			[]string{"test", "task", "description", "index"},
+			[]string{"test", "task", "description", "title", "index"},
 		),
 	}
 }
@@ -111,6 +112,6 @@ func (m *Metrics) SetTaskDuration(name, index string, duration float64) {
 	m.TaskDuration.WithLabelValues(m.testName, name, index).Set(duration)
 }
 
-func (m *Metrics) SetTaskInfo(name, description string, index int) {
-	m.TaskInfo.WithLabelValues(m.testName, name, description, fmt.Sprintf("%d", index)).Set(float64(index))
+func (m *Metrics) SetTaskInfo(ta task.Runnable, index int) {
+	m.TaskInfo.WithLabelValues(m.testName, ta.Name(), ta.Description(), ta.Title(), fmt.Sprintf("%d", index)).Set(float64(index))
 }

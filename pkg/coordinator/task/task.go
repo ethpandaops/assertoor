@@ -33,9 +33,11 @@ type Runnable interface {
 
 	Description() string
 	Name() string
+	Title() string
 	Config() interface{}
 	PollingInterval() time.Duration
 	Logger() logrus.FieldLogger
+	Timeout() time.Duration
 }
 
 var (
@@ -43,7 +45,7 @@ var (
 )
 
 //nolint:gocyclo // unavoidable
-func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL, consensusURL, taskName string, config *helper.RawMessage) (Runnable, error) {
+func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL, consensusURL, taskName string, config *helper.RawMessage, title string, timeout time.Duration) (Runnable, error) {
 	switch taskName {
 	case sleep.Name:
 		conf := sleep.Config{}
@@ -60,7 +62,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return sleep.NewTask(ctx, log, base), nil
+		return sleep.NewTask(ctx, log, base, title, timeout), nil
 	case botharesynced.Name:
 		conf := botharesynced.Config{}
 
@@ -76,7 +78,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return botharesynced.NewTask(ctx, log, consensusURL, executionURL, base), nil
+		return botharesynced.NewTask(ctx, log, consensusURL, executionURL, base, title, timeout), nil
 
 	case botharesyncing.Name:
 		conf := botharesyncing.Config{}
@@ -93,7 +95,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return botharesyncing.NewTask(ctx, log, consensusURL, executionURL, base), nil
+		return botharesyncing.NewTask(ctx, log, consensusURL, executionURL, base, title, timeout), nil
 
 	case consensusishealthy.Name:
 		conf := consensusishealthy.Config{}
@@ -110,7 +112,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return consensusishealthy.NewTask(ctx, log, consensusURL, base), nil
+		return consensusishealthy.NewTask(ctx, log, consensusURL, base, title, timeout), nil
 
 	case consensusissynced.Name:
 		conf := consensusissynced.Config{}
@@ -127,7 +129,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return consensusissynced.NewTask(ctx, log, consensusURL, base), nil
+		return consensusissynced.NewTask(ctx, log, consensusURL, base, title, timeout), nil
 
 	case consensusissyncing.Name:
 		conf := consensusissyncing.Config{}
@@ -144,7 +146,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return consensusissyncing.NewTask(ctx, log, consensusURL, base), nil
+		return consensusissyncing.NewTask(ctx, log, consensusURL, base, title, timeout), nil
 
 	case consensusisunhealthy.Name:
 		conf := consensusisunhealthy.Config{}
@@ -161,7 +163,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return consensusisunhealthy.NewTask(ctx, log, consensusURL, base), nil
+		return consensusisunhealthy.NewTask(ctx, log, consensusURL, base, title, timeout), nil
 
 	case consensuscheckpointhasprogressed.Name:
 		conf := consensuscheckpointhasprogressed.Config{}
@@ -178,7 +180,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return consensuscheckpointhasprogressed.NewTask(ctx, log, consensusURL, base), nil
+		return consensuscheckpointhasprogressed.NewTask(ctx, log, consensusURL, base, title, timeout), nil
 
 	case executionhasprogressed.Name:
 		conf := executionhasprogressed.Config{}
@@ -195,7 +197,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return executionhasprogressed.NewTask(ctx, log, executionURL, base), nil
+		return executionhasprogressed.NewTask(ctx, log, executionURL, base, title, timeout), nil
 
 	case executionishealthy.Name:
 		conf := executionishealthy.Config{}
@@ -212,7 +214,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return executionishealthy.NewTask(ctx, log, executionURL, base), nil
+		return executionishealthy.NewTask(ctx, log, executionURL, base, title, timeout), nil
 
 	case executionissynced.Name:
 		conf := executionissynced.Config{}
@@ -229,7 +231,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return executionissynced.NewTask(ctx, log, executionURL, base), nil
+		return executionissynced.NewTask(ctx, log, executionURL, base, title, timeout), nil
 
 	case executionissyncing.Name:
 		conf := executionissyncing.Config{}
@@ -246,7 +248,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return executionissyncing.NewTask(ctx, log, executionURL, base), nil
+		return executionissyncing.NewTask(ctx, log, executionURL, base, title, timeout), nil
 
 	case executionisunhealthy.Name:
 		conf := executionisunhealthy.Config{}
@@ -263,7 +265,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return executionisunhealthy.NewTask(ctx, log, executionURL, base), nil
+		return executionisunhealthy.NewTask(ctx, log, executionURL, base, title, timeout), nil
 
 	case runcommand.Name:
 		conf := runcommand.Config{}
@@ -280,7 +282,7 @@ func NewRunnableByName(ctx context.Context, log logrus.FieldLogger, executionURL
 			return nil, err
 		}
 
-		return runcommand.NewTask(ctx, log, base), nil
+		return runcommand.NewTask(ctx, log, base, title, timeout), nil
 	}
 
 	return nil, fmt.Errorf("unknown task: %s", taskName)

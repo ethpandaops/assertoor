@@ -1,13 +1,13 @@
 package sleep
 
 import (
-	"encoding/json"
 	"errors"
-	"time"
+
+	human "github.com/samcm/sync-test-coordinator/pkg/coordinator/human-duration"
 )
 
 type Config struct {
-	Duration Duration `yaml:"duration" json:"duration"`
+	Duration human.Duration `yaml:"duration" json:"duration"`
 }
 
 func DefaultConfig() Config {
@@ -20,34 +20,4 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
-}
-
-type Duration struct {
-	time.Duration
-}
-
-func (d *Duration) UnmarshalText(text []byte) error {
-	return d.Unmarshal(string(text))
-}
-
-func (d *Duration) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-
-	return d.Unmarshal(s)
-}
-
-func (d *Duration) Unmarshal(s string) (err error) {
-	d.Duration, err = time.ParseDuration(s)
-	return
-}
-
-func (d Duration) MarshalText() ([]byte, error) {
-	return []byte(d.Duration.String()), nil
-}
-
-func (d Duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Duration.String())
 }
