@@ -5,9 +5,12 @@ execution:
 
 test:
   name: basic
+  timeout: 48h
   tasks:
   - name: execution_is_healthy
+    timeout: 10m
   - name: consensus_is_healthy
+    timeout: 10m
   - config:
       consensus:
         percent: 100
