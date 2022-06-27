@@ -53,7 +53,7 @@ func NewMetrics(namespace, testName string) Metrics {
 				Name:      "current_task",
 				Help:      "The current task being executed",
 			},
-			[]string{"test", "task", "index"},
+			[]string{"test", "task", "title", "index"},
 		),
 		TotalTasks: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -69,7 +69,7 @@ func NewMetrics(namespace, testName string) Metrics {
 				Name:      "task_duration_ms",
 				Help:      "The duration of the task (in milliseconds.)",
 			},
-			[]string{"test", "task", "index"},
+			[]string{"test", "task", "title", "index"},
 		),
 		TaskInfo: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -95,9 +95,9 @@ func (m *Metrics) SetTestInfo(description string) {
 	m.TestInfo.WithLabelValues(m.testName, description).Set(1)
 }
 
-func (m *Metrics) SetCurrentTask(name string, index int) {
+func (m *Metrics) SetCurrentTask(ta task.Runnable, index int) {
 	m.CurrentTask.Reset()
-	m.CurrentTask.WithLabelValues(m.testName, name, fmt.Sprintf("%d", index)).Set(float64(index))
+	m.CurrentTask.WithLabelValues(m.testName, ta.Name(), ta.Title(), fmt.Sprintf("%d", index)).Set(float64(index))
 }
 
 func (m *Metrics) SetTotalTasks(total float64) {
@@ -108,8 +108,8 @@ func (m *Metrics) SetTestDuration(duration float64) {
 	m.TestDuration.WithLabelValues(m.testName).Set(duration)
 }
 
-func (m *Metrics) SetTaskDuration(name, index string, duration float64) {
-	m.TaskDuration.WithLabelValues(m.testName, name, index).Set(duration)
+func (m *Metrics) SetTaskDuration(ta task.Runnable, index string, duration float64) {
+	m.TaskDuration.WithLabelValues(m.testName, ta.Name(), ta.Title(), index).Set(duration)
 }
 
 func (m *Metrics) SetTaskInfo(ta task.Runnable, index int) {

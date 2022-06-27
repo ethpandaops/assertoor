@@ -143,7 +143,7 @@ func (t *Test) runCleanupTasks(ctx context.Context) {
 
 func (t *Test) runTasks(ctx context.Context) error {
 	for index, task := range t.tasks {
-		t.metrics.SetCurrentTask(task.Name(), index)
+		t.metrics.SetCurrentTask(task, index)
 
 		if err := t.startTaskLoop(ctx, task, index); err != nil {
 			return err
@@ -171,7 +171,7 @@ func (t *Test) startTaskLoop(ctx context.Context, ta task.Runnable, index int) e
 	now := time.Now()
 
 	defer func() {
-		t.metrics.SetTaskDuration(ta.Name(), fmt.Sprintf("%d", index), float64(time.Since(now).Milliseconds()))
+		t.metrics.SetTaskDuration(ta, fmt.Sprintf("%d", index), float64(time.Since(now).Milliseconds()))
 	}()
 
 	t.activeTask = ta
