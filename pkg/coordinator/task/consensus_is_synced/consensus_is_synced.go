@@ -13,6 +13,8 @@ type Task struct {
 	client       *consensus.Client
 	log          logrus.FieldLogger
 	config       Config
+	title        string
+	timeout      time.Duration
 }
 
 const (
@@ -20,11 +22,13 @@ const (
 	Description = "Waits until the consensus client considers itself synced."
 )
 
-func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL string, config Config) *Task {
+func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL string, config Config, title string, timeout time.Duration) *Task {
 	return &Task{
 		consensusURL: consensusURL,
 		log:          log.WithField("task", Name),
 		config:       config,
+		title:        title,
+		timeout:      timeout,
 	}
 }
 
@@ -38,6 +42,14 @@ func DefaultConfig() Config {
 
 func (t *Task) Name() string {
 	return Name
+}
+
+func (t *Task) Title() string {
+	return t.title
+}
+
+func (t *Task) Timeout() time.Duration {
+	return t.timeout
 }
 
 func (t *Task) Config() interface{} {

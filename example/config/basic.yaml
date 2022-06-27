@@ -6,14 +6,27 @@ consensus:
 
 test:
   name: "basic"
-
+  timeout: 48h
   tasks:
   - name: execution_is_healthy
+    title: "Execution client is healthy"
   - name: consensus_is_healthy
+    title: "Consensus client is healthy"
+
   - name: both_are_synced
+    title: "Both are synced"
     config:
       consensus:
         percent: 100
       execution:
         percent: 100
+  cleanup_tasks:
+  - name: run_command
+    title: "Kill all clients"
+    config:
+      command:
+      - sh
+      - -c
+      - pkill $CONSENSUS_CLIENT_NAME
+      allowed_to_fail: true
 

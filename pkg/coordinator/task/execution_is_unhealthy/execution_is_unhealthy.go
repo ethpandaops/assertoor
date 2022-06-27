@@ -9,9 +9,11 @@ import (
 )
 
 type Task struct {
-	client *execution.Client
-	log    logrus.FieldLogger
-	config Config
+	client  *execution.Client
+	log     logrus.FieldLogger
+	config  Config
+	title   string
+	timeout time.Duration
 }
 
 const (
@@ -19,11 +21,13 @@ const (
 	Description = "Performs a health check against the execution client. Finishes when the execution client is unhealthy."
 )
 
-func NewTask(ctx context.Context, log logrus.FieldLogger, executionURL string, config Config) *Task {
+func NewTask(ctx context.Context, log logrus.FieldLogger, executionURL string, config Config, title string, timeout time.Duration) *Task {
 	return &Task{
-		client: execution.GetExecutionClient(ctx, log, executionURL),
-		log:    log.WithField("task", Name),
-		config: config,
+		client:  execution.GetExecutionClient(ctx, log, executionURL),
+		log:     log.WithField("task", Name),
+		config:  config,
+		title:   title,
+		timeout: timeout,
 	}
 }
 
@@ -31,8 +35,16 @@ func (t *Task) Name() string {
 	return Name
 }
 
+func (t *Task) Timeout() time.Duration {
+	return t.timeout
+}
+
 func (t *Task) Description() string {
 	return Description
+}
+
+func (t *Task) Title() string {
+	return t.title
 }
 
 func (t *Task) Config() interface{} {

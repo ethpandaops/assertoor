@@ -2,6 +2,7 @@ package botharesynced
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	consensusissyncing "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_syncing"
@@ -14,6 +15,8 @@ type Task struct {
 	execution *executionissyncing.Task
 	consensus *consensusissyncing.Task
 	config    Config
+	title     string
+	timeout   time.Duration
 }
 
 const (
@@ -22,15 +25,17 @@ const (
 )
 
 // NewTask returns a new BothAreSynced task.
-func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL, executionURL string, config Config) *Task {
-	consensus := consensusissyncing.NewTask(ctx, log, consensusURL, config.ConsensusissyncingConfig)
-	execution := executionissyncing.NewTask(ctx, log, executionURL, config.ExecutionissyncingConfig)
+func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL, executionURL string, config Config, title string, timeout time.Duration) *Task {
+	consensus := consensusissyncing.NewTask(ctx, log, consensusURL, config.ConsensusissyncingConfig, fmt.Sprintf(title, "(consensus)"), timeout)
+	execution := executionissyncing.NewTask(ctx, log, executionURL, config.ExecutionissyncingConfig, fmt.Sprintf(title, "(execution)"), timeout)
 
 	return &Task{
 		log:       log.WithField("task", Name),
 		consensus: consensus,
 		execution: execution,
 		config:    config,
+		title:     title,
+		timeout:   timeout,
 	}
 }
 
@@ -40,6 +45,14 @@ func (t *Task) Config() interface{} {
 
 func (t *Task) Name() string {
 	return Name
+}
+
+func (t *Task) Timeout() time.Duration {
+	return t.timeout
+}
+
+func (t *Task) Title() string {
+	return t.title
 }
 
 func (t *Task) Description() string {

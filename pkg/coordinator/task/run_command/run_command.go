@@ -9,8 +9,10 @@ import (
 )
 
 type Task struct {
-	config Config
-	log    logrus.FieldLogger
+	config  Config
+	log     logrus.FieldLogger
+	title   string
+	timeout time.Duration
 }
 
 const (
@@ -18,10 +20,12 @@ const (
 	Description = "Runs a shell command."
 )
 
-func NewTask(ctx context.Context, log logrus.FieldLogger, config Config) *Task {
+func NewTask(ctx context.Context, log logrus.FieldLogger, config Config, title string, timeout time.Duration) *Task {
 	return &Task{
-		config: config,
-		log:    log.WithField("task", Name),
+		config:  config,
+		log:     log.WithField("task", Name),
+		title:   title,
+		timeout: timeout,
 	}
 }
 
@@ -31,6 +35,14 @@ func (t *Task) Name() string {
 
 func (t *Task) Description() string {
 	return Description
+}
+
+func (t *Task) Timeout() time.Duration {
+	return t.timeout
+}
+
+func (t *Task) Title() string {
+	return t.title
 }
 
 func (t *Task) Config() interface{} {
