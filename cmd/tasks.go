@@ -1,6 +1,5 @@
 /*
 Copyright © 2022 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
@@ -8,7 +7,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/samcm/sync-test-coordinator/pkg/coordinator/test"
+	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/test"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )

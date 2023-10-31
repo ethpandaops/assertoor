@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	consensusissynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_synced"
-	executionissynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_synced"
+	consensusissynced "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/consensus_is_synced"
+	executionissynced "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/execution_is_synced"
 	"github.com/sirupsen/logrus"
 )
 

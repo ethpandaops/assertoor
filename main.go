@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/samcm/sync-test-coordinator/cmd"
+	"github.com/ethpandaops/sync-test-coordinator/cmd"
 )
 
 func main() {

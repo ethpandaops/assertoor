@@ -1,17 +1,17 @@
 package task
 
 import (
-	botharesynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/both_are_synced"
-	consensuscheckpointhasprogressed "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_checkpoint_has_progressed"
-	consensusishealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_healthy"
-	consensusissynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_synced"
-	consensusissyncing "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_syncing"
-	consensusisunhealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_unhealthy"
-	executionhasprogressed "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_has_progressed"
-	executionishealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_healthy"
-	executionissynced "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_synced"
-	executionisunhealthy "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_unhealthy"
-	runcommand "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/run_command"
+	botharesynced "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/both_are_synced"
+	consensuscheckpointhasprogressed "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/consensus_checkpoint_has_progressed"
+	consensusishealthy "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/consensus_is_healthy"
+	consensusissynced "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/consensus_is_synced"
+	consensusissyncing "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/consensus_is_syncing"
+	consensusisunhealthy "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/consensus_is_unhealthy"
+	executionhasprogressed "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/execution_has_progressed"
+	executionishealthy "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/execution_is_healthy"
+	executionissynced "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/execution_is_synced"
+	executionisunhealthy "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/execution_is_unhealthy"
+	runcommand "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/run_command"
 )
 
 func AvailableTasks() MapOfRunnableInfo {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/samcm/sync-test-coordinator/pkg/coordinator/clients/consensus"
+	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/clients/consensus"
 	"github.com/sirupsen/logrus"
 )
 

@@ -3,7 +3,7 @@ package coordinator
 import (
 	"os"
 
-	"github.com/samcm/sync-test-coordinator/pkg/coordinator/test"
+	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/test"
 	"gopkg.in/yaml.v2"
 )
 

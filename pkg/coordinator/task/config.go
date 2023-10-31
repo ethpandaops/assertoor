@@ -1,8 +1,8 @@
 package task
 
 import (
-	"github.com/samcm/sync-test-coordinator/pkg/coordinator/helper"
-	"github.com/samcm/sync-test-coordinator/pkg/coordinator/human-duration"
+	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/helper"
+	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/human-duration"
 )
 
 type Config struct {

@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/samcm/sync-test-coordinator/pkg/coordinator"
+	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

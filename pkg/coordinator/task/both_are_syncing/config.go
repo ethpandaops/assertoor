@@ -1,8 +1,8 @@
 package botharesynced
 
 import (
-	consensusissyncing "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/consensus_is_syncing"
-	executionissyncing "github.com/samcm/sync-test-coordinator/pkg/coordinator/task/execution_is_syncing"
+	consensusissyncing "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/consensus_is_syncing"
+	executionissyncing "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task/execution_is_syncing"
 )
 
 type Config struct {

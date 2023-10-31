@@ -3,7 +3,7 @@ package sleep
 import (
 	"errors"
 
-	human "github.com/samcm/sync-test-coordinator/pkg/coordinator/human-duration"
+	human "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/human-duration"
 )
 
 type Config struct {

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/test"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/samcm/sync-test-coordinator/pkg/coordinator/test"
 	"github.com/sirupsen/logrus"
 )
 

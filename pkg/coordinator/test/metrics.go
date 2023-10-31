@@ -3,8 +3,8 @@ package test
 import (
 	"fmt"
 
+	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/samcm/sync-test-coordinator/pkg/coordinator/task"
 )
 
 type Metrics struct {

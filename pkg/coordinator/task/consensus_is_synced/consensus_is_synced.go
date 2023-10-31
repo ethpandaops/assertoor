@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
-	"github.com/samcm/sync-test-coordinator/pkg/coordinator/clients/consensus"
+	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/clients/consensus"
 	"github.com/sirupsen/logrus"
 )
 
