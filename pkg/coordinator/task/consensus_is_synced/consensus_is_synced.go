@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/samcm/sync-test-coordinator/pkg/coordinator/clients/consensus"
 	"github.com/sirupsen/logrus"
 )
@@ -98,19 +99,23 @@ func (t *Task) IsComplete(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 
-	_, err = t.client.GetSpec(ctx)
+	t.log.WithField("min_slot_height", t.config.MinSlotHeight).Info("Waiting for head slot to advance")
+
+	block, err := t.client.Node().FetchBlock(ctx, "head")
 	if err != nil {
 		return false, err
 	}
 
-	// Check that our head slot is greater than the min slot height just to be sure.
-	// Like if the node has just started up and hasn't started syncing yet.
-	checkpoint, err := t.client.GetCheckpoint(ctx, consensus.Head)
+	slot, err := block.Slot()
 	if err != nil {
 		return false, err
 	}
 
-	t.log.WithField("current_slot", checkpoint.Slot).WithField("min_slot_height", t.config.MinSlotHeight).Info("waiting for chain progression")
+	if slot > phase0.Slot(t.config.MinSlotHeight) {
+		return true, nil
+	}
 
-	return int(checkpoint.Slot) > t.config.MinSlotHeight, nil
+	t.log.WithField("slot", slot).Info("Head slot has not advanced far enough")
+
+	return false, nil
 }

@@ -36,7 +36,7 @@ func AvailableTasks() task.MapOfRunnableInfo {
 	return task.AvailableTasks()
 }
 
-func CreateTest(ctx context.Context, log logrus.FieldLogger, executionURL, consensusURL string, config Config) (Runnable, error) {
+func CreateRunnable(ctx context.Context, log logrus.FieldLogger, executionURL, consensusURL string, config Config) (Runnable, error) {
 	runnable := &Test{
 		name:      config.Name,
 		tasks:     []task.Runnable{},

@@ -3,168 +3,108 @@ package consensus
 import (
 	"context"
 	"errors"
-	"math"
+	"fmt"
+	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/beacon/pkg/beacon"
+	"github.com/ethpandaops/beacon/pkg/human"
 	"github.com/sirupsen/logrus"
-
-	eth2client "github.com/attestantio/go-eth2-client"
-	"github.com/attestantio/go-eth2-client/http"
 )
 
 // Client represents an Ethereum Consensus client.
 type Client struct {
-	url    string
-	client eth2client.Service
-	log    logrus.FieldLogger
-
-	state State
+	url  string
+	log  logrus.FieldLogger
+	node beacon.Node
 }
 
 // NewConsensusClient returns a new Client client.
 func NewConsensusClient(log logrus.FieldLogger, url string) Client {
 	return Client{
-		url:   url,
-		log:   log,
-		state: NewState(),
+		url: url,
+		log: log,
 	}
-}
-
-// State returns the state of the client
-func (c *Client) State() State {
-	return c.state
 }
 
 // Bootstrapped returns true if the client has been bootstrapped.
 func (c *Client) Bootstrapped() bool {
-	return c.client != nil
+	return c.node != nil
+}
+
+// Ready returns true if the client is ready to be used.
+func (c *Client) Ready() bool {
+	return c.Bootstrapped() && c.node.Healthy()
+}
+
+func (c *Client) Node() beacon.Node {
+	return c.node
 }
 
 // Bootstrap bootstraps the client.
-func (c *Client) Bootstrap(ctx context.Context) error {
-	client, err := http.New(ctx,
-		http.WithAddress(c.url),
-		http.WithLogLevel(zerolog.WarnLevel),
-	)
-	if err != nil {
-		return err
+func (c *Client) Bootstrap(ctx context.Context, opts ...*beacon.Options) error {
+	op := beacon.DefaultOptions().
+		DisableEmptySlotDetection().
+		DisableEmptySlotDetection()
+
+	op.HealthCheck.Interval = human.Duration{1 * time.Second}
+
+	if len(opts) > 0 {
+		op = opts[0]
 	}
 
-	c.client = client
+	node := beacon.NewNode(c.log, &beacon.Config{
+		Name: "beacon_node",
+		Addr: c.url,
+	}, "sync_test_coordinator", *op)
+
+	if err := node.Start(ctx); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (c *Client) IsHealthy(ctx context.Context) (bool, error) {
-	err := c.GetNodeVersion(ctx)
-	if err != nil {
-		c.state.Healthy = false
-
-		return false, err
-	}
-
-	c.state.Healthy = true
-
-	return true, nil
+	return c.node.Healthy(), nil
 }
 
 func (c *Client) GetSyncStatus(ctx context.Context) (*SyncStatus, error) {
-	provider, isProvider := c.client.(eth2client.NodeSyncingProvider)
-	if !isProvider {
-		return nil, errors.New("client does not implement eth2client.NodeSyncingProvider")
-	}
-
-	syncing, err := provider.NodeSyncing(ctx)
+	state, err := c.node.FetchSyncStatus(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	status := NewSyncStatus(syncing)
+	status := NewSyncStatus(state)
 
 	return &status, nil
 }
 
 func (c *Client) GetSpec(ctx context.Context) (*Spec, error) {
-	provider, isProvider := c.client.(eth2client.SpecProvider)
-	if !isProvider {
-		return nil, errors.New("client does not implement eth2client.SpecProvider")
-	}
+	return c.GetSpec(ctx)
+}
 
-	spec, err := provider.Spec(ctx)
+func (c *Client) GetCheckpoint(ctx context.Context, checkpointName CheckpointName) (*phase0.Checkpoint, error) {
+	finality, err := c.node.FetchFinality(ctx, "head")
 	if err != nil {
 		return nil, err
 	}
 
-	c.state.Spec.update(spec)
-
-	return &c.state.Spec, nil
-}
-
-func (c *Client) GetChainState(ctx context.Context) (ChainState, error) {
-	state := NewChainState()
-
-	for _, name := range CheckpointNames {
-		checkpoint, err := c.GetCheckpoint(ctx, name)
-		if err != nil {
-			c.log.WithError(err).WithField("checkpoint", checkpoint).Error("get checkpoint failed")
-
-			continue
-		}
-
-		state[name] = *checkpoint
+	if finality == nil {
+		return nil, errors.New("finality is nil")
 	}
 
-	return state, nil
-}
-
-func (c *Client) GetCheckpoint(ctx context.Context, checkpointName CheckpointName) (*Checkpoint, error) {
-	if c.state.Spec.SlotsPerEpoch == 0 {
-		return nil, errors.New("slots per epoch not set")
+	if checkpointName == Finalized {
+		return finality.Finalized, nil
 	}
 
-	provider, isProvider := c.client.(eth2client.BeaconBlockHeadersProvider)
-	if !isProvider {
-		return nil, errors.New("client does not implement eth2client.BeaconBlockHeadersProvider")
+	if checkpointName == Justified {
+		return finality.Justified, nil
 	}
 
-	block, err := provider.BeaconBlockHeader(ctx, string(checkpointName))
-	if err != nil {
-		return nil, err
-	}
-
-	if block == nil {
-		return nil, errors.New("block is nil")
-	}
-
-	if block.Header == nil {
-		return nil, errors.New("block header is nil")
-	}
-
-	if block.Header.Message == nil {
-		return nil, errors.New("block header message is nil")
-	}
-
-	checkpoint, exists := c.state.ChainState[checkpointName]
-	if !exists {
-		return nil, errors.New("checkpoint does not exist")
-	}
-
-	checkpoint.Slot = uint64(block.Header.Message.Slot)
-	checkpoint.Epoch = uint64(math.Floor(float64(uint64(block.Header.Message.Slot) / c.state.Spec.SlotsPerEpoch))) //nolint:staticcheck // false positive
-
-	return &checkpoint, nil
+	return nil, fmt.Errorf("unknown checkpoint name %s", checkpointName)
 }
 
 func (c *Client) GetNodeVersion(ctx context.Context) error {
-	provider, isProvider := c.client.(eth2client.NodeVersionProvider)
-	if !isProvider {
-		return errors.New("client does not implement eth2client.NodeVersionProvider")
-	}
-
-	_, err := provider.NodeVersion(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.GetNodeVersion(ctx)
 }

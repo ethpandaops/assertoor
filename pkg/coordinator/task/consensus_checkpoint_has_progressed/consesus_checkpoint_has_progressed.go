@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/samcm/sync-test-coordinator/pkg/coordinator/clients/consensus"
 	"github.com/sirupsen/logrus"
 )
@@ -16,12 +17,12 @@ type Task struct {
 	timeout      time.Duration
 	consensusURL string
 
-	checkpoint int64
+	checkpoint *phase0.Epoch
 }
 
 const (
 	Name        = "consensus_checkpoint_has_progressed"
-	Description = "Checks if a consensus checkpoint has progressed (i.e. if the `head` slot has advanced by 3)."
+	Description = "Checks if a consensus checkpoint has progressed (i.e. if the 'finalized' checkpoint has advanced by 2 epochs.)."
 )
 
 func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL string, config Config, title string, timeout time.Duration) *Task {
@@ -32,7 +33,7 @@ func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL string, c
 		title:        title,
 		timeout:      timeout,
 
-		checkpoint: -1,
+		checkpoint: nil,
 	}
 }
 
@@ -93,19 +94,19 @@ func (t *Task) IsComplete(ctx context.Context) (bool, error) {
 		"internal_checkpoint": t.checkpoint,
 	}).Info("checking if checkpoint has progressed")
 
-	// If the checkpoint is -1, we haven't gone through a cycle yet.
-	if t.checkpoint == -1 {
-		t.checkpoint = int64(checkpoint.Slot)
+	// If the checkpoint isn't set then this is our starting epich.
+	if t.checkpoint == nil {
+		t.checkpoint = &checkpoint.Epoch
 
 		return false, nil
 	}
 
 	// If the checkpoint hasn't changed, we're still waiting.
-	if t.checkpoint == int64(checkpoint.Slot) {
+	if t.checkpoint == &checkpoint.Epoch {
 		return false, nil
 	}
 
-	if int64(checkpoint.Slot)-t.checkpoint >= t.config.Distance {
+	if checkpoint.Epoch-*t.checkpoint >= t.config.Distance {
 		return true, nil
 	}
 

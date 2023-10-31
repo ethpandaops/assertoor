@@ -36,7 +36,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		WithField("lame_duck_seconds", c.lameDuckSeconds).
 		Info("starting coordinator")
 
-	testToRun, err := test.CreateTest(ctx, c.log, c.Config.Execution.URL, c.Config.Consensus.URL, c.Config.Test)
+	testToRun, err := test.CreateRunnable(ctx, c.log, c.Config.Execution.URL, c.Config.Consensus.URL, c.Config.Test)
 	if err != nil {
 		return err
 	}
