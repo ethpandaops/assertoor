@@ -93,6 +93,10 @@ func (t *Task) Start(ctx context.Context) error {
 	return nil
 }
 
+func (t *Task) Cleanup(ctx context.Context) error {
+	return nil
+}
+
 func (t *Task) Logger() logrus.FieldLogger {
 	return t.log
 }

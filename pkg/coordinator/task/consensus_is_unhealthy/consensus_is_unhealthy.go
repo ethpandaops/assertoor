@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/clients/consensus"
 	"github.com/sirupsen/logrus"
 )
@@ -15,6 +16,8 @@ type Task struct {
 	config       Config
 	title        string
 	timeout      time.Duration
+
+	done bool
 }
 
 const (
@@ -29,6 +32,7 @@ func NewTask(ctx context.Context, log logrus.FieldLogger, consensusURL string, c
 		config:       config,
 		title:        title,
 		timeout:      timeout,
+		done:         false,
 	}
 }
 
@@ -61,14 +65,27 @@ func (t *Task) ValidateConfig() error {
 }
 
 func (t *Task) PollingInterval() time.Duration {
-	return time.Second * 1
+	return time.Millisecond * 100
 }
 
 func (t *Task) Start(ctx context.Context) error {
 	client := consensus.NewConsensusClient(t.log, t.consensusURL)
-	if err := client.Bootstrap(ctx); err != nil {
+
+	client.Node().StartAsync(ctx)
+
+	client.Node().OnHealthCheckFailed(ctx, func(ctx context.Context, event *beacon.HealthCheckFailedEvent) error {
+		t.done = true
+
 		return nil
-	}
+	})
+
+	return nil
+}
+
+func (t *Task) Cleanup(ctx context.Context) error {
+	t.client.Node().Stop(ctx)
+
+	t.client = nil
 
 	return nil
 }
@@ -78,14 +95,5 @@ func (t *Task) Logger() logrus.FieldLogger {
 }
 
 func (t *Task) IsComplete(ctx context.Context) (bool, error) {
-	if t.client == nil {
-		return true, nil
-	}
-
-	_, err := t.client.IsHealthy(ctx)
-	if err != nil {
-		return true, nil
-	}
-
-	return false, nil
+	return t.done, nil
 }

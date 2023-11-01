@@ -1,0 +1,15 @@
+execution:
+  url: http://localhost:8545
+
+consensus:
+  url: http://localhost:5052
+
+test:
+  name: "basic"
+  timeout: 48h
+  tasks:
+  - name: consensus_is_healthy
+    title: "Consensus client is healthy"
+
+  - name: consensus_is_synced
+    title: consensus is synced

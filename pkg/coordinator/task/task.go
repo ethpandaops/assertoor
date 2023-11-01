@@ -28,6 +28,7 @@ import (
 // Runnable represents an INDIVIDUAL task to be run. These tasks should be as small as possible.
 type Runnable interface {
 	Start(ctx context.Context) error
+	Cleanup(ctx context.Context) error
 	IsComplete(ctx context.Context) (bool, error)
 	ValidateConfig() error
 

@@ -64,6 +64,14 @@ func (t *Task) PollingInterval() time.Duration {
 func (t *Task) Start(ctx context.Context) error {
 	t.client = consensus.GetConsensusClient(ctx, t.log, t.consensusURL)
 
+	return t.client.Start(ctx)
+}
+
+func (t *Task) Cleanup(ctx context.Context) error {
+	t.client.Node().Stop(ctx)
+
+	t.client = nil
+
 	return nil
 }
 

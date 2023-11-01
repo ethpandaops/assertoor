@@ -20,10 +20,27 @@ type Client struct {
 }
 
 // NewConsensusClient returns a new Client client.
-func NewConsensusClient(log logrus.FieldLogger, url string) Client {
+func NewConsensusClient(log logrus.FieldLogger, url string, opts ...*beacon.Options) Client {
+	op := beacon.DefaultOptions().
+		DisableEmptySlotDetection().
+		DisableEmptySlotDetection().
+		DisablePrometheusMetrics()
+
+	op.HealthCheck.Interval = human.Duration{1 * time.Second}
+
+	if len(opts) > 0 {
+		op = opts[0]
+	}
+
+	node := beacon.NewNode(log, &beacon.Config{
+		Name: "beacon_node",
+		Addr: url,
+	}, "sync_test_coordinator", *op)
+
 	return Client{
-		url: url,
-		log: log,
+		node: node,
+		url:  url,
+		log:  log,
 	}
 }
 
@@ -41,29 +58,9 @@ func (c *Client) Node() beacon.Node {
 	return c.node
 }
 
-// Bootstrap bootstraps the client.
-func (c *Client) Bootstrap(ctx context.Context, opts ...*beacon.Options) error {
-	op := beacon.DefaultOptions().
-		DisableEmptySlotDetection().
-		DisableEmptySlotDetection().
-		DisablePrometheusMetrics()
-
-	op.HealthCheck.Interval = human.Duration{1 * time.Second}
-
-	if len(opts) > 0 {
-		op = opts[0]
-	}
-
-	node := beacon.NewNode(c.log, &beacon.Config{
-		Name: "beacon_node",
-		Addr: c.url,
-	}, "sync_test_coordinator", *op)
-
-	if err := node.Start(ctx); err != nil {
-		return err
-	}
-
-	return nil
+// Start bootstraps the client.
+func (c *Client) Start(ctx context.Context) error {
+	return c.node.Start(ctx)
 }
 
 func (c *Client) IsHealthy(ctx context.Context) (bool, error) {
