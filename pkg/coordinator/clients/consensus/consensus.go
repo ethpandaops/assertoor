@@ -45,7 +45,8 @@ func (c *Client) Node() beacon.Node {
 func (c *Client) Bootstrap(ctx context.Context, opts ...*beacon.Options) error {
 	op := beacon.DefaultOptions().
 		DisableEmptySlotDetection().
-		DisableEmptySlotDetection()
+		DisableEmptySlotDetection().
+		DisablePrometheusMetrics()
 
 	op.HealthCheck.Interval = human.Duration{1 * time.Second}
 
