@@ -1,7 +1,6 @@
-# Sync Test Coordinator
+# Minccino Testnet Testing tool
 
-This project serves as a controller for Ethereum Sync Tests. Users can define sync tests in yaml, and have the controller ensure the test is conducted while reporting on the status via logs and Prometheus metrics.
-
+This project serves as a controller for Ethereum Tests. Users can define tests in yaml, and have the controller ensure the test is conducted while reporting on the status via logs and Prometheus metrics.
 
 
 ### Configuration

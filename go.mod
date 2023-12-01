@@ -1,12 +1,13 @@
-module github.com/ethpandaops/sync-test-coordinator
+module github.com/ethpandaops/minccino
 
-go 1.19
+go 1.21.1
 
 require (
 	github.com/attestantio/go-eth2-client v0.18.4-0.20231012194602-0eff364fec01
 	github.com/ethereum/go-ethereum v1.13.4
 	github.com/ethpandaops/beacon v0.31.0
 	github.com/imdario/mergo v0.3.12
+	github.com/mashingan/smapping v0.1.19
 	github.com/onrik/ethrpc v1.0.0
 	github.com/prometheus/client_golang v1.17.0
 	github.com/sirupsen/logrus v1.9.3
@@ -31,6 +32,7 @@ require (
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
+	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0 // indirect
 	github.com/ethereum/c-kzg-4844 v0.3.1 // indirect
 	github.com/ethpandaops/ethwallclock v0.2.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
@@ -42,9 +44,11 @@ require (
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/goccy/go-yaml v1.9.5 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/gookit/event v1.1.1 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/kelseyhightower/envconfig v1.4.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.1.2 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
@@ -79,5 +83,6 @@ require (
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
