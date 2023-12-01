@@ -1,4 +1,4 @@
-package execution
+package rpc
 
 type SyncStatus struct {
 	IsSyncing     bool
