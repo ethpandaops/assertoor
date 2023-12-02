@@ -12,5 +12,5 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
   ca-certificates \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /bin/app /sync-test-coordinator
-ENTRYPOINT ["/sync-test-coordinator"]
+COPY --from=builder /bin/app /minccino
+ENTRYPOINT ["/minccino"]

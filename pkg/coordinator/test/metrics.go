@@ -1,9 +1,6 @@
 package test
 
 import (
-	"fmt"
-
-	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -95,10 +92,12 @@ func (m *Metrics) SetTestInfo(description string) {
 	m.TestInfo.WithLabelValues(m.testName, description).Set(1)
 }
 
+/*
 func (m *Metrics) SetCurrentTask(ta task.Runnable, index int) {
 	m.CurrentTask.Reset()
 	m.CurrentTask.WithLabelValues(m.testName, ta.Name(), ta.Title(), fmt.Sprintf("%d", index)).Set(float64(index))
 }
+*/
 
 func (m *Metrics) SetTotalTasks(total float64) {
 	m.TotalTasks.WithLabelValues(m.testName).Set(total)
@@ -108,6 +107,7 @@ func (m *Metrics) SetTestDuration(duration float64) {
 	m.TestDuration.WithLabelValues(m.testName).Set(duration)
 }
 
+/*
 func (m *Metrics) SetTaskDuration(ta task.Runnable, index string, duration float64) {
 	m.TaskDuration.WithLabelValues(m.testName, ta.Name(), ta.Title(), index).Set(duration)
 }
@@ -115,3 +115,4 @@ func (m *Metrics) SetTaskDuration(ta task.Runnable, index string, duration float
 func (m *Metrics) SetTaskInfo(ta task.Runnable, index int) {
 	m.TaskInfo.WithLabelValues(m.testName, ta.Name(), ta.Description(), ta.Title(), fmt.Sprintf("%d", index)).Set(float64(index))
 }
+*/

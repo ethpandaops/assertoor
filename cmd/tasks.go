@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/test"
+	"github.com/ethpandaops/minccino/pkg/coordinator/task/tasks"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )
@@ -17,7 +17,7 @@ var tasksCmd = &cobra.Command{
 	Use:   "tasks",
 	Short: "Lists all available tasks",
 	Run: func(cmd *cobra.Command, args []string) {
-		available := test.AvailableTasks()
+		available := tasks.AvailableTasks()
 
 		yamlData, err := yaml.Marshal(&available)
 		if err != nil {

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/test"
+	"github.com/ethpandaops/minccino/pkg/coordinator/test"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
@@ -31,7 +31,6 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, lameDuc
 // Run executes the test until completion.
 func (c *Coordinator) Run(ctx context.Context) error {
 	c.log.
-		WithField("config", c.Config).
 		WithField("metrics_port", c.metricsPort).
 		WithField("lame_duck_seconds", c.lameDuckSeconds).
 		Info("starting coordinator")
@@ -45,7 +44,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		return err
 	}
 
-	c.log.Info(fmt.Sprintf("starting test '%s' which contains %v tasks", testToRun.Name(), len(testToRun.Tasks())))
+	c.log.Info(fmt.Sprintf("starting test '%s'", testToRun.Name()))
 
 	//nolint:errcheck // ignore
 	go c.startMetrics()

@@ -4,14 +4,14 @@ import (
 	"log"
 	"os"
 
-	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator"
+	"github.com/ethpandaops/minccino/pkg/coordinator"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "sync-test-coordinator",
+	Use:   "minccino",
 	Short: "Runs a configured test until completion or error",
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := coordinator.NewConfig(cfgFile)
@@ -57,7 +57,7 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ethereum-metrics-exporter.yaml)")
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "log-format", "json", "log format (default is text). Valid values are 'text', 'json'")
+	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "json", "log format (default is text). Valid values are 'text', 'json'")
 
 	rootCmd.Flags().IntVarP(&metricsPort, "metrics-port", "", 9090, "Port to serve Prometheus metrics on")
 	rootCmd.Flags().IntVarP(&lameDuckSeconds, "lame-duck-seconds", "", 30, "Lame duck period in seconds (wait for this long after completion before terminating")

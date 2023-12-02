@@ -6,5 +6,5 @@ RUN apt-get install -y --no-install-recommends \
   ca-certificates \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
-COPY sync-test-coordinator* /sync-test-coordinator
-ENTRYPOINT ["/sync-test-coordinator"]
+COPY minccino* /minccino
+ENTRYPOINT ["/minccino"]

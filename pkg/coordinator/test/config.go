@@ -1,13 +1,13 @@
 package test
 
 import (
-	human "github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/human-duration"
-	"github.com/ethpandaops/sync-test-coordinator/pkg/coordinator/task"
+	"github.com/ethpandaops/minccino/pkg/coordinator/helper"
+	human "github.com/ethpandaops/minccino/pkg/coordinator/human-duration"
 )
 
 type Config struct {
-	Name         string         `yaml:"name" json:"name"`
-	Timeout      human.Duration `yaml:"timeout" json:"timeout"`
-	Tasks        []task.Config  `yaml:"tasks" json:"tasks"`
-	CleanupTasks []task.Config  `yaml:"cleanup_tasks" json:"cleanup_tasks"`
+	Name         string              `yaml:"name" json:"name"`
+	Timeout      human.Duration      `yaml:"timeout" json:"timeout"`
+	Tasks        []helper.RawMessage `yaml:"tasks" json:"tasks"`
+	CleanupTasks []helper.RawMessage `yaml:"cleanup_tasks" json:"cleanup_tasks"`
 }

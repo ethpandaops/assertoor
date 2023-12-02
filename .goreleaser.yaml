@@ -1,4 +1,4 @@
-project_name: sync-test-coordinator
+project_name: minccino
 
 before:
   hooks:
@@ -7,7 +7,7 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
-    binary: sync-test-coordinator-{{.Version}}
+    binary: minccino-{{.Version}}
     goos:
       - linux
       - windows
