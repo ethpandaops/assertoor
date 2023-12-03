@@ -25,6 +25,8 @@ builds:
       - goos: windows
         goarch: arm64
     mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X github.com/ethpandaops/minccino/pkg/coordinator/buildinfo.BuildRelease={{.Tag}} -X github.com/ethpandaops/minccino/pkg/coordinator/buildinfo.BuildVersion={{.ShortCommit}}
 checksum:
   name_template: 'checksums.txt'
 snapshot:

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ethpandaops/minccino/pkg/coordinator/buildinfo"
 	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
 	"github.com/ethpandaops/minccino/pkg/coordinator/test"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -32,6 +33,7 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, lameDuc
 // Run executes the coordinator until completion.
 func (c *Coordinator) Run(ctx context.Context) error {
 	c.log.
+		WithField("build_version", buildinfo.GetVersion()).
 		WithField("metrics_port", c.metricsPort).
 		WithField("lame_duck_seconds", c.lameDuckSeconds).
 		Info("starting coordinator")
