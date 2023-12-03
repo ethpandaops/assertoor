@@ -16,7 +16,7 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Runs multiple tasks in parallel.",
-		Config:      Config{},
+		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
 )

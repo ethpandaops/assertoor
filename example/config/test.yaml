@@ -1,10 +1,42 @@
-consensus:
-  url: http://localhost:5052
-execution:
-  url: http://localhost:8545
+endpoints:
+  - name: "local"
+    executionUrl: http://localhost:8545
+    consensusUrl: http://localhost:5052
 
 test:
-  name: basic
+  name: "basic"
   timeout: 48h
   tasks:
-  - name: both_are_synced
+  - name: check_clients_are_healthy
+    title: "Check all clients are ready"
+    timeout: 30s
+
+  - name: run_tasks_concurrent
+    title: "Check all clients are synced"
+    timeout: 30s
+    config:
+      tasks:
+      - name: check_consensus_sync_status
+        title: "Check all CL clients are synced"
+      - name: check_execution_sync_status
+        title: "Check all EL clients are synced"
+  - name: sleep
+    title: "Sleep 5 sec"
+    config:
+      duration: 5s
+  - name: run_command
+    title: "Run test command"
+    config:
+      command:
+        - echo
+        - "hello world"
+
+  cleanupTasks:
+  - name: run_command
+    title: "Cleanup command"
+    config:
+      command:
+      - sh
+      - -c
+      - echo 'cleanup'
+      allowed_to_fail: true

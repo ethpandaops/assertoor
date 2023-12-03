@@ -16,7 +16,7 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Runs a shell command.",
-		Config:      Config{},
+		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
 )

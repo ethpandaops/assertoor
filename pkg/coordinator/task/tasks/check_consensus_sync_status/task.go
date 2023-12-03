@@ -16,7 +16,7 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Checks consensus clients for their sync status.",
-		Config:      Config{},
+		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
 )

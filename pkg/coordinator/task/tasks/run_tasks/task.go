@@ -15,7 +15,7 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Run tasks sequentially.",
-		Config:      Config{},
+		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
 )

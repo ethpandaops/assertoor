@@ -15,7 +15,7 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Sleeps for a specified duration.",
-		Config:      Config{},
+		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
 )

@@ -1,8 +1,7 @@
-execution:
-  url: http://localhost:8545
-
-consensus:
-  url: http://localhost:5052
+endpoints:
+  - name: "local"
+    executionUrl: http://localhost:8545
+    consensusUrl: http://localhost:5052
 
 test:
   name: "basic"
@@ -18,7 +17,7 @@ test:
       command:
         - echo
         - "hi"
-  cleanup_tasks:
+  cleanupTasks:
   - name: run_command
     title: "Cleanup command"
     config:

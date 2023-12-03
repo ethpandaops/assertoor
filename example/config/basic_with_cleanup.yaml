@@ -1,31 +1,33 @@
-consensus:
-  url: http://localhost:5052
-execution:
-  url: http://localhost:8545
+endpoints:
+  - name: "local"
+    executionUrl: http://localhost:8545
+    consensusUrl: http://localhost:5052
 
 test:
   name: basic
   timeout: 48h
   tasks:
-  - name: execution_is_healthy
+  - name: check_clients_are_healthy
     timeout: 10m
-  - name: consensus_is_healthy
-    timeout: 10m
-  - config:
-      consensus:
-        percent: 100
-      execution:
-        percent: 100
-    name: both_are_synced
-  - config:
+
+  - name: run_tasks_concurrent
+    title: "Check if EL & CL clients are synced"
+    timeout: 30s
+    config:
+      tasks:
+      - name: check_consensus_sync_status
+        title: "Check if CL clients are synced"
+      - name: check_execution_sync_status
+        title: "Check if EL clients are synced"
+  - name: run_command
+    config:
       command:
       - sh
       - -c
       - pkill $CONSENSUS_CLIENT_NAME
-    name: run_command
-  - config:
+  - name: run_command
+    config:
       command:
       - sh
       - -c
       - pkill $EXECUTION_CLIENT_NAME
-    name: run_command
