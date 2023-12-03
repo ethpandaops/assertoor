@@ -5,21 +5,16 @@ import (
 
 	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
 	"github.com/ethpandaops/minccino/pkg/coordinator/test"
+	web_types "github.com/ethpandaops/minccino/pkg/coordinator/web/types"
 	"gopkg.in/yaml.v2"
 )
-
-type Consensus struct {
-	URL string `yaml:"url"`
-}
-
-// ExecutionNode represents a single ethereum execution client.
-type Execution struct {
-	URL string `yaml:"url"`
-}
 
 type Config struct {
 	// List of execution & consensus clients to use.
 	Endpoints []clients.ClientConfig `yaml:"endpoints" json:"endpoints"`
+
+	// WebServer config
+	Web *web_types.WebConfig `yaml:"web" json:"web"`
 
 	// Test is the test configuration.
 	Test test.Config `yaml:"test" json:"test"`

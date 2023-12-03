@@ -203,12 +203,10 @@ func (client *Client) pollClientHead() error {
 
 func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *phase0.SignedBeaconBlockHeader, source string) error {
 	cachedBlock, isNewBlock := client.pool.blockCache.AddBlock(root, slot)
-	if cachedBlock != nil {
-		if header != nil {
-			cachedBlock.SetHeader(header)
-		}
-		cachedBlock.SetSeenBy(client)
+	if cachedBlock == nil {
+		return fmt.Errorf("could not add block to cache %v [0x%x]", slot, root)
 	}
+	cachedBlock.SetSeenBy(client)
 	if isNewBlock {
 		client.logger.Infof("received cl block %v [0x%x] %v", slot, root, source)
 	} else {
@@ -216,6 +214,9 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 	}
 
 	err := cachedBlock.EnsureHeader(func() (*phase0.SignedBeaconBlockHeader, error) {
+		if header != nil {
+			return header, nil
+		}
 		ctx, cancel := context.WithTimeout(client.clientCtx, 10*time.Second)
 		defer cancel()
 		header, err := client.rpcClient.GetBlockHeaderByBlockroot(ctx, cachedBlock.Root)

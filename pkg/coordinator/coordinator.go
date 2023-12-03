@@ -9,6 +9,7 @@ import (
 	"github.com/ethpandaops/minccino/pkg/coordinator/buildinfo"
 	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
 	"github.com/ethpandaops/minccino/pkg/coordinator/test"
+	"github.com/ethpandaops/minccino/pkg/coordinator/web/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
@@ -17,6 +18,7 @@ type Coordinator struct {
 	// Config is the coordinator configuration.
 	Config          *Config
 	log             logrus.FieldLogger
+	webserver       *server.WebServer
 	metricsPort     int
 	lameDuckSeconds int
 }
@@ -50,6 +52,17 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		}
 	}
 
+	// init webserver
+	if c.Config.Web != nil && c.Config.Web.Server != nil {
+		c.webserver, err = server.NewWebServer(c.Config.Web.Server, c.log)
+		if err != nil {
+			return err
+		}
+		if c.Config.Web.Frontend != nil {
+			c.webserver.StartFrontend(c.Config.Web.Frontend, clientPool)
+		}
+	}
+
 	// run test
 	testToRun, err := test.CreateRunnable(ctx, c.log, clientPool, c.Config.Test)
 	if err != nil {
@@ -71,11 +84,14 @@ func (c *Coordinator) Run(ctx context.Context) error {
 
 	c.log.WithField("test", c.Config.Test).Info("test completed!")
 
-	c.log.WithField("seconds", c.lameDuckSeconds).Info("Initiating lame duck")
+	if c.webserver == nil {
+		c.log.WithField("seconds", c.lameDuckSeconds).Info("Initiating lame duck")
+		time.Sleep(time.Duration(c.lameDuckSeconds) * time.Second)
+		c.log.Info("lame duck complete")
+	} else {
+		<-ctx.Done()
+	}
 
-	time.Sleep(time.Duration(c.lameDuckSeconds) * time.Second)
-
-	c.log.Info("lame duck complete")
 	c.log.Info("Shutting down..")
 
 	return nil

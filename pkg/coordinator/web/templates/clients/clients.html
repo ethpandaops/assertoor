@@ -1,0 +1,135 @@
+{{ define "page" }}
+  <div class="container mt-2">
+
+    <div class="card mt-2">
+      <div class="card-body px-0 py-3">
+        <h2 class="px-2">Clients</h2>
+        <div class="table-responsive px-0 py-1">
+          <table class="table table-nobr" id="clients">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Head Block</th>
+                <th>Head Slot</th>
+                <th>Status</th>
+                <th>Ready</th>
+                <th>Type</th>
+                <th>Version</th>
+              </tr>
+            </thead>
+              <tbody>
+                {{ range $i, $client := .Clients }}
+                  <tr>
+                    <td rowspan="2">{{ $client.Index }}</td>
+                    <td rowspan="2">{{ $client.Name }}</td>
+
+                    <td>{{ $client.CLHeadSlot }}</td>
+                    <td>
+                      <span class="text-truncate d-inline-block" style="max-width: 200px">0x{{ printf "%x" $client.CLHeadRoot }}</span>
+                      <i class="fa fa-copy text-muted p-1" role="button" data-bs-toggle="tooltip" title="Copy to clipboard" data-clipboard-text="0x{{ printf "%x" $client.CLHeadRoot }}"></i>
+                    </td>
+                    <td>
+                      {{ if eq $client.CLStatus "online" }}
+                        <span class="badge rounded-pill text-bg-success">Online</span>
+                      {{ else if eq $client.CLStatus "synchronizing" }}
+                        <span class="badge rounded-pill text-bg-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Updated: {{ formatTimeDiff $client.CLLastRefresh }}">Synchronizing</span>
+                      {{ else if eq $client.CLStatus "optimistic" }}
+                        <span class="badge rounded-pill text-bg-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Updated: {{ formatTimeDiff $client.CLLastRefresh }}">Optimistic</span>
+                      {{ else if eq $client.CLStatus "offline" }}
+                        <span class="badge rounded-pill text-bg-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Updated: {{ formatTimeDiff $client.CLLastRefresh }}, Error: {{ $client.CLLastError }}">Offline</span>
+                      {{ else }}
+                        <span class="badge rounded-pill text-bg-secondary">{{ $client.CLStatus }}</span>
+                      {{ end }}
+                    </td>
+                    <td>
+                      {{ if .CLIsReady }}
+                        <span class="badge rounded-pill text-bg-success">yes</span>
+                      {{ else }}
+                        <span class="badge rounded-pill text-bg-danger">no</span>
+                      {{ end }}
+                    </td>
+                    <td>
+                      {{ if eq $client.CLType 1 }}
+                        <span class="badge rounded-pill text-bg-success">Lighthouse</span>
+                      {{ else if eq $client.CLType 2 }}
+                        <span class="badge rounded-pill text-bg-success">Lodestar</span>
+                      {{ else if eq $client.CLType 3 }}
+                        <span class="badge rounded-pill text-bg-success">Nimbus</span>
+                      {{ else if eq $client.CLType 4 }}
+                        <span class="badge rounded-pill text-bg-success">Prysm</span>
+                      {{ else if eq $client.CLType 5 }}
+                        <span class="badge rounded-pill text-bg-success">Teku</span>
+                      {{ else if eq $client.CLType 6 }}
+                        <span class="badge rounded-pill text-bg-success">Grandine</span>
+                      {{ else }}
+                        <span class="badge rounded-pill text-bg-secondary">Unknown</span>
+                      {{ end }}
+                    </td>
+                    <td>
+                      <span class="text-truncate d-inline-block" style="max-width: 400px">{{ $client.CLVersion }}</span>
+                      <i class="fa fa-copy text-muted p-1" role="button" data-bs-toggle="tooltip" title="Copy to clipboard" data-clipboard-text="{{ $client.CLVersion }}"></i>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>{{ $client.ELHeadNumber }}</td>
+                    <td>
+                      <span class="text-truncate d-inline-block" style="max-width: 200px">0x{{ printf "%x" $client.ELHeadHash }}</span>
+                      <i class="fa fa-copy text-muted p-1" role="button" data-bs-toggle="tooltip" title="Copy to clipboard" data-clipboard-text="0x{{ printf "%x" $client.ELHeadHash }}"></i>
+                    </td>
+                    <td>
+                      {{ if eq $client.ELStatus "online" }}
+                        <span class="badge rounded-pill text-bg-success">Online</span>
+                      {{ else if eq $client.ELStatus "synchronizing" }}
+                        <span class="badge rounded-pill text-bg-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Updated: {{ formatTimeDiff $client.ELLastRefresh }}">Synchronizing</span>
+                      {{ else if eq $client.ELStatus "optimistic" }}
+                        <span class="badge rounded-pill text-bg-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Updated: {{ formatTimeDiff $client.ELLastRefresh }}">Optimistic</span>
+                      {{ else if eq $client.ELStatus "offline" }}
+                        <span class="badge rounded-pill text-bg-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Updated: {{ formatTimeDiff $client.ELLastRefresh }}, Error: {{ $client.ELLastError }}">Offline</span>
+                      {{ else }}
+                        <span class="badge rounded-pill text-bg-secondary">{{ $client.ELStatus }}</span>
+                      {{ end }}
+                    </td>
+                    <td>
+                      {{ if .ELIsReady }}
+                        <span class="badge rounded-pill text-bg-success">yes</span>
+                      {{ else }}
+                        <span class="badge rounded-pill text-bg-danger">no</span>
+                      {{ end }}
+                    </td>
+                    <td>
+                      {{ if eq $client.ELType 1 }}
+                        <span class="badge rounded-pill text-bg-success">Besu</span>
+                      {{ else if eq $client.ELType 2 }}
+                        <span class="badge rounded-pill text-bg-success">Erigon</span>
+                      {{ else if eq $client.ELType 3 }}
+                        <span class="badge rounded-pill text-bg-success">EthereumJS</span>
+                      {{ else if eq $client.ELType 4 }}
+                        <span class="badge rounded-pill text-bg-success">Geth</span>
+                      {{ else if eq $client.ELType 5 }}
+                        <span class="badge rounded-pill text-bg-success">Nethermind</span>
+                      {{ else if eq $client.ELType 6 }}
+                        <span class="badge rounded-pill text-bg-success">Reth</span>
+                      {{ else }}
+                        <span class="badge rounded-pill text-bg-secondary">Unknown</span>
+                      {{ end }}
+                    </td>
+                    <td>
+                      <span class="text-truncate d-inline-block" style="max-width: 400px">{{ $client.ELVersion }}</span>
+                      <i class="fa fa-copy text-muted p-1" role="button" data-bs-toggle="tooltip" title="Copy to clipboard" data-clipboard-text="{{ $client.ELVersion }}"></i>
+                    </td>
+                  </tr>
+                {{ end }}
+              </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+{{ end }}
+
+{{ define "js" }}
+{{ end }}
+{{ define "css" }}
+{{ end }}

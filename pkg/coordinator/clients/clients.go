@@ -107,6 +107,14 @@ func (pool *ClientPool) processConsensusBlockNotification(block *consensus.Block
 	poolClient.ExecutionClient.NotifyNewBlock(common.Hash(hash), number)
 }
 
+func (pool *ClientPool) GetConsensusPool() *consensus.Pool {
+	return pool.consensusPool
+}
+
+func (pool *ClientPool) GetExecutionPool() *execution.Pool {
+	return pool.executionPool
+}
+
 func (pool *ClientPool) GetAllClients() []*PoolClient {
 	clients := make([]*PoolClient, len(pool.clients))
 	copy(clients, pool.clients)

@@ -1,0 +1,23 @@
+{{ define "header" }}
+  <header class="p-1 text-bg-dark header-bar" data-bs-theme="dark">
+    <nav id="nav" class="main-navigation navbar navbar-expand-lg navbar-light">
+      <div class="container d-flex">
+        <a class="navbar-brand col-10 col-lg-auto me-lg-3 " href="/">
+          <div class="page-brand">
+            <div class="page-brand-container">
+              <span class="brand-text page-brand-title">{{ .Title }}</span>
+            </div>
+          </div>
+        </a>
+
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/clients">
+              <span class="nav-text">Clients</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+{{ end }}

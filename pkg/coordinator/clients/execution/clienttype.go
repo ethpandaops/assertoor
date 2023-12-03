@@ -10,20 +10,20 @@ type ClientType int8
 var (
 	UnspecifiedClient ClientType = 0
 	UnknownClient     ClientType = -1
-	LighthouseClient  ClientType = 1
-	LodestarClient    ClientType = 2
-	NimbusClient      ClientType = 3
-	PrysmClient       ClientType = 4
-	TekuClient        ClientType = 5
-	GrandineClient    ClientType = 6
+	BesuClient        ClientType = 1
+	ErigonClient      ClientType = 2
+	EthjsClient       ClientType = 3
+	GethClient        ClientType = 4
+	NethermindClient  ClientType = 5
+	RethClient        ClientType = 6
 )
 var clientTypePatterns = map[ClientType]*regexp.Regexp{
-	LighthouseClient: regexp.MustCompile("(?i)^Lighthouse/.*"),
-	LodestarClient:   regexp.MustCompile("(?i)^Lodestar/.*"),
-	NimbusClient:     regexp.MustCompile("(?i)^Nimbus/.*"),
-	PrysmClient:      regexp.MustCompile("(?i)^Prysm/.*"),
-	TekuClient:       regexp.MustCompile("(?i)^teku/.*"),
-	GrandineClient:   regexp.MustCompile("(?i)^Grandine/.*"),
+	BesuClient:       regexp.MustCompile("(?i)^Besu/.*"),
+	ErigonClient:     regexp.MustCompile("(?i)^Erigon/.*"),
+	EthjsClient:      regexp.MustCompile("(?i)^Ethereumjs/.*"),
+	GethClient:       regexp.MustCompile("(?i)^Geth/.*"),
+	NethermindClient: regexp.MustCompile("(?i)^Nethermind/.*"),
+	RethClient:       regexp.MustCompile("(?i)^Reth/.*"),
 }
 
 func (client *Client) parseClientVersion(version string) {
@@ -38,18 +38,18 @@ func (client *Client) parseClientVersion(version string) {
 
 func ParseClientType(name string) ClientType {
 	switch name {
-	case "lighthouse":
-		return LighthouseClient
-	case "lodestar":
-		return LodestarClient
-	case "nimbus":
-		return NimbusClient
-	case "prysm":
-		return PrysmClient
-	case "teku":
-		return TekuClient
-	case "grandine":
-		return GrandineClient
+	case "besu":
+		return BesuClient
+	case "erigon":
+		return ErigonClient
+	case "ethjs":
+		return EthjsClient
+	case "geth":
+		return GethClient
+	case "nethermind":
+		return NethermindClient
+	case "reth":
+		return RethClient
 	}
 	return UnknownClient
 }
@@ -60,18 +60,18 @@ func (client *Client) GetClientType() ClientType {
 
 func (clientType ClientType) String() string {
 	switch clientType {
-	case LighthouseClient:
-		return "lighthouse"
-	case LodestarClient:
-		return "lodestar"
-	case NimbusClient:
-		return "nimbus"
-	case PrysmClient:
-		return "prysm"
-	case TekuClient:
-		return "teku"
-	case GrandineClient:
-		return "grandine"
+	case BesuClient:
+		return "besu"
+	case ErigonClient:
+		return "erigon"
+	case EthjsClient:
+		return "ethjs"
+	case GethClient:
+		return "geth"
+	case NethermindClient:
+		return "nethermind"
+	case RethClient:
+		return "reth"
 	default:
 		return fmt.Sprintf("unknown: %d", clientType)
 	}

@@ -1,0 +1,29 @@
+{{ define "page" }}
+  <div class="container mt-2">
+    <h2 class="py-2">Minccino: Testnet Testing Tool</h2>
+    <div class="row">
+    </div>
+    <div class="row">
+      <div class="col-6 col-sm-4 col-lg-3">
+        Consensus Clients:
+      </div>
+      <div class="col-6 col-sm-8 col-lg-9">
+        {{ .CLReadyCount }} / {{ .ClientCount }}  (Slot: {{ .CLHeadSlot }})
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-6 col-sm-4 col-lg-3">
+        Execution Clients:
+      </div>
+      <div class="col-6 col-sm-8 col-lg-9">
+        {{ .ELReadyCount }} / {{ .ClientCount }}  (Block: {{ .ELHeadNumber }})
+      </div>
+    </div>
+    
+  </div>
+{{ end }}
+
+{{ define "js" }}
+{{ end }}
+{{ define "css" }}
+{{ end }}
