@@ -40,10 +40,10 @@ type Task interface {
 	Title() string
 	Description() string
 
+	Config() interface{}
 	Logger() logrus.FieldLogger
 	Timeout() time.Duration
 
 	ValidateConfig() error
 	Execute(ctx context.Context) error
-	Cleanup(ctx context.Context) error
 }

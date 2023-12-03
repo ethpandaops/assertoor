@@ -250,11 +250,6 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 			taskState.taskError = err
 			ts.setTaskResult(task, types.TaskResultFailure, false)
 		}
-
-		err := task.Cleanup(ctx)
-		if err != nil {
-			task.Logger().Errorf("task cleanup failed: %v", err)
-		}
 	}()
 
 	// run task watcher if supplied
@@ -268,7 +263,9 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 
 	if err != nil {
 		task.Logger().Errorf("task execution returned error: %v", err)
-		taskState.taskError = err
+		if taskState.taskError == nil {
+			taskState.taskError = err
+		}
 	}
 
 	// set task result

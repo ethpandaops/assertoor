@@ -58,6 +58,10 @@ func (t *Task) Description() string {
 	return TaskDescriptor.Description
 }
 
+func (t *Task) Config() interface{} {
+	return t.config
+}
+
 func (t *Task) Logger() logrus.FieldLogger {
 	return t.logger
 }
@@ -80,8 +84,4 @@ func (t *Task) Execute(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-}
-
-func (t *Task) Cleanup(ctx context.Context) error {
-	return nil
 }

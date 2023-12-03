@@ -59,6 +59,10 @@ func (t *Task) Title() string {
 	return t.options.Title
 }
 
+func (t *Task) Config() interface{} {
+	return t.config
+}
+
 func (t *Task) Logger() logrus.FieldLogger {
 	return t.logger
 }
@@ -103,9 +107,5 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.WithField("stdout", string(stdOut)).Info("command run successfully")
 
-	return nil
-}
-
-func (t *Task) Cleanup(ctx context.Context) error {
 	return nil
 }

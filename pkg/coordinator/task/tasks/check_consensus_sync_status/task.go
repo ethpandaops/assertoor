@@ -61,6 +61,10 @@ func (t *Task) Title() string {
 	return t.options.Title
 }
 
+func (t *Task) Config() interface{} {
+	return t.config
+}
+
 func (t *Task) Logger() logrus.FieldLogger {
 	return t.logger
 }
@@ -86,10 +90,6 @@ func (t *Task) Execute(ctx context.Context) error {
 			return nil
 		}
 	}
-}
-
-func (t *Task) Cleanup(ctx context.Context) error {
-	return nil
 }
 
 func (t *Task) processCheck(ctx context.Context) error {
