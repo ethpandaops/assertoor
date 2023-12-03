@@ -149,9 +149,10 @@ func (client *Client) pollClientHead() error {
 
 func (client *Client) processBlock(hash common.Hash, number uint64, block *types.Block, source string) error {
 	cachedBlock, isNewBlock := client.pool.blockCache.AddBlock(hash, number)
-	if cachedBlock != nil {
-		cachedBlock.SetSeenBy(client)
+	if cachedBlock == nil {
+		return fmt.Errorf("could not add block to cache")
 	}
+	cachedBlock.SetSeenBy(client)
 	if isNewBlock {
 		client.logger.Infof("received el block %v [0x%x] %v", number, hash, source)
 	} else {

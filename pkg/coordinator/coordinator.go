@@ -41,8 +41,8 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, endpoint := range c.Config.Endpoints {
-		err = clientPool.AddClient(&endpoint)
+	for idx := range c.Config.Endpoints {
+		err = clientPool.AddClient(&c.Config.Endpoints[idx])
 		if err != nil {
 			return err
 		}

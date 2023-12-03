@@ -27,6 +27,9 @@ var rootCmd = &cobra.Command{
 			logr.SetFormatter(&logrus.TextFormatter{})
 			logr.Info("Log format set to text")
 		}
+		if verbose {
+			logr.SetLevel(logrus.DebugLevel)
+		}
 
 		coord := coordinator.NewCoordinator(config, logr, metricsPort, lameDuckSeconds)
 
@@ -40,6 +43,7 @@ var rootCmd = &cobra.Command{
 var (
 	cfgFile         string
 	logFormat       string
+	verbose         bool
 	metricsPort     int
 	lameDuckSeconds int
 )
@@ -58,6 +62,7 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ethereum-metrics-exporter.yaml)")
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "json", "log format (default is text). Valid values are 'text', 'json'")
+	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Help message for toggle")
 
 	rootCmd.Flags().IntVarP(&metricsPort, "metrics-port", "", 9090, "Port to serve Prometheus metrics on")
 	rootCmd.Flags().IntVarP(&lameDuckSeconds, "lame-duck-seconds", "", 30, "Lame duck period in seconds (wait for this long after completion before terminating")

@@ -119,9 +119,10 @@ func (t *Task) processClientCheck(ctx context.Context, client *clients.PoolClien
 		checkLogger.Warnf("errof fetching sync status: %v", err)
 		return false
 	}
+	currentBlock, _ := client.ExecutionClient.GetLastHead()
 	clientIdx := client.ExecutionClient.GetIndex()
 	if t.firstHeight[clientIdx] == 0 {
-		t.firstHeight[clientIdx] = syncStatus.CurrentBlock
+		t.firstHeight[clientIdx] = currentBlock
 	}
 
 	if syncStatus.IsSyncing != t.config.ExpectSyncing {
@@ -137,12 +138,12 @@ func (t *Task) processClientCheck(ctx context.Context, client *clients.PoolClien
 		checkLogger.Debugf("check failed. check: ExpectMaxPercent, expected: <= %v, got: %v", t.config.ExpectMaxPercent, syncPercent)
 		return false
 	}
-	if int64(syncStatus.CurrentBlock) < int64(t.config.MinBlockHeight) {
-		checkLogger.Debugf("check failed. check: MinSlotHeight, expected: >= %v, got: %v", t.config.MinBlockHeight, syncStatus.CurrentBlock)
+	if int64(currentBlock) < int64(t.config.MinBlockHeight) {
+		checkLogger.Debugf("check failed. check: MinSlotHeight, expected: >= %v, got: %v", t.config.MinBlockHeight, currentBlock)
 		return false
 	}
-	if t.config.WaitForChainProgression && syncStatus.CurrentBlock <= t.firstHeight[clientIdx] {
-		checkLogger.Debugf("check failed. check: WaitForChainProgression, expected block height: >= %v, got: %v", t.firstHeight[clientIdx], syncStatus.CurrentBlock)
+	if t.config.WaitForChainProgression && currentBlock <= t.firstHeight[clientIdx] {
+		checkLogger.Debugf("check failed. check: WaitForChainProgression, expected block height: >= %v, got: %v", t.firstHeight[clientIdx], currentBlock)
 		return false
 	}
 	return true

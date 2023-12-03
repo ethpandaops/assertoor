@@ -234,7 +234,7 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 		go func() {
 			select {
 			case <-time.After(taskTimeout):
-				task.Logger().Errorf("task timed out")
+				task.Logger().Warnf("task timed out")
 				taskState.isTimeout = true
 				taskCancelFn()
 			case <-taskCtx.Done():
@@ -272,15 +272,12 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 	}
 
 	// set task result
-	if taskState.isTimeout {
-		// always fail tasks on timeout
-		ts.setTaskResult(task, types.TaskResultFailure, false)
-	} else if !taskState.updatedResult {
+	if !taskState.updatedResult || taskState.taskResult == types.TaskResultNone {
 		// set task result if not already done by task
-		if err == nil {
-			ts.setTaskResult(task, types.TaskResultSuccess, false)
-		} else {
+		if taskState.isTimeout || err != nil {
 			ts.setTaskResult(task, types.TaskResultFailure, false)
+		} else {
+			ts.setTaskResult(task, types.TaskResultSuccess, false)
 		}
 	}
 
@@ -289,7 +286,7 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 	}
 	if taskState.taskResult == types.TaskResultFailure {
 		task.Logger().Warnf("task failed with failure result")
-		return fmt.Errorf("task failed: %w", taskState.taskError)
+		return fmt.Errorf("task failed")
 	}
 	task.Logger().Infof("task completed")
 	return nil
