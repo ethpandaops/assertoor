@@ -9,6 +9,7 @@ import (
 	"github.com/ethpandaops/minccino/pkg/coordinator/buildinfo"
 	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
 	"github.com/ethpandaops/minccino/pkg/coordinator/test"
+	"github.com/ethpandaops/minccino/pkg/coordinator/types"
 	"github.com/ethpandaops/minccino/pkg/coordinator/web/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -18,7 +19,9 @@ type Coordinator struct {
 	// Config is the coordinator configuration.
 	Config          *Config
 	log             logrus.FieldLogger
+	clientPool      *clients.ClientPool
 	webserver       *server.WebServer
+	tests           []types.Test
 	metricsPort     int
 	lameDuckSeconds int
 }
@@ -27,6 +30,7 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, lameDuc
 	return &Coordinator{
 		log:             log,
 		Config:          config,
+		tests:           []types.Test{},
 		metricsPort:     metricsPort,
 		lameDuckSeconds: lameDuckSeconds,
 	}
@@ -45,6 +49,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	c.clientPool = clientPool
 	for idx := range c.Config.Endpoints {
 		err = clientPool.AddClient(&c.Config.Endpoints[idx])
 		if err != nil {
@@ -59,15 +64,16 @@ func (c *Coordinator) Run(ctx context.Context) error {
 			return err
 		}
 		if c.Config.Web.Frontend != nil {
-			c.webserver.StartFrontend(c.Config.Web.Frontend, clientPool)
+			c.webserver.StartFrontend(c.Config.Web.Frontend, c)
 		}
 	}
 
 	// run test
-	testToRun, err := test.CreateRunnable(ctx, c.log, clientPool, c.Config.Test)
+	testToRun, err := test.CreateRunnable(ctx, c, c.Config.Test)
 	if err != nil {
 		return err
 	}
+	c.tests = append(c.tests, testToRun)
 
 	if err := testToRun.Validate(); err != nil {
 		return err
@@ -95,6 +101,20 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	c.log.Info("Shutting down..")
 
 	return nil
+}
+
+func (c *Coordinator) Logger() logrus.FieldLogger {
+	return c.log
+}
+
+func (c *Coordinator) ClientPool() *clients.ClientPool {
+	return c.clientPool
+}
+
+func (c *Coordinator) GetTests() []types.Test {
+	tests := make([]types.Test, len(c.tests))
+	copy(tests, c.tests)
+	return tests
 }
 
 func (c *Coordinator) startMetrics() error {

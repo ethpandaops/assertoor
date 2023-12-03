@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/task/types"
+	"github.com/ethpandaops/minccino/pkg/coordinator/types"
 	"github.com/imdario/mergo"
 	"github.com/sirupsen/logrus"
 )

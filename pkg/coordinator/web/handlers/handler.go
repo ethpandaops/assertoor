@@ -1,15 +1,15 @@
 package handlers
 
 import (
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
+	"github.com/ethpandaops/minccino/pkg/coordinator/types"
 )
 
 type FrontendHandler struct {
-	pool *clients.ClientPool
+	coordinator types.Coordinator
 }
 
-func NewFrontendHandler(clientPool *clients.ClientPool) *FrontendHandler {
+func NewFrontendHandler(coordinator types.Coordinator) *FrontendHandler {
 	return &FrontendHandler{
-		pool: clientPool,
+		coordinator: coordinator,
 	}
 }

@@ -40,16 +40,17 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 	pageData := &IndexPage{}
 
-	allClients := fh.pool.GetAllClients()
+	clientPool := fh.coordinator.ClientPool()
+	allClients := clientPool.GetAllClients()
 	pageData.ClientCount = uint64(len(allClients))
 
-	canonicalClFork := fh.pool.GetConsensusPool().GetCanonicalFork(2)
+	canonicalClFork := clientPool.GetConsensusPool().GetCanonicalFork(2)
 	if canonicalClFork != nil {
 		pageData.CLReadyCount = uint64(len(canonicalClFork.ReadyClients))
 		pageData.CLHeadSlot = uint64(canonicalClFork.Slot)
 		pageData.CLHeadRoot = canonicalClFork.Root[:]
 	}
-	canonicalElFork := fh.pool.GetExecutionPool().GetCanonicalFork(2)
+	canonicalElFork := clientPool.GetExecutionPool().GetCanonicalFork(2)
 	if canonicalElFork != nil {
 		pageData.ELReadyCount = uint64(len(canonicalElFork.ReadyClients))
 		pageData.ELHeadNumber = uint64(canonicalElFork.Number)

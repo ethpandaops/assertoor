@@ -5,21 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
-	"github.com/ethpandaops/minccino/pkg/coordinator/task/scheduler"
+	"github.com/ethpandaops/minccino/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 
-type Runnable interface {
-	Validate() error
-	Run(ctx context.Context) error
-	Name() string
-	Percent() float64
-}
-
 type Test struct {
 	name          string
-	taskScheduler *scheduler.TaskScheduler
+	taskScheduler *TaskScheduler
 
 	log    logrus.FieldLogger
 	config Config
@@ -27,45 +19,45 @@ type Test struct {
 	metrics Metrics
 }
 
-func CreateRunnable(ctx context.Context, log logrus.FieldLogger, clientPool *clients.ClientPool, config Config) (Runnable, error) {
-	runnable := &Test{
+func CreateRunnable(ctx context.Context, coordinator types.Coordinator, config Config) (types.Test, error) {
+	test := &Test{
 		name:    config.Name,
-		log:     log.WithField("component", "test").WithField("test", config.Name),
+		log:     coordinator.Logger().WithField("component", "test").WithField("test", config.Name),
 		config:  config,
 		metrics: NewMetrics("sync_test_coordinator", config.Name),
 	}
 
 	// parse tasks
-	runnable.taskScheduler = scheduler.NewTaskScheduler(runnable.log, clientPool)
+	test.taskScheduler = NewTaskScheduler(test.log, coordinator)
 	for _, rawtask := range config.Tasks {
-		taskOptions, err := runnable.taskScheduler.ParseTaskOptions(&rawtask)
+		taskOptions, err := test.taskScheduler.ParseTaskOptions(&rawtask)
 		if err != nil {
 			return nil, err
 		}
-		_, err = runnable.taskScheduler.AddRootTask(taskOptions)
+		_, err = test.taskScheduler.AddRootTask(taskOptions)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	for _, rawtask := range config.CleanupTasks {
-		taskOptions, err := runnable.taskScheduler.ParseTaskOptions(&rawtask)
+		taskOptions, err := test.taskScheduler.ParseTaskOptions(&rawtask)
 		if err != nil {
 			return nil, err
 		}
-		_, err = runnable.taskScheduler.AddCleanupTask(taskOptions)
+		_, err = test.taskScheduler.AddCleanupTask(taskOptions)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// setup metrics
-	runnable.metrics.Register()
+	test.metrics.Register()
 
-	runnable.metrics.SetTestInfo(config.Name)
-	runnable.metrics.SetTotalTasks(float64(len(config.Tasks)))
+	test.metrics.SetTestInfo(config.Name)
+	test.metrics.SetTotalTasks(float64(len(config.Tasks)))
 
-	return runnable, nil
+	return test, nil
 }
 
 func (t *Test) Name() string {

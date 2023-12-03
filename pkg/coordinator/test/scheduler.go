@@ -1,4 +1,4 @@
-package scheduler
+package test
 
 import (
 	"context"
@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
 	"github.com/ethpandaops/minccino/pkg/coordinator/helper"
-	"github.com/ethpandaops/minccino/pkg/coordinator/task/tasks"
-	"github.com/ethpandaops/minccino/pkg/coordinator/task/types"
+	"github.com/ethpandaops/minccino/pkg/coordinator/tasks"
+	"github.com/ethpandaops/minccino/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 
 type TaskScheduler struct {
+	coordinator      types.Coordinator
 	logger           logrus.FieldLogger
 	taskCount        uint64
 	allTasks         []types.Task
@@ -22,8 +22,6 @@ type TaskScheduler struct {
 	rootCleanupTasks []types.Task
 	taskStateMutex   sync.RWMutex
 	taskStateMap     map[types.Task]*taskExecutionState
-
-	clientPool *clients.ClientPool
 }
 
 type taskExecutionState struct {
@@ -37,13 +35,13 @@ type taskExecutionState struct {
 	resultMutex      sync.RWMutex
 }
 
-func NewTaskScheduler(logger logrus.FieldLogger, clientPool *clients.ClientPool) *TaskScheduler {
+func NewTaskScheduler(logger logrus.FieldLogger, coordinator types.Coordinator) *TaskScheduler {
 	return &TaskScheduler{
 		logger:       logger,
 		rootTasks:    make([]types.Task, 0),
 		allTasks:     make([]types.Task, 0),
 		taskStateMap: make(map[types.Task]*taskExecutionState),
-		clientPool:   clientPool,
+		coordinator:  coordinator,
 	}
 }
 
@@ -55,8 +53,8 @@ func (ts *TaskScheduler) GetTaskCount() int {
 	return len(ts.allTasks)
 }
 
-func (ts *TaskScheduler) GetClientPool() *clients.ClientPool {
-	return ts.clientPool
+func (ts *TaskScheduler) GetCoordinator() types.Coordinator {
+	return ts.coordinator
 }
 
 func (ts *TaskScheduler) ParseTaskOptions(rawtask *helper.RawMessage) (*types.TaskOptions, error) {

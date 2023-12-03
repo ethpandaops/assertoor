@@ -63,7 +63,7 @@ func (fh *FrontendHandler) getClientsPageData() (*ClientsPage, error) {
 	}
 
 	// get clients
-	for _, client := range fh.pool.GetAllClients() {
+	for _, client := range fh.coordinator.ClientPool().GetAllClients() {
 		clientData := fh.getClientsPageClientData(client)
 		pageData.Clients = append(pageData.Clients, clientData)
 	}
@@ -73,6 +73,7 @@ func (fh *FrontendHandler) getClientsPageData() (*ClientsPage, error) {
 }
 
 func (fh *FrontendHandler) getClientsPageClientData(client *clients.PoolClient) *ClientsPageClient {
+	clientPool := fh.coordinator.ClientPool()
 	headSlot, headRoot := client.ConsensusClient.GetLastHead()
 	blockNum, blockHash := client.ExecutionClient.GetLastHead()
 	clientData := &ClientsPageClient{
@@ -83,13 +84,13 @@ func (fh *FrontendHandler) getClientsPageClientData(client *clients.PoolClient) 
 		CLHeadSlot:    uint64(headSlot),
 		CLHeadRoot:    headRoot[:],
 		CLLastRefresh: client.ConsensusClient.GetLastEventTime(),
-		CLIsReady:     fh.pool.GetConsensusPool().GetCanonicalFork(2).IsClientReady(client.ConsensusClient),
+		CLIsReady:     clientPool.GetConsensusPool().GetCanonicalFork(2).IsClientReady(client.ConsensusClient),
 		ELVersion:     client.ExecutionClient.GetVersion(),
 		ELType:        uint64(client.ExecutionClient.GetClientType()),
 		ELHeadNumber:  uint64(blockNum),
 		ELHeadHash:    blockHash[:],
 		ELLastRefresh: client.ExecutionClient.GetLastEventTime(),
-		ELIsReady:     fh.pool.GetExecutionPool().GetCanonicalFork(2).IsClientReady(client.ExecutionClient),
+		ELIsReady:     clientPool.GetExecutionPool().GetCanonicalFork(2).IsClientReady(client.ExecutionClient),
 	}
 	if lastError := client.ConsensusClient.GetLastError(); lastError != nil {
 		clientData.CLLastError = lastError.Error()

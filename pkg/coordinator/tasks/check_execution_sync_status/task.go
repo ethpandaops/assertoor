@@ -1,4 +1,4 @@
-package checkclientsarehealthy
+package checkexecutionsyncstatus
 
 import (
 	"context"
@@ -6,28 +6,27 @@ import (
 	"time"
 
 	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients/consensus"
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients/execution"
-	"github.com/ethpandaops/minccino/pkg/coordinator/task/types"
+	"github.com/ethpandaops/minccino/pkg/coordinator/types"
 	"github.com/imdario/mergo"
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	TaskName       = "check_clients_are_healthy"
+	TaskName       = "check_execution_sync_status"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Checks if clients are healthy.",
+		Description: "Checks execution clients for their sync status.",
 		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
 )
 
 type Task struct {
-	ctx     *types.TaskContext
-	options *types.TaskOptions
-	config  Config
-	logger  logrus.FieldLogger
+	ctx         *types.TaskContext
+	options     *types.TaskOptions
+	config      Config
+	logger      logrus.FieldLogger
+	firstHeight map[uint16]uint64
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -42,10 +41,11 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 		}
 	}
 	return &Task{
-		ctx:     ctx,
-		options: options,
-		config:  config,
-		logger:  ctx.Scheduler.GetLogger().WithField("task", TaskName),
+		ctx:         ctx,
+		options:     options,
+		config:      config,
+		logger:      ctx.Scheduler.GetLogger().WithField("task", TaskName),
+		firstHeight: map[uint16]uint64{},
 	}, nil
 }
 
@@ -93,12 +93,11 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) processCheck(ctx context.Context) error {
-	expectedResult := !t.config.ExpectUnhealthy
 	allResultsPass := true
 	failedClients := []string{}
-	for _, client := range t.ctx.Scheduler.GetClientPool().GetClientsByNamePatterns(t.config.ClientNamePatterns) {
+	for _, client := range t.ctx.Scheduler.GetCoordinator().ClientPool().GetClientsByNamePatterns(t.config.ClientNamePatterns) {
 		checkResult := t.processClientCheck(ctx, client)
-		if checkResult != expectedResult {
+		if !checkResult {
 			allResultsPass = false
 			failedClients = append(failedClients, client.Config.Name)
 		}
@@ -114,10 +113,37 @@ func (t *Task) processCheck(ctx context.Context) error {
 }
 
 func (t *Task) processClientCheck(ctx context.Context, client *clients.PoolClient) bool {
-	if !t.config.SkipConsensusCheck && client.ConsensusClient.GetStatus() == consensus.ClientStatusOffline {
+	checkLogger := t.logger.WithField("client", client.Config.Name)
+	syncStatus, err := client.ExecutionClient.GetRpcClient().GetNodeSyncing(ctx)
+	if err != nil {
+		checkLogger.Warnf("errof fetching sync status: %v", err)
 		return false
 	}
-	if !t.config.SkipExecutionCheck && client.ExecutionClient.GetStatus() == execution.ClientStatusOffline {
+	currentBlock, _ := client.ExecutionClient.GetLastHead()
+	clientIdx := client.ExecutionClient.GetIndex()
+	if t.firstHeight[clientIdx] == 0 {
+		t.firstHeight[clientIdx] = currentBlock
+	}
+
+	if syncStatus.IsSyncing != t.config.ExpectSyncing {
+		checkLogger.Debugf("check failed. check: ExpectSyncing, expected: %v, got: %v", t.config.ExpectSyncing, syncStatus.IsSyncing)
+		return false
+	}
+	syncPercent := syncStatus.Percent()
+	if syncPercent < t.config.ExpectMinPercent {
+		checkLogger.Debugf("check failed. check: ExpectMinPercent, expected: >= %v, got: %v", t.config.ExpectMinPercent, syncPercent)
+		return false
+	}
+	if syncPercent > t.config.ExpectMaxPercent {
+		checkLogger.Debugf("check failed. check: ExpectMaxPercent, expected: <= %v, got: %v", t.config.ExpectMaxPercent, syncPercent)
+		return false
+	}
+	if int64(currentBlock) < int64(t.config.MinBlockHeight) {
+		checkLogger.Debugf("check failed. check: MinSlotHeight, expected: >= %v, got: %v", t.config.MinBlockHeight, currentBlock)
+		return false
+	}
+	if t.config.WaitForChainProgression && currentBlock <= t.firstHeight[clientIdx] {
+		checkLogger.Debugf("check failed. check: WaitForChainProgression, expected block height: >= %v, got: %v", t.firstHeight[clientIdx], currentBlock)
 		return false
 	}
 	return true

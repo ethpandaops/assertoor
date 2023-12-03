@@ -1,20 +1,20 @@
-package sleep
+package runtasks
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/task/types"
+	"github.com/ethpandaops/minccino/pkg/coordinator/types"
 	"github.com/imdario/mergo"
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	TaskName       = "sleep"
+	TaskName       = "run_tasks"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Sleeps for a specified duration.",
+		Description: "Run tasks sequentially.",
 		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
@@ -25,6 +25,7 @@ type Task struct {
 	options *types.TaskOptions
 	config  Config
 	logger  logrus.FieldLogger
+	tasks   []types.Task
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -38,24 +39,39 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 			return nil, fmt.Errorf("error merging task config for %v: %w", TaskName, err)
 		}
 	}
+
+	childTasks := []types.Task{}
+	for i, rawtask := range config.Tasks {
+		taskOpts, err := ctx.Scheduler.ParseTaskOptions(&rawtask)
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing child task config #%v : %w", i, err)
+		}
+		task, err := ctx.NewTask(taskOpts)
+		if err != nil {
+			return nil, fmt.Errorf("failed initializing child task #%v : %w", i, err)
+		}
+		childTasks = append(childTasks, task)
+	}
+
 	return &Task{
 		ctx:     ctx,
 		options: options,
 		config:  config,
 		logger:  ctx.Scheduler.GetLogger().WithField("task", TaskName),
+		tasks:   childTasks,
 	}, nil
 }
 
 func (t *Task) Name() string {
-	return TaskDescriptor.Name
-}
-
-func (t *Task) Title() string {
-	return t.options.Title
+	return TaskName
 }
 
 func (t *Task) Description() string {
 	return TaskDescriptor.Description
+}
+
+func (t *Task) Title() string {
+	return t.options.Title
 }
 
 func (t *Task) Config() interface{} {
@@ -78,10 +94,11 @@ func (t *Task) ValidateConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	select {
-	case <-time.After(t.config.Duration.Duration):
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+	for i, task := range t.tasks {
+		err := t.ctx.Scheduler.ExecuteTask(ctx, task, t.ctx.Scheduler.WatchTaskPass)
+		if err != nil {
+			return fmt.Errorf("child task #%v failed: %w", i, err)
+		}
 	}
+	return nil
 }

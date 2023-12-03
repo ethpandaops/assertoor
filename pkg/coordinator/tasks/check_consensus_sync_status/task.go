@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
-	"github.com/ethpandaops/minccino/pkg/coordinator/task/types"
+	"github.com/ethpandaops/minccino/pkg/coordinator/types"
 	"github.com/imdario/mergo"
 	"github.com/sirupsen/logrus"
 )
@@ -95,7 +95,7 @@ func (t *Task) Execute(ctx context.Context) error {
 func (t *Task) processCheck(ctx context.Context) error {
 	allResultsPass := true
 	failedClients := []string{}
-	for _, client := range t.ctx.Scheduler.GetClientPool().GetClientsByNamePatterns(t.config.ClientNamePatterns) {
+	for _, client := range t.ctx.Scheduler.GetCoordinator().ClientPool().GetClientsByNamePatterns(t.config.ClientNamePatterns) {
 		checkResult := t.processClientCheck(ctx, client)
 		if !checkResult {
 			allResultsPass = false

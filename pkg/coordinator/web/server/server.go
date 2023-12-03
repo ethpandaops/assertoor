@@ -4,7 +4,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
+	coordinator_types "github.com/ethpandaops/minccino/pkg/coordinator/types"
 	"github.com/ethpandaops/minccino/pkg/coordinator/web"
 	"github.com/ethpandaops/minccino/pkg/coordinator/web/handlers"
 	"github.com/ethpandaops/minccino/pkg/coordinator/web/types"
@@ -62,7 +62,7 @@ func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*WebSe
 	return ws, nil
 }
 
-func (ws *WebServer) StartFrontend(config *types.FrontendConfig, clientPool *clients.ClientPool) error {
+func (ws *WebServer) StartFrontend(config *types.FrontendConfig, coordinator coordinator_types.Coordinator) error {
 	if config.Pprof {
 		// add pprof handler
 		ws.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
@@ -74,7 +74,7 @@ func (ws *WebServer) StartFrontend(config *types.FrontendConfig, clientPool *cli
 		}
 
 		// register frontend routes
-		frontendHandler := handlers.NewFrontendHandler(clientPool)
+		frontendHandler := handlers.NewFrontendHandler(coordinator)
 		ws.router.HandleFunc("/", frontendHandler.Index).Methods("GET")
 		ws.router.HandleFunc("/clients", frontendHandler.Clients).Methods("GET")
 

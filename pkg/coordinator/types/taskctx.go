@@ -3,14 +3,13 @@ package types
 import (
 	"context"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
 	"github.com/ethpandaops/minccino/pkg/coordinator/helper"
 	"github.com/sirupsen/logrus"
 )
 
 type TaskScheduler interface {
 	GetLogger() logrus.FieldLogger
-	GetClientPool() *clients.ClientPool
+	GetCoordinator() Coordinator
 	ParseTaskOptions(rawtask *helper.RawMessage) (*TaskOptions, error)
 	ExecuteTask(ctx context.Context, task Task, taskWatchFn func(task Task, ctx context.Context, cancelFn context.CancelFunc)) error
 	WatchTaskPass(task Task, ctx context.Context, cancelFn context.CancelFunc)
