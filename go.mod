@@ -1,6 +1,6 @@
 module github.com/ethpandaops/minccino
 
-go 1.21.1
+go 1.21
 
 require (
 	github.com/attestantio/go-eth2-client v0.18.4-0.20231012194602-0eff364fec01
