@@ -1,13 +1,12 @@
 package rpc
 
 import (
-	"math/big"
 	"reflect"
 )
 
 type ChainSpec struct {
-	NetworkId *big.Int
-	ChainId   *big.Int
+	NetworkId string
+	ChainId   string
 }
 
 func (chain *ChainSpec) CheckMismatch(chain2 *ChainSpec) []string {

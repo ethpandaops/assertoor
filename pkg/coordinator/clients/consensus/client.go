@@ -107,6 +107,10 @@ func (client *Client) GetEndpointConfig() *ClientConfig {
 	return client.endpointConfig
 }
 
+func (client *Client) GetRpcClient() *rpc.BeaconClient {
+	return client.rpcClient
+}
+
 func (client *Client) GetLastHead() (phase0.Slot, phase0.Root) {
 	client.headMutex.RLock()
 	defer client.headMutex.RUnlock()

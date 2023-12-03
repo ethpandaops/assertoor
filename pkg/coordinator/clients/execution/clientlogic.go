@@ -111,7 +111,7 @@ func (client *Client) runClientLogic() error {
 		}
 		select {
 		case updateNotification := <-client.updateChan:
-			err := client.processBlock(updateNotification.hash, updateNotification.number, nil)
+			err := client.processBlock(updateNotification.hash, updateNotification.number, nil, "notified")
 			if err != nil {
 				client.logger.Warnf("error processing execution block update: %v", err)
 			} else {
@@ -139,7 +139,7 @@ func (client *Client) pollClientHead() error {
 	if latestBlock == nil {
 		return fmt.Errorf("could not find latest block")
 	}
-	err = client.processBlock(latestBlock.Hash(), latestBlock.Number().Uint64(), latestBlock)
+	err = client.processBlock(latestBlock.Hash(), latestBlock.Number().Uint64(), latestBlock, "polled")
 	if err != nil {
 		client.logger.Warnf("error processing execution block: %v", err)
 	}
@@ -147,16 +147,21 @@ func (client *Client) pollClientHead() error {
 	return nil
 }
 
-func (client *Client) processBlock(hash common.Hash, number uint64, block *types.Block) error {
-	cachedBlock, _ := client.pool.blockCache.AddBlock(hash, number)
+func (client *Client) processBlock(hash common.Hash, number uint64, block *types.Block, source string) error {
+	cachedBlock, isNewBlock := client.pool.blockCache.AddBlock(hash, number)
 	if cachedBlock != nil {
-		if block != nil {
-			cachedBlock.SetBlock(block)
-		}
 		cachedBlock.SetSeenBy(client)
+	}
+	if isNewBlock {
+		client.logger.Infof("received el block %v [0x%x] %v", number, hash, source)
+	} else {
+		client.logger.Debugf("received known el block %v [0x%x] %v", number, hash, source)
 	}
 
 	loaded, err := cachedBlock.EnsureBlock(func() (*types.Block, error) {
+		if block != nil {
+			return block, nil
+		}
 		ctx, cancel := context.WithTimeout(client.clientCtx, 10*time.Second)
 		defer cancel()
 		block, err := client.rpcClient.GetBlockByHash(ctx, cachedBlock.Hash)

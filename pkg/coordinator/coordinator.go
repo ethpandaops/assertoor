@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
 	"github.com/ethpandaops/minccino/pkg/coordinator/test"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -28,14 +29,27 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, lameDuc
 	}
 }
 
-// Run executes the test until completion.
+// Run executes the coordinator until completion.
 func (c *Coordinator) Run(ctx context.Context) error {
 	c.log.
 		WithField("metrics_port", c.metricsPort).
 		WithField("lame_duck_seconds", c.lameDuckSeconds).
 		Info("starting coordinator")
 
-	testToRun, err := test.CreateRunnable(ctx, c.log, c.Config.Execution.URL, c.Config.Consensus.URL, c.Config.Test)
+	// init client pool
+	clientPool, err := clients.NewClientPool()
+	if err != nil {
+		return err
+	}
+	for _, endpoint := range c.Config.Endpoints {
+		err = clientPool.AddClient(&endpoint)
+		if err != nil {
+			return err
+		}
+	}
+
+	// run test
+	testToRun, err := test.CreateRunnable(ctx, c.log, clientPool, c.Config.Test)
 	if err != nil {
 		return err
 	}

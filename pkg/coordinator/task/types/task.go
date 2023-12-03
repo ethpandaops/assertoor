@@ -42,10 +42,8 @@ type Task interface {
 
 	Logger() logrus.FieldLogger
 	Timeout() time.Duration
-	PollingInterval() time.Duration
 
 	ValidateConfig() error
-	GetResult() (TaskResult, error)
 	Execute(ctx context.Context) error
 	Cleanup(ctx context.Context) error
 }

@@ -43,7 +43,7 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 		ctx:     ctx,
 		options: options,
 		config:  config,
-		logger:  ctx.Logger.WithField("task", TaskName),
+		logger:  ctx.Scheduler.GetLogger().WithField("task", TaskName),
 	}, nil
 }
 
@@ -65,21 +65,6 @@ func (t *Task) Logger() logrus.FieldLogger {
 
 func (t *Task) Timeout() time.Duration {
 	return t.options.Timeout.Duration
-}
-
-func (t *Task) PollingInterval() time.Duration {
-	return 0
-}
-
-func (t *Task) GetResult() (types.TaskResult, error) {
-	taskStatus := t.ctx.Scheduler.GetTaskStatus(t)
-	if taskStatus.Error != nil {
-		return types.TaskResultFailure, taskStatus.Error
-	}
-	if taskStatus.IsRunning {
-		return types.TaskResultNone, nil
-	}
-	return types.TaskResultSuccess, nil
 }
 
 func (t *Task) ValidateConfig() error {

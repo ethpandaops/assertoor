@@ -90,6 +90,15 @@ func (bc *BeaconClient) GetNodeSyncing(ctx context.Context) (*v1.SyncState, erro
 	return result, nil
 }
 
+func (bc *BeaconClient) GetNodeSyncStatus(ctx context.Context) (*SyncStatus, error) {
+	syncState, err := bc.GetNodeSyncing(ctx)
+	if err != nil {
+		return nil, err
+	}
+	syncStatus := NewSyncStatus(syncState)
+	return &syncStatus, nil
+}
+
 func (bc *BeaconClient) GetNodeVersion(ctx context.Context) (string, error) {
 	provider, isProvider := bc.clientSvc.(eth2client.NodeVersionProvider)
 	if !isProvider {

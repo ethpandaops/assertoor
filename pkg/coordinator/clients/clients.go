@@ -2,6 +2,7 @@ package clients
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -31,11 +32,17 @@ type ClientConfig struct {
 }
 
 func NewClientPool() (*ClientPool, error) {
-	consensusPool, err := consensus.NewPool(&consensus.PoolConfig{})
+	consensusPool, err := consensus.NewPool(&consensus.PoolConfig{
+		FollowDistance: 10,
+		ForkDistance:   1,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not init consensus pool: %w", err)
 	}
-	executionPool, err := execution.NewPool(&execution.PoolConfig{})
+	executionPool, err := execution.NewPool(&execution.PoolConfig{
+		FollowDistance: 10,
+		ForkDistance:   1,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not init execution pool: %w", err)
 	}
@@ -98,4 +105,24 @@ func (pool *ClientPool) processConsensusBlockNotification(block *consensus.Block
 		return
 	}
 	poolClient.ExecutionClient.NotifyNewBlock(common.Hash(hash), number)
+}
+
+func (pool *ClientPool) GetAllClients() []*PoolClient {
+	clients := make([]*PoolClient, len(pool.clients))
+	copy(clients, pool.clients)
+	return clients
+}
+
+func (pool *ClientPool) GetClientsByNamePatterns(patterns []string) []*PoolClient {
+	clients := []*PoolClient{}
+	for _, client := range pool.clients {
+		for _, pattern := range patterns {
+			matched, _ := regexp.MatchString(pattern, client.Config.Name)
+			if matched {
+				clients = append(clients, client)
+				break
+			}
+		}
+	}
+	return clients
 }

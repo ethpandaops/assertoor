@@ -13,6 +13,7 @@ type Block struct {
 	Hash       common.Hash
 	Number     uint64
 	blockMutex sync.Mutex
+	blockCMtx  sync.Mutex
 	blockChan  chan bool
 	block      *types.Block
 	seenMutex  sync.RWMutex
@@ -50,11 +51,6 @@ func (block *Block) AwaitBlock(timeout time.Duration) *types.Block {
 	return block.block
 }
 
-func (block *Block) SetBlock(ethblock *types.Block) {
-	block.block = ethblock
-	close(block.blockChan)
-}
-
 func (block *Block) GetParentHash() *common.Hash {
 	if block.block == nil {
 		return nil
@@ -77,6 +73,7 @@ func (block *Block) EnsureBlock(loadBlock func() (*types.Block, error)) (bool, e
 	if err != nil {
 		return false, err
 	}
+
 	block.block = blockBody
 	close(block.blockChan)
 	return true, nil

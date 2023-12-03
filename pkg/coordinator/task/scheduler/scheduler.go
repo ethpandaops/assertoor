@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
 	"github.com/ethpandaops/minccino/pkg/coordinator/helper"
 	"github.com/ethpandaops/minccino/pkg/coordinator/task/tasks"
 	"github.com/ethpandaops/minccino/pkg/coordinator/task/types"
@@ -19,17 +20,43 @@ type TaskScheduler struct {
 	rootTasks        []types.Task
 	allCleanupTasks  []types.Task
 	rootCleanupTasks []types.Task
-	runningMutex     sync.Mutex
-	runningTasks     map[types.Task]*types.TaskStatus
+	taskStateMutex   sync.RWMutex
+	taskStateMap     map[types.Task]*taskExecutionState
+
+	clientPool *clients.ClientPool
 }
 
-func NewTaskScheduler(logger logrus.FieldLogger) *TaskScheduler {
+type taskExecutionState struct {
+	isStarted        bool
+	isRunning        bool
+	isTimeout        bool
+	updatedResult    bool
+	taskResult       types.TaskResult
+	taskError        error
+	resultNotifyChan chan bool
+	resultMutex      sync.RWMutex
+}
+
+func NewTaskScheduler(logger logrus.FieldLogger, clientPool *clients.ClientPool) *TaskScheduler {
 	return &TaskScheduler{
 		logger:       logger,
 		rootTasks:    make([]types.Task, 0),
 		allTasks:     make([]types.Task, 0),
-		runningTasks: make(map[types.Task]*types.TaskStatus),
+		taskStateMap: make(map[types.Task]*taskExecutionState),
+		clientPool:   clientPool,
 	}
+}
+
+func (ts *TaskScheduler) GetLogger() logrus.FieldLogger {
+	return ts.logger
+}
+
+func (ts *TaskScheduler) GetTaskCount() int {
+	return len(ts.allTasks)
+}
+
+func (ts *TaskScheduler) GetClientPool() *clients.ClientPool {
+	return ts.clientPool
 }
 
 func (ts *TaskScheduler) ParseTaskOptions(rawtask *helper.RawMessage) (*types.TaskOptions, error) {
@@ -58,10 +85,6 @@ func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.Task,
 	return task, nil
 }
 
-func (ts *TaskScheduler) GetTaskCount() int {
-	return len(ts.allTasks)
-}
-
 func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, isCleanupTask bool) (types.Task, error) {
 	// lookup task by name
 	var taskDescriptor *types.TaskDescriptor
@@ -80,10 +103,12 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, 
 	taskCtx := &types.TaskContext{
 		Scheduler:  ts,
 		Index:      ts.taskCount,
-		Logger:     ts.logger,
 		ParentTask: parent,
 		NewTask: func(options *types.TaskOptions) (types.Task, error) {
 			return ts.newTask(options, task, isCleanupTask)
+		},
+		SetResult: func(result types.TaskResult) {
+			ts.setTaskResult(task, result, true)
 		},
 	}
 	ts.taskCount++
@@ -93,12 +118,41 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, 
 		return nil, fmt.Errorf("failed task '%v' initialization: %w", options.Name, err)
 	}
 
+	// create internal execution state
+	ts.taskStateMutex.Lock()
+	taskState := &taskExecutionState{}
+	ts.taskStateMap[task] = taskState
+	ts.taskStateMutex.Unlock()
+
 	if isCleanupTask {
 		ts.allCleanupTasks = append(ts.allCleanupTasks, task)
 	} else {
 		ts.allTasks = append(ts.allTasks, task)
 	}
 	return task, nil
+}
+
+func (ts *TaskScheduler) setTaskResult(task types.Task, result types.TaskResult, setUpdated bool) {
+	ts.taskStateMutex.RLock()
+	taskState := ts.taskStateMap[task]
+	ts.taskStateMutex.RUnlock()
+	if taskState == nil {
+		return
+	}
+
+	taskState.resultMutex.Lock()
+	defer taskState.resultMutex.Unlock()
+	if setUpdated {
+		taskState.updatedResult = true
+	}
+	if taskState.taskResult == result {
+		return
+	}
+	taskState.taskResult = result
+	if taskState.resultNotifyChan != nil {
+		close(taskState.resultNotifyChan)
+		taskState.resultNotifyChan = nil
+	}
 }
 
 func (ts *TaskScheduler) ValidateTaskConfigs() error {
@@ -157,34 +211,46 @@ func (ts *TaskScheduler) runCleanupTasks(ctx context.Context) {
 // ExecuteTask executes a task
 // this function blocks until the task is executed or the context cancelled
 func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskWatchFn func(task types.Task, ctx context.Context, cancelFn context.CancelFunc)) error {
-	runningTask := &types.TaskStatus{
-		IsRunning: true,
-	}
-	defer func() {
-		runningTask.IsRunning = false
-	}()
-
 	// check if task has already been started/executed
-	ts.runningMutex.Lock()
-	if ts.runningTasks[task] != nil {
-		ts.runningMutex.Unlock()
+	ts.taskStateMutex.RLock()
+	taskState := ts.taskStateMap[task]
+	ts.taskStateMutex.RUnlock()
+	if taskState == nil {
+		return fmt.Errorf("task state not found")
+	}
+	if taskState.isStarted {
 		return fmt.Errorf("task has already been executed")
 	}
-	ts.runningTasks[task] = runningTask
-	ts.runningMutex.Unlock()
+	taskState.isStarted = true
+	taskState.isRunning = true
+	defer func() {
+		taskState.isRunning = false
+	}()
 
 	// create cancelable task context
-	var taskCtx context.Context
-	var taskCancelFn context.CancelFunc
+	taskCtx, taskCancelFn := context.WithCancel(ctx)
 	taskTimeout := task.Timeout()
 	if taskTimeout > 0 {
-		taskCtx, taskCancelFn = context.WithTimeout(ctx, taskTimeout)
-	} else {
-		taskCtx, taskCancelFn = context.WithCancel(ctx)
+		go func() {
+			select {
+			case <-time.After(taskTimeout):
+				task.Logger().Errorf("task timed out")
+				taskState.isTimeout = true
+				taskCancelFn()
+			case <-taskCtx.Done():
+			}
+		}()
 	}
 	defer taskCancelFn()
 
 	defer func() {
+		if r := recover(); r != nil {
+			err := r.(error)
+			task.Logger().Errorf("task execution panic: %v", r)
+			taskState.taskError = err
+			ts.setTaskResult(task, types.TaskResultFailure, false)
+		}
+
 		err := task.Cleanup(ctx)
 		if err != nil {
 			task.Logger().Errorf("task cleanup failed: %v", err)
@@ -199,38 +265,84 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 	// execute task
 	task.Logger().Infof("starting task")
 	err := task.Execute(taskCtx)
+
 	if err != nil {
-		task.Logger().Errorf("task failed: %v", err)
-		runningTask.Error = err
-		return fmt.Errorf("task failed: %w", err)
+		task.Logger().Errorf("task execution returned error: %v", err)
+		taskState.taskError = err
 	}
 
-	task.Logger().Infof("task completed", err)
+	// set task result
+	if taskState.isTimeout {
+		// always fail tasks on timeout
+		ts.setTaskResult(task, types.TaskResultFailure, false)
+	} else if !taskState.updatedResult {
+		// set task result if not already done by task
+		if err == nil {
+			ts.setTaskResult(task, types.TaskResultSuccess, false)
+		} else {
+			ts.setTaskResult(task, types.TaskResultFailure, false)
+		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("task failed: %w", err)
+	}
+	if taskState.taskResult == types.TaskResultFailure {
+		task.Logger().Warnf("task failed with failure result")
+		return fmt.Errorf("task failed: %w", taskState.taskError)
+	}
+	task.Logger().Infof("task completed")
 	return nil
 }
 
 func (ts *TaskScheduler) WatchTaskPass(task types.Task, ctx context.Context, cancelFn context.CancelFunc) {
 	// poll task result and cancel context when task result is passed or failed
 	for {
-		pollInterval := task.PollingInterval()
-		if pollInterval == 0 {
-			pollInterval = 5 * time.Second
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(pollInterval):
-			taskResult, _ := task.GetResult()
-			if taskResult == types.TaskResultSuccess || taskResult == types.TaskResultFailure {
-				cancelFn()
+		updateChan := ts.GetTaskResultUpdateChan(task, types.TaskResultNone)
+		if updateChan != nil {
+			select {
+			case <-ctx.Done():
 				return
+			case <-updateChan:
 			}
+		}
+		taskStatus := ts.GetTaskStatus(task)
+		if taskStatus.Result != types.TaskResultNone {
+			cancelFn()
+			return
 		}
 	}
 }
 
 func (ts *TaskScheduler) GetTaskStatus(task types.Task) *types.TaskStatus {
-	ts.runningMutex.Lock()
-	defer ts.runningMutex.Unlock()
-	return ts.runningTasks[task]
+	ts.taskStateMutex.RLock()
+	taskState := ts.taskStateMap[task]
+	ts.taskStateMutex.RUnlock()
+	if taskState == nil {
+		return nil
+	}
+	return &types.TaskStatus{
+		IsStarted: taskState.isStarted,
+		IsRunning: taskState.isRunning,
+		Result:    taskState.taskResult,
+		Error:     taskState.taskError,
+	}
+}
+
+func (ts *TaskScheduler) GetTaskResultUpdateChan(task types.Task, oldResult types.TaskResult) <-chan bool {
+	ts.taskStateMutex.RLock()
+	taskState := ts.taskStateMap[task]
+	ts.taskStateMutex.RUnlock()
+	if taskState == nil {
+		return nil
+	}
+	taskState.resultMutex.RLock()
+	defer taskState.resultMutex.RUnlock()
+	if taskState.taskResult != oldResult {
+		return nil
+	}
+	if taskState.resultNotifyChan == nil {
+		taskState.resultNotifyChan = make(chan bool)
+	}
+	return taskState.resultNotifyChan
 }

@@ -109,6 +109,10 @@ func (client *Client) GetLastEventTime() time.Time {
 	return client.lastEvent
 }
 
+func (client *Client) GetRpcClient() *rpc.ExecutionClient {
+	return client.rpcClient
+}
+
 func (client *Client) GetStatus() ClientStatus {
 	if client.isSyncing {
 		return ClientStatusSynchronizing

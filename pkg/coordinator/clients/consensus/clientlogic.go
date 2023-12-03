@@ -156,18 +156,9 @@ func (client *Client) runClientLogic() error {
 }
 
 func (client *Client) processBlockEvent(evt *v1.BlockEvent) error {
-	currentBlock, isNewBlock := client.pool.blockCache.AddBlock(evt.Block, evt.Slot)
-	if currentBlock != nil {
-		if isNewBlock {
-			client.logger.Infof("received block %v [0x%x] stream", currentBlock.Slot, currentBlock.Root)
-		} else {
-			client.logger.Debugf("received known block %v [0x%x] stream", currentBlock.Slot, currentBlock.Root)
-		}
-
-		err := client.processBlock(currentBlock.Root, currentBlock.Slot, nil)
-		if err != nil {
-			return fmt.Errorf("could not process block: %v", err)
-		}
+	err := client.processBlock(evt.Block, evt.Slot, nil, "streamed")
+	if err != nil {
+		return fmt.Errorf("could not process block: %v", err)
 	}
 
 	client.headMutex.Lock()
@@ -196,7 +187,7 @@ func (client *Client) pollClientHead() error {
 	if latestHeader == nil {
 		return fmt.Errorf("could not find latest header")
 	}
-	err = client.processBlock(latestHeader.Root, latestHeader.Header.Message.Slot, latestHeader.Header)
+	err = client.processBlock(latestHeader.Root, latestHeader.Header.Message.Slot, latestHeader.Header, "polled")
 	if err != nil {
 		return fmt.Errorf("could not get process block: %v", err)
 	}
@@ -210,13 +201,18 @@ func (client *Client) pollClientHead() error {
 	return nil
 }
 
-func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *phase0.SignedBeaconBlockHeader) error {
-	cachedBlock, _ := client.pool.blockCache.AddBlock(root, slot)
+func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *phase0.SignedBeaconBlockHeader, source string) error {
+	cachedBlock, isNewBlock := client.pool.blockCache.AddBlock(root, slot)
 	if cachedBlock != nil {
 		if header != nil {
 			cachedBlock.SetHeader(header)
 		}
 		cachedBlock.SetSeenBy(client)
+	}
+	if isNewBlock {
+		client.logger.Infof("received cl block %v [0x%x] %v", slot, root, source)
+	} else {
+		client.logger.Debugf("received known cl block %v [0x%x] %v", slot, root, source)
 	}
 
 	err := cachedBlock.EnsureHeader(func() (*phase0.SignedBeaconBlockHeader, error) {
@@ -250,7 +246,7 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 		client.headMutex.Unlock()
 		return nil
 	}
-	client.headSlot = header.Message.Slot
+	client.headSlot = slot
 	client.headRoot = root
 	client.headMutex.Unlock()
 

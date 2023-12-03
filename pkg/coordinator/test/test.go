@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
 	"github.com/ethpandaops/minccino/pkg/coordinator/task/scheduler"
 	"github.com/sirupsen/logrus"
 )
@@ -26,7 +27,7 @@ type Test struct {
 	metrics Metrics
 }
 
-func CreateRunnable(ctx context.Context, log logrus.FieldLogger, executionURL, consensusURL string, config Config) (Runnable, error) {
+func CreateRunnable(ctx context.Context, log logrus.FieldLogger, clientPool *clients.ClientPool, config Config) (Runnable, error) {
 	runnable := &Test{
 		name:    config.Name,
 		log:     log.WithField("component", "test").WithField("test", config.Name),
@@ -35,7 +36,7 @@ func CreateRunnable(ctx context.Context, log logrus.FieldLogger, executionURL, c
 	}
 
 	// parse tasks
-	runnable.taskScheduler = scheduler.NewTaskScheduler(runnable.log)
+	runnable.taskScheduler = scheduler.NewTaskScheduler(runnable.log, clientPool)
 	for _, rawtask := range config.Tasks {
 		taskOptions, err := runnable.taskScheduler.ParseTaskOptions(&rawtask)
 		if err != nil {

@@ -3,6 +3,7 @@ package coordinator
 import (
 	"os"
 
+	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
 	"github.com/ethpandaops/minccino/pkg/coordinator/test"
 	"gopkg.in/yaml.v2"
 )
@@ -17,10 +18,9 @@ type Execution struct {
 }
 
 type Config struct {
-	// Execution is the execution node to use.
-	Execution Execution `yaml:"execution" json:"execution"`
-	// Consensus is the consensus node to use.
-	Consensus Consensus `yaml:"consensus" json:"consensus"`
+	// List of execution & consensus clients to use.
+	Endpoints []clients.ClientConfig `yaml:"endpoints" json:"endpoints"`
+
 	// Test is the test configuration.
 	Test test.Config `yaml:"test" json:"test"`
 }
@@ -28,13 +28,14 @@ type Config struct {
 // DefaultConfig represents a sane-default configuration.
 func DefaultConfig() *Config {
 	return &Config{
+		Endpoints: []clients.ClientConfig{
+			{
+				Name:         "local",
+				ExecutionUrl: "http://localhost:8545",
+				ConsensusUrl: "http://localhost:5052",
+			},
+		},
 		Test: test.BasicSynced(),
-		Execution: Execution{
-			URL: "http://localhost:8545",
-		},
-		Consensus: Consensus{
-			URL: "http://localhost:5052",
-		},
 	}
 }
 

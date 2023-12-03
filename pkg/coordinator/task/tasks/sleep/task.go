@@ -25,7 +25,6 @@ type Task struct {
 	options *types.TaskOptions
 	config  Config
 	logger  logrus.FieldLogger
-	result  types.TaskResult
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -43,7 +42,7 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 		ctx:     ctx,
 		options: options,
 		config:  config,
-		logger:  ctx.Logger.WithField("task", TaskName),
+		logger:  ctx.Scheduler.GetLogger().WithField("task", TaskName),
 	}, nil
 }
 
@@ -67,18 +66,6 @@ func (t *Task) Timeout() time.Duration {
 	return t.options.Timeout.Duration
 }
 
-func (t *Task) PollingInterval() time.Duration {
-	return 0
-}
-
-func (t *Task) GetResult() (types.TaskResult, error) {
-	taskStatus := t.ctx.Scheduler.GetTaskStatus(t)
-	if taskStatus.Error != nil {
-		return types.TaskResultFailure, taskStatus.Error
-	}
-	return t.result, nil
-}
-
 func (t *Task) ValidateConfig() error {
 	if err := t.config.Validate(); err != nil {
 		return err
@@ -87,8 +74,12 @@ func (t *Task) ValidateConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	time.Sleep(t.config.Duration.Duration)
-	return nil
+	select {
+	case <-time.After(t.config.Duration.Duration):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (t *Task) Cleanup(ctx context.Context) error {
