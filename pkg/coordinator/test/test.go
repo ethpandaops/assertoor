@@ -12,11 +12,14 @@ import (
 type Test struct {
 	name          string
 	taskScheduler *TaskScheduler
+	log           logrus.FieldLogger
+	config        Config
+	metrics       Metrics
 
-	log    logrus.FieldLogger
-	config Config
-
-	metrics Metrics
+	status    types.TestStatus
+	startTime time.Time
+	stopTime  time.Time
+	timeout   time.Duration
 }
 
 func CreateRunnable(ctx context.Context, coordinator types.Coordinator, config Config) (types.Test, error) {
@@ -25,6 +28,9 @@ func CreateRunnable(ctx context.Context, coordinator types.Coordinator, config C
 		log:     coordinator.Logger().WithField("component", "test").WithField("test", config.Name),
 		config:  config,
 		metrics: NewMetrics("sync_test_coordinator", config.Name),
+	}
+	if test.config.Timeout.Duration > 0 {
+		test.timeout = test.config.Timeout.Duration
 	}
 
 	// parse tasks
@@ -64,6 +70,22 @@ func (t *Test) Name() string {
 	return t.name
 }
 
+func (t *Test) StartTime() time.Time {
+	return t.startTime
+}
+
+func (t *Test) StopTime() time.Time {
+	return t.stopTime
+}
+
+func (t *Test) Timeout() time.Duration {
+	return t.timeout
+}
+
+func (t *Test) Status() types.TestStatus {
+	return t.status
+}
+
 func (t *Test) Validate() error {
 	err := t.taskScheduler.ValidateTaskConfigs()
 	if err != nil {
@@ -78,26 +100,34 @@ func (t *Test) Validate() error {
 }
 
 func (t *Test) Run(ctx context.Context) error {
-	now := time.Now()
-
-	defer t.metrics.SetTestDuration(float64(time.Since(now).Milliseconds()))
-
-	timeout := time.Hour * 24 * 365 // 1 year
-	if t.config.Timeout.Duration > 0 {
-		timeout = t.config.Timeout.Duration
+	if t.status != types.TestStatusPending {
+		return fmt.Errorf("test has already been started")
 	}
-	t.log.WithField("timeout", timeout.String()).Info("setting test timeout")
 
-	err := t.taskScheduler.RunTasks(ctx, timeout)
+	t.startTime = time.Now()
+	t.status = types.TestStatusRunning
+
+	defer func() {
+		t.metrics.SetTestDuration(float64(time.Since(t.startTime).Milliseconds()))
+		t.stopTime = time.Now()
+	}()
+
+	t.log.WithField("timeout", t.timeout.String()).Info("starting test")
+
+	err := t.taskScheduler.RunTasks(ctx, t.timeout)
 	if err != nil {
 		t.log.Info("test failed!")
-
+		t.status = types.TestStatusFailure
 		return err
 	}
 
 	t.log.Info("test completed!")
-
+	t.status = types.TestStatusSuccess
 	return nil
+}
+
+func (t *Test) GetTaskScheduler() types.TaskScheduler {
+	return t.taskScheduler
 }
 
 func (t *Test) Percent() float64 {

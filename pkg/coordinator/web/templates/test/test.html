@@ -1,0 +1,208 @@
+{{ define "page" }}
+  <div class="container mt-2">
+    <h2 class="py-2">Test {{ .Index }}: {{ .Name }}</h2>
+    
+    <!-- client pool status -->
+    <div class="row">
+      <div class="col-6 col-sm-4 col-lg-3">
+        Test Status:
+      </div>
+      <div class="col-6 col-sm-8 col-lg-9">
+        {{ if eq .Status "pending" }}
+          <span class="badge rounded-pill text-bg-secondary">
+            <i class="far fa-hourglass-half"></i> Pending
+          </span>
+        {{ else if eq .Status "running" }}
+          <span class="badge rounded-pill text-bg-primary">
+            <i class="far fa-play-circle"></i> Running
+          </span>
+        {{ else if eq .Status "success" }}
+          <span class="badge rounded-pill text-bg-success">
+            <i class="fas fa-check-circle"></i> Success
+          </span>
+        {{ else if eq .Status "failure" }}
+          <span class="badge rounded-pill text-bg-danger">
+            <i class="fas fa-times-circle"></i> Failed
+          </span>
+        {{ else }}
+          <span class="badge rounded-pill text-bg-warning">
+            {{ .Status }}
+          </span>
+        {{ end }}
+      </div>
+    </div>
+    {{ if .IsStarted }}
+    <div class="row">
+      <div class="col-6 col-sm-4 col-lg-3">
+        Start Time:
+      </div>
+      <div class="col-6 col-sm-8 col-lg-9">
+        {{ formatDateTime .StartTime.UTC }}     
+      </div>
+    </div>
+    {{ end }}
+    {{ if .IsCompleted }}
+    <div class="row">
+      <div class="col-6 col-sm-4 col-lg-3">
+        Finish Time:
+      </div>
+      <div class="col-6 col-sm-8 col-lg-9">
+        {{ formatDateTime .StopTime.UTC }}     
+      </div>
+    </div>
+    {{ end }}
+    <div class="row">
+      <div class="col-6 col-sm-4 col-lg-3">
+        Timeout:
+      </div>
+      <div class="col-6 col-sm-8 col-lg-9">
+        {{ .Timeout }}     
+      </div>
+    </div>
+    
+    <!-- task list -->
+    <div class="task-list">
+      <div class="card mt-2">
+        <div class="card-body px-0 py-1">
+          <h4 class="px-2 py-1 my-0">Tasks</h4>
+          <div class="accordion accordion-flush" id="tasksList">
+            <div class="accordion-item d-none d-sm-block task-list-header">
+              <h2 class="accordion-header">
+                <div class="accordion-button task-header collapsed">
+                  <div class="container">
+                    <div class="row">
+                      <div class="col-6 col-sm-3 col-lg-3">Name</div>
+                      <div class="col-6 col-sm-6 col-lg-7">Title</div>
+                      <div class="col-6 col-sm-3 col-lg-2">Run Time</div>
+                    </div>
+                  </div>
+                  <div class="task-status"></div>
+                </div>
+              </h2>
+            </div>
+            {{ range $i, $task := .Tasks }}
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button task-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#task{{ $task.Index }}-panel" aria-expanded="true" aria-controls="task{{ $task.Index }}-panel">
+                    <div class="container">
+                      <div class="row">
+
+                        <div class="d-sm-none col-3 px-0">Name:</div>
+                        <div class="col-7 col-sm-3 col-lg-3">{{ $task.Name }}</div>
+
+                        <div class="d-sm-none col-3 px-0">Title:</div>
+                        <div class="col-7 col-sm-6 col-lg-7">{{ $task.Title }}</div>
+
+                        <div class="d-sm-none col-3 px-0">Run Time:</div>
+                        <div class="col-7 col-sm-3 col-lg-2">{{ if $task.HasRunTime }}{{ $task.RunTime }}{{ else }}?{{ end }}{{ if $task.HasTimeout }} / {{ $task.Timeout }}{{ end }}</div>
+
+                      </div>
+                    </div>
+                    <div class="task-status">
+                      {{ if eq $task.Status "pending" }}
+                        <span class="badge rounded-pill text-bg-secondary">
+                          <i class="far fa-hourglass-half"></i>
+                        </span>
+                      {{ else if eq $task.Status "running" }}
+                        <span class="badge rounded-pill text-bg-primary">
+                          <i class="far fa-play-circle"></i>
+                        </span>
+                      {{ end }}
+
+                      {{ if eq $task.Result "success" }}
+                        <span class="badge rounded-pill text-bg-success">
+                          <i class="fas fa-check"></i>
+                        </span>
+                      {{ else if eq $task.Result "failure" }}
+                        <span class="badge rounded-pill text-bg-danger">
+                          <i class="fas fa-times"></i>
+                        </span>
+                      {{ else }}
+                        <span class="badge rounded-pill text-bg-secondary">
+                          <i class="fas fa-question"></i>
+                        </span>
+                      {{ end }}
+                    </div>
+                  </button>
+                </h2>
+                <div id="task{{ $task.Index }}-panel" class="accordion-collapse collapse">
+                  <div class="accordion-body">
+                    <div class="container">
+                      <div class="row">
+                        <div class="col-6 col-sm-3 col-lg-2">Status:</div>
+                        <div class="col-6 col-sm-3 col-lg-10">
+                          {{ if eq $task.Status "pending" }}
+                            <span class="badge rounded-pill text-bg-secondary">
+                              <i class="far fa-hourglass-half"></i> Pending
+                            </span>
+                          {{ else if eq $task.Status "running" }}
+                            <span class="badge rounded-pill text-bg-primary">
+                              <i class="far fa-play-circle"></i> Running
+                            </span>
+                          {{ else if eq $task.Status "complete" }}
+                            <span class="badge rounded-pill text-bg-success">
+                              <i class="far fa-check-circle"></i> Complete
+                            </span>
+                          {{ else }}
+                            <span class="badge rounded-pill text-bg-warning">
+                              <i class="far fa-question"></i> {{ $task.Status }}
+                            </span>
+                          {{ end }}
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-6 col-sm-3 col-lg-2">Result:</div>
+                        <div class="col-6 col-sm-3 col-lg-10">
+                          {{ if eq $task.Result "success" }}
+                            <span class="badge rounded-pill text-bg-success">
+                              <i class="fas fa-check"></i> Success
+                            </span>
+                          {{ else if eq $task.Result "failure" }}
+                            <span class="badge rounded-pill text-bg-danger">
+                              <i class="fas fa-times"></i> Failure
+                            </span>
+                          {{ else }}
+                            <span class="badge rounded-pill text-bg-secondary">
+                              <i class="fas fa-question"></i> None
+                            </span>
+                          {{ end }}
+                        </div>
+                      </div>
+                      {{ if $task.IsStarted }}
+                      <div class="row">
+                        <div class="col-6 col-sm-3 col-lg-2">Start Time:</div>
+                        <div class="col-6 col-sm-3 col-lg-10">{{ formatDateTime $task.StartTime.UTC }}</div>
+                      </div>
+                      {{ end }}
+                      {{ if $task.IsCompleted }}
+                      <div class="row">
+                        <div class="col-6 col-sm-3 col-lg-2">Finish Time:</div>
+                        <div class="col-6 col-sm-3 col-lg-10">{{ formatDateTime $task.StopTime.UTC }}</div>
+                      </div>
+                      {{ end }}
+                      {{ if not (eq $task.ResultError "") }}
+                      <div class="row">
+                        <div class="col-6 col-sm-3 col-lg-2">Error Result:</div>
+                        <div class="col-6 col-sm-3 col-lg-10">
+                          <pre>{{ .ResultError }}</pre>
+                        </div>
+                      </div>
+                      {{ end }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {{ end }}
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+{{ end }}
+
+{{ define "js" }}
+{{ end }}
+{{ define "css" }}
+{{ end }}

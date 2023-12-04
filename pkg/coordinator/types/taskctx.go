@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"time"
 
 	"github.com/ethpandaops/minccino/pkg/coordinator/helper"
 	"github.com/sirupsen/logrus"
@@ -13,13 +14,21 @@ type TaskScheduler interface {
 	ParseTaskOptions(rawtask *helper.RawMessage) (*TaskOptions, error)
 	ExecuteTask(ctx context.Context, task Task, taskWatchFn func(task Task, ctx context.Context, cancelFn context.CancelFunc)) error
 	WatchTaskPass(task Task, ctx context.Context, cancelFn context.CancelFunc)
+	GetTaskCount() int
+	GetAllTasks() []Task
+	GetRootTasks() []Task
+	GetAllCleanupTasks() []Task
+	GetRootCleanupTasks() []Task
 	GetTaskStatus(task Task) *TaskStatus
 	GetTaskResultUpdateChan(task Task, oldResult TaskResult) <-chan bool
 }
 
 type TaskStatus struct {
+	Index     uint64
 	IsStarted bool
 	IsRunning bool
+	StartTime time.Time
+	StopTime  time.Time
 	Result    TaskResult
 	Error     error
 }

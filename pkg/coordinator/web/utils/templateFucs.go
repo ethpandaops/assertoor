@@ -38,6 +38,7 @@ func GetTemplateFuncs() template.FuncMap {
 		"percent":        func(i float64) float64 { return i * 100 },
 		"contains":       strings.Contains,
 		"formatTimeDiff": FormatTimeDiff,
+		"formatDateTime": FormatDateTime,
 	}
 }
 
@@ -80,4 +81,8 @@ func FormatTimeDiff(ts time.Time) template.HTML {
 	} else {
 		return template.HTML(fmt.Sprintf("in %v", timeStr))
 	}
+}
+
+func FormatDateTime(ts time.Time) template.HTML {
+	return template.HTML(ts.Format("02-01-2006 15:04:05"))
 }

@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -25,9 +26,12 @@ type TaskScheduler struct {
 }
 
 type taskExecutionState struct {
+	index            uint64
 	isStarted        bool
 	isRunning        bool
 	isTimeout        bool
+	startTime        time.Time
+	stopTime         time.Time
 	updatedResult    bool
 	taskResult       types.TaskResult
 	taskError        error
@@ -38,6 +42,7 @@ type taskExecutionState struct {
 func NewTaskScheduler(logger logrus.FieldLogger, coordinator types.Coordinator) *TaskScheduler {
 	return &TaskScheduler{
 		logger:       logger,
+		taskCount:    1,
 		rootTasks:    make([]types.Task, 0),
 		allTasks:     make([]types.Task, 0),
 		taskStateMap: make(map[types.Task]*taskExecutionState),
@@ -98,9 +103,10 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, 
 
 	// create instance of task
 	var task types.Task
+	taskIdx := ts.taskCount
 	taskCtx := &types.TaskContext{
 		Scheduler:  ts,
-		Index:      ts.taskCount,
+		Index:      taskIdx,
 		ParentTask: parent,
 		NewTask: func(options *types.TaskOptions) (types.Task, error) {
 			return ts.newTask(options, task, isCleanupTask)
@@ -118,7 +124,9 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, 
 
 	// create internal execution state
 	ts.taskStateMutex.Lock()
-	taskState := &taskExecutionState{}
+	taskState := &taskExecutionState{
+		index: taskIdx,
+	}
 	ts.taskStateMap[task] = taskState
 	ts.taskStateMutex.Unlock()
 
@@ -220,9 +228,11 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 		return fmt.Errorf("task has already been executed")
 	}
 	taskState.isStarted = true
+	taskState.startTime = time.Now()
 	taskState.isRunning = true
 	defer func() {
 		taskState.isRunning = false
+		taskState.stopTime = time.Now()
 	}()
 
 	// create cancelable task context
@@ -306,6 +316,44 @@ func (ts *TaskScheduler) WatchTaskPass(task types.Task, ctx context.Context, can
 	}
 }
 
+func (ts *TaskScheduler) GetAllTasks() []types.Task {
+	tasks := make([]types.Task, len(ts.allTasks))
+	copy(tasks, ts.allTasks)
+	ts.taskStateMutex.RLock()
+	sort.Slice(tasks, func(a, b int) bool {
+		taskIdxA := ts.taskStateMap[tasks[a]].index
+		taskIdxB := ts.taskStateMap[tasks[b]].index
+		return taskIdxA < taskIdxB
+	})
+	ts.taskStateMutex.RUnlock()
+	return tasks
+}
+
+func (ts *TaskScheduler) GetRootTasks() []types.Task {
+	tasks := make([]types.Task, len(ts.rootTasks))
+	copy(tasks, ts.rootTasks)
+	return tasks
+}
+
+func (ts *TaskScheduler) GetAllCleanupTasks() []types.Task {
+	tasks := make([]types.Task, len(ts.allCleanupTasks))
+	copy(tasks, ts.allCleanupTasks)
+	ts.taskStateMutex.RLock()
+	sort.Slice(tasks, func(a, b int) bool {
+		taskIdxA := ts.taskStateMap[tasks[a]].index
+		taskIdxB := ts.taskStateMap[tasks[b]].index
+		return taskIdxA < taskIdxB
+	})
+	ts.taskStateMutex.RUnlock()
+	return tasks
+}
+
+func (ts *TaskScheduler) GetRootCleanupTasks() []types.Task {
+	tasks := make([]types.Task, len(ts.rootCleanupTasks))
+	copy(tasks, ts.rootCleanupTasks)
+	return tasks
+}
+
 func (ts *TaskScheduler) GetTaskStatus(task types.Task) *types.TaskStatus {
 	ts.taskStateMutex.RLock()
 	taskState := ts.taskStateMap[task]
@@ -314,8 +362,11 @@ func (ts *TaskScheduler) GetTaskStatus(task types.Task) *types.TaskStatus {
 		return nil
 	}
 	return &types.TaskStatus{
+		Index:     taskState.index,
 		IsStarted: taskState.isStarted,
 		IsRunning: taskState.isRunning,
+		StartTime: taskState.startTime,
+		StopTime:  taskState.stopTime,
 		Result:    taskState.taskResult,
 		Error:     taskState.taskError,
 	}
