@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"context"
 	"sort"
 	"sync"
 	"time"
@@ -48,10 +49,14 @@ func (block *Block) GetBlock() *spec.VersionedSignedBeaconBlock {
 	return block.block
 }
 
-func (block *Block) AwaitBlock(timeout time.Duration) *spec.VersionedSignedBeaconBlock {
+func (block *Block) AwaitBlock(timeout time.Duration, ctx context.Context) *spec.VersionedSignedBeaconBlock {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	select {
 	case <-block.blockChan:
 	case <-time.After(timeout):
+	case <-ctx.Done():
 	}
 	return block.block
 }

@@ -75,20 +75,20 @@ func (client *Client) resetContext() {
 	client.clientCtx, client.clientCtxCancel = context.WithCancel(context.Background())
 }
 
-func (client *Client) SubscribeBlockEvent(subscription *Subscription[*Block]) *Subscription[*Block] {
-	return client.blockDispatcher.Subscribe(subscription)
+func (client *Client) SubscribeBlockEvent(capacity int) *Subscription[*Block] {
+	return client.blockDispatcher.Subscribe(capacity)
 }
 
-func (client *Client) UnsubscribeBlockEvent(subscription *Subscription[*Block]) *Subscription[*Block] {
-	return client.blockDispatcher.Subscribe(subscription)
+func (client *Client) UnsubscribeBlockEvent(subscription *Subscription[*Block]) {
+	client.blockDispatcher.Unsubscribe(subscription)
 }
 
-func (client *Client) SubscribeFinalizedEvent(subscription *Subscription[*FinalizedCheckpoint]) *Subscription[*FinalizedCheckpoint] {
-	return client.checkpointDispatcher.Subscribe(subscription)
+func (client *Client) SubscribeFinalizedEvent(capacity int) *Subscription[*FinalizedCheckpoint] {
+	return client.checkpointDispatcher.Subscribe(capacity)
 }
 
-func (client *Client) UnsubscribeFinalizedEvent(subscription *Subscription[*FinalizedCheckpoint]) *Subscription[*FinalizedCheckpoint] {
-	return client.checkpointDispatcher.Subscribe(subscription)
+func (client *Client) UnsubscribeFinalizedEvent(subscription *Subscription[*FinalizedCheckpoint]) {
+	client.checkpointDispatcher.Unsubscribe(subscription)
 }
 
 func (client *Client) GetIndex() uint16 {

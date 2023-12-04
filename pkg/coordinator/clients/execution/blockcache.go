@@ -46,12 +46,12 @@ func NewBlockCache(followDistance uint64) (*BlockCache, error) {
 	return &cache, nil
 }
 
-func (cache *BlockCache) SubscribeBlockEvent(subscription *Subscription[*Block]) *Subscription[*Block] {
-	return cache.blockDispatcher.Subscribe(subscription)
+func (cache *BlockCache) SubscribeBlockEvent(capacity int) *Subscription[*Block] {
+	return cache.blockDispatcher.Subscribe(capacity)
 }
 
-func (cache *BlockCache) UnsubscribeBlockEvent(subscription *Subscription[*Block]) *Subscription[*Block] {
-	return cache.blockDispatcher.Subscribe(subscription)
+func (cache *BlockCache) UnsubscribeBlockEvent(subscription *Subscription[*Block]) {
+	cache.blockDispatcher.Unsubscribe(subscription)
 }
 
 func (cache *BlockCache) notifyBlockReady(block *Block) {
