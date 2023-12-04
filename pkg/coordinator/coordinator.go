@@ -68,27 +68,19 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		}
 	}
 
-	// run test
-	testToRun, err := test.CreateRunnable(ctx, c, c.Config.Test)
-	if err != nil {
-		return err
-	}
-	c.tests = append(c.tests, testToRun)
-
-	if err := testToRun.Validate(); err != nil {
-		return err
-	}
-
-	c.log.Info(fmt.Sprintf("starting test '%s'", testToRun.Name()))
-
 	//nolint:errcheck // ignore
 	go c.startMetrics()
 
-	if err := testToRun.Run(ctx); err != nil {
-		return err
+	// initialize tests
+	for _, testCfg := range c.Config.Tests {
+		test, err := test.CreateTest(ctx, c, testCfg)
+		if err != nil {
+			return fmt.Errorf("failed initializing test '%v': %w", testCfg.Name, err)
+		}
+		c.tests = append(c.tests, test)
 	}
 
-	c.log.WithField("test", c.Config.Test).Info("test completed!")
+	c.runTests(ctx)
 
 	if c.webserver == nil {
 		c.log.WithField("seconds", c.lameDuckSeconds).Info("Initiating lame duck")
@@ -126,4 +118,17 @@ func (c *Coordinator) startMetrics() error {
 	err := http.ListenAndServe(fmt.Sprintf(":%v", c.metricsPort), nil)
 
 	return err
+}
+
+func (c *Coordinator) runTests(ctx context.Context) {
+	for _, test := range c.tests {
+		if err := test.Validate(); err != nil {
+			test.Logger().Errorf("test validation failed: %v", err)
+			continue
+		}
+		if err := test.Run(ctx); err != nil {
+			test.Logger().Errorf("test execution failed: %v", err)
+			continue
+		}
+	}
 }

@@ -16,8 +16,8 @@ type Config struct {
 	// WebServer config
 	Web *web_types.WebConfig `yaml:"web" json:"web"`
 
-	// Test is the test configuration.
-	Test test.Config `yaml:"test" json:"test"`
+	// List of Test configurations.
+	Tests []*test.Config `yaml:"tests" json:"tests"`
 }
 
 // DefaultConfig represents a sane-default configuration.
@@ -30,7 +30,9 @@ func DefaultConfig() *Config {
 				ConsensusUrl: "http://localhost:5052",
 			},
 		},
-		Test: test.BasicSynced(),
+		Tests: []*test.Config{
+			test.BasicSynced(),
+		},
 	}
 }
 

@@ -102,15 +102,30 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 	pageData.Tests = []*IndexPageTest{}
 	for idx, test := range fh.coordinator.GetTests() {
 		testData := &IndexPageTest{
-			Index:       uint64(idx),
-			Name:        test.Name(),
-			IsStarted:   test.Status() != types.TestStatusPending,
-			IsCompleted: test.Status() > types.TestStatusRunning,
-			StartTime:   test.StartTime(),
-			StopTime:    test.StopTime(),
-			Timeout:     test.Timeout(),
-			HasTimeout:  test.Timeout() > 0,
-			TaskCount:   uint64(test.GetTaskScheduler().GetTaskCount()),
+			Index:      uint64(idx),
+			Name:       test.Name(),
+			StartTime:  test.StartTime(),
+			StopTime:   test.StopTime(),
+			Timeout:    test.Timeout(),
+			HasTimeout: test.Timeout() > 0,
+		}
+
+		switch test.Status() {
+		case types.TestStatusPending:
+			testData.Status = "pending"
+		case types.TestStatusRunning:
+			testData.Status = "running"
+			testData.IsStarted = true
+		case types.TestStatusSuccess:
+			testData.Status = "success"
+			testData.IsStarted = true
+			testData.IsCompleted = true
+		case types.TestStatusFailure:
+			testData.Status = "failure"
+			testData.IsStarted = true
+			testData.IsCompleted = true
+		case types.TestStatusSkipped:
+			testData.Status = "skipped"
 		}
 		if testData.IsCompleted {
 			testData.RunTime = testData.StopTime.Sub(testData.StartTime)
@@ -119,15 +134,8 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 			testData.RunTime = time.Since(testData.StartTime)
 			testData.HasRunTime = true
 		}
-		switch test.Status() {
-		case types.TestStatusPending:
-			testData.Status = "pending"
-		case types.TestStatusRunning:
-			testData.Status = "running"
-		case types.TestStatusSuccess:
-			testData.Status = "success"
-		case types.TestStatusFailure:
-			testData.Status = "failure"
+		if taskScheduler := test.GetTaskScheduler(); taskScheduler != nil {
+			testData.TaskCount = uint64(taskScheduler.GetTaskCount())
 		}
 		pageData.Tests = append(pageData.Tests, testData)
 	}

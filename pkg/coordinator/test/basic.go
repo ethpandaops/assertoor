@@ -1,7 +1,7 @@
 package test
 
-func BasicSynced() Config {
-	return Config{
+func BasicSynced() *Config {
+	return &Config{
 		Name: "basic",
 		// Tasks: []TaskConfig{
 		// 	{

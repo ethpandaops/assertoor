@@ -3,6 +3,8 @@ package types
 import (
 	"context"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 type TestStatus uint8
@@ -12,6 +14,7 @@ const (
 	TestStatusRunning TestStatus = 1
 	TestStatusSuccess TestStatus = 2
 	TestStatusFailure TestStatus = 3
+	TestStatusSkipped TestStatus = 4
 )
 
 type Test interface {
@@ -23,5 +26,6 @@ type Test interface {
 	Timeout() time.Duration
 	Percent() float64
 	Status() TestStatus
+	Logger() logrus.FieldLogger
 	GetTaskScheduler() TaskScheduler
 }

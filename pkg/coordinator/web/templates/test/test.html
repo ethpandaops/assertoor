@@ -99,16 +99,6 @@
                       </div>
                     </div>
                     <div class="task-status">
-                      {{ if eq $task.Status "pending" }}
-                        <span class="badge rounded-pill text-bg-secondary">
-                          <i class="far fa-hourglass-half"></i>
-                        </span>
-                      {{ else if eq $task.Status "running" }}
-                        <span class="badge rounded-pill text-bg-primary">
-                          <i class="far fa-play-circle"></i>
-                        </span>
-                      {{ end }}
-
                       {{ if eq $task.Result "success" }}
                         <span class="badge rounded-pill text-bg-success">
                           <i class="fas fa-check"></i>
@@ -120,6 +110,16 @@
                       {{ else }}
                         <span class="badge rounded-pill text-bg-secondary">
                           <i class="fas fa-question"></i>
+                        </span>
+                      {{ end }}
+
+                      {{ if eq $task.Status "pending" }}
+                        <span class="badge rounded-pill text-bg-secondary">
+                          <i class="far fa-hourglass-half"></i>
+                        </span>
+                      {{ else if eq $task.Status "running" }}
+                        <span class="badge rounded-pill text-bg-primary">
+                          <i class="far fa-play-circle"></i>
                         </span>
                       {{ end }}
                     </div>

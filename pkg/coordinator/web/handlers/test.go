@@ -104,65 +104,71 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 	}
 
 	pageData := &TestPage{
-		Index:       uint64(testIdx),
-		Name:        test.Name(),
-		IsStarted:   test.Status() != types.TestStatusPending,
-		IsCompleted: test.Status() > types.TestStatusRunning,
-		StartTime:   test.StartTime(),
-		StopTime:    test.StopTime(),
-		Timeout:     test.Timeout(),
+		Index:     uint64(testIdx),
+		Name:      test.Name(),
+		StartTime: test.StartTime(),
+		StopTime:  test.StopTime(),
+		Timeout:   test.Timeout(),
 	}
 	switch test.Status() {
 	case types.TestStatusPending:
 		pageData.Status = "pending"
 	case types.TestStatusRunning:
 		pageData.Status = "running"
+		pageData.IsStarted = true
 	case types.TestStatusSuccess:
 		pageData.Status = "success"
+		pageData.IsStarted = true
+		pageData.IsCompleted = true
 	case types.TestStatusFailure:
 		pageData.Status = "failure"
+		pageData.IsStarted = true
+		pageData.IsCompleted = true
+	case types.TestStatusSkipped:
+		pageData.Status = "skipped"
 	}
 
 	taskScheduler := test.GetTaskScheduler()
+	if taskScheduler != nil {
+		for _, task := range taskScheduler.GetAllTasks() {
+			taskStatus := taskScheduler.GetTaskStatus(task)
 
-	for _, task := range taskScheduler.GetAllTasks() {
-		taskStatus := taskScheduler.GetTaskStatus(task)
+			taskData := &TestPageTask{
+				Index:       taskStatus.Index,
+				Name:        task.Name(),
+				Title:       task.Title(),
+				IsStarted:   taskStatus.IsStarted,
+				IsCompleted: taskStatus.IsStarted && !taskStatus.IsRunning,
+				StartTime:   taskStatus.StartTime,
+				StopTime:    taskStatus.StopTime,
+				Timeout:     task.Timeout(),
+				HasTimeout:  task.Timeout() > 0,
+			}
+			if !taskStatus.IsStarted {
+				taskData.Status = "pending"
+			} else if taskStatus.IsRunning {
+				taskData.Status = "running"
+				taskData.HasRunTime = true
+				taskData.RunTime = time.Since(taskStatus.StartTime)
+			} else {
+				taskData.Status = "complete"
+				taskData.HasRunTime = true
+				taskData.RunTime = taskStatus.StopTime.Sub(taskStatus.StartTime)
+			}
+			switch taskStatus.Result {
+			case types.TaskResultNone:
+				taskData.Result = "none"
+			case types.TaskResultSuccess:
+				taskData.Result = "success"
+			case types.TaskResultFailure:
+				taskData.Result = "failure"
+			}
+			if taskStatus.Error != nil {
+				taskData.ResultError = taskStatus.Error.Error()
+			}
 
-		taskData := &TestPageTask{
-			Index:       taskStatus.Index,
-			Name:        task.Name(),
-			Title:       task.Title(),
-			IsStarted:   taskStatus.IsStarted,
-			IsCompleted: taskStatus.IsStarted && !taskStatus.IsRunning,
-			StartTime:   taskStatus.StartTime,
-			StopTime:    taskStatus.StopTime,
-			Timeout:     task.Timeout(),
-			HasTimeout:  task.Timeout() > 0,
+			pageData.Tasks = append(pageData.Tasks, taskData)
 		}
-		if !taskStatus.IsStarted {
-			taskData.Status = "pending"
-		} else if taskStatus.IsRunning {
-			taskData.Status = "running"
-			taskData.HasRunTime = true
-			taskData.RunTime = time.Since(taskStatus.StartTime)
-		} else {
-			taskData.Status = "complete"
-			taskData.HasRunTime = true
-			taskData.RunTime = taskStatus.StopTime.Sub(taskStatus.StartTime)
-		}
-		switch taskStatus.Result {
-		case types.TaskResultNone:
-			taskData.Result = "none"
-		case types.TaskResultSuccess:
-			taskData.Result = "success"
-		case types.TaskResultFailure:
-			taskData.Result = "failure"
-		}
-		if taskStatus.Error != nil {
-			taskData.ResultError = taskStatus.Error.Error()
-		}
-
-		pageData.Tasks = append(pageData.Tasks, taskData)
 	}
 
 	return pageData, nil
