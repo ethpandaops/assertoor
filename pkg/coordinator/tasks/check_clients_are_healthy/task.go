@@ -99,21 +99,31 @@ func (t *Task) Execute(ctx context.Context) error {
 
 func (t *Task) processCheck() {
 	expectedResult := !t.config.ExpectUnhealthy
-	allResultsPass := true
+	passResultCount := 0
+	totalClientCount := 0
 	failedClients := []string{}
 
 	for _, client := range t.ctx.Scheduler.GetCoordinator().ClientPool().GetClientsByNamePatterns(t.config.ClientNamePatterns) {
+		totalClientCount++
+
 		checkResult := t.processClientCheck(client)
 		if checkResult != expectedResult {
-			allResultsPass = false
+			passResultCount++
 
 			failedClients = append(failedClients, client.Config.Name)
 		}
 	}
 
-	t.logger.Infof("Check result: %v, Failed Clients: %v", allResultsPass, failedClients)
+	requiredPassCount := t.config.MinClientCount
+	if requiredPassCount == 0 {
+		requiredPassCount = totalClientCount
+	}
 
-	if allResultsPass {
+	resultPass := passResultCount >= requiredPassCount
+
+	t.logger.Infof("Check result: %v, Failed Clients: %v", resultPass, failedClients)
+
+	if resultPass {
 		t.ctx.SetResult(types.TaskResultSuccess)
 	} else {
 		t.ctx.SetResult(types.TaskResultNone)

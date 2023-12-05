@@ -12,6 +12,7 @@ type Config struct {
 	SkipConsensusCheck bool           `yaml:"skipConsensusCheck" json:"skipConsensusCheck"`
 	SkipExecutionCheck bool           `yaml:"skipExecutionCheck" json:"skipExecutionCheck"`
 	ExpectUnhealthy    bool           `yaml:"expectUnhealthy" json:"expectUnhealthy"`
+	MinClientCount     int            `yaml:"minClientCount" json:"minClientCount"`
 }
 
 func DefaultConfig() Config {

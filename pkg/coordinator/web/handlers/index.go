@@ -139,10 +139,10 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 		}
 
 		if testData.IsCompleted {
-			testData.RunTime = testData.StopTime.Sub(testData.StartTime)
+			testData.RunTime = testData.StopTime.Sub(testData.StartTime).Round(1 * time.Millisecond)
 			testData.HasRunTime = true
 		} else if testData.IsStarted {
-			testData.RunTime = time.Since(testData.StartTime)
+			testData.RunTime = time.Since(testData.StartTime).Round(1 * time.Millisecond)
 			testData.HasRunTime = true
 		}
 

@@ -162,11 +162,11 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 			case taskStatus.IsRunning:
 				taskData.Status = "running"
 				taskData.HasRunTime = true
-				taskData.RunTime = time.Since(taskStatus.StartTime)
+				taskData.RunTime = time.Since(taskStatus.StartTime).Round(1 * time.Millisecond)
 			default:
 				taskData.Status = "complete"
 				taskData.HasRunTime = true
-				taskData.RunTime = taskStatus.StopTime.Sub(taskStatus.StartTime)
+				taskData.RunTime = taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond)
 			}
 
 			switch taskStatus.Result {
