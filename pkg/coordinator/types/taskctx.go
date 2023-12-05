@@ -24,19 +24,19 @@ type TaskScheduler interface {
 }
 
 type TaskStatus struct {
-	Index     uint64
-	IsStarted bool
-	IsRunning bool
-	StartTime time.Time
-	StopTime  time.Time
-	Result    TaskResult
-	Error     error
+	Index       uint64
+	ParentIndex uint64
+	IsStarted   bool
+	IsRunning   bool
+	StartTime   time.Time
+	StopTime    time.Time
+	Result      TaskResult
+	Error       error
 }
 
 type TaskContext struct {
-	Scheduler  TaskScheduler
-	Index      uint64
-	ParentTask Task
-	NewTask    func(options *TaskOptions) (Task, error)
-	SetResult  func(result TaskResult)
+	Scheduler TaskScheduler
+	Index     uint64
+	NewTask   func(options *TaskOptions) (Task, error)
+	SetResult func(result TaskResult)
 }

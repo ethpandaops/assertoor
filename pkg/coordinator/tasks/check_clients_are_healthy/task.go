@@ -107,9 +107,9 @@ func (t *Task) processCheck() {
 		totalClientCount++
 
 		checkResult := t.processClientCheck(client)
-		if checkResult != expectedResult {
+		if checkResult == expectedResult {
 			passResultCount++
-
+		} else {
 			failedClients = append(failedClients, client.Config.Name)
 		}
 	}

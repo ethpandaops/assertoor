@@ -14,7 +14,6 @@ type Test struct {
 	taskScheduler *TaskScheduler
 	log           logrus.FieldLogger
 	config        *Config
-	metrics       Metrics
 
 	status    types.TestStatus
 	startTime time.Time
@@ -24,11 +23,10 @@ type Test struct {
 
 func CreateTest(coordinator types.Coordinator, config *Config) (types.Test, error) {
 	test := &Test{
-		name:    config.Name,
-		log:     coordinator.Logger().WithField("component", "test").WithField("test", config.Name),
-		config:  config,
-		metrics: NewMetrics("sync_test_coordinator", config.Name),
-		status:  types.TestStatusPending,
+		name:   config.Name,
+		log:    coordinator.Logger().WithField("component", "test").WithField("test", config.Name),
+		config: config,
+		status: types.TestStatusPending,
 	}
 	if test.config.Timeout.Duration > 0 {
 		test.timeout = test.config.Timeout.Duration
@@ -60,12 +58,6 @@ func CreateTest(coordinator types.Coordinator, config *Config) (types.Test, erro
 				return nil, err
 			}
 		}
-
-		// setup metrics
-		test.metrics.Register()
-
-		test.metrics.SetTestInfo(config.Name)
-		test.metrics.SetTotalTasks(float64(len(config.Tasks)))
 	}
 
 	return test, nil
@@ -127,7 +119,6 @@ func (t *Test) Run(ctx context.Context) error {
 	t.status = types.TestStatusRunning
 
 	defer func() {
-		t.metrics.SetTestDuration(float64(time.Since(t.startTime).Milliseconds()))
 		t.stopTime = time.Now()
 	}()
 

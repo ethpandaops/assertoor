@@ -27,6 +27,8 @@ type TaskScheduler struct {
 
 type taskExecutionState struct {
 	index            uint64
+	task             types.Task
+	parentState      *taskExecutionState
 	isStarted        bool
 	isRunning        bool
 	isTimeout        bool
@@ -93,7 +95,7 @@ func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.Task,
 	return task, nil
 }
 
-func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, isCleanupTask bool) (types.Task, error) {
+func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskExecutionState, isCleanupTask bool) (types.Task, error) {
 	// lookup task by name
 	var taskDescriptor *types.TaskDescriptor
 
@@ -112,12 +114,15 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, 
 	var task types.Task
 
 	taskIdx := ts.taskCount
+	taskState := &taskExecutionState{
+		index:       taskIdx,
+		parentState: parentState,
+	}
 	taskCtx := &types.TaskContext{
-		Scheduler:  ts,
-		Index:      taskIdx,
-		ParentTask: parent,
+		Scheduler: ts,
+		Index:     taskIdx,
 		NewTask: func(options *types.TaskOptions) (types.Task, error) {
-			return ts.newTask(options, task, isCleanupTask)
+			return ts.newTask(options, taskState, isCleanupTask)
 		},
 		SetResult: func(result types.TaskResult) {
 			ts.setTaskResult(task, result, true)
@@ -135,9 +140,7 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, 
 
 	// create internal execution state
 	ts.taskStateMutex.Lock()
-	taskState := &taskExecutionState{
-		index: taskIdx,
-	}
+	taskState.task = task
 	ts.taskStateMap[task] = taskState
 	ts.taskStateMutex.Unlock()
 
@@ -409,15 +412,21 @@ func (ts *TaskScheduler) GetTaskStatus(task types.Task) *types.TaskStatus {
 		return nil
 	}
 
-	return &types.TaskStatus{
-		Index:     taskState.index,
-		IsStarted: taskState.isStarted,
-		IsRunning: taskState.isRunning,
-		StartTime: taskState.startTime,
-		StopTime:  taskState.stopTime,
-		Result:    taskState.taskResult,
-		Error:     taskState.taskError,
+	taskStatus := &types.TaskStatus{
+		Index:       taskState.index,
+		ParentIndex: 0,
+		IsStarted:   taskState.isStarted,
+		IsRunning:   taskState.isRunning,
+		StartTime:   taskState.startTime,
+		StopTime:    taskState.stopTime,
+		Result:      taskState.taskResult,
+		Error:       taskState.taskError,
 	}
+	if taskState.parentState != nil {
+		taskStatus.ParentIndex = taskState.parentState.index
+	}
+
+	return taskStatus
 }
 
 func (ts *TaskScheduler) GetTaskResultUpdateChan(task types.Task, oldResult types.TaskResult) <-chan bool {

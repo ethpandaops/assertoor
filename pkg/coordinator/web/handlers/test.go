@@ -27,6 +27,8 @@ type TestPage struct {
 
 type TestPageTask struct {
 	Index       uint64        `json:"index"`
+	ParentIndex uint64        `json:"parent_index"`
+	IndentPx    uint64        `json:"indent_px"`
 	Name        string        `json:"name"`
 	Title       string        `json:"title"`
 	IsStarted   bool          `json:"started"`
@@ -141,11 +143,14 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 
 	taskScheduler := test.GetTaskScheduler()
 	if taskScheduler != nil {
+		indentationMap := map[uint64]int{}
+
 		for _, task := range taskScheduler.GetAllTasks() {
 			taskStatus := taskScheduler.GetTaskStatus(task)
 
 			taskData := &TestPageTask{
 				Index:       taskStatus.Index,
+				ParentIndex: taskStatus.ParentIndex,
 				Name:        task.Name(),
 				Title:       task.Title(),
 				IsStarted:   taskStatus.IsStarted,
@@ -155,6 +160,14 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 				Timeout:     task.Timeout(),
 				HasTimeout:  task.Timeout() > 0,
 			}
+
+			indentation := 0
+			if taskData.ParentIndex > 0 {
+				indentation = indentationMap[taskData.ParentIndex] + 1
+			}
+
+			indentationMap[taskData.Index] = indentation
+			taskData.IndentPx = uint64(20 * indentation)
 
 			switch {
 			case !taskStatus.IsStarted:

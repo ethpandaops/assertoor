@@ -82,7 +82,7 @@
             </div>
             {{ range $i, $task := .Tasks }}
               <div class="accordion-item">
-                <h2 class="accordion-header">
+                <h2 class="accordion-header" style="padding-left: {{ $task.IndentPx }}px">
                   <button class="accordion-button task-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#task{{ $task.Index }}-panel" aria-expanded="true" aria-controls="task{{ $task.Index }}-panel">
                     <div class="container">
                       <div class="row">
