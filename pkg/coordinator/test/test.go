@@ -28,6 +28,7 @@ func CreateTest(coordinator types.Coordinator, config *Config) (types.Test, erro
 		log:     coordinator.Logger().WithField("component", "test").WithField("test", config.Name),
 		config:  config,
 		metrics: NewMetrics("sync_test_coordinator", config.Name),
+		status:  types.TestStatusPending,
 	}
 	if test.config.Timeout.Duration > 0 {
 		test.timeout = test.config.Timeout.Duration

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
+	"github.com/ethpandaops/minccino/pkg/coordinator/clients/consensus/rpc"
 	"github.com/ethpandaops/minccino/pkg/coordinator/types"
 	"github.com/imdario/mergo"
 	"github.com/sirupsen/logrus"
@@ -102,7 +103,23 @@ func (t *Task) processCheck(ctx context.Context) {
 	failedClients := []string{}
 
 	for _, client := range t.ctx.Scheduler.GetCoordinator().ClientPool().GetClientsByNamePatterns(t.config.ClientNamePatterns) {
-		checkResult := t.processClientCheck(ctx, client)
+		var checkResult bool
+
+		checkLogger := t.logger.WithField("client", client.Config.Name)
+		syncStatus, err := client.ConsensusClient.GetRPCClient().GetNodeSyncStatus(ctx)
+
+		if ctx.Err() != nil {
+			return
+		}
+
+		if err != nil {
+			checkLogger.Warnf("errof fetching sync status: %v", err)
+
+			checkResult = false
+		} else {
+			checkResult = t.processClientCheck(client, syncStatus, checkLogger)
+		}
+
 		if !checkResult {
 			allResultsPass = false
 
@@ -119,15 +136,7 @@ func (t *Task) processCheck(ctx context.Context) {
 	}
 }
 
-func (t *Task) processClientCheck(ctx context.Context, client *clients.PoolClient) bool {
-	checkLogger := t.logger.WithField("client", client.Config.Name)
-
-	syncStatus, err := client.ConsensusClient.GetRPCClient().GetNodeSyncStatus(ctx)
-	if err != nil {
-		checkLogger.Warnf("errof fetching sync status: %v", err)
-		return false
-	}
-
+func (t *Task) processClientCheck(client *clients.PoolClient, syncStatus *rpc.SyncStatus, checkLogger logrus.FieldLogger) bool {
 	clientIdx := client.ExecutionClient.GetIndex()
 	if t.firstHeight[clientIdx] == 0 {
 		t.firstHeight[clientIdx] = syncStatus.HeadSlot

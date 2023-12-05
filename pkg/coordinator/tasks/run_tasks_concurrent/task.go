@@ -163,7 +163,8 @@ func (t *Task) Execute(ctx context.Context) error {
 			failureCount = 0
 			pendingCount = 0
 
-			for _, result := range resultMap {
+			for _, task := range t.tasks {
+				result := resultMap[task]
 				switch result {
 				case types.TaskResultSuccess:
 					successCount++
@@ -181,14 +182,14 @@ func (t *Task) Execute(ctx context.Context) error {
 				taskComplete = true
 			}
 
-			if failureCount >= failureLimit {
+			if !taskComplete && failureCount >= failureLimit {
 				t.logger.Infof("failure limit reached (%v success, %v failure)", successCount, failureCount)
 				t.ctx.SetResult(types.TaskResultFailure)
 
 				taskComplete = true
 			}
 
-			if pendingCount == 0 {
+			if !taskComplete && pendingCount == 0 {
 				t.logger.Infof("all child tasks completed (%v success, %v failure)", successCount, failureCount)
 				t.ctx.SetResult(types.TaskResultFailure)
 
@@ -228,11 +229,11 @@ func (t *Task) watchChildTask(_ context.Context, _ context.CancelFunc, task type
 			taskActive = false
 		}
 
-		t.logger.Debugf("result update notification for task %v (%v -> %v)", t.taskIdxMap[task], oldStatus, taskStatus.Result)
-
 		if taskStatus.Result == oldStatus {
 			continue
 		}
+
+		t.logger.Debugf("result update notification for task %v (%v -> %v)", t.taskIdxMap[task], oldStatus, taskStatus.Result)
 
 		t.resultNotifyChan <- taskResultUpdate{
 			task:   task,
