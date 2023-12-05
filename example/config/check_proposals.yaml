@@ -1,0 +1,156 @@
+
+endpoints:
+  - name: "dugtrio-devnet12"
+    executionUrl: "https://rpc.dencun-devnet-12.ethpandaops.io/"
+    consensusUrl: "https://beacon.dencun-devnet-12.ethpandaops.io/"
+
+web:
+  server:
+    host: "0.0.0.0"
+    port: 8080
+  frontend:
+    enabled: true
+    debug: true
+    pprof: true
+
+tests:
+# test test1
+- name: "test1"
+  timeout: 48h
+  tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  - name: run_tasks_concurrent
+    title: "Check if all EL & CL clients are synced"
+    timeout: 30s
+    config:
+      tasks:
+      - name: check_consensus_sync_status
+        title: "Check if CL clients are synced"
+      - name: check_execution_sync_status
+        title: "Check if EL clients are synced"
+  
+  - name: sleep
+    title: "Sleep 5 sec"
+    config:
+      duration: 5s
+  - name: run_command
+    title: "Run test command"
+    config:
+      command:
+        - echo
+        - "hi"
+
+  cleanupTasks:
+  - name: run_command
+    title: "Cleanup command"
+    config:
+      command:
+      - sh
+      - -c
+      - echo 'cleanup'
+      allowed_to_fail: true
+
+# Every CL client proposes block
+- name: "Every client pair proposed block"
+  timeout: 48h
+  tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  - name: sleep
+    title: "Sleep 5 sec just for fun"
+    config:
+      duration: 5s
+  
+  - name: run_tasks_concurrent
+    title: "Check if all client pairs proposed a block"
+    timeout: 2h
+    config:
+      tasks:
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with lighthouse/besu graffiti"
+        config:
+          graffitiPatterns: ["lighthouse/besu.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with lighthouse/erigon graffiti"
+        config:
+          graffitiPatterns: ["lighthouse/erigon.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with lighthouse/geth graffiti"
+        config:
+          graffitiPatterns: ["lighthouse/geth.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with lighthouse/nethermind graffiti"
+        config:
+          graffitiPatterns: ["lighthouse/nethermind.*"]
+      
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with lodestar/besu graffiti"
+        config:
+          graffitiPatterns: ["lodestar/besu.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with lodestar/erigon graffiti"
+        config:
+          graffitiPatterns: ["lodestar/erigon.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with lodestar/geth graffiti"
+        config:
+          graffitiPatterns: ["lodestar/geth.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with lodestar/nethermind graffiti"
+        config:
+          graffitiPatterns: ["lodestar/nethermind.*"]
+      
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with nimbus/besu graffiti"
+        config:
+          graffitiPatterns: ["nimbus/besu.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with nimbus/erigon graffiti"
+        config:
+          graffitiPatterns: ["nimbus/erigon.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with nimbus/geth graffiti"
+        config:
+          graffitiPatterns: ["nimbus/geth.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with nimbus/nethermind graffiti"
+        config:
+          graffitiPatterns: ["nimbus/nethermind.*"]
+
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with teku/besu graffiti"
+        config:
+          graffitiPatterns: ["teku/besu.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with teku/erigon graffiti"
+        config:
+          graffitiPatterns: ["teku/erigon.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with teku/geth graffiti"
+        config:
+          graffitiPatterns: ["teku/geth.*"]
+      - name: check_consensus_block_proposals
+        title: "Wait for block proposal with teku/nethermind graffiti"
+        config:
+          graffitiPatterns: ["teku/nethermind.*"]
+
+  - name: run_command
+    title: "Run test command"
+    config:
+      command:
+        - echo
+        - "hi"
+  
+
+
+  
+
