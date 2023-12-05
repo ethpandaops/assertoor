@@ -31,11 +31,12 @@ type Pool struct {
 }
 
 func NewPool(config *PoolConfig) (*Pool, error) {
+	var err error
+
 	pool := Pool{
 		clients:       make([]*Client, 0),
 		rrLastIndexes: map[ClientType]uint16{},
 	}
-	var err error
 
 	switch config.SchedulerMode {
 	case "", "rr", "roundrobin":
@@ -48,6 +49,7 @@ func NewPool(config *PoolConfig) (*Pool, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &pool, nil
 }
 
@@ -58,11 +60,14 @@ func (pool *Pool) GetBlockCache() *BlockCache {
 func (pool *Pool) AddEndpoint(endpoint *ClientConfig) (*Client, error) {
 	clientIdx := pool.clientCounter
 	pool.clientCounter++
+
 	client, err := pool.newPoolClient(clientIdx, endpoint)
 	if err != nil {
 		return nil, err
 	}
+
 	pool.clients = append(pool.clients, client)
+
 	return client, nil
 }
 
@@ -80,6 +85,7 @@ func (pool *Pool) GetReadyEndpoint(clientType ClientType) *Client {
 	if len(readyClients) == 0 {
 		return nil
 	}
+
 	selectedClient := pool.runClientScheduler(readyClients, clientType)
 
 	return selectedClient
@@ -101,6 +107,7 @@ func (pool *Pool) IsClientReady(client *Client) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -108,27 +115,31 @@ func (pool *Pool) runClientScheduler(readyClients []*Client, clientType ClientTy
 	pool.schedulerMutex.Lock()
 	defer pool.schedulerMutex.Unlock()
 
-	switch pool.schedulerMode {
-	case RoundRobinScheduler:
+	if pool.schedulerMode == RoundRobinScheduler {
 		var firstReadyClient *Client
+
 		for _, client := range readyClients {
 			if clientType != UnspecifiedClient && clientType != client.clientType {
 				continue
 			}
+
 			if firstReadyClient == nil {
 				firstReadyClient = client
 			}
+
 			if client.clientIdx > pool.rrLastIndexes[clientType] {
 				pool.rrLastIndexes[clientType] = client.clientIdx
 				return client
 			}
 		}
+
 		if firstReadyClient == nil {
 			return nil
-		} else {
-			pool.rrLastIndexes[clientType] = firstReadyClient.clientIdx
-			return firstReadyClient
 		}
+
+		pool.rrLastIndexes[clientType] = firstReadyClient.clientIdx
+
+		return firstReadyClient
 	}
 
 	return readyClients[0]

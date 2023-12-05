@@ -25,6 +25,7 @@ func (pool *Pool) GetCanonicalFork(forkDistance int64) *HeadFork {
 	if len(forks) == 0 {
 		return nil
 	}
+
 	return forks[0]
 }
 
@@ -35,26 +36,33 @@ func (pool *Pool) GetHeadForks(forkDistance int64) []*HeadFork {
 
 	pool.forkCacheMutex.Lock()
 	defer pool.forkCacheMutex.Unlock()
+
 	if pool.forkCache[forkDistance] != nil {
 		return pool.forkCache[forkDistance]
 	}
 
 	headForks := []*HeadFork{}
+
 	for _, client := range pool.clients {
-		cHeadSlot, cHeadRoot := client.GetLastHead()
 		var matchingFork *HeadFork
+
+		cHeadSlot, cHeadRoot := client.GetLastHead()
+
 		for _, fork := range headForks {
 			if bytes.Equal(fork.Root[:], cHeadRoot[:]) || pool.blockCache.IsCanonicalBlock(cHeadRoot, fork.Root) {
 				matchingFork = fork
 				break
 			}
+
 			if pool.blockCache.IsCanonicalBlock(fork.Root, cHeadRoot) {
 				fork.Root = cHeadRoot
 				fork.Slot = cHeadSlot
 				matchingFork = fork
+
 				break
 			}
 		}
+
 		if matchingFork == nil {
 			matchingFork = &HeadFork{
 				Root:       cHeadRoot,
@@ -66,17 +74,21 @@ func (pool *Pool) GetHeadForks(forkDistance int64) []*HeadFork {
 			matchingFork.AllClients = append(matchingFork.AllClients, client)
 		}
 	}
+
 	for _, fork := range headForks {
 		fork.ReadyClients = make([]*Client, 0)
 		for _, client := range fork.AllClients {
 			if client.GetStatus() != ClientStatusOnline {
 				continue
 			}
-			var headDistance uint64 = 0
+
+			headDistance := uint64(0)
 			_, cHeadRoot := client.GetLastHead()
+
 			if !bytes.Equal(fork.Root[:], cHeadRoot[:]) {
 				_, headDistance = pool.blockCache.GetBlockDistance(cHeadRoot, fork.Root)
 			}
+
 			if headDistance <= uint64(forkDistance) {
 				fork.ReadyClients = append(fork.ReadyClients, client)
 			}
@@ -91,6 +103,7 @@ func (pool *Pool) GetHeadForks(forkDistance int64) []*HeadFork {
 	})
 
 	pool.forkCache[forkDistance] = headForks
+
 	return headForks
 }
 
@@ -98,10 +111,12 @@ func (fork *HeadFork) IsClientReady(client *Client) bool {
 	if fork == nil {
 		return false
 	}
+
 	for _, cli := range fork.ReadyClients {
 		if cli.clientIdx == client.clientIdx {
 			return true
 		}
 	}
+
 	return false
 }

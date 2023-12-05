@@ -13,7 +13,6 @@ type Block struct {
 	Hash       common.Hash
 	Number     uint64
 	blockMutex sync.Mutex
-	blockCMtx  sync.Mutex
 	blockChan  chan bool
 	block      *types.Block
 	seenMutex  sync.RWMutex
@@ -23,13 +22,16 @@ type Block struct {
 func (block *Block) GetSeenBy() []*Client {
 	block.seenMutex.RLock()
 	defer block.seenMutex.RUnlock()
+
 	clients := []*Client{}
 	for _, client := range block.seenMap {
 		clients = append(clients, client)
 	}
+
 	sort.Slice(clients, func(a, b int) bool {
 		return clients[a].clientIdx < clients[b].clientIdx
 	})
+
 	return clients
 }
 
@@ -48,6 +50,7 @@ func (block *Block) AwaitBlock(timeout time.Duration) *types.Block {
 	case <-block.blockChan:
 	case <-time.After(timeout):
 	}
+
 	return block.block
 }
 
@@ -55,6 +58,7 @@ func (block *Block) GetParentHash() *common.Hash {
 	if block.block == nil {
 		return nil
 	}
+
 	return &block.block.Header().ParentHash
 }
 
@@ -65,6 +69,7 @@ func (block *Block) EnsureBlock(loadBlock func() (*types.Block, error)) (bool, e
 
 	block.blockMutex.Lock()
 	defer block.blockMutex.Unlock()
+
 	if block.block != nil {
 		return false, nil
 	}
@@ -76,5 +81,6 @@ func (block *Block) EnsureBlock(loadBlock func() (*types.Block, error)) (bool, e
 
 	block.block = blockBody
 	close(block.blockChan)
+
 	return true, nil
 }

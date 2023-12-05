@@ -32,12 +32,15 @@ func (c *Config) Validate() error {
 	if c.ExpectMinPercent > 100 {
 		return errors.New("expectMinPercent must be less than 100")
 	}
+
 	if c.ExpectMaxPercent > 100 {
 		return errors.New("ExpectMaxPercent must be less than 100")
 	}
+
 	if c.ExpectMaxPercent < c.ExpectMinPercent {
 		return errors.New("ExpectMaxPercent must be <= ExpectMinPercent")
 	}
+
 	if c.MinSlotHeight < 0 {
 		return errors.New("minSlotHeight must be >= 0")
 	}

@@ -39,26 +39,31 @@ type taskResultUpdate struct {
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
 	config := DefaultConfig()
+
 	if options.Config != nil {
 		conf := &Config{}
 		if err := options.Config.Unmarshal(&conf); err != nil {
 			return nil, fmt.Errorf("error parsing task config for %v: %w", TaskName, err)
 		}
+
 		if err := mergo.Merge(&config, conf, mergo.WithOverride); err != nil {
 			return nil, fmt.Errorf("error merging task config for %v: %w", TaskName, err)
 		}
 	}
 
 	childTasks := []types.Task{}
-	for i, rawtask := range config.Tasks {
-		taskOpts, err := ctx.Scheduler.ParseTaskOptions(&rawtask)
+
+	for i := range config.Tasks {
+		taskOpts, err := ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
 		if err != nil {
 			return nil, fmt.Errorf("failed parsing child task config #%v : %w", i, err)
 		}
+
 		task, err := ctx.NewTask(taskOpts)
 		if err != nil {
 			return nil, fmt.Errorf("failed initializing child task #%v : %w", i, err)
 		}
+
 		childTasks = append(childTasks, task)
 	}
 
@@ -101,25 +106,32 @@ func (t *Task) ValidateConfig() error {
 	if err := t.config.Validate(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (t *Task) Execute(ctx context.Context) error {
 	taskWaitGroup := sync.WaitGroup{}
+
 	taskCtx, cancelFn := context.WithCancel(ctx)
-	t.taskCtx = taskCtx
 	defer cancelFn()
+
+	t.taskCtx = taskCtx
 
 	// start child tasks
 	for i := range t.tasks {
 		taskWaitGroup.Add(1)
+
 		t.taskIdxMap[t.tasks[i]] = i
 
 		go func(i int) {
 			defer taskWaitGroup.Done()
+
 			task := t.tasks[i]
 
 			t.logger.Debugf("starting child task %v", i)
+
+			//nolint:errcheck // ignore
 			t.ctx.Scheduler.ExecuteTask(taskCtx, task, t.watchChildTask)
 		}(i)
 	}
@@ -129,13 +141,16 @@ func (t *Task) Execute(ctx context.Context) error {
 	if successLimit == 0 {
 		successLimit = uint64(len(t.tasks))
 	}
+
 	failureLimit := t.config.FailTaskCount
 	if failureLimit == 0 {
 		failureLimit = uint64(len(t.tasks))
 	}
 
+	var successCount, failureCount, pendingCount uint64
+
 	resultMap := map[types.Task]types.TaskResult{}
-	var successCount, failureCount uint64
+
 	taskComplete := false
 	for !taskComplete {
 		select {
@@ -146,24 +161,40 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			successCount = 0
 			failureCount = 0
+			pendingCount = 0
+
 			for _, result := range resultMap {
 				switch result {
 				case types.TaskResultSuccess:
 					successCount++
 				case types.TaskResultFailure:
 					failureCount++
+				case types.TaskResultNone:
+					pendingCount++
 				}
 			}
+
 			if successCount >= successLimit {
 				t.logger.Infof("success limit reached (%v success, %v failure)", successCount, failureCount)
 				t.ctx.SetResult(types.TaskResultSuccess)
+
 				taskComplete = true
 			}
+
 			if failureCount >= failureLimit {
 				t.logger.Infof("failure limit reached (%v success, %v failure)", successCount, failureCount)
 				t.ctx.SetResult(types.TaskResultFailure)
+
 				taskComplete = true
 			}
+
+			if pendingCount == 0 {
+				t.logger.Infof("all child tasks completed (%v success, %v failure)", successCount, failureCount)
+				t.ctx.SetResult(types.TaskResultFailure)
+
+				taskComplete = true
+			}
+
 			if !taskComplete {
 				t.logger.Debugf("result update (%v success, %v failure)", successCount, failureCount)
 			}
@@ -177,9 +208,10 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) watchChildTask(task types.Task, ctx context.Context, cancelFn context.CancelFunc) {
+func (t *Task) watchChildTask(_ context.Context, _ context.CancelFunc, task types.Task) {
 	oldStatus := types.TaskResultNone
 	taskActive := true
+
 	for taskActive {
 		updateChan := t.ctx.Scheduler.GetTaskResultUpdateChan(task, oldStatus)
 		if updateChan != nil {
@@ -190,18 +222,23 @@ func (t *Task) watchChildTask(task types.Task, ctx context.Context, cancelFn con
 			case <-updateChan:
 			}
 		}
+
 		taskStatus := t.ctx.Scheduler.GetTaskStatus(task)
 		if !taskStatus.IsRunning {
 			taskActive = false
 		}
+
 		t.logger.Debugf("result update notification for task %v (%v -> %v)", t.taskIdxMap[task], oldStatus, taskStatus.Result)
+
 		if taskStatus.Result == oldStatus {
 			continue
 		}
+
 		t.resultNotifyChan <- taskResultUpdate{
 			task:   task,
 			result: taskStatus.Result,
 		}
+
 		oldStatus = taskStatus.Result
 	}
 }

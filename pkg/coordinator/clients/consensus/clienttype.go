@@ -8,7 +8,7 @@ import (
 type ClientType int8
 
 var (
-	UnspecifiedClient ClientType = 0
+	UnspecifiedClient ClientType
 	UnknownClient     ClientType = -1
 	LighthouseClient  ClientType = 1
 	LodestarClient    ClientType = 2
@@ -28,11 +28,12 @@ var clientTypePatterns = map[ClientType]*regexp.Regexp{
 
 func (client *Client) parseClientVersion(version string) {
 	for clientType, versionPattern := range clientTypePatterns {
-		if versionPattern.Match([]byte(version)) {
+		if versionPattern.MatchString(version) {
 			client.clientType = clientType
 			return
 		}
 	}
+
 	client.clientType = UnknownClient
 }
 
@@ -50,8 +51,9 @@ func ParseClientType(name string) ClientType {
 		return TekuClient
 	case "grandine":
 		return GrandineClient
+	default:
+		return UnknownClient
 	}
-	return UnknownClient
 }
 
 func (client *Client) GetClientType() ClientType {

@@ -16,5 +16,6 @@ func AvailableTasks() MapOfRunnableInfo {
 			Config:      taskDescriptor.Config,
 		}
 	}
+
 	return available
 }

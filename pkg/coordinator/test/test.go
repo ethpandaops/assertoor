@@ -22,7 +22,7 @@ type Test struct {
 	timeout   time.Duration
 }
 
-func CreateTest(ctx context.Context, coordinator types.Coordinator, config *Config) (types.Test, error) {
+func CreateTest(coordinator types.Coordinator, config *Config) (types.Test, error) {
 	test := &Test{
 		name:    config.Name,
 		log:     coordinator.Logger().WithField("component", "test").WithField("test", config.Name),
@@ -36,11 +36,10 @@ func CreateTest(ctx context.Context, coordinator types.Coordinator, config *Conf
 	if config.Disable {
 		test.status = types.TestStatusSkipped
 	} else {
-
 		// parse tasks
 		test.taskScheduler = NewTaskScheduler(test.log, coordinator)
-		for _, rawtask := range config.Tasks {
-			taskOptions, err := test.taskScheduler.ParseTaskOptions(&rawtask)
+		for i := range config.Tasks {
+			taskOptions, err := test.taskScheduler.ParseTaskOptions(&config.Tasks[i])
 			if err != nil {
 				return nil, err
 			}
@@ -50,8 +49,8 @@ func CreateTest(ctx context.Context, coordinator types.Coordinator, config *Conf
 			}
 		}
 
-		for _, rawtask := range config.CleanupTasks {
-			taskOptions, err := test.taskScheduler.ParseTaskOptions(&rawtask)
+		for i := range config.CleanupTasks {
+			taskOptions, err := test.taskScheduler.ParseTaskOptions(&config.CleanupTasks[i])
 			if err != nil {
 				return nil, err
 			}
@@ -67,6 +66,7 @@ func CreateTest(ctx context.Context, coordinator types.Coordinator, config *Conf
 		test.metrics.SetTestInfo(config.Name)
 		test.metrics.SetTotalTasks(float64(len(config.Tasks)))
 	}
+
 	return test, nil
 }
 
@@ -98,6 +98,7 @@ func (t *Test) Validate() error {
 	if t.taskScheduler == nil {
 		return nil
 	}
+
 	err := t.taskScheduler.ValidateTaskConfigs()
 	if err != nil {
 		t.status = types.TestStatusFailure
@@ -116,6 +117,7 @@ func (t *Test) Run(ctx context.Context) error {
 	if t.taskScheduler == nil {
 		return nil
 	}
+
 	if t.status != types.TestStatusPending {
 		return fmt.Errorf("test has already been started")
 	}
@@ -134,11 +136,13 @@ func (t *Test) Run(ctx context.Context) error {
 	if err != nil {
 		t.log.Info("test failed!")
 		t.status = types.TestStatusFailure
+
 		return err
 	}
 
 	t.log.Info("test completed!")
 	t.status = types.TestStatusSuccess
+
 	return nil
 }
 
@@ -147,6 +151,5 @@ func (t *Test) GetTaskScheduler() types.TaskScheduler {
 }
 
 func (t *Test) Percent() float64 {
-	//return float64(t.currIndex) / float64(len(t.tasks))
 	return 0
 }

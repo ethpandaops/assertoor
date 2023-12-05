@@ -49,7 +49,9 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	c.clientPool = clientPool
+
 	for idx := range c.Config.Endpoints {
 		err = clientPool.AddClient(&c.Config.Endpoints[idx])
 		if err != nil {
@@ -63,8 +65,12 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+
 		if c.Config.Web.Frontend != nil {
-			c.webserver.StartFrontend(c.Config.Web.Frontend, c)
+			err = c.webserver.StartFrontend(c.Config.Web.Frontend, c)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -73,11 +79,12 @@ func (c *Coordinator) Run(ctx context.Context) error {
 
 	// initialize tests
 	for _, testCfg := range c.Config.Tests {
-		test, err := test.CreateTest(ctx, c, testCfg)
+		testRef, err := test.CreateTest(c, testCfg)
 		if err != nil {
 			return fmt.Errorf("failed initializing test '%v': %w", testCfg.Name, err)
 		}
-		c.tests = append(c.tests, test)
+
+		c.tests = append(c.tests, testRef)
 	}
 
 	c.runTests(ctx)
@@ -106,6 +113,7 @@ func (c *Coordinator) ClientPool() *clients.ClientPool {
 func (c *Coordinator) GetTests() []types.Test {
 	tests := make([]types.Test, len(c.tests))
 	copy(tests, c.tests)
+
 	return tests
 }
 
@@ -115,19 +123,21 @@ func (c *Coordinator) startMetrics() error {
 
 	http.Handle("/metrics", promhttp.Handler())
 
+	//nolint:gosec // ignore
 	err := http.ListenAndServe(fmt.Sprintf(":%v", c.metricsPort), nil)
 
 	return err
 }
 
 func (c *Coordinator) runTests(ctx context.Context) {
-	for _, test := range c.tests {
-		if err := test.Validate(); err != nil {
-			test.Logger().Errorf("test validation failed: %v", err)
+	for _, testRef := range c.tests {
+		if err := testRef.Validate(); err != nil {
+			testRef.Logger().Errorf("test validation failed: %v", err)
 			continue
 		}
-		if err := test.Run(ctx); err != nil {
-			test.Logger().Errorf("test execution failed: %v", err)
+
+		if err := testRef.Run(ctx); err != nil {
+			testRef.Logger().Errorf("test execution failed: %v", err)
 			continue
 		}
 	}

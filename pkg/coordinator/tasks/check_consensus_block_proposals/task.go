@@ -32,15 +32,18 @@ type Task struct {
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
 	config := DefaultConfig()
+
 	if options.Config != nil {
 		conf := &Config{}
 		if err := options.Config.Unmarshal(&conf); err != nil {
 			return nil, fmt.Errorf("error parsing task config for %v: %w", TaskName, err)
 		}
+
 		if err := mergo.Merge(&config, conf, mergo.WithOverride); err != nil {
 			return nil, fmt.Errorf("error merging task config for %v: %w", TaskName, err)
 		}
 	}
+
 	return &Task{
 		ctx:         ctx,
 		options:     options,
@@ -78,15 +81,18 @@ func (t *Task) ValidateConfig() error {
 	if err := t.config.Validate(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (t *Task) Execute(ctx context.Context) error {
 	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
 	blockSubscription := consensusPool.GetBlockCache().SubscribeBlockEvent(10)
+
 	defer blockSubscription.Unsubscribe()
 
 	totalMatches := 0
+
 	for {
 		select {
 		case block := <-blockSubscription.Channel():
@@ -94,9 +100,10 @@ func (t *Task) Execute(ctx context.Context) error {
 			if !matches {
 				break
 			}
-			totalMatches++
+
 			t.logger.Infof("matching block %v [0x%x]", block.Slot, block.Root)
 
+			totalMatches++
 			if totalMatches >= t.config.BlockCount {
 				t.ctx.SetResult(types.TaskResultSuccess)
 				return nil
@@ -107,8 +114,9 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 }
 
+//nolint:gocyclo // ignore
 func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
-	blockData := block.AwaitBlock(2*time.Second, ctx)
+	blockData := block.AwaitBlock(ctx, 2*time.Second)
 	if blockData == nil {
 		t.logger.Warnf("could not fetch block data for block %v [0x%x]", block.Slot, block.Root)
 		return false
@@ -121,6 +129,7 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 			t.logger.Warnf("could not get graffiti for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
+
 		var matched bool
 		for _, pattern := range t.config.GraffitiPatterns {
 			matched, err = regexp.MatchString(pattern, string(graffiti[:]))
@@ -128,10 +137,12 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 				break
 			}
 		}
+
 		if err != nil {
 			t.logger.Warnf("could not check graffiti for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
+
 		if !matched {
 			t.logger.Debugf("check failed for block %v [0x%x]: unmatched graffiti", block.Slot, block.Root)
 			return false
@@ -145,6 +156,7 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 			t.logger.Warnf("could not get deposits for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
+
 		if len(deposits) < t.config.MinDepositCount {
 			t.logger.Debugf("check failed for block %v [0x%x]: not enough deposits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinDepositCount, len(deposits))
 			return false
@@ -158,6 +170,7 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 			t.logger.Warnf("could not get voluntary exits for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
+
 		if len(exits) < t.config.MinExitCount {
 			t.logger.Debugf("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinExitCount, len(exits))
 			return false
@@ -171,11 +184,13 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 			t.logger.Warnf("could not get attester slashings for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
+
 		propSlashings, err := blockData.ProposerSlashings()
 		if err != nil {
 			t.logger.Warnf("could not get attester slashings for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
+
 		slashingCount := len(attSlashings) + len(propSlashings)
 		if slashingCount < t.config.MinSlashingCount {
 			t.logger.Debugf("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinSlashingCount, slashingCount)
@@ -190,6 +205,7 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 			t.logger.Warnf("could not get bls to execution changes for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
+
 		if len(blsChanges) < t.config.MinBlsChangeCount {
 			t.logger.Debugf("check failed for block %v [0x%x]: not enough bls changes (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinBlsChangeCount, len(blsChanges))
 			return false
@@ -203,6 +219,7 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 			t.logger.Warnf("could not get withdrawals for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
+
 		if len(withdrawals) < t.config.MinWithdrawalCount {
 			t.logger.Debugf("check failed for block %v [0x%x]: not enough withdrawals (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinWithdrawalCount, len(withdrawals))
 			return false
@@ -216,6 +233,7 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 			t.logger.Warnf("could not get transactions for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
+
 		if len(transactions) < t.config.MinTransactionCount {
 			t.logger.Debugf("check failed for block %v [0x%x]: not enough transactions (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinTransactionCount, len(transactions))
 			return false
@@ -229,6 +247,7 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 			t.logger.Warnf("could not get blobs for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
+
 		if len(blobs) < t.config.MinBlobCount {
 			t.logger.Debugf("check failed for block %v [0x%x]: not enough blobs (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinBlobCount, len(blobs))
 			return false

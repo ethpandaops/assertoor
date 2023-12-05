@@ -21,5 +21,6 @@ func (c *Config) Validate() error {
 	if len(c.Tasks) == 0 {
 		return errors.New("at least one task must be specified")
 	}
+
 	return nil
 }

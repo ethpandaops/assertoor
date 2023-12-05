@@ -32,15 +32,18 @@ type Task struct {
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
 	config := DefaultConfig()
+
 	if options.Config != nil {
 		conf := &Config{}
 		if err := options.Config.Unmarshal(&conf); err != nil {
 			return nil, fmt.Errorf("error parsing task config for %v: %w", TaskName, err)
 		}
+
 		if err := mergo.Merge(&config, conf, mergo.WithOverride); err != nil {
 			return nil, fmt.Errorf("error merging task config for %v: %w", TaskName, err)
 		}
 	}
+
 	return &Task{
 		ctx:     ctx,
 		options: options,
@@ -77,48 +80,54 @@ func (t *Task) ValidateConfig() error {
 	if err := t.config.Validate(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	t.processCheck(ctx)
+	t.processCheck()
+
 	for {
 		select {
 		case <-time.After(t.config.PollInterval.Duration):
-			t.processCheck(ctx)
+			t.processCheck()
 		case <-ctx.Done():
 			return nil
 		}
 	}
 }
 
-func (t *Task) processCheck(ctx context.Context) error {
+func (t *Task) processCheck() {
 	expectedResult := !t.config.ExpectUnhealthy
 	allResultsPass := true
 	failedClients := []string{}
+
 	for _, client := range t.ctx.Scheduler.GetCoordinator().ClientPool().GetClientsByNamePatterns(t.config.ClientNamePatterns) {
-		checkResult := t.processClientCheck(ctx, client)
+		checkResult := t.processClientCheck(client)
 		if checkResult != expectedResult {
 			allResultsPass = false
+
 			failedClients = append(failedClients, client.Config.Name)
 		}
 	}
 
 	t.logger.Infof("Check result: %v, Failed Clients: %v", allResultsPass, failedClients)
+
 	if allResultsPass {
 		t.ctx.SetResult(types.TaskResultSuccess)
 	} else {
 		t.ctx.SetResult(types.TaskResultNone)
 	}
-	return nil
 }
 
-func (t *Task) processClientCheck(ctx context.Context, client *clients.PoolClient) bool {
+func (t *Task) processClientCheck(client *clients.PoolClient) bool {
 	if !t.config.SkipConsensusCheck && client.ConsensusClient.GetStatus() == consensus.ClientStatusOffline {
 		return false
 	}
+
 	if !t.config.SkipExecutionCheck && client.ExecutionClient.GetStatus() == execution.ClientStatusOffline {
 		return false
 	}
+
 	return true
 }

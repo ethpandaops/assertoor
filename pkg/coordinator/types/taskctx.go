@@ -12,8 +12,8 @@ type TaskScheduler interface {
 	GetLogger() logrus.FieldLogger
 	GetCoordinator() Coordinator
 	ParseTaskOptions(rawtask *helper.RawMessage) (*TaskOptions, error)
-	ExecuteTask(ctx context.Context, task Task, taskWatchFn func(task Task, ctx context.Context, cancelFn context.CancelFunc)) error
-	WatchTaskPass(task Task, ctx context.Context, cancelFn context.CancelFunc)
+	ExecuteTask(ctx context.Context, task Task, taskWatchFn func(ctx context.Context, cancelFn context.CancelFunc, task Task)) error
+	WatchTaskPass(ctx context.Context, cancelFn context.CancelFunc, task Task)
 	GetTaskCount() int
 	GetAllTasks() []Task
 	GetRootTasks() []Task

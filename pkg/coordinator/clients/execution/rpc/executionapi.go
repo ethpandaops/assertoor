@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -19,16 +18,15 @@ type ExecutionClient struct {
 }
 
 // NewExecutionClient is used to create a new execution client
-func NewExecutionClient(name string, url string, headers map[string]string) (*ExecutionClient, error) {
+func NewExecutionClient(name, url string, headers map[string]string) (*ExecutionClient, error) {
 	client := &ExecutionClient{
 		name:     name,
 		endpoint: url,
 		headers:  headers,
 	}
+
 	return client, nil
 }
-
-var errNotFound = errors.New("not found 404")
 
 func (ec *ExecutionClient) Initialize(ctx context.Context) error {
 	if ec.ethClient != nil {
@@ -39,6 +37,7 @@ func (ec *ExecutionClient) Initialize(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	for hKey, hVal := range ec.headers {
 		rpcClient.SetHeader(hKey, hVal)
 	}
@@ -52,21 +51,24 @@ func (ec *ExecutionClient) Initialize(ctx context.Context) error {
 func (ec *ExecutionClient) GetClientVersion(ctx context.Context) (string, error) {
 	var result string
 	err := ec.rpcClient.CallContext(ctx, &result, "web3_clientVersion")
+
 	return result, err
 }
 
 func (ec *ExecutionClient) GetChainSpec(ctx context.Context) (*ChainSpec, error) {
-	chainId, err := ec.ethClient.ChainID(ctx)
+	chainID, err := ec.ethClient.ChainID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	networkId, err := ec.ethClient.NetworkID(ctx)
+
+	networkID, err := ec.ethClient.NetworkID(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	return &ChainSpec{
-		ChainId:   chainId.String(),
-		NetworkId: networkId.String(),
+		ChainID:   chainID.String(),
+		NetworkID: networkID.String(),
 	}, nil
 }
 
@@ -97,6 +99,7 @@ func (ec *ExecutionClient) GetLatestBlock(ctx context.Context) (*types.Block, er
 	if err != nil {
 		return nil, err
 	}
+
 	return block, nil
 }
 
@@ -105,5 +108,6 @@ func (ec *ExecutionClient) GetBlockByHash(ctx context.Context, hash common.Hash)
 	if err != nil {
 		return nil, err
 	}
+
 	return block, nil
 }

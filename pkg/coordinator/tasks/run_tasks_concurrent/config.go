@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	// number of successfull child tasks to make this task succeed (0 = all tasks)
+	// number of successful child tasks to make this task succeed (0 = all tasks)
 	SucceedTaskCount uint64 `yaml:"succeedTaskCount" json:"succeedTaskCount"`
 
 	// number of failed child tasks to make this task fail (0 = all tasks)
@@ -28,5 +28,6 @@ func (c *Config) Validate() error {
 	if len(c.Tasks) == 0 {
 		return errors.New("at least one task must be specified")
 	}
+
 	return nil
 }

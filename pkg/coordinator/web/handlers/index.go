@@ -44,19 +44,23 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var templateFiles = append(web.LayoutTemplateFiles,
+	templateFiles := web.LayoutTemplateFiles
+	templateFiles = append(templateFiles,
 		"index/index.html",
 	)
-	var pageTemplate = web.GetTemplate(templateFiles...)
+	pageTemplate := web.GetTemplate(templateFiles...)
 	data := web.InitPageData(w, r, "index", "/", "Index", templateFiles)
 
 	var pageError error
 	data.Data, pageError = fh.getIndexPageData()
+
 	if pageError != nil {
 		web.HandlePageError(w, r, pageError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "text/html")
+
 	if web.HandleTemplateError(w, r, "index.go", "Index", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
 		return // an error has occurred and was processed
 	}
@@ -64,20 +68,27 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 
 func (fh *FrontendHandler) IndexData(w http.ResponseWriter, r *http.Request) {
 	var pageData *IndexPage
+
 	var pageError error
 	pageData, pageError = fh.getIndexPageData()
+
 	if pageError != nil {
 		web.HandlePageError(w, r, pageError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
+
 	err := json.NewEncoder(w).Encode(pageData)
 	if err != nil {
 		logrus.WithError(err).Error("error encoding index data")
+
+		//nolint:gocritic // ignore
 		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
 }
 
+//nolint:unparam // ignore
 func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 	pageData := &IndexPage{}
 
@@ -85,21 +96,24 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 	clientPool := fh.coordinator.ClientPool()
 	allClients := clientPool.GetAllClients()
 	pageData.ClientCount = uint64(len(allClients))
+
 	canonicalClFork := clientPool.GetConsensusPool().GetCanonicalFork(2)
 	if canonicalClFork != nil {
 		pageData.CLReadyCount = uint64(len(canonicalClFork.ReadyClients))
 		pageData.CLHeadSlot = uint64(canonicalClFork.Slot)
 		pageData.CLHeadRoot = canonicalClFork.Root[:]
 	}
+
 	canonicalElFork := clientPool.GetExecutionPool().GetCanonicalFork(2)
 	if canonicalElFork != nil {
 		pageData.ELReadyCount = uint64(len(canonicalElFork.ReadyClients))
-		pageData.ELHeadNumber = uint64(canonicalElFork.Number)
+		pageData.ELHeadNumber = canonicalElFork.Number
 		pageData.ELHeadHash = canonicalElFork.Hash[:]
 	}
 
 	// tasks list
 	pageData.Tests = []*IndexPageTest{}
+
 	for idx, test := range fh.coordinator.GetTests() {
 		testData := &IndexPageTest{
 			Index:      uint64(idx),
@@ -108,25 +122,22 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 			StopTime:   test.StopTime(),
 			Timeout:    test.Timeout(),
 			HasTimeout: test.Timeout() > 0,
+			Status:     string(test.Status()),
 		}
 
 		switch test.Status() {
 		case types.TestStatusPending:
-			testData.Status = "pending"
 		case types.TestStatusRunning:
-			testData.Status = "running"
 			testData.IsStarted = true
 		case types.TestStatusSuccess:
-			testData.Status = "success"
 			testData.IsStarted = true
 			testData.IsCompleted = true
 		case types.TestStatusFailure:
-			testData.Status = "failure"
 			testData.IsStarted = true
 			testData.IsCompleted = true
 		case types.TestStatusSkipped:
-			testData.Status = "skipped"
 		}
+
 		if testData.IsCompleted {
 			testData.RunTime = testData.StopTime.Sub(testData.StartTime)
 			testData.HasRunTime = true
@@ -134,9 +145,11 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 			testData.RunTime = time.Since(testData.StartTime)
 			testData.HasRunTime = true
 		}
+
 		if taskScheduler := test.GetTaskScheduler(); taskScheduler != nil {
 			testData.TaskCount = uint64(taskScheduler.GetTaskCount())
 		}
+
 		pageData.Tests = append(pageData.Tests, testData)
 	}
 

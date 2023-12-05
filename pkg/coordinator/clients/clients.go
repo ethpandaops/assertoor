@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"time"
@@ -25,9 +26,9 @@ type PoolClient struct {
 
 type ClientConfig struct {
 	Name             string            `yaml:"name"`
-	ConsensusUrl     string            `yaml:"consensusUrl"`
+	ConsensusURL     string            `yaml:"consensusUrl"`
 	ConsensusHeaders map[string]string `yaml:"consensusHeaders"`
-	ExecutionUrl     string            `yaml:"executionUrl"`
+	ExecutionURL     string            `yaml:"executionUrl"`
 	ExecutionHeaders map[string]string `yaml:"executionHeaders"`
 }
 
@@ -39,6 +40,7 @@ func NewClientPool() (*ClientPool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not init consensus pool: %w", err)
 	}
+
 	executionPool, err := execution.NewPool(&execution.PoolConfig{
 		FollowDistance: 10,
 		ForkDistance:   1,
@@ -46,6 +48,7 @@ func NewClientPool() (*ClientPool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not init execution pool: %w", err)
 	}
+
 	return &ClientPool{
 		consensusPool: consensusPool,
 		executionPool: executionPool,
@@ -56,7 +59,7 @@ func NewClientPool() (*ClientPool, error) {
 func (pool *ClientPool) AddClient(config *ClientConfig) error {
 	consensusClient, err := pool.consensusPool.AddEndpoint(&consensus.ClientConfig{
 		Name:    config.Name,
-		Url:     config.ConsensusUrl,
+		URL:     config.ConsensusURL,
 		Headers: config.ConsensusHeaders,
 	})
 	if err != nil {
@@ -65,7 +68,7 @@ func (pool *ClientPool) AddClient(config *ClientConfig) error {
 
 	executionClient, err := pool.executionPool.AddEndpoint(&execution.ClientConfig{
 		Name:    config.Name,
-		Url:     config.ExecutionUrl,
+		URL:     config.ExecutionURL,
 		Headers: config.ExecutionHeaders,
 	})
 	if err != nil {
@@ -81,6 +84,7 @@ func (pool *ClientPool) AddClient(config *ClientConfig) error {
 	go pool.processConsensusBlockNotification(poolClient)
 
 	pool.clients = append(pool.clients, poolClient)
+
 	return nil
 }
 
@@ -88,26 +92,26 @@ func (pool *ClientPool) processConsensusBlockNotification(poolClient *PoolClient
 	subscription := poolClient.ConsensusClient.SubscribeBlockEvent(100)
 	defer subscription.Unsubscribe()
 
-	for {
-		select {
-		case block := <-subscription.Channel():
-			versionedBlock := block.AwaitBlock(2*time.Second, nil)
-			if versionedBlock == nil {
-				logrus.Warnf("cl/el block notification failed: AwaitBlock timeout (client: %v, slot: %v, root: 0x%x)", poolClient.Config.Name, block.Slot, block.Root)
-				break
-			}
-			hash, err := versionedBlock.ExecutionBlockHash()
-			if err != nil {
-				logrus.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
-				break
-			}
-			number, err := versionedBlock.ExecutionBlockNumber()
-			if err != nil {
-				logrus.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
-				break
-			}
-			poolClient.ExecutionClient.NotifyNewBlock(common.Hash(hash), number)
+	for block := range subscription.Channel() {
+		versionedBlock := block.AwaitBlock(context.Background(), 2*time.Second)
+		if versionedBlock == nil {
+			logrus.Warnf("cl/el block notification failed: AwaitBlock timeout (client: %v, slot: %v, root: 0x%x)", poolClient.Config.Name, block.Slot, block.Root)
+			break
 		}
+
+		hash, err := versionedBlock.ExecutionBlockHash()
+		if err != nil {
+			logrus.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
+			break
+		}
+
+		number, err := versionedBlock.ExecutionBlockNumber()
+		if err != nil {
+			logrus.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
+			break
+		}
+
+		poolClient.ExecutionClient.NotifyNewBlock(common.Hash(hash), number)
 	}
 }
 
@@ -122,6 +126,7 @@ func (pool *ClientPool) GetExecutionPool() *execution.Pool {
 func (pool *ClientPool) GetAllClients() []*PoolClient {
 	clients := make([]*PoolClient, len(pool.clients))
 	copy(clients, pool.clients)
+
 	return clients
 }
 
@@ -136,5 +141,6 @@ func (pool *ClientPool) GetClientsByNamePatterns(patterns []string) []*PoolClien
 			}
 		}
 	}
+
 	return clients
 }

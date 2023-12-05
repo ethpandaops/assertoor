@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/minccino/pkg/coordinator/clients/execution/rpc"
 	"github.com/sirupsen/logrus"
@@ -20,7 +19,7 @@ var (
 )
 
 type ClientConfig struct {
-	Url     string
+	URL     string
 	Name    string
 	Headers map[string]string
 }
@@ -44,8 +43,6 @@ type Client struct {
 	headMutex       sync.RWMutex
 	headHash        common.Hash
 	headNumber      uint64
-	finalizedRoot   phase0.Root
-	finalizedEpoch  phase0.Epoch
 }
 
 type clientBlockNotification struct {
@@ -54,7 +51,7 @@ type clientBlockNotification struct {
 }
 
 func (pool *Pool) newPoolClient(clientIdx uint16, endpoint *ClientConfig) (*Client, error) {
-	rpcClient, err := rpc.NewExecutionClient(endpoint.Name, endpoint.Url, endpoint.Headers)
+	rpcClient, err := rpc.NewExecutionClient(endpoint.Name, endpoint.URL, endpoint.Headers)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +65,9 @@ func (pool *Pool) newPoolClient(clientIdx uint16, endpoint *ClientConfig) (*Clie
 		logger:         logrus.WithField("client", endpoint.Name),
 	}
 	client.resetContext()
+
 	go client.runClientLoop()
+
 	return &client, nil
 }
 
@@ -76,6 +75,7 @@ func (client *Client) resetContext() {
 	if client.clientCtxCancel != nil {
 		client.clientCtxCancel()
 	}
+
 	client.clientCtx, client.clientCtxCancel = context.WithCancel(context.Background())
 }
 
@@ -98,6 +98,7 @@ func (client *Client) GetEndpointConfig() *ClientConfig {
 func (client *Client) GetLastHead() (uint64, common.Hash) {
 	client.headMutex.RLock()
 	defer client.headMutex.RUnlock()
+
 	return client.headNumber, client.headHash
 }
 
@@ -109,16 +110,17 @@ func (client *Client) GetLastEventTime() time.Time {
 	return client.lastEvent
 }
 
-func (client *Client) GetRpcClient() *rpc.ExecutionClient {
+func (client *Client) GetRPCClient() *rpc.ExecutionClient {
 	return client.rpcClient
 }
 
 func (client *Client) GetStatus() ClientStatus {
-	if client.isSyncing {
+	switch {
+	case client.isSyncing:
 		return ClientStatusSynchronizing
-	} else if client.isOnline {
+	case client.isOnline:
 		return ClientStatusOnline
-	} else {
+	default:
 		return ClientStatusOffline
 	}
 }

@@ -25,13 +25,17 @@ type Block struct {
 func (block *Block) GetSeenBy() []*Client {
 	block.seenMutex.RLock()
 	defer block.seenMutex.RUnlock()
+
 	clients := []*Client{}
+
 	for _, client := range block.seenMap {
 		clients = append(clients, client)
 	}
+
 	sort.Slice(clients, func(a, b int) bool {
 		return clients[a].clientIdx < clients[b].clientIdx
 	})
+
 	return clients
 }
 
@@ -49,15 +53,17 @@ func (block *Block) GetBlock() *spec.VersionedSignedBeaconBlock {
 	return block.block
 }
 
-func (block *Block) AwaitBlock(timeout time.Duration, ctx context.Context) *spec.VersionedSignedBeaconBlock {
+func (block *Block) AwaitBlock(ctx context.Context, timeout time.Duration) *spec.VersionedSignedBeaconBlock {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+
 	select {
 	case <-block.blockChan:
 	case <-time.After(timeout):
 	case <-ctx.Done():
 	}
+
 	return block.block
 }
 
@@ -65,6 +71,7 @@ func (block *Block) GetParentRoot() *phase0.Root {
 	if block.header == nil {
 		return nil
 	}
+
 	return &block.header.Message.ParentRoot
 }
 
@@ -79,6 +86,7 @@ func (block *Block) EnsureHeader(loadHeader func() (*phase0.SignedBeaconBlockHea
 
 	block.headerMutex.Lock()
 	defer block.headerMutex.Unlock()
+
 	if block.header != nil {
 		return nil
 	}
@@ -87,27 +95,31 @@ func (block *Block) EnsureHeader(loadHeader func() (*phase0.SignedBeaconBlockHea
 	if err != nil {
 		return err
 	}
+
 	block.header = header
+
 	return nil
 }
 
-func (block *Block) EnsureBlock(loadBlock func() (*spec.VersionedSignedBeaconBlock, error)) (error, bool) {
+func (block *Block) EnsureBlock(loadBlock func() (*spec.VersionedSignedBeaconBlock, error)) (bool, error) {
 	if block.block != nil {
-		return nil, false
+		return false, nil
 	}
 
 	block.blockMutex.Lock()
 	defer block.blockMutex.Unlock()
+
 	if block.block != nil {
-		return nil, false
+		return false, nil
 	}
 
 	blockBody, err := loadBlock()
 	if err != nil {
-		return err, false
+		return false, err
 	}
+
 	block.block = blockBody
 	close(block.blockChan)
 
-	return nil, true
+	return true, nil
 }

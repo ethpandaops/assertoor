@@ -23,10 +23,12 @@ func (client *Client) runClientLoop() {
 
 	for {
 		err := client.checkClient()
+		waitTime := 10
 
 		if err == nil {
 			err = client.runClientLogic()
 		}
+
 		if err == nil {
 			client.retryCounter = 0
 			return
@@ -36,7 +38,7 @@ func (client *Client) runClientLoop() {
 		client.lastError = err
 		client.lastEvent = time.Now()
 		client.retryCounter++
-		waitTime := 10
+
 		if client.retryCounter > 10 {
 			waitTime = 300
 		} else if client.retryCounter > 5 {
@@ -62,6 +64,7 @@ func (client *Client) checkClient() error {
 	if err != nil {
 		return fmt.Errorf("error while fetching node version: %v", err)
 	}
+
 	client.versionStr = nodeVersion
 	client.parseClientVersion(nodeVersion)
 
@@ -70,19 +73,22 @@ func (client *Client) checkClient() error {
 	if err != nil {
 		return fmt.Errorf("error while fetching specs: %v", err)
 	}
+
 	err = client.pool.blockCache.SetClientSpecs(specs)
 	if err != nil {
 		return fmt.Errorf("invalid node specs: %v", err)
 	}
 
-	// check syncronization state
+	// check synchronization state
 	syncStatus, err := client.rpcClient.GetNodeSyncing(ctx)
 	if err != nil {
 		return fmt.Errorf("error while fetching synchronization status: %v", err)
 	}
+
 	if syncStatus == nil {
 		return fmt.Errorf("could not get synchronization status")
 	}
+
 	client.isSyncing = syncStatus.IsSyncing
 	client.isOptimistic = syncStatus.IsOptimistic
 
@@ -100,11 +106,13 @@ func (client *Client) runClientLogic() error {
 	if client.isSyncing {
 		return fmt.Errorf("beacon node is synchronizing")
 	}
+
 	if client.isOptimistic {
 		return fmt.Errorf("beacon node is optimistic")
 	}
 
 	specs := client.pool.blockCache.GetSpecs()
+
 	finalizedEpoch, _ := client.pool.blockCache.GetFinalizedCheckpoint()
 	if client.headSlot < phase0.Slot(finalizedEpoch)*phase0.Slot(specs.SlotsPerEpoch) {
 		return fmt.Errorf("beacon node is behind finalized checkpoint (node head: %v, finalized: %v)", client.headSlot, phase0.Slot(finalizedEpoch)*phase0.Slot(specs.SlotsPerEpoch))
@@ -116,22 +124,33 @@ func (client *Client) runClientLogic() error {
 
 	// process events
 	client.lastEvent = time.Now()
+
 	for {
-		var eventTimeout time.Duration = time.Since(client.lastEvent)
+		eventTimeout := time.Since(client.lastEvent)
 		if eventTimeout > 30*time.Second {
 			eventTimeout = 0
 		} else {
 			eventTimeout = 30*time.Second - eventTimeout
 		}
+
 		select {
 		case evt := <-blockStream.EventChan:
 			now := time.Now()
+
 			switch evt.Event {
 			case rpc.StreamBlockEvent:
-				client.processBlockEvent(evt.Data.(*v1.BlockEvent))
+				err := client.processBlockEvent(evt.Data.(*v1.BlockEvent))
+				if err != nil {
+					client.logger.Warnf("failed processing block event: %v", err)
+				}
+
 			case rpc.StreamFinalizedEvent:
-				client.processFinalizedEvent(evt.Data.(*v1.FinalizedCheckpointEvent))
+				err := client.processFinalizedEvent(evt.Data.(*v1.FinalizedCheckpointEvent))
+				if err != nil {
+					client.logger.Warnf("failed processing finalized event: %v", err)
+				}
 			}
+
 			client.logger.Tracef("event (%v) processing time: %v ms", evt.Event, time.Since(now).Milliseconds())
 			client.lastEvent = time.Now()
 		case ready := <-blockStream.ReadyChan:
@@ -145,11 +164,13 @@ func (client *Client) runClientLogic() error {
 			}
 		case <-time.After(eventTimeout):
 			client.logger.Debug("no head event since 30 secs, polling chain head")
+
 			err := client.pollClientHead()
 			if err != nil {
 				client.isOnline = false
 				return err
 			}
+
 			client.lastEvent = time.Now()
 		}
 	}
@@ -172,8 +193,7 @@ func (client *Client) processBlockEvent(evt *v1.BlockEvent) error {
 
 func (client *Client) processFinalizedEvent(evt *v1.FinalizedCheckpointEvent) error {
 	client.logger.Debugf("received finalization_checkpoint event: finalized %v [0x%x]", evt.Epoch, evt.Block)
-	client.setFinalizedHead(evt.Epoch, evt.Block)
-	return nil
+	return client.setFinalizedHead(evt.Epoch, evt.Block)
 }
 
 func (client *Client) pollClientHead() error {
@@ -184,9 +204,11 @@ func (client *Client) pollClientHead() error {
 	if err != nil {
 		return fmt.Errorf("could not get latest header: %v", err)
 	}
+
 	if latestHeader == nil {
 		return fmt.Errorf("could not find latest header")
 	}
+
 	err = client.processBlock(latestHeader.Root, latestHeader.Header.Message.Slot, latestHeader.Header, "polled")
 	if err != nil {
 		return fmt.Errorf("could not get process block: %v", err)
@@ -196,9 +218,8 @@ func (client *Client) pollClientHead() error {
 	if err != nil {
 		return fmt.Errorf("could not get finality checkpoint: %v", err)
 	}
-	client.setFinalizedHead(finalityCheckpoint.Finalized.Epoch, finalityCheckpoint.Finalized.Root)
 
-	return nil
+	return client.setFinalizedHead(finalityCheckpoint.Finalized.Epoch, finalityCheckpoint.Finalized.Root)
 }
 
 func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *phase0.SignedBeaconBlockHeader, source string) error {
@@ -206,7 +227,9 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 	if cachedBlock == nil {
 		return fmt.Errorf("could not add block to cache %v [0x%x]", slot, root)
 	}
+
 	cachedBlock.SetSeenBy(client)
+
 	if isNewBlock {
 		client.logger.Infof("received cl block %v [0x%x] %v", slot, root, source)
 	} else {
@@ -225,19 +248,24 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 		}
 		return header.Header, nil
 	})
+	if err != nil {
+		return err
+	}
 
-	err, loaded := cachedBlock.EnsureBlock(func() (*spec.VersionedSignedBeaconBlock, error) {
+	loaded, err := cachedBlock.EnsureBlock(func() (*spec.VersionedSignedBeaconBlock, error) {
 		ctx, cancel := context.WithTimeout(client.clientCtx, 10*time.Second)
 		defer cancel()
-		block, err := client.rpcClient.GetBlockBodyByBlockroot(ctx, cachedBlock.Root)
-		if err != nil {
-			return nil, err
+
+		block, err2 := client.rpcClient.GetBlockBodyByBlockroot(ctx, cachedBlock.Root)
+		if err2 != nil {
+			return nil, err2
 		}
 		return block, nil
 	})
 	if err != nil {
 		return err
 	}
+
 	if loaded {
 		client.pool.blockCache.notifyBlockReady(cachedBlock)
 	}
@@ -247,6 +275,7 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 		client.headMutex.Unlock()
 		return nil
 	}
+
 	client.headSlot = slot
 	client.headRoot = root
 	client.headMutex.Unlock()
@@ -267,11 +296,13 @@ func (client *Client) setFinalizedHead(epoch phase0.Epoch, root phase0.Root) err
 		client.headMutex.Unlock()
 		return nil
 	}
+
 	client.finalizedEpoch = epoch
 	client.finalizedRoot = root
 	client.headMutex.Unlock()
 
 	client.pool.blockCache.SetFinalizedCheckpoint(epoch, root)
+
 	err := client.checkpointDispatcher.Fire(&FinalizedCheckpoint{
 		Epoch: epoch,
 		Root:  root,

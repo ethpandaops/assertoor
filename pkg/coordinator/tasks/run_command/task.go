@@ -30,15 +30,18 @@ type Task struct {
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
 	config := DefaultConfig()
+
 	if options.Config != nil {
 		conf := &Config{}
 		if err := options.Config.Unmarshal(&conf); err != nil {
 			return nil, fmt.Errorf("error parsing task config for %v: %w", TaskName, err)
 		}
+
 		if err := mergo.Merge(&config, conf, mergo.WithOverride); err != nil {
 			return nil, fmt.Errorf("error merging task config for %v: %w", TaskName, err)
 		}
 	}
+
 	return &Task{
 		ctx:     ctx,
 		options: options,
@@ -75,6 +78,7 @@ func (t *Task) ValidateConfig() error {
 	if err := t.config.Validate(); err != nil {
 		return err
 	}
+
 	return nil
 }
 

@@ -17,7 +17,6 @@ type WebServer struct {
 	serverConfig *types.ServerConfig
 	logger       logrus.FieldLogger
 	router       *mux.Router
-	listener     net.Listener
 	server       *http.Server
 }
 
@@ -30,15 +29,16 @@ func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*WebSe
 
 	n := negroni.New()
 	n.Use(negroni.NewRecovery())
-	//n.Use(gzip.Gzip(gzip.DefaultCompression))
 	n.UseHandler(ws.router)
 
 	if config.Host == "" {
 		config.Host = "0.0.0.0"
 	}
+
 	if config.Port == "" {
 		config.Port = "8080"
 	}
+
 	ws.server = &http.Server{
 		Addr:         config.Host + ":" + config.Port,
 		WriteTimeout: config.WriteTimeout,
@@ -67,6 +67,7 @@ func (ws *WebServer) StartFrontend(config *types.FrontendConfig, coordinator coo
 		// add pprof handler
 		ws.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
 	}
+
 	if config.Enabled {
 		frontend, err := web.NewFrontend(config)
 		if err != nil {
@@ -81,5 +82,6 @@ func (ws *WebServer) StartFrontend(config *types.FrontendConfig, coordinator coo
 
 		ws.router.PathPrefix("/").Handler(frontend)
 	}
+
 	return nil
 }

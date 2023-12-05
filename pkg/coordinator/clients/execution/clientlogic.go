@@ -25,6 +25,7 @@ func (client *Client) runClientLoop() {
 		if err == nil {
 			err = client.runClientLogic()
 		}
+
 		if err == nil {
 			client.retryCounter = 0
 			return
@@ -34,6 +35,7 @@ func (client *Client) runClientLoop() {
 		client.lastError = err
 		client.lastEvent = time.Now()
 		client.retryCounter++
+
 		waitTime := 10
 		if client.retryCounter > 10 {
 			waitTime = 300
@@ -60,6 +62,7 @@ func (client *Client) checkClient() error {
 	if err != nil {
 		return fmt.Errorf("error while fetching node version: %v", err)
 	}
+
 	client.versionStr = nodeVersion
 	client.parseClientVersion(nodeVersion)
 
@@ -68,19 +71,22 @@ func (client *Client) checkClient() error {
 	if err != nil {
 		return fmt.Errorf("error while fetching specs: %v", err)
 	}
+
 	err = client.pool.blockCache.SetClientSpecs(specs)
 	if err != nil {
 		return fmt.Errorf("invalid node specs: %v", err)
 	}
 
-	// check syncronization state
+	// check synchronization state
 	syncStatus, err := client.rpcClient.GetNodeSyncing(ctx)
 	if err != nil {
 		return fmt.Errorf("error while fetching synchronization status: %v", err)
 	}
+
 	if syncStatus == nil {
 		return fmt.Errorf("could not get synchronization status")
 	}
+
 	client.isSyncing = syncStatus.IsSyncing
 
 	return nil
@@ -102,13 +108,15 @@ func (client *Client) runClientLogic() error {
 	client.lastEvent = time.Now()
 	client.isOnline = true
 	client.updateChan = make(chan *clientBlockNotification, 10)
+
 	for {
-		var eventTimeout time.Duration = time.Since(client.lastEvent)
+		eventTimeout := time.Since(client.lastEvent)
 		if eventTimeout > 30*time.Second {
 			eventTimeout = 0
 		} else {
 			eventTimeout = 30*time.Second - eventTimeout
 		}
+
 		select {
 		case updateNotification := <-client.updateChan:
 			err := client.processBlock(updateNotification.hash, updateNotification.number, nil, "notified")
@@ -123,6 +131,7 @@ func (client *Client) runClientLogic() error {
 				client.isOnline = false
 				return err
 			}
+
 			client.lastEvent = time.Now()
 		}
 	}
@@ -136,9 +145,11 @@ func (client *Client) pollClientHead() error {
 	if err != nil {
 		return fmt.Errorf("could not get latest block: %v", err)
 	}
+
 	if latestBlock == nil {
 		return fmt.Errorf("could not find latest block")
 	}
+
 	err = client.processBlock(latestBlock.Hash(), latestBlock.Number().Uint64(), latestBlock, "polled")
 	if err != nil {
 		client.logger.Warnf("error processing execution block: %v", err)
@@ -152,7 +163,9 @@ func (client *Client) processBlock(hash common.Hash, number uint64, block *types
 	if cachedBlock == nil {
 		return fmt.Errorf("could not add block to cache")
 	}
+
 	cachedBlock.SetSeenBy(client)
+
 	if isNewBlock {
 		client.logger.Infof("received el block %v [0x%x] %v", number, hash, source)
 	} else {
@@ -174,6 +187,7 @@ func (client *Client) processBlock(hash common.Hash, number uint64, block *types
 	if err != nil {
 		return err
 	}
+
 	if loaded {
 		client.pool.blockCache.notifyBlockReady(cachedBlock)
 	}
@@ -183,6 +197,7 @@ func (client *Client) processBlock(hash common.Hash, number uint64, block *types
 		client.headMutex.Unlock()
 		return nil
 	}
+
 	client.headNumber = number
 	client.headHash = hash
 	client.headMutex.Unlock()

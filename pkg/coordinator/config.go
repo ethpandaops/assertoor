@@ -26,8 +26,8 @@ func DefaultConfig() *Config {
 		Endpoints: []clients.ClientConfig{
 			{
 				Name:         "local",
-				ExecutionUrl: "http://localhost:8545",
-				ConsensusUrl: "http://localhost:5052",
+				ExecutionURL: "http://localhost:8545",
+				ConsensusURL: "http://localhost:5052",
 			},
 		},
 		Tests: []*test.Config{

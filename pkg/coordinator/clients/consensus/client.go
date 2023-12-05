@@ -20,7 +20,7 @@ var (
 )
 
 type ClientConfig struct {
-	Url     string
+	URL     string
 	Name    string
 	Headers map[string]string
 }
@@ -51,7 +51,7 @@ type Client struct {
 }
 
 func (pool *Pool) newPoolClient(clientIdx uint16, endpoint *ClientConfig) (*Client, error) {
-	rpcClient, err := rpc.NewBeaconClient(endpoint.Name, endpoint.Url, endpoint.Headers)
+	rpcClient, err := rpc.NewBeaconClient(endpoint.Name, endpoint.URL, endpoint.Headers)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,9 @@ func (pool *Pool) newPoolClient(clientIdx uint16, endpoint *ClientConfig) (*Clie
 		logger:         logrus.WithField("client", endpoint.Name),
 	}
 	client.resetContext()
+
 	go client.runClientLoop()
+
 	return &client, nil
 }
 
@@ -72,6 +74,7 @@ func (client *Client) resetContext() {
 	if client.clientCtxCancel != nil {
 		client.clientCtxCancel()
 	}
+
 	client.clientCtx, client.clientCtxCancel = context.WithCancel(context.Background())
 }
 
@@ -107,13 +110,14 @@ func (client *Client) GetEndpointConfig() *ClientConfig {
 	return client.endpointConfig
 }
 
-func (client *Client) GetRpcClient() *rpc.BeaconClient {
+func (client *Client) GetRPCClient() *rpc.BeaconClient {
 	return client.rpcClient
 }
 
 func (client *Client) GetLastHead() (phase0.Slot, phase0.Root) {
 	client.headMutex.RLock()
 	defer client.headMutex.RUnlock()
+
 	return client.headSlot, client.headRoot
 }
 
@@ -126,13 +130,14 @@ func (client *Client) GetLastEventTime() time.Time {
 }
 
 func (client *Client) GetStatus() ClientStatus {
-	if client.isSyncing {
+	switch {
+	case client.isSyncing:
 		return ClientStatusSynchronizing
-	} else if client.isOptimistic {
+	case client.isOptimistic:
 		return ClientStatusOptimistic
-	} else if client.isOnline {
+	case client.isOnline:
 		return ClientStatusOnline
-	} else {
+	default:
 		return ClientStatusOffline
 	}
 }

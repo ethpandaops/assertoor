@@ -44,13 +44,13 @@ type Meta struct {
 
 type ErrorPageData struct {
 	CallTime   time.Time
-	CallUrl    string
+	CallURL    string
 	ErrorMsg   string
 	StackTrace string
 	Version    string
 }
 
-func InitPageData(w http.ResponseWriter, r *http.Request, active, path, title string, mainTemplates []string) *PageData {
+func InitPageData(_ http.ResponseWriter, r *http.Request, active, path, title string, mainTemplates []string) *PageData {
 	fullTitle := fmt.Sprintf("%v - %v - %v", title, frontendConfig.SiteName, time.Now().Year())
 
 	if title == "" {
@@ -92,7 +92,7 @@ func InitPageData(w http.ResponseWriter, r *http.Request, active, path, title st
 }
 
 // used to handle errors constructed by Template.ExecuteTemplate correctly
-func HandleTemplateError(w http.ResponseWriter, r *http.Request, fileIdentifier string, functionIdentifier string, infoIdentifier string, err error) error {
+func HandleTemplateError(w http.ResponseWriter, r *http.Request, fileIdentifier, functionIdentifier, infoIdentifier string, err error) error {
 	// ignore network related errors
 	if err != nil && !errors.Is(err, syscall.EPIPE) && !errors.Is(err, syscall.ETIMEDOUT) {
 		logger.WithFields(logrus.Fields{
@@ -102,40 +102,51 @@ func HandleTemplateError(w http.ResponseWriter, r *http.Request, fileIdentifier 
 			"error type": fmt.Sprintf("%T", err),
 			"route":      r.URL.String(),
 		}).WithError(err).Error("error executing template")
+
+		//nolint:gocritic // ignore
 		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
+
 	return err
 }
 
 func HandlePageError(w http.ResponseWriter, r *http.Request, pageError error) {
-	templateFiles := append(LayoutTemplateFiles, "_layout/500.html")
+	templateFiles := LayoutTemplateFiles
+	templateFiles = append(templateFiles, "_layout/500.html")
 	notFoundTemplate := GetTemplate(templateFiles...)
+
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusInternalServerError)
 	data := InitPageData(w, r, "blockchain", r.URL.Path, "Internal Error", templateFiles)
 	errData := &ErrorPageData{
 		CallTime: time.Now(),
-		CallUrl:  r.URL.String(),
+		CallURL:  r.URL.String(),
 		ErrorMsg: pageError.Error(),
 		Version:  buildinfo.GetVersion(),
 	}
 	data.Data = errData
+
 	err := notFoundTemplate.ExecuteTemplate(w, "layout", data)
 	if err != nil {
 		logrus.Errorf("error executing page error template for %v route: %v", r.URL.String(), err)
+		//nolint:gocritic // ignore
 		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
 }
 
 func HandleNotFound(w http.ResponseWriter, r *http.Request) {
-	templateFiles := append(LayoutTemplateFiles, "_layout/404.html")
+	templateFiles := LayoutTemplateFiles
+	templateFiles = append(templateFiles, "_layout/404.html")
 	notFoundTemplate := GetTemplate(templateFiles...)
+
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusNotFound)
 	data := InitPageData(w, r, "blockchain", r.URL.Path, "Not Found", templateFiles)
+
 	err := notFoundTemplate.ExecuteTemplate(w, "layout", data)
 	if err != nil {
 		logrus.Errorf("error executing not-found template for %v route: %v", r.URL.String(), err)
+		//nolint:gocritic // ignore
 		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
 }

@@ -67,6 +67,7 @@ func (ts *TaskScheduler) ParseTaskOptions(rawtask *helper.RawMessage) (*types.Ta
 	if err := rawtask.Unmarshal(&options); err != nil {
 		return nil, fmt.Errorf("error parsing task: %w", err)
 	}
+
 	return options, nil
 }
 
@@ -75,7 +76,9 @@ func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.Task, er
 	if err != nil {
 		return nil, err
 	}
+
 	ts.rootTasks = append(ts.rootTasks, task)
+
 	return task, nil
 }
 
@@ -84,25 +87,30 @@ func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.Task,
 	if err != nil {
 		return nil, err
 	}
+
 	ts.rootCleanupTasks = append(ts.rootCleanupTasks, task)
+
 	return task, nil
 }
 
 func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, isCleanupTask bool) (types.Task, error) {
 	// lookup task by name
 	var taskDescriptor *types.TaskDescriptor
+
 	for _, taskDesc := range tasks.AvailableTaskDescriptors {
 		if taskDesc.Name == options.Name {
 			taskDescriptor = taskDesc
 			break
 		}
 	}
+
 	if taskDescriptor == nil {
 		return nil, fmt.Errorf("unknown task name: %v", options.Name)
 	}
 
 	// create instance of task
 	var task types.Task
+
 	taskIdx := ts.taskCount
 	taskCtx := &types.TaskContext{
 		Scheduler:  ts,
@@ -115,9 +123,12 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, 
 			ts.setTaskResult(task, result, true)
 		},
 	}
+
 	ts.taskCount++
+
 	var err error
 	task, err = taskDescriptor.NewTask(taskCtx, options)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed task '%v' initialization: %w", options.Name, err)
 	}
@@ -135,6 +146,7 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parent types.Task, 
 	} else {
 		ts.allTasks = append(ts.allTasks, task)
 	}
+
 	return task, nil
 }
 
@@ -142,18 +154,22 @@ func (ts *TaskScheduler) setTaskResult(task types.Task, result types.TaskResult,
 	ts.taskStateMutex.RLock()
 	taskState := ts.taskStateMap[task]
 	ts.taskStateMutex.RUnlock()
+
 	if taskState == nil {
 		return
 	}
 
 	taskState.resultMutex.Lock()
 	defer taskState.resultMutex.Unlock()
+
 	if setUpdated {
 		taskState.updatedResult = true
 	}
+
 	if taskState.taskResult == result {
 		return
 	}
+
 	taskState.taskResult = result
 	if taskState.resultNotifyChan != nil {
 		close(taskState.resultNotifyChan)
@@ -169,6 +185,7 @@ func (ts *TaskScheduler) ValidateTaskConfigs() error {
 			return fmt.Errorf("task %v config validation failed: %w", task.Name(), err)
 		}
 	}
+
 	for _, task := range ts.allCleanupTasks {
 		err := task.ValidateConfig()
 		if err != nil {
@@ -176,6 +193,7 @@ func (ts *TaskScheduler) ValidateTaskConfigs() error {
 			return fmt.Errorf("cleanup task %v config validation failed: %w", task.Name(), err)
 		}
 	}
+
 	return nil
 }
 
@@ -183,13 +201,16 @@ func (ts *TaskScheduler) RunTasks(ctx context.Context, timeout time.Duration) er
 	defer ts.runCleanupTasks(ctx)
 
 	var tasksCtx context.Context
+
 	if timeout > 0 {
 		c, cancel := context.WithTimeout(ctx, timeout)
 		tasksCtx = c
+
 		defer cancel()
 	} else {
 		c, cancel := context.WithCancel(ctx)
 		tasksCtx = c
+
 		defer cancel()
 	}
 
@@ -198,10 +219,12 @@ func (ts *TaskScheduler) RunTasks(ctx context.Context, timeout time.Duration) er
 		if err != nil {
 			return err
 		}
+
 		if tasksCtx.Err() != nil {
 			return tasksCtx.Err()
 		}
 	}
+
 	return nil
 }
 
@@ -210,26 +233,34 @@ func (ts *TaskScheduler) runCleanupTasks(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		ts.ExecuteTask(ctx, task, ts.WatchTaskPass)
+
+		err := ts.ExecuteTask(ctx, task, ts.WatchTaskPass)
+		if err != nil {
+			task.Logger().Errorf("cleanup task failed: %v", err)
+		}
 	}
 }
 
 // ExecuteTask executes a task
 // this function blocks until the task is executed or the context cancelled
-func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskWatchFn func(task types.Task, ctx context.Context, cancelFn context.CancelFunc)) error {
+func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskWatchFn func(ctx context.Context, cancelFn context.CancelFunc, task types.Task)) error {
 	// check if task has already been started/executed
 	ts.taskStateMutex.RLock()
 	taskState := ts.taskStateMap[task]
 	ts.taskStateMutex.RUnlock()
+
 	if taskState == nil {
 		return fmt.Errorf("task state not found")
 	}
+
 	if taskState.isStarted {
 		return fmt.Errorf("task has already been executed")
 	}
+
 	taskState.isStarted = true
 	taskState.startTime = time.Now()
 	taskState.isRunning = true
+
 	defer func() {
 		taskState.isRunning = false
 		taskState.stopTime = time.Now()
@@ -238,31 +269,37 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 	// create cancelable task context
 	taskCtx, taskCancelFn := context.WithCancel(ctx)
 	taskTimeout := task.Timeout()
+
 	if taskTimeout > 0 {
 		go func() {
 			select {
 			case <-time.After(taskTimeout):
-				task.Logger().Warnf("task timed out")
 				taskState.isTimeout = true
+
+				task.Logger().Warnf("task timed out")
 				taskCancelFn()
 			case <-taskCtx.Done():
 			}
 		}()
 	}
+
 	defer taskCancelFn()
 
 	defer func() {
 		if r := recover(); r != nil {
-			err := r.(error)
+			err, ok := r.(error)
+			if ok {
+				taskState.taskError = err
+			}
+
 			task.Logger().Errorf("task execution panic: %v", r)
-			taskState.taskError = err
 			ts.setTaskResult(task, types.TaskResultFailure, false)
 		}
 	}()
 
 	// run task watcher if supplied
 	if taskWatchFn != nil {
-		go taskWatchFn(task, taskCtx, taskCancelFn)
+		go taskWatchFn(taskCtx, taskCancelFn, task)
 	}
 
 	// execute task
@@ -271,6 +308,7 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 
 	if err != nil {
 		task.Logger().Errorf("task execution returned error: %v", err)
+
 		if taskState.taskError == nil {
 			taskState.taskError = err
 		}
@@ -289,15 +327,18 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 	if err != nil {
 		return fmt.Errorf("task failed: %w", err)
 	}
+
 	if taskState.taskResult == types.TaskResultFailure {
 		task.Logger().Warnf("task failed with failure result")
 		return fmt.Errorf("task failed")
 	}
+
 	task.Logger().Infof("task completed")
+
 	return nil
 }
 
-func (ts *TaskScheduler) WatchTaskPass(task types.Task, ctx context.Context, cancelFn context.CancelFunc) {
+func (ts *TaskScheduler) WatchTaskPass(ctx context.Context, cancelFn context.CancelFunc, task types.Task) {
 	// poll task result and cancel context when task result is passed or failed
 	for {
 		updateChan := ts.GetTaskResultUpdateChan(task, types.TaskResultNone)
@@ -308,6 +349,7 @@ func (ts *TaskScheduler) WatchTaskPass(task types.Task, ctx context.Context, can
 			case <-updateChan:
 			}
 		}
+
 		taskStatus := ts.GetTaskStatus(task)
 		if taskStatus.Result != types.TaskResultNone {
 			cancelFn()
@@ -317,50 +359,56 @@ func (ts *TaskScheduler) WatchTaskPass(task types.Task, ctx context.Context, can
 }
 
 func (ts *TaskScheduler) GetAllTasks() []types.Task {
-	tasks := make([]types.Task, len(ts.allTasks))
-	copy(tasks, ts.allTasks)
+	taskList := make([]types.Task, len(ts.allTasks))
+	copy(taskList, ts.allTasks)
 	ts.taskStateMutex.RLock()
-	sort.Slice(tasks, func(a, b int) bool {
-		taskIdxA := ts.taskStateMap[tasks[a]].index
-		taskIdxB := ts.taskStateMap[tasks[b]].index
+	sort.Slice(taskList, func(a, b int) bool {
+		taskIdxA := ts.taskStateMap[taskList[a]].index
+		taskIdxB := ts.taskStateMap[taskList[b]].index
 		return taskIdxA < taskIdxB
 	})
 	ts.taskStateMutex.RUnlock()
-	return tasks
+
+	return taskList
 }
 
 func (ts *TaskScheduler) GetRootTasks() []types.Task {
-	tasks := make([]types.Task, len(ts.rootTasks))
-	copy(tasks, ts.rootTasks)
-	return tasks
+	taskList := make([]types.Task, len(ts.rootTasks))
+	copy(taskList, ts.rootTasks)
+
+	return taskList
 }
 
 func (ts *TaskScheduler) GetAllCleanupTasks() []types.Task {
-	tasks := make([]types.Task, len(ts.allCleanupTasks))
-	copy(tasks, ts.allCleanupTasks)
+	taskList := make([]types.Task, len(ts.allCleanupTasks))
+	copy(taskList, ts.allCleanupTasks)
 	ts.taskStateMutex.RLock()
-	sort.Slice(tasks, func(a, b int) bool {
-		taskIdxA := ts.taskStateMap[tasks[a]].index
-		taskIdxB := ts.taskStateMap[tasks[b]].index
+	sort.Slice(taskList, func(a, b int) bool {
+		taskIdxA := ts.taskStateMap[taskList[a]].index
+		taskIdxB := ts.taskStateMap[taskList[b]].index
 		return taskIdxA < taskIdxB
 	})
 	ts.taskStateMutex.RUnlock()
-	return tasks
+
+	return taskList
 }
 
 func (ts *TaskScheduler) GetRootCleanupTasks() []types.Task {
-	tasks := make([]types.Task, len(ts.rootCleanupTasks))
-	copy(tasks, ts.rootCleanupTasks)
-	return tasks
+	taskList := make([]types.Task, len(ts.rootCleanupTasks))
+	copy(taskList, ts.rootCleanupTasks)
+
+	return taskList
 }
 
 func (ts *TaskScheduler) GetTaskStatus(task types.Task) *types.TaskStatus {
 	ts.taskStateMutex.RLock()
 	taskState := ts.taskStateMap[task]
 	ts.taskStateMutex.RUnlock()
+
 	if taskState == nil {
 		return nil
 	}
+
 	return &types.TaskStatus{
 		Index:     taskState.index,
 		IsStarted: taskState.isStarted,
@@ -376,16 +424,21 @@ func (ts *TaskScheduler) GetTaskResultUpdateChan(task types.Task, oldResult type
 	ts.taskStateMutex.RLock()
 	taskState := ts.taskStateMap[task]
 	ts.taskStateMutex.RUnlock()
+
 	if taskState == nil {
 		return nil
 	}
+
 	taskState.resultMutex.RLock()
 	defer taskState.resultMutex.RUnlock()
+
 	if taskState.taskResult != oldResult {
 		return nil
 	}
+
 	if taskState.resultNotifyChan == nil {
 		taskState.resultNotifyChan = make(chan bool)
 	}
+
 	return taskState.resultNotifyChan
 }

@@ -40,6 +40,7 @@ func NewFrontend(config *types.FrontendConfig) (*Frontend, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	fileSys := http.FS(subFs)
 
 	templateFiles, err = fs.Sub(templateEmbedFS, "templates")
@@ -52,6 +53,7 @@ func NewFrontend(config *types.FrontendConfig) (*Frontend, error) {
 		rootFileSys:     fileSys,
 		NotFoundHandler: HandleNotFound,
 	}
+
 	return &frontend, nil
 }
 
@@ -62,12 +64,15 @@ func (frontend *Frontend) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		upath = "/" + upath
 		r.URL.Path = upath
 	}
+
 	name := path.Clean(upath)
 	f, err := frontend.rootFileSys.Open(name)
+
 	if err != nil {
 		handleHTTPError(err, frontend.NotFoundHandler, w, r)
 		return
 	}
+
 	defer f.Close()
 
 	_, err = f.Stat()

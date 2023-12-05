@@ -50,22 +50,27 @@ func (fh *FrontendHandler) Test(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var templateFiles = append(web.LayoutTemplateFiles,
+	templateFiles := web.LayoutTemplateFiles
+	templateFiles = append(templateFiles,
 		"test/test.html",
 	)
-	var pageTemplate = web.GetTemplate(templateFiles...)
+	pageTemplate := web.GetTemplate(templateFiles...)
 	data := web.InitPageData(w, r, "test", "/", "Test ", templateFiles)
 
 	vars := mux.Vars(r)
+
 	testIdx, pageError := strconv.ParseInt(vars["testIdx"], 10, 64)
 	if pageError == nil {
 		data.Data, pageError = fh.getTestPageData(testIdx)
 	}
+
 	if pageError != nil {
 		web.HandlePageError(w, r, pageError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "text/html")
+
 	if web.HandleTemplateError(w, r, "test.go", "Test", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
 		return // an error has occurred and was processed
 	}
@@ -73,25 +78,33 @@ func (fh *FrontendHandler) Test(w http.ResponseWriter, r *http.Request) {
 
 func (fh *FrontendHandler) TestData(w http.ResponseWriter, r *http.Request) {
 	var pageData *TestPage
+
 	vars := mux.Vars(r)
+
 	testIdx, pageError := strconv.ParseInt(vars["testIdx"], 10, 64)
 	if pageError == nil {
 		pageData, pageError = fh.getTestPageData(testIdx)
 	}
+
 	if pageError != nil {
 		web.HandlePageError(w, r, pageError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
+
 	err := json.NewEncoder(w).Encode(pageData)
 	if err != nil {
 		logrus.WithError(err).Error("error encoding test data")
+
+		//nolint:gocritic // ignore
 		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
 }
 
 func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 	var test types.Test
+
 	allTests := fh.coordinator.GetTests()
 	for idx := range allTests {
 		if int64(idx) == testIdx {
@@ -99,6 +112,7 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 			break
 		}
 	}
+
 	if test == nil {
 		return nil, fmt.Errorf("Test not found")
 	}
@@ -109,23 +123,20 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 		StartTime: test.StartTime(),
 		StopTime:  test.StopTime(),
 		Timeout:   test.Timeout(),
+		Status:    string(test.Status()),
 	}
+
 	switch test.Status() {
 	case types.TestStatusPending:
-		pageData.Status = "pending"
 	case types.TestStatusRunning:
-		pageData.Status = "running"
 		pageData.IsStarted = true
 	case types.TestStatusSuccess:
-		pageData.Status = "success"
 		pageData.IsStarted = true
 		pageData.IsCompleted = true
 	case types.TestStatusFailure:
-		pageData.Status = "failure"
 		pageData.IsStarted = true
 		pageData.IsCompleted = true
 	case types.TestStatusSkipped:
-		pageData.Status = "skipped"
 	}
 
 	taskScheduler := test.GetTaskScheduler()
@@ -144,17 +155,20 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 				Timeout:     task.Timeout(),
 				HasTimeout:  task.Timeout() > 0,
 			}
-			if !taskStatus.IsStarted {
+
+			switch {
+			case !taskStatus.IsStarted:
 				taskData.Status = "pending"
-			} else if taskStatus.IsRunning {
+			case taskStatus.IsRunning:
 				taskData.Status = "running"
 				taskData.HasRunTime = true
 				taskData.RunTime = time.Since(taskStatus.StartTime)
-			} else {
+			default:
 				taskData.Status = "complete"
 				taskData.HasRunTime = true
 				taskData.RunTime = taskStatus.StopTime.Sub(taskStatus.StartTime)
 			}
+
 			switch taskStatus.Result {
 			case types.TaskResultNone:
 				taskData.Result = "none"
@@ -163,6 +177,7 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 			case types.TaskResultFailure:
 				taskData.Result = "failure"
 			}
+
 			if taskStatus.Error != nil {
 				taskData.ResultError = taskStatus.Error.Error()
 			}

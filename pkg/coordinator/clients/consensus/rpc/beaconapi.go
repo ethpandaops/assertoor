@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -26,16 +25,15 @@ type BeaconClient struct {
 }
 
 // NewBeaconClient is used to create a new beacon client
-func NewBeaconClient(name string, url string, headers map[string]string) (*BeaconClient, error) {
+func NewBeaconClient(name, url string, headers map[string]string) (*BeaconClient, error) {
 	client := &BeaconClient{
 		name:     name,
 		endpoint: url,
 		headers:  headers,
 	}
+
 	return client, nil
 }
-
-var errNotFound = errors.New("not found 404")
 
 func (bc *BeaconClient) Initialize(ctx context.Context) error {
 	if bc.clientSvc != nil {
@@ -47,7 +45,7 @@ func (bc *BeaconClient) Initialize(ctx context.Context) error {
 		http.WithTimeout(10 * time.Minute),
 		http.WithLogLevel(zerolog.Disabled),
 		// TODO (when upstream PR is merged)
-		//http.WithConnectionCheck(false),
+		// http.WithConnectionCheck(false),
 	}
 
 	// set extra endpoint headers
@@ -61,20 +59,24 @@ func (bc *BeaconClient) Initialize(ctx context.Context) error {
 	}
 
 	bc.clientSvc = clientSvc
+
 	return nil
 }
 
 func (bc *BeaconClient) GetGenesis() (*v1.Genesis, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	provider, isProvider := bc.clientSvc.(eth2client.GenesisProvider)
 	if !isProvider {
 		return nil, fmt.Errorf("get genesis not supported")
 	}
+
 	result, err := provider.Genesis(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -83,10 +85,12 @@ func (bc *BeaconClient) GetNodeSyncing(ctx context.Context) (*v1.SyncState, erro
 	if !isProvider {
 		return nil, fmt.Errorf("get node syncing not supported")
 	}
+
 	result, err := provider.NodeSyncing(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -95,7 +99,9 @@ func (bc *BeaconClient) GetNodeSyncStatus(ctx context.Context) (*SyncStatus, err
 	if err != nil {
 		return nil, err
 	}
+
 	syncStatus := NewSyncStatus(syncState)
+
 	return &syncStatus, nil
 }
 
@@ -104,10 +110,12 @@ func (bc *BeaconClient) GetNodeVersion(ctx context.Context) (string, error) {
 	if !isProvider {
 		return "", fmt.Errorf("get node version not supported")
 	}
+
 	result, err := provider.NodeVersion(ctx)
 	if err != nil {
 		return "", err
 	}
+
 	return result, nil
 }
 
@@ -116,10 +124,12 @@ func (bc *BeaconClient) GetConfigSpecs(ctx context.Context) (map[string]interfac
 	if !isProvider {
 		return nil, fmt.Errorf("get specs not supported")
 	}
+
 	result, err := provider.Spec(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -128,10 +138,12 @@ func (bc *BeaconClient) GetLatestBlockHead(ctx context.Context) (*v1.BeaconBlock
 	if !isProvider {
 		return nil, fmt.Errorf("get beacon block headers not supported")
 	}
+
 	result, err := provider.BeaconBlockHeader(ctx, "head")
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -140,10 +152,12 @@ func (bc *BeaconClient) GetFinalityCheckpoints(ctx context.Context) (*v1.Finalit
 	if !isProvider {
 		return nil, fmt.Errorf("get finality not supported")
 	}
+
 	result, err := provider.Finality(ctx, "head")
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -152,10 +166,12 @@ func (bc *BeaconClient) GetBlockHeaderByBlockroot(ctx context.Context, blockroot
 	if !isProvider {
 		return nil, fmt.Errorf("get beacon block headers not supported")
 	}
+
 	result, err := provider.BeaconBlockHeader(ctx, fmt.Sprintf("0x%x", blockroot))
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -164,10 +180,12 @@ func (bc *BeaconClient) GetBlockHeaderBySlot(ctx context.Context, slot phase0.Sl
 	if !isProvider {
 		return nil, fmt.Errorf("get beacon block headers not supported")
 	}
+
 	result, err := provider.BeaconBlockHeader(ctx, fmt.Sprintf("%d", slot))
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -176,12 +194,15 @@ func (bc *BeaconClient) GetBlockBodyByBlockroot(ctx context.Context, blockroot p
 	if !isProvider {
 		return nil, fmt.Errorf("get signed beacon block not supported")
 	}
+
 	result, err := provider.SignedBeaconBlock(ctx, fmt.Sprintf("0x%x", blockroot))
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "GET failed with status 404") {
 			return nil, nil
 		}
+
 		return nil, err
 	}
+
 	return result, nil
 }

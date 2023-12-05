@@ -30,26 +30,31 @@ type Task struct {
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
 	config := DefaultConfig()
+
 	if options.Config != nil {
 		conf := &Config{}
 		if err := options.Config.Unmarshal(&conf); err != nil {
 			return nil, fmt.Errorf("error parsing task config for %v: %w", TaskName, err)
 		}
+
 		if err := mergo.Merge(&config, conf, mergo.WithOverride); err != nil {
 			return nil, fmt.Errorf("error merging task config for %v: %w", TaskName, err)
 		}
 	}
 
 	childTasks := []types.Task{}
-	for i, rawtask := range config.Tasks {
-		taskOpts, err := ctx.Scheduler.ParseTaskOptions(&rawtask)
+
+	for i := range config.Tasks {
+		taskOpts, err := ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
 		if err != nil {
 			return nil, fmt.Errorf("failed parsing child task config #%v : %w", i, err)
 		}
+
 		task, err := ctx.NewTask(taskOpts)
 		if err != nil {
 			return nil, fmt.Errorf("failed initializing child task #%v : %w", i, err)
 		}
+
 		childTasks = append(childTasks, task)
 	}
 
@@ -90,6 +95,7 @@ func (t *Task) ValidateConfig() error {
 	if err := t.config.Validate(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -100,5 +106,6 @@ func (t *Task) Execute(ctx context.Context) error {
 			return fmt.Errorf("child task #%v failed: %w", i, err)
 		}
 	}
+
 	return nil
 }

@@ -38,25 +38,30 @@ type ClientsPageClient struct {
 
 // Clients will return the "clients" page using a go template
 func (fh *FrontendHandler) Clients(w http.ResponseWriter, r *http.Request) {
-	var templateFiles = append(web.LayoutTemplateFiles,
+	templateFiles := web.LayoutTemplateFiles
+	templateFiles = append(templateFiles,
 		"clients/clients.html",
 	)
 
-	var pageTemplate = web.GetTemplate(templateFiles...)
+	pageTemplate := web.GetTemplate(templateFiles...)
 	data := web.InitPageData(w, r, "clients", "/clients", "Clients", templateFiles)
 
 	var pageError error
 	data.Data, pageError = fh.getClientsPageData()
+
 	if pageError != nil {
 		web.HandlePageError(w, r, pageError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "text/html")
+
 	if web.HandleTemplateError(w, r, "clients.go", "Clients", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
 		return // an error has occurred and was processed
 	}
 }
 
+//nolint:unparam // ignore
 func (fh *FrontendHandler) getClientsPageData() (*ClientsPage, error) {
 	pageData := &ClientsPage{
 		Clients: []*ClientsPageClient{},
@@ -67,6 +72,7 @@ func (fh *FrontendHandler) getClientsPageData() (*ClientsPage, error) {
 		clientData := fh.getClientsPageClientData(client)
 		pageData.Clients = append(pageData.Clients, clientData)
 	}
+
 	pageData.ClientCount = uint64(len(pageData.Clients))
 
 	return pageData, nil
@@ -87,14 +93,16 @@ func (fh *FrontendHandler) getClientsPageClientData(client *clients.PoolClient) 
 		CLIsReady:     clientPool.GetConsensusPool().GetCanonicalFork(2).IsClientReady(client.ConsensusClient),
 		ELVersion:     client.ExecutionClient.GetVersion(),
 		ELType:        uint64(client.ExecutionClient.GetClientType()),
-		ELHeadNumber:  uint64(blockNum),
+		ELHeadNumber:  blockNum,
 		ELHeadHash:    blockHash[:],
 		ELLastRefresh: client.ExecutionClient.GetLastEventTime(),
 		ELIsReady:     clientPool.GetExecutionPool().GetCanonicalFork(2).IsClientReady(client.ExecutionClient),
 	}
+
 	if lastError := client.ConsensusClient.GetLastError(); lastError != nil {
 		clientData.CLLastError = lastError.Error()
 	}
+
 	switch client.ConsensusClient.GetStatus() {
 	case consensus.ClientStatusOffline:
 		clientData.CLStatus = "offline"
@@ -105,9 +113,11 @@ func (fh *FrontendHandler) getClientsPageClientData(client *clients.PoolClient) 
 	case consensus.ClientStatusSynchronizing:
 		clientData.CLStatus = "synchronizing"
 	}
+
 	if lastError := client.ExecutionClient.GetLastError(); lastError != nil {
 		clientData.ELLastError = lastError.Error()
 	}
+
 	switch client.ExecutionClient.GetStatus() {
 	case execution.ClientStatusOffline:
 		clientData.ELStatus = "offline"
@@ -116,5 +126,6 @@ func (fh *FrontendHandler) getClientsPageClientData(client *clients.PoolClient) 
 	case execution.ClientStatusSynchronizing:
 		clientData.ELStatus = "synchronizing"
 	}
+
 	return clientData
 }
