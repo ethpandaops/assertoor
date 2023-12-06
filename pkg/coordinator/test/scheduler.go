@@ -28,6 +28,7 @@ type TaskScheduler struct {
 type taskExecutionState struct {
 	index            uint64
 	task             types.Task
+	taskDepth        uint64
 	parentState      *taskExecutionState
 	isStarted        bool
 	isRunning        bool
@@ -118,6 +119,12 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskEx
 		index:       taskIdx,
 		parentState: parentState,
 	}
+
+	if parentState != nil {
+		taskState.parentState = parentState
+		taskState.taskDepth = parentState.taskDepth + 1
+	}
+
 	taskCtx := &types.TaskContext{
 		Scheduler: ts,
 		Index:     taskIdx,
@@ -142,13 +149,13 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskEx
 	ts.taskStateMutex.Lock()
 	taskState.task = task
 	ts.taskStateMap[task] = taskState
-	ts.taskStateMutex.Unlock()
 
 	if isCleanupTask {
 		ts.allCleanupTasks = append(ts.allCleanupTasks, task)
 	} else {
 		ts.allTasks = append(ts.allTasks, task)
 	}
+	ts.taskStateMutex.Unlock()
 
 	return task, nil
 }
@@ -362,45 +369,69 @@ func (ts *TaskScheduler) WatchTaskPass(ctx context.Context, cancelFn context.Can
 }
 
 func (ts *TaskScheduler) GetAllTasks() []types.Task {
+	ts.taskStateMutex.RLock()
 	taskList := make([]types.Task, len(ts.allTasks))
 	copy(taskList, ts.allTasks)
-	ts.taskStateMutex.RLock()
-	sort.Slice(taskList, func(a, b int) bool {
-		taskIdxA := ts.taskStateMap[taskList[a]].index
-		taskIdxB := ts.taskStateMap[taskList[b]].index
-		return taskIdxA < taskIdxB
-	})
+	ts.sortTaskList(taskList)
 	ts.taskStateMutex.RUnlock()
 
 	return taskList
 }
 
 func (ts *TaskScheduler) GetRootTasks() []types.Task {
+	ts.taskStateMutex.RLock()
 	taskList := make([]types.Task, len(ts.rootTasks))
 	copy(taskList, ts.rootTasks)
+	ts.taskStateMutex.RUnlock()
 
 	return taskList
 }
 
 func (ts *TaskScheduler) GetAllCleanupTasks() []types.Task {
+	ts.taskStateMutex.RLock()
 	taskList := make([]types.Task, len(ts.allCleanupTasks))
 	copy(taskList, ts.allCleanupTasks)
-	ts.taskStateMutex.RLock()
-	sort.Slice(taskList, func(a, b int) bool {
-		taskIdxA := ts.taskStateMap[taskList[a]].index
-		taskIdxB := ts.taskStateMap[taskList[b]].index
-		return taskIdxA < taskIdxB
-	})
+	ts.sortTaskList(taskList)
 	ts.taskStateMutex.RUnlock()
 
 	return taskList
 }
 
 func (ts *TaskScheduler) GetRootCleanupTasks() []types.Task {
+	ts.taskStateMutex.RLock()
 	taskList := make([]types.Task, len(ts.rootCleanupTasks))
 	copy(taskList, ts.rootCleanupTasks)
+	ts.taskStateMutex.RUnlock()
 
 	return taskList
+}
+
+func (ts *TaskScheduler) sortTaskList(taskList []types.Task) {
+	sort.Slice(taskList, func(a, b int) bool {
+		taskStateA := ts.taskStateMap[taskList[a]]
+		taskStateB := ts.taskStateMap[taskList[b]]
+		if taskStateA.parentState == taskStateB.parentState {
+			return taskStateA.index < taskStateB.index
+		}
+		for {
+			switch {
+			case taskStateA.parentState == taskStateB:
+				return false
+			case taskStateB.parentState == taskStateA:
+				return true
+			case taskStateA.taskDepth > taskStateB.taskDepth:
+				taskStateA = taskStateA.parentState
+			case taskStateB.taskDepth > taskStateA.taskDepth:
+				taskStateB = taskStateB.parentState
+			default:
+				taskStateA = taskStateA.parentState
+				taskStateB = taskStateB.parentState
+			}
+			if taskStateA.parentState == taskStateB.parentState {
+				return taskStateA.index < taskStateB.index
+			}
+		}
+	})
 }
 
 func (ts *TaskScheduler) GetTaskStatus(task types.Task) *types.TaskStatus {
