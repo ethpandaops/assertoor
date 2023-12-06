@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients/consensus"
-	"github.com/ethpandaops/minccino/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/imdario/mergo"
 	"github.com/sirupsen/logrus"
 )

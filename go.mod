@@ -1,4 +1,4 @@
-module github.com/ethpandaops/minccino
+module github.com/ethpandaops/assertoor
 
 go 1.21
 

@@ -3,7 +3,7 @@ package runtasksconcurrent
 import (
 	"errors"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/helper"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 )
 
 type Config struct {

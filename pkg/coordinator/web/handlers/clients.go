@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients/consensus"
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients/execution"
-	"github.com/ethpandaops/minccino/pkg/coordinator/web"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 )
 
 type ClientsPage struct {

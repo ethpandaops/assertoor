@@ -3,9 +3,9 @@ package coordinator
 import (
 	"os"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
-	"github.com/ethpandaops/minccino/pkg/coordinator/test"
-	web_types "github.com/ethpandaops/minccino/pkg/coordinator/web/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
+	web_types "github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
 	"gopkg.in/yaml.v2"
 )
 

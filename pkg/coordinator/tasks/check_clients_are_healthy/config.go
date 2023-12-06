@@ -3,7 +3,7 @@ package checkclientsarehealthy
 import (
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/human-duration"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
 )
 
 type Config struct {

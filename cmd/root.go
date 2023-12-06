@@ -4,14 +4,14 @@ import (
 	"log"
 	"os"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator"
+	"github.com/ethpandaops/assertoor/pkg/coordinator"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "minccino",
+	Use:   "assertoor",
 	Short: "Runs a configured test until completion or error",
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := coordinator.NewConfig(cfgFile)

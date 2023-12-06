@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/types"
-	"github.com/ethpandaops/minccino/pkg/coordinator/web"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )

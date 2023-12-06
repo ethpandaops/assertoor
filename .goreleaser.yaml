@@ -1,4 +1,4 @@
-project_name: minccino
+project_name: assertoor
 
 before:
   hooks:
@@ -7,7 +7,7 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
-    binary: minccino-{{.Version}}
+    binary: assertoor-{{.Version}}
     goos:
       - linux
       - windows
@@ -26,7 +26,7 @@ builds:
         goarch: arm64
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X github.com/ethpandaops/minccino/pkg/coordinator/buildinfo.BuildRelease={{.Tag}} -X github.com/ethpandaops/minccino/pkg/coordinator/buildinfo.BuildVersion={{.ShortCommit}}
+      - -s -w -X github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.BuildRelease={{.Tag}} -X github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.BuildVersion={{.ShortCommit}}
 checksum:
   name_template: 'checksums.txt'
 snapshot:

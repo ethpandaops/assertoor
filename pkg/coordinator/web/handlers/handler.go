@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/ethpandaops/minccino/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 )
 
 type FrontendHandler struct {

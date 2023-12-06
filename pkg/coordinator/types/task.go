@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/helper"
-	"github.com/ethpandaops/minccino/pkg/coordinator/human-duration"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
 	"github.com/sirupsen/logrus"
 )
 

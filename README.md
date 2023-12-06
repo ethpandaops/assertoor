@@ -1,4 +1,4 @@
-# Minccino Testnet Testing tool
+# Assertoor Testnet Testing tool
 
 This project serves as a controller for Ethereum Tests. Users can define tests in yaml, and have the controller ensure the test is conducted while reporting on the status via logs and Prometheus metrics.
 

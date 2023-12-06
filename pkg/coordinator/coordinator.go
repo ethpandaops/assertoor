@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/buildinfo"
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients"
-	"github.com/ethpandaops/minccino/pkg/coordinator/test"
-	"github.com/ethpandaops/minccino/pkg/coordinator/types"
-	"github.com/ethpandaops/minccino/pkg/coordinator/web/server"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/web/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )

@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/helper"
-	"github.com/ethpandaops/minccino/pkg/coordinator/tasks"
-	"github.com/ethpandaops/minccino/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/tasks"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 

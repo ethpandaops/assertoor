@@ -1,8 +1,8 @@
 package test
 
 import (
-	"github.com/ethpandaops/minccino/pkg/coordinator/helper"
-	human "github.com/ethpandaops/minccino/pkg/coordinator/human-duration"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
+	human "github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
 )
 
 type Config struct {

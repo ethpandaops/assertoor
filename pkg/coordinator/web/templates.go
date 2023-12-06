@@ -14,7 +14,7 @@ import (
 
 	"github.com/tdewolff/minify"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/web/utils"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/web/utils"
 )
 
 var templateFiles fs.FS

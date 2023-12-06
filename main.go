@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/ethpandaops/minccino/cmd"
+	"github.com/ethpandaops/assertoor/cmd"
 )
 
 func main() {

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients/consensus"
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients/execution"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"github.com/sirupsen/logrus"
 )
 

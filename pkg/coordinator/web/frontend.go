@@ -8,7 +8,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/web/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,7 +33,7 @@ func NewFrontend(config *types.FrontendConfig) (*Frontend, error) {
 	frontendConfig = config
 
 	if frontendConfig.SiteName == "" {
-		frontendConfig.SiteName = "Minccino"
+		frontendConfig.SiteName = "Assertoor"
 	}
 
 	subFs, err := fs.Sub(staticEmbedFS, "static")

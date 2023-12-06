@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethpandaops/minccino/pkg/coordinator/clients/execution/rpc"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution/rpc"
 	"github.com/sirupsen/logrus"
 )
 

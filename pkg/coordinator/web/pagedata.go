@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ethpandaops/minccino/pkg/coordinator/buildinfo"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
 	"github.com/sirupsen/logrus"
 )
 
@@ -60,7 +60,7 @@ func InitPageData(_ http.ResponseWriter, r *http.Request, active, path, title st
 	data := &PageData{
 		Meta: &Meta{
 			Title:       fullTitle,
-			Description: "minccino: testnet testing tool",
+			Description: "assertoor: testnet testing tool",
 			Domain:      r.Host,
 			Path:        path,
 			Templates:   strings.Join(mainTemplates, ","),
