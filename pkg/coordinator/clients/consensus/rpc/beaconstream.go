@@ -64,7 +64,7 @@ func (bs *BeaconStream) Start() {
 func (bs *BeaconStream) Close() {
 	if bs.running {
 		bs.running = false
-		bs.killChan <- true
+		close(bs.killChan)
 	}
 
 	bs.runMutex.Lock()
