@@ -21,7 +21,7 @@ type Test struct {
 	timeout   time.Duration
 }
 
-func CreateTest(coordinator types.Coordinator, config *Config) (types.Test, error) {
+func CreateTest(coordinator types.Coordinator, config *Config, variables types.Variables) (types.Test, error) {
 	test := &Test{
 		name:   config.Name,
 		log:    coordinator.Logger().WithField("component", "test").WithField("test", config.Name),
@@ -35,8 +35,14 @@ func CreateTest(coordinator types.Coordinator, config *Config) (types.Test, erro
 	if config.Disable {
 		test.status = types.TestStatusSkipped
 	} else {
+		// set test variables
+		testVars := coordinator.NewVariables(variables)
+		for name, value := range config.TestVars {
+			testVars.SetVar(name, value)
+		}
+
 		// parse tasks
-		test.taskScheduler = NewTaskScheduler(test.log, coordinator)
+		test.taskScheduler = NewTaskScheduler(test.log, coordinator, testVars)
 		for i := range config.Tasks {
 			taskOptions, err := test.taskScheduler.ParseTaskOptions(&config.Tasks[i])
 			if err != nil {
@@ -115,6 +121,7 @@ func (t *Test) Run(ctx context.Context) error {
 		return fmt.Errorf("test has already been started")
 	}
 
+	// track start/stop time
 	t.startTime = time.Now()
 	t.status = types.TestStatusRunning
 
@@ -122,6 +129,7 @@ func (t *Test) Run(ctx context.Context) error {
 		t.stopTime = time.Now()
 	}()
 
+	// run test tasks
 	t.log.WithField("timeout", t.timeout.String()).Info("starting test")
 
 	err := t.taskScheduler.RunTasks(ctx, t.timeout)

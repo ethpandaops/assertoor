@@ -10,6 +10,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -77,9 +78,15 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	//nolint:errcheck // ignore
 	go c.startMetrics()
 
+	// load global variables
+	variables := c.NewVariables(nil)
+	for name, value := range c.Config.GlobalVars {
+		variables.SetVar(name, value)
+	}
+
 	// initialize tests
 	for _, testCfg := range c.Config.Tests {
-		testRef, err := test.CreateTest(c, testCfg)
+		testRef, err := test.CreateTest(c, testCfg, variables)
 		if err != nil {
 			return fmt.Errorf("failed initializing test '%v': %w", testCfg.Name, err)
 		}
@@ -106,6 +113,10 @@ func (c *Coordinator) Logger() logrus.FieldLogger {
 	return c.log
 }
 
+func (c *Coordinator) NewVariables(parentScope types.Variables) types.Variables {
+	return vars.NewVariables(parentScope)
+}
+
 func (c *Coordinator) ClientPool() *clients.ClientPool {
 	return c.clientPool
 }
@@ -130,6 +141,7 @@ func (c *Coordinator) startMetrics() error {
 }
 
 func (c *Coordinator) runTests(ctx context.Context) {
+	// run tests
 	for _, testRef := range c.tests {
 		if err := testRef.Validate(); err != nil {
 			testRef.Logger().Errorf("test validation failed: %v", err)

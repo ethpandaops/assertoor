@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 type TaskScheduler struct {
 	coordinator      types.Coordinator
 	logger           logrus.FieldLogger
+	rootVars         types.Variables
 	taskCount        uint64
 	allTasks         []types.Task
 	rootTasks        []types.Task
@@ -29,6 +31,7 @@ type taskExecutionState struct {
 	index            uint64
 	task             types.Task
 	taskDepth        uint64
+	taskVars         types.Variables
 	parentState      *taskExecutionState
 	isStarted        bool
 	isRunning        bool
@@ -42,9 +45,10 @@ type taskExecutionState struct {
 	resultMutex      sync.RWMutex
 }
 
-func NewTaskScheduler(logger logrus.FieldLogger, coordinator types.Coordinator) *TaskScheduler {
+func NewTaskScheduler(logger logrus.FieldLogger, coordinator types.Coordinator, variables types.Variables) *TaskScheduler {
 	return &TaskScheduler{
 		logger:       logger,
+		rootVars:     variables,
 		taskCount:    1,
 		rootTasks:    make([]types.Task, 0),
 		allTasks:     make([]types.Task, 0),
@@ -75,7 +79,7 @@ func (ts *TaskScheduler) ParseTaskOptions(rawtask *helper.RawMessage) (*types.Ta
 }
 
 func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.Task, error) {
-	task, err := ts.newTask(options, nil, false)
+	task, err := ts.newTask(options, nil, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +90,7 @@ func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.Task, er
 }
 
 func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.Task, error) {
-	task, err := ts.newTask(options, nil, true)
+	task, err := ts.newTask(options, nil, nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +100,7 @@ func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.Task,
 	return task, nil
 }
 
-func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskExecutionState, isCleanupTask bool) (types.Task, error) {
+func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskExecutionState, variables types.Variables, isCleanupTask bool) (types.Task, error) {
 	// lookup task by name
 	var taskDescriptor *types.TaskDescriptor
 
@@ -109,6 +113,14 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskEx
 
 	if taskDescriptor == nil {
 		return nil, fmt.Errorf("unknown task name: %v", options.Name)
+	}
+
+	if variables == nil {
+		if parentState != nil {
+			variables = parentState.taskVars
+		} else {
+			variables = ts.rootVars
+		}
 	}
 
 	// create instance of task
@@ -128,8 +140,8 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskEx
 	taskCtx := &types.TaskContext{
 		Scheduler: ts,
 		Index:     taskIdx,
-		NewTask: func(options *types.TaskOptions) (types.Task, error) {
-			return ts.newTask(options, taskState, isCleanupTask)
+		NewTask: func(options *types.TaskOptions, variables types.Variables) (types.Task, error) {
+			return ts.newTask(options, taskState, variables, isCleanupTask)
 		},
 		SetResult: func(result types.TaskResult) {
 			ts.setTaskResult(task, result, true)
@@ -302,7 +314,7 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 				taskState.taskError = err
 			}
 
-			task.Logger().Errorf("task execution panic: %v", r)
+			task.Logger().Errorf("task execution panic: %v, stack: %v", r, string(debug.Stack()))
 			ts.setTaskResult(task, types.TaskResultFailure, false)
 		}
 	}()

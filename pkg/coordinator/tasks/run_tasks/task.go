@@ -50,7 +50,7 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 			return nil, fmt.Errorf("failed parsing child task config #%v : %w", i, err)
 		}
 
-		task, err := ctx.NewTask(taskOpts)
+		task, err := ctx.NewTask(taskOpts, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed initializing child task #%v : %w", i, err)
 		}

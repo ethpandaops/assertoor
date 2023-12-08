@@ -37,6 +37,7 @@ type TaskStatus struct {
 type TaskContext struct {
 	Scheduler TaskScheduler
 	Index     uint64
-	NewTask   func(options *TaskOptions) (Task, error)
+	Vars      Variables
+	NewTask   func(options *TaskOptions, variables Variables) (Task, error)
 	SetResult func(result TaskResult)
 }
