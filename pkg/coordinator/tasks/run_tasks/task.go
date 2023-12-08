@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/imdario/mergo"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,41 +28,10 @@ type Task struct {
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
-	config := DefaultConfig()
-
-	if options.Config != nil {
-		conf := &Config{}
-		if err := options.Config.Unmarshal(&conf); err != nil {
-			return nil, fmt.Errorf("error parsing task config for %v: %w", TaskName, err)
-		}
-
-		if err := mergo.Merge(&config, conf, mergo.WithOverride); err != nil {
-			return nil, fmt.Errorf("error merging task config for %v: %w", TaskName, err)
-		}
-	}
-
-	childTasks := []types.Task{}
-
-	for i := range config.Tasks {
-		taskOpts, err := ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed parsing child task config #%v : %w", i, err)
-		}
-
-		task, err := ctx.NewTask(taskOpts, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed initializing child task #%v : %w", i, err)
-		}
-
-		childTasks = append(childTasks, task)
-	}
-
 	return &Task{
 		ctx:     ctx,
 		options: options,
-		config:  config,
 		logger:  ctx.Scheduler.GetLogger().WithField("task", TaskName),
-		tasks:   childTasks,
 	}, nil
 }
 
@@ -91,10 +59,46 @@ func (t *Task) Timeout() time.Duration {
 	return t.options.Timeout.Duration
 }
 
-func (t *Task) ValidateConfig() error {
-	if err := t.config.Validate(); err != nil {
+func (t *Task) LoadConfig() error {
+	config := DefaultConfig()
+
+	// parse static config
+	if t.options.Config != nil {
+		if err := t.options.Config.Unmarshal(&config); err != nil {
+			return fmt.Errorf("error parsing task config for %v: %w", TaskName, err)
+		}
+	}
+
+	// load dynamic vars
+	err := t.ctx.Vars.ConsumeVars(&config, t.options.ConfigVars)
+	if err != nil {
 		return err
 	}
+
+	// validate config
+	if err := config.Validate(); err != nil {
+		return err
+	}
+
+	// init child tasks
+	childTasks := []types.Task{}
+
+	for i := range config.Tasks {
+		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
+		if err != nil {
+			return fmt.Errorf("failed parsing child task config #%v : %w", i, err)
+		}
+
+		task, err := t.ctx.NewTask(taskOpts, nil)
+		if err != nil {
+			return fmt.Errorf("failed initializing child task #%v : %w", i, err)
+		}
+
+		childTasks = append(childTasks, task)
+	}
+
+	t.config = config
+	t.tasks = childTasks
 
 	return nil
 }

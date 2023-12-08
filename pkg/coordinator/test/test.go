@@ -98,12 +98,6 @@ func (t *Test) Validate() error {
 		return nil
 	}
 
-	err := t.taskScheduler.ValidateTaskConfigs()
-	if err != nil {
-		t.status = types.TestStatusFailure
-		return fmt.Errorf("test %s config validation failed: %w", t.name, err)
-	}
-
 	if t.taskScheduler.GetTaskCount() == 0 {
 		t.status = types.TestStatusFailure
 		return fmt.Errorf("test %s has no tasks", t.name)

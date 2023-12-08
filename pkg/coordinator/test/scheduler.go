@@ -130,6 +130,7 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskEx
 	taskState := &taskExecutionState{
 		index:       taskIdx,
 		parentState: parentState,
+		taskVars:    variables,
 	}
 
 	if parentState != nil {
@@ -140,6 +141,7 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskEx
 	taskCtx := &types.TaskContext{
 		Scheduler: ts,
 		Index:     taskIdx,
+		Vars:      variables,
 		NewTask: func(options *types.TaskOptions, variables types.Variables) (types.Task, error) {
 			return ts.newTask(options, taskState, variables, isCleanupTask)
 		},
@@ -197,26 +199,6 @@ func (ts *TaskScheduler) setTaskResult(task types.Task, result types.TaskResult,
 		close(taskState.resultNotifyChan)
 		taskState.resultNotifyChan = nil
 	}
-}
-
-func (ts *TaskScheduler) ValidateTaskConfigs() error {
-	for _, task := range ts.allTasks {
-		err := task.ValidateConfig()
-		if err != nil {
-			task.Logger().WithError(err).Errorf("config validation failed")
-			return fmt.Errorf("task %v config validation failed: %w", task.Name(), err)
-		}
-	}
-
-	for _, task := range ts.allCleanupTasks {
-		err := task.ValidateConfig()
-		if err != nil {
-			task.Logger().WithError(err).Errorf("config validation failed")
-			return fmt.Errorf("cleanup task %v config validation failed: %w", task.Name(), err)
-		}
-	}
-
-	return nil
 }
 
 func (ts *TaskScheduler) RunTasks(ctx context.Context, timeout time.Duration) error {
@@ -288,6 +270,13 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 		taskState.stopTime = time.Now()
 	}()
 
+	// load task config
+	err := task.LoadConfig()
+	if err != nil {
+		task.Logger().WithError(err).Errorf("config validation failed")
+		return fmt.Errorf("task %v config validation failed: %w", task.Name(), err)
+	}
+
 	// create cancelable task context
 	taskCtx, taskCancelFn := context.WithCancel(ctx)
 	taskTimeout := task.Timeout()
@@ -309,9 +298,9 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 
 	defer func() {
 		if r := recover(); r != nil {
-			err, ok := r.(error)
+			pErr, ok := r.(error)
 			if ok {
-				taskState.taskError = err
+				taskState.taskError = pErr
 			}
 
 			task.Logger().Errorf("task execution panic: %v, stack: %v", r, string(debug.Stack()))
@@ -326,7 +315,7 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 
 	// execute task
 	task.Logger().Infof("starting task")
-	err := task.Execute(taskCtx)
+	err = task.Execute(taskCtx)
 
 	if err != nil {
 		task.Logger().Errorf("task execution returned error: %v", err)

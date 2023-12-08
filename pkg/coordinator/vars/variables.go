@@ -1,9 +1,11 @@
 package vars
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"gopkg.in/yaml.v2"
 )
 
 type Variables struct {
@@ -38,6 +40,20 @@ func (v *Variables) GetVar(name string) interface{} {
 	return nil
 }
 
+func (v *Variables) LookupVar(name string) (interface{}, bool) {
+	v.varsMutex.RLock()
+	varValue := v.varsMap[name]
+	v.varsMutex.RUnlock()
+
+	if varValue.isDefined {
+		return varValue.value, true
+	} else if v.parentScope != nil {
+		return v.parentScope.LookupVar(name)
+	}
+
+	return nil, false
+}
+
 func (v *Variables) SetVar(name string, value interface{}) {
 	v.varsMutex.Lock()
 	v.varsMap[name] = variableValue{
@@ -45,4 +61,33 @@ func (v *Variables) SetVar(name string, value interface{}) {
 		value:     value,
 	}
 	v.varsMutex.Unlock()
+}
+
+func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string) error {
+	applyMap := map[string]interface{}{}
+
+	for cfgName, varName := range consumeMap {
+		varValue, varFound := v.LookupVar(varName)
+		if !varFound {
+			continue
+		}
+
+		applyMap[cfgName] = varValue
+	}
+
+	// apply to confiy by generating a yaml, which is then parsed with the config types
+	// dirty hack, but we don't have to care about types this way
+	applyYaml, err := yaml.Marshal(&applyMap)
+	if err != nil {
+		return fmt.Errorf("could not marshal dynamic config vars")
+	}
+
+	fmt.Printf("merge config: %v", string(applyYaml))
+
+	err = yaml.Unmarshal(applyYaml, config)
+	if err != nil {
+		return fmt.Errorf("could not unmarshal dynamic config vars")
+	}
+
+	return nil
 }

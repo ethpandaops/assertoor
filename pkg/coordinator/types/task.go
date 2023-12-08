@@ -21,6 +21,8 @@ type TaskOptions struct {
 	Name string `yaml:"name" json:"name"`
 	// The configuration object of the task.
 	Config *helper.RawMessage `yaml:"config" json:"config"`
+	// The configuration settings to consume from runtime variables.
+	ConfigVars map[string]string `yaml:"configVars" json:"configVars"`
 	// The title of the task - this is used to describe the task to the user.
 	Title string `yaml:"title" json:"title"`
 	// Timeout defines the max time waiting for the condition to be met.
@@ -44,6 +46,6 @@ type Task interface {
 	Logger() logrus.FieldLogger
 	Timeout() time.Duration
 
-	ValidateConfig() error
+	LoadConfig() error
 	Execute(ctx context.Context) error
 }
