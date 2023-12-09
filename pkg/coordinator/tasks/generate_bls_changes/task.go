@@ -132,18 +132,25 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	perSlotCount := 0
+	totalCount := 0
 
 	for {
 		accountIdx := t.nextIndex
 		t.nextIndex++
-		perSlotCount++
 
 		err := t.generateBlsChange(ctx, accountIdx, genesis, validators)
 		if err != nil {
 			t.logger.Errorf("error generating bls change: %v", err.Error())
+		} else {
+			perSlotCount++
+			totalCount++
 		}
 
 		if t.lastIndex > 0 && t.nextIndex >= t.lastIndex {
+			break
+		}
+
+		if t.config.LimitTotal > 0 && totalCount >= t.config.LimitTotal {
 			break
 		}
 
@@ -252,7 +259,7 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64, genesis
 	} else {
 		clients := clientPool.GetClientsByNamePatterns([]string{t.config.ClientPattern})
 		if len(clients) == 0 {
-			return fmt.Errorf("no ready client found with pattern %v", t.config.ClientPattern)
+			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
 		client = clients[0].ConsensusClient
 	}
