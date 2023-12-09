@@ -16,6 +16,8 @@ type Config struct {
 	// WebServer config
 	Web *web_types.WebConfig `yaml:"web" json:"web"`
 
+	GlobalVars map[string]interface{} `yaml:"globalVars" json:"globalVars"`
+
 	// List of Test configurations.
 	Tests []*test.Config `yaml:"tests" json:"tests"`
 }
@@ -30,6 +32,7 @@ func DefaultConfig() *Config {
 				ConsensusURL: "http://localhost:5052",
 			},
 		},
+		GlobalVars: make(map[string]interface{}),
 		Tests: []*test.Config{
 			test.BasicSynced(),
 		},

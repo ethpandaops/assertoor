@@ -8,6 +8,8 @@ import (
 	checkconsensussyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_sync_status"
 	checkexecutionsyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_execution_sync_status"
 	runcommand "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_command"
+	runshell "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_shell"
+	runtaskmatrix "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_task_matrix"
 	runtasks "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_tasks"
 	runtasksconcurrent "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_tasks_concurrent"
 	sleep "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/sleep"
@@ -19,6 +21,8 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkconsensussyncstatus.TaskDescriptor,
 	checkexecutionsyncstatus.TaskDescriptor,
 	runcommand.TaskDescriptor,
+	runshell.TaskDescriptor,
+	runtaskmatrix.TaskDescriptor,
 	runtasks.TaskDescriptor,
 	runtasksconcurrent.TaskDescriptor,
 	sleep.TaskDescriptor,

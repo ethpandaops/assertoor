@@ -1,4 +1,4 @@
-package runtasksconcurrent
+package runtaskmatrix
 
 import (
 	"context"
@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	TaskName       = "run_tasks_concurrent"
+	TaskName       = "run_task_matrix"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Runs multiple tasks in parallel.",
+		Description: "Run a task multiple times based on an input array.",
 		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
@@ -94,13 +94,18 @@ func (t *Task) LoadConfig() error {
 	// init child tasks
 	childTasks := []types.Task{}
 
-	for i := range config.Tasks {
-		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
+	for i := range config.MatrixValues {
+		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(config.Task)
 		if err != nil {
 			return fmt.Errorf("failed parsing child task config #%v : %w", i, err)
 		}
 
-		task, err := t.ctx.NewTask(taskOpts, nil)
+		taskVars := t.ctx.Vars.NewScope()
+		if config.MatrixVar != "" {
+			taskVars.SetVar(config.MatrixVar, config.MatrixValues[i])
+		}
+
+		task, err := t.ctx.NewTask(taskOpts, taskVars)
 		if err != nil {
 			return fmt.Errorf("failed initializing child task #%v : %w", i, err)
 		}
@@ -122,6 +127,11 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.taskCtx = taskCtx
 
+	var taskWaitChan chan bool
+	if !t.config.RunConcurrent {
+		taskWaitChan = make(chan bool, 1)
+	}
+
 	// start child tasks
 	for i := range t.tasks {
 		taskWaitGroup.Add(1)
@@ -131,7 +141,18 @@ func (t *Task) Execute(ctx context.Context) error {
 		go func(i int) {
 			defer taskWaitGroup.Done()
 
+			if taskWaitChan != nil {
+				taskWaitChan <- true
+				defer func() {
+					<-taskWaitChan
+				}()
+			}
+
 			task := t.tasks[i]
+
+			if taskCtx.Err() != nil {
+				return
+			}
 
 			t.logger.Debugf("starting child task %v", i)
 

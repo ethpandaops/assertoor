@@ -8,5 +8,6 @@ import (
 type Coordinator interface {
 	Logger() logrus.FieldLogger
 	ClientPool() *clients.ClientPool
+	NewVariables(parentScope Variables) Variables
 	GetTests() []Test
 }
