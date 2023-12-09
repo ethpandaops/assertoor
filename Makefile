@@ -12,7 +12,7 @@ test:
 
 build:
 	@echo version: $(VERSION)
-	go build -v -o bin/ -ldflags="-s -w $(GOLDFLAGS)" .
+	env CGO_ENABLED=1 go build -v -o bin/ -ldflags="-s -w $(GOLDFLAGS)" .
 
 clean:
 	rm -f bin/*

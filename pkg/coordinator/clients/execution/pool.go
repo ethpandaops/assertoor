@@ -32,6 +32,7 @@ type Pool struct {
 
 func NewPool(config *PoolConfig) (*Pool, error) {
 	pool := Pool{
+		config:        config,
 		clients:       make([]*Client, 0),
 		rrLastIndexes: map[ClientType]uint16{},
 	}

@@ -10,6 +10,7 @@ import (
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/http"
 	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/attestantio/go-eth2-client/spec/capella"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/rs/zerolog"
 	"github.com/sirupsen/logrus"
@@ -63,10 +64,7 @@ func (bc *BeaconClient) Initialize(ctx context.Context) error {
 	return nil
 }
 
-func (bc *BeaconClient) GetGenesis() (*v1.Genesis, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+func (bc *BeaconClient) GetGenesis(ctx context.Context) (*v1.Genesis, error) {
 	provider, isProvider := bc.clientSvc.(eth2client.GenesisProvider)
 	if !isProvider {
 		return nil, fmt.Errorf("get genesis not supported")
@@ -205,4 +203,32 @@ func (bc *BeaconClient) GetBlockBodyByBlockroot(ctx context.Context, blockroot p
 	}
 
 	return result, nil
+}
+
+func (bc *BeaconClient) GetStateValidators(ctx context.Context, stateRef string) (map[phase0.ValidatorIndex]*v1.Validator, error) {
+	provider, isProvider := bc.clientSvc.(eth2client.ValidatorsProvider)
+	if !isProvider {
+		return nil, fmt.Errorf("get validators not supported")
+	}
+
+	result, err := provider.Validators(ctx, stateRef, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (bc *BeaconClient) SubmitBLSToExecutionChanges(ctx context.Context, blsChanges []*capella.SignedBLSToExecutionChange) error {
+	submitter, isOk := bc.clientSvc.(eth2client.BLSToExecutionChangesSubmitter)
+	if !isOk {
+		return fmt.Errorf("submit bls to execution changes not supported")
+	}
+
+	err := submitter.SubmitBLSToExecutionChanges(ctx, blsChanges)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

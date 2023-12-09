@@ -34,6 +34,7 @@ func NewPool(config *PoolConfig) (*Pool, error) {
 	var err error
 
 	pool := Pool{
+		config:        config,
 		clients:       make([]*Client, 0),
 		rrLastIndexes: map[ClientType]uint16{},
 	}
