@@ -36,7 +36,7 @@ func CreateTest(coordinator types.Coordinator, config *Config, variables types.V
 		test.status = types.TestStatusSkipped
 	} else {
 		// set test variables
-		testVars := coordinator.NewVariables(variables)
+		testVars := variables.NewScope()
 		for name, value := range config.TestVars {
 			testVars.SetVar(name, value)
 		}

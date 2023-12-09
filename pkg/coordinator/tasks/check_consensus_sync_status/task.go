@@ -47,7 +47,7 @@ func (t *Task) Description() string {
 }
 
 func (t *Task) Title() string {
-	return t.options.Title
+	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
 }
 
 func (t *Task) Config() interface{} {

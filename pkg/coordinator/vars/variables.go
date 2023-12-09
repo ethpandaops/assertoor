@@ -2,6 +2,7 @@ package vars
 
 import (
 	"fmt"
+	"regexp"
 	"sync"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
@@ -61,6 +62,24 @@ func (v *Variables) SetVar(name string, value interface{}) {
 		value:     value,
 	}
 	v.varsMutex.Unlock()
+}
+
+func (v *Variables) NewScope() types.Variables {
+	return NewVariables(v)
+}
+
+func (v *Variables) ResolvePlaceholders(str string) string {
+	r := regexp.MustCompile(`\${([^}]+)}`)
+
+	return r.ReplaceAllStringFunc(str, func(m string) string {
+		parts := r.FindStringSubmatch(m)
+
+		varValue, varFound := v.LookupVar(parts[1])
+		if varFound {
+			return fmt.Sprintf("%v", varValue)
+		}
+		return m
+	})
 }
 
 func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string) error {

@@ -46,7 +46,7 @@ func (t *Task) Description() string {
 }
 
 func (t *Task) Title() string {
-	return t.options.Title
+	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
 }
 
 func (t *Task) Config() interface{} {
@@ -115,6 +115,16 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	stderrChan := t.readOutputStream(stderr)
 	defer close(stderrChan)
+
+	// add env vars
+	for envName, varName := range t.config.EnvVars {
+		varValue, varFound := t.ctx.Vars.LookupVar(varName)
+		if !varFound {
+			continue
+		}
+
+		command.Env = append(command.Env, fmt.Sprintf("%v=%v", envName, varValue))
+	}
 
 	// start shell
 	err = command.Start()

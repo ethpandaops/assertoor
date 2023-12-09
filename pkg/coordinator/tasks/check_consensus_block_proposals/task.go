@@ -47,7 +47,7 @@ func (t *Task) Description() string {
 }
 
 func (t *Task) Title() string {
-	return t.options.Title
+	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
 }
 
 func (t *Task) Config() interface{} {
@@ -117,7 +117,6 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 }
 
-//nolint:gocyclo // ignore
 func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 	blockData := block.AwaitBlock(ctx, 2*time.Second)
 	if blockData == nil {
@@ -126,21 +125,14 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 	}
 
 	// check graffiti
-	if len(t.config.GraffitiPatterns) > 0 {
+	if t.config.GraffitiPattern != "" {
 		graffiti, err := blockData.Graffiti()
 		if err != nil {
 			t.logger.Warnf("could not get graffiti for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
 		}
 
-		var matched bool
-		for _, pattern := range t.config.GraffitiPatterns {
-			matched, err = regexp.MatchString(pattern, string(graffiti[:]))
-			if matched || err != nil {
-				break
-			}
-		}
-
+		matched, err := regexp.MatchString(t.config.GraffitiPattern, string(graffiti[:]))
 		if err != nil {
 			t.logger.Warnf("could not check graffiti for block %v [0x%x]: %v", block.Slot, block.Root, err)
 			return false
