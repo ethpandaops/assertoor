@@ -1,0 +1,92 @@
+endpoints:
+  - name: "dugtrio-devnet12"
+    executionUrl: "https://rpc.dencun-devnet-12.ethpandaops.io/"
+    consensusUrl: "https://beacon.dencun-devnet-12.ethpandaops.io/"
+
+web:
+  server:
+    host: "0.0.0.0"
+    port: 8080
+  frontend:
+    enabled: true
+    debug: true
+    pprof: true
+
+globalVars:
+  clientGraffitis:
+  #- "lighthouse/besu.*"
+  #- "lighthouse/erigon.*"
+  - "lighthouse/geth.*"
+  #- "lighthouse/nethermind.*"
+  #- "lodestar/besu.*"
+  #- "lodestar/erigon.*"
+  #- "lodestar/geth.*"
+  #- "lodestar/nethermind.*"
+  #- "nimbus/besu.*"
+  #- "nimbus/erigon.*"
+  #- "nimbus/geth.*"
+  #- "nimbus/nethermind.*"
+  #- "teku/besu.*"
+  #- "teku/erigon.*"
+  - "teku/geth.*"
+  #- "teku/nethermind.*"
+
+tests:
+
+  # Every client combo proposes block
+- name: "Every client combo proposes block"
+  timeout: 48h
+  tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+  - name: run_task_matrix
+    title: "Check block proposals from all client pairs"
+    configVars:
+      matrixValues: "clientGraffitis"
+    config:
+      runConcurrent: true
+      matrixVar: "clientGraffiti"
+      task:
+        name: check_consensus_block_proposals
+        title: "Wait for block proposal with ${clientGraffiti} graffiti"
+        configVars:
+          graffitiPattern: "clientGraffiti"
+          minBlsChangeCount: 1
+
+  # Every cl client proposes a block with withdrawal messages
+- name: "Every cl client proposes a block with withdrawal messages"
+  timeout: 48h
+  tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+  - name: run_tasks_concurrent
+    title: "Generate BLS Changes & Track inclusion"
+    config:
+      succeedTaskCount: 1
+      tasks:
+      - name: generate_bls_changes
+        title: "Generate BLS changes"
+        config:
+          mnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+          limitPerSlot: 1
+          indexCount: 400
+          targetAddress: 0x14627ea0e2B27b817DbfF94c3dA383bB73F8C30b
+      - name: run_task_matrix
+        title: "Check BLS inclusion with all client pairs"
+        configVars:
+          matrixValues: "clientGraffitis"
+        config:
+          runConcurrent: true
+          matrixVar: "clientGraffiti"
+          task:
+            name: check_consensus_block_proposals
+            title: "Wait for block proposal with BLS changes & ${clientGraffiti} graffiti"
+            configVars:
+              graffitiPattern: "clientGraffiti"
+              minBlsChangeCount: 1
