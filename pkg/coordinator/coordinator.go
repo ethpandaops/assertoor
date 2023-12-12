@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
@@ -22,6 +23,7 @@ type Coordinator struct {
 	log             logrus.FieldLogger
 	clientPool      *clients.ClientPool
 	webserver       *server.WebServer
+	validatorNames  *names.ValidatorNames
 	tests           []types.Test
 	metricsPort     int
 	lameDuckSeconds int
@@ -94,6 +96,11 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		c.tests = append(c.tests, testRef)
 	}
 
+	// load validator names
+	c.validatorNames = names.NewValidatorNames(c.Config.ValidatorNames)
+	c.validatorNames.LoadValidatorNames()
+
+	// run tests
 	c.runTests(ctx)
 
 	if c.webserver == nil {
@@ -119,6 +126,10 @@ func (c *Coordinator) NewVariables(parentScope types.Variables) types.Variables 
 
 func (c *Coordinator) ClientPool() *clients.ClientPool {
 	return c.clientPool
+}
+
+func (c *Coordinator) ValidatorNames() *names.ValidatorNames {
+	return c.validatorNames
 }
 
 func (c *Coordinator) GetTests() []types.Test {

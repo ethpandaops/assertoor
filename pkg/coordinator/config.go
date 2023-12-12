@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	web_types "github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
 	"gopkg.in/yaml.v2"
@@ -16,6 +17,10 @@ type Config struct {
 	// WebServer config
 	Web *web_types.WebConfig `yaml:"web" json:"web"`
 
+	// Validator names config
+	ValidatorNames *names.Config `yaml:"validatorNames" json:"validatorNames"`
+
+	// Global variables
 	GlobalVars map[string]interface{} `yaml:"globalVars" json:"globalVars"`
 
 	// List of Test configurations.
