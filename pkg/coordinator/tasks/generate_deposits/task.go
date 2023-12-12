@@ -149,7 +149,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateDeposit(ctx, accountIdx, genesis, validators)
+		err := t.generateDeposit(ctx, accountIdx, genesis, validators, nil)
 		if err != nil {
 			t.logger.Errorf("error generating deposit: %v", err.Error())
 		} else {
@@ -197,7 +197,7 @@ func (t *Task) loadChainState(ctx context.Context) (*v1.Genesis, map[phase0.Vali
 	return genesis, validators, nil
 }
 
-func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, genesis *v1.Genesis, validators map[phase0.ValidatorIndex]*v1.Validator) error {
+func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, genesis *v1.Genesis, validators map[phase0.ValidatorIndex]*v1.Validator, onConfirm func()) error {
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
 
@@ -298,21 +298,34 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, genesis *
 		return fmt.Errorf("cannot build deposit transaction: %w", err)
 	}
 
-	t.logger.Infof("sending deposit transaction (nonce: %v)", tx.Nonce())
+	t.logger.Infof("sending deposit transaction (account idx: %v, nonce: %v)", accountIdx, tx.Nonce())
 
 	err = client.GetRPCClient().SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed sending deposit transaction: %w", err)
 	}
 
-	receipt, err := wallet.AwaitTransaction(ctx, tx)
-	if err != nil {
-		return fmt.Errorf("failed awaiting transaction receipt: %w", err)
-	}
+	go func() {
+		if onConfirm != nil {
+			defer onConfirm()
+		}
 
-	if receipt == nil {
-		return fmt.Errorf("transaction replaced")
-	}
+		receipt, err := wallet.AwaitTransaction(ctx, tx)
+
+		if ctx.Err() != nil {
+			return
+		}
+
+		if err != nil {
+			t.logger.Errorf("failed awaiting transaction receipt: %w", err)
+			return
+		}
+
+		if receipt == nil {
+			t.logger.Errorf("transaction replaced")
+			return
+		}
+	}()
 
 	return nil
 }
