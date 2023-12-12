@@ -1,46 +1,56 @@
-package generateblschanges
+package generatedeposits
 
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
-	"github.com/attestantio/go-eth2-client/spec/capella"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
+	"github.com/protolambda/zrnt/eth2/configs"
+	"github.com/protolambda/zrnt/eth2/util/hashing"
 	"github.com/protolambda/ztyp/tree"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
 	util "github.com/wealdtech/go-eth2-util"
+
+	depositcontract "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_deposits/deposit_contract"
 )
 
 var (
-	TaskName       = "generate_bls_changes"
+	TaskName       = "generate_deposits"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Generates bls changes and sends them to the network",
+		Description: "Generates deposits and sends them to the network",
 		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
 )
 
 type Task struct {
-	ctx        *types.TaskContext
-	options    *types.TaskOptions
-	config     Config
-	logger     logrus.FieldLogger
-	withdrSeed []byte
-	nextIndex  uint64
-	lastIndex  uint64
-	targetAddr common.Eth1Address
+	ctx                 *types.TaskContext
+	options             *types.TaskOptions
+	config              Config
+	logger              logrus.FieldLogger
+	valkeySeed          []byte
+	nextIndex           uint64
+	lastIndex           uint64
+	walletPrivKey       *ecdsa.PrivateKey
+	depositContractAddr ethcommon.Address
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -96,17 +106,18 @@ func (t *Task) LoadConfig() error {
 		return valerr
 	}
 
-	t.withdrSeed, err = t.mnemonicToSeed(config.Mnemonic)
+	t.valkeySeed, err = t.mnemonicToSeed(config.Mnemonic)
 	if err != nil {
 		return err
 	}
 
-	err = t.targetAddr.UnmarshalText([]byte(config.TargetAddress))
+	t.walletPrivKey, err = crypto.HexToECDSA(config.WalletPrivkey)
 	if err != nil {
-		return fmt.Errorf("cannot decode execution addr: %w", err)
+		return err
 	}
 
 	t.config = config
+	t.depositContractAddr = ethcommon.HexToAddress(config.DepositContract)
 
 	return nil
 }
@@ -138,9 +149,9 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateBlsChange(ctx, accountIdx, genesis, validators)
+		err := t.generateDeposit(ctx, accountIdx, genesis, validators)
 		if err != nil {
-			t.logger.Errorf("error generating bls change: %v", err.Error())
+			t.logger.Errorf("error generating deposit: %v", err.Error())
 		} else {
 			perSlotCount++
 			totalCount++
@@ -186,12 +197,18 @@ func (t *Task) loadChainState(ctx context.Context) (*v1.Genesis, map[phase0.Vali
 	return genesis, validators, nil
 }
 
-func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64, genesis *v1.Genesis, validators map[phase0.ValidatorIndex]*v1.Validator) error {
+func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, genesis *v1.Genesis, validators map[phase0.ValidatorIndex]*v1.Validator) error {
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
+	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
 
-	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, validatorKeyPath)
+	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, validatorKeyPath)
 	if err != nil {
 		return fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
+	}
+
+	withdrPrivkey, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
+	if err != nil {
+		return fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
 	}
 
 	var validator *v1.Validator
@@ -204,78 +221,97 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64, genesis
 		}
 	}
 
-	if validator == nil {
-		return fmt.Errorf("validator not found")
+	if validator != nil {
+		return fmt.Errorf("validator already exists on chain")
 	}
 
-	if validator.Validator.WithdrawalCredentials[0] != 0x00 {
-		return fmt.Errorf("validator %v does not have 0x00 withdrawal creds", validator.Index)
+	var pub, withdrPub common.BLSPubkey
+
+	copy(pub[:], validatorPubkey)
+	copy(withdrPub[:], withdrPrivkey.PublicKey().Marshal())
+
+	withdrCreds := hashing.Hash(withdrPub[:])
+	withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
+
+	data := common.DepositData{
+		Pubkey:                pub,
+		WithdrawalCredentials: withdrCreds,
+		Amount:                configs.Mainnet.MAX_EFFECTIVE_BALANCE,
+		Signature:             common.BLSSignature{},
 	}
-
-	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
-
-	withdr, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, withdrAccPath)
-	if err != nil {
-		return fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
-	}
-
-	var withdrPub common.BLSPubkey
-
-	copy(withdrPub[:], withdr.PublicKey().Marshal())
-
-	msg := common.BLSToExecutionChange{
-		ValidatorIndex:     common.ValidatorIndex(validator.Index),
-		FromBLSPubKey:      withdrPub,
-		ToExecutionAddress: t.targetAddr,
-	}
+	msgRoot := data.ToMessage().HashTreeRoot(tree.GetHashFn())
 
 	var secKey hbls.SecretKey
 
-	err = secKey.Deserialize(withdr.Marshal())
+	err = secKey.Deserialize(validatorPrivkey.Marshal())
 	if err != nil {
-		return fmt.Errorf("failed converting validator priv key: %w", err)
+		return fmt.Errorf("cannot convert validator priv key")
 	}
 
-	msgRoot := msg.HashTreeRoot(tree.GetHashFn())
-	dom := common.ComputeDomain(common.DOMAIN_BLS_TO_EXECUTION_CHANGE, common.Version(genesis.GenesisForkVersion), tree.Root(genesis.GenesisValidatorsRoot))
-	signingRoot := common.ComputeSigningRoot(msgRoot, dom)
-	sig := secKey.SignHash(signingRoot[:])
+	dom := common.ComputeDomain(common.DOMAIN_DEPOSIT, common.Version(genesis.GenesisForkVersion), common.Root{})
+	msg := common.ComputeSigningRoot(msgRoot, dom)
+	sig := secKey.SignHash(msg[:])
+	copy(data.Signature[:], sig.Serialize())
 
-	var signedMsg common.SignedBLSToExecutionChange
+	dataRoot := data.HashTreeRoot(tree.GetHashFn())
 
-	signedMsg.BLSToExecutionChange = msg
-	copy(signedMsg.Signature[:], sig.Serialize())
+	// generate deposit transaction
 
-	signedChangeJSON, err := json.Marshal(&signedMsg)
-	if err != nil {
-		return err
-	}
-
-	var client *consensus.Client
+	var client *execution.Client
 
 	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
 	if t.config.ClientPattern == "" {
-		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+		client = clientPool.GetExecutionPool().GetReadyEndpoint(execution.UnspecifiedClient)
 	} else {
 		clients := clientPool.GetClientsByNamePatterns([]string{t.config.ClientPattern})
 		if len(clients) == 0 {
 			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
-		client = clients[0].ConsensusClient
+		client = clients[0].ExecutionClient
 	}
 
-	blsChange := &capella.SignedBLSToExecutionChange{}
-
-	err = json.Unmarshal(signedChangeJSON, blsChange)
+	depositContract, err := depositcontract.NewDepositContract(t.depositContractAddr, client.GetRPCClient().GetEthClient())
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot create bound instance of DepositContract: %w", err)
 	}
 
-	t.logger.WithField("client", client.GetName()).Infof("sending bls change for validator %v", validator.Index)
-
-	err = client.GetRPCClient().SubmitBLSToExecutionChanges(ctx, []*capella.SignedBLSToExecutionChange{blsChange})
+	wallet, err := clientPool.GetExecutionPool().GetWalletByPrivkey(t.walletPrivKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot initialize wallet: %w", err)
+	}
+
+	tx, err := wallet.BuildTransaction(ctx, func(ctx context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
+		amount := big.NewInt(int64(data.Amount))
+		amount.Mul(amount, big.NewInt(1000000000))
+		return depositContract.Deposit(&bind.TransactOpts{
+			From:      wallet.GetAddress(),
+			Nonce:     big.NewInt(int64(nonce)),
+			Value:     amount,
+			GasLimit:  200000,
+			GasFeeCap: big.NewInt(t.config.DepositTxFeeCap),
+			GasTipCap: big.NewInt(t.config.DepositTxTipCap),
+			Signer:    signer,
+			NoSend:    true,
+		}, data.Pubkey[:], data.WithdrawalCredentials[:], data.Signature[:], dataRoot)
+	})
+	if err != nil {
+		return fmt.Errorf("cannot build deposit transaction: %w", err)
+	}
+
+	t.logger.Infof("sending deposit transaction (nonce: %v)", tx.Nonce())
+
+	err = client.GetRPCClient().SendTransaction(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed sending deposit transaction: %w", err)
+	}
+
+	receipt, err := wallet.AwaitTransaction(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed awaiting transaction receipt: %w", err)
+	}
+
+	if receipt == nil {
+		return fmt.Errorf("transaction replaced")
 	}
 
 	return nil

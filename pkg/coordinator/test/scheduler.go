@@ -62,6 +62,10 @@ func (ts *TaskScheduler) GetLogger() logrus.FieldLogger {
 }
 
 func (ts *TaskScheduler) GetTaskCount() int {
+	if ts == nil {
+		return 0
+	}
+
 	return len(ts.allTasks)
 }
 

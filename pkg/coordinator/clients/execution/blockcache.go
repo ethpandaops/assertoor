@@ -3,6 +3,7 @@ package execution
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"runtime/debug"
 	"sort"
 	"strings"
@@ -90,6 +91,24 @@ func (cache *BlockCache) GetSpecs() *rpc.ChainSpec {
 	defer cache.specMutex.RUnlock()
 
 	return cache.specs
+}
+
+func (cache *BlockCache) GetChainID() *big.Int {
+	cache.specMutex.RLock()
+	defer cache.specMutex.RUnlock()
+
+	if cache.specs == nil {
+		return nil
+	}
+
+	chainID := new(big.Int)
+
+	_, ok := chainID.SetString(cache.specs.ChainID, 10)
+	if !ok {
+		return nil
+	}
+
+	return chainID
 }
 
 func (cache *BlockCache) AddBlock(hash common.Hash, number uint64) (*Block, bool) {

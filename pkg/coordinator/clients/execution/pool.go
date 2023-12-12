@@ -3,6 +3,8 @@ package execution
 import (
 	"fmt"
 	"sync"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 type SchedulerMode uint8
@@ -28,6 +30,9 @@ type Pool struct {
 	schedulerMode  SchedulerMode
 	schedulerMutex sync.Mutex
 	rrLastIndexes  map[ClientType]uint16
+
+	walletsMutex sync.Mutex
+	walletsMap   map[common.Address]*Wallet
 }
 
 func NewPool(config *PoolConfig) (*Pool, error) {
@@ -35,6 +40,7 @@ func NewPool(config *PoolConfig) (*Pool, error) {
 		config:        config,
 		clients:       make([]*Client, 0),
 		rrLastIndexes: map[ClientType]uint16{},
+		walletsMap:    map[common.Address]*Wallet{},
 	}
 
 	var err error

@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -46,6 +47,10 @@ func (ec *ExecutionClient) Initialize(ctx context.Context) error {
 	ec.ethClient = ethclient.NewClient(rpcClient)
 
 	return nil
+}
+
+func (ec *ExecutionClient) GetEthClient() *ethclient.Client {
+	return ec.ethClient
 }
 
 func (ec *ExecutionClient) GetClientVersion(ctx context.Context) (string, error) {
@@ -110,4 +115,20 @@ func (ec *ExecutionClient) GetBlockByHash(ctx context.Context, hash common.Hash)
 	}
 
 	return block, nil
+}
+
+func (ec *ExecutionClient) GetNonceAt(ctx context.Context, wallet common.Address, blockNumber *big.Int) (uint64, error) {
+	return ec.ethClient.NonceAt(ctx, wallet, blockNumber)
+}
+
+func (ec *ExecutionClient) GetBalanceAt(ctx context.Context, wallet common.Address, blockNumber *big.Int) (*big.Int, error) {
+	return ec.ethClient.BalanceAt(ctx, wallet, blockNumber)
+}
+
+func (ec *ExecutionClient) GetTransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+	return ec.ethClient.TransactionReceipt(ctx, txHash)
+}
+
+func (ec *ExecutionClient) SendTransaction(ctx context.Context, tx *types.Transaction) error {
+	return ec.ethClient.SendTransaction(ctx, tx)
 }
