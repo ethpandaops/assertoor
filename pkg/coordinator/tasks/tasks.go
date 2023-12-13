@@ -9,6 +9,7 @@ import (
 	checkexecutionsyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_execution_sync_status"
 	generateblschanges "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_bls_changes"
 	generatedeposits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_deposits"
+	generateexits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_exits"
 	runcommand "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_command"
 	runshell "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_shell"
 	runtaskmatrix "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_task_matrix"
@@ -24,6 +25,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkexecutionsyncstatus.TaskDescriptor,
 	generateblschanges.TaskDescriptor,
 	generatedeposits.TaskDescriptor,
+	generateexits.TaskDescriptor,
 	runcommand.TaskDescriptor,
 	runshell.TaskDescriptor,
 	runtaskmatrix.TaskDescriptor,

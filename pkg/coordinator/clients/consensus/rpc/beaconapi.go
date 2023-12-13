@@ -219,6 +219,20 @@ func (bc *BeaconClient) GetStateValidators(ctx context.Context, stateRef string)
 	return result, nil
 }
 
+func (bc *BeaconClient) GetForkState(ctx context.Context, stateRef string) (*phase0.Fork, error) {
+	provider, isProvider := bc.clientSvc.(eth2client.ForkProvider)
+	if !isProvider {
+		return nil, fmt.Errorf("get fork not supported")
+	}
+
+	result, err := provider.Fork(ctx, stateRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (bc *BeaconClient) SubmitBLSToExecutionChanges(ctx context.Context, blsChanges []*capella.SignedBLSToExecutionChange) error {
 	submitter, isOk := bc.clientSvc.(eth2client.BLSToExecutionChangesSubmitter)
 	if !isOk {
@@ -226,6 +240,20 @@ func (bc *BeaconClient) SubmitBLSToExecutionChanges(ctx context.Context, blsChan
 	}
 
 	err := submitter.SubmitBLSToExecutionChanges(ctx, blsChanges)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (bc *BeaconClient) SubmitVoluntaryExits(ctx context.Context, exit *phase0.SignedVoluntaryExit) error {
+	submitter, isOk := bc.clientSvc.(eth2client.VoluntaryExitSubmitter)
+	if !isOk {
+		return fmt.Errorf("submit voluntary exit not supported")
+	}
+
+	err := submitter.SubmitVoluntaryExit(ctx, exit)
 	if err != nil {
 		return err
 	}
