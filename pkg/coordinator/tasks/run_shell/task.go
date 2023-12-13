@@ -3,9 +3,11 @@ package runshell
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os/exec"
+	"regexp"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
@@ -157,6 +159,7 @@ cmdloop:
 	for {
 		select {
 		case line := <-stdoutChan:
+			t.parseOutputVars(line)
 			cmdLogger.Infof("OUT: %v", line)
 		case line := <-stderrChan:
 			cmdLogger.Warnf("ERR: %v", line)
@@ -191,4 +194,21 @@ func (t *Task) readOutputStream(pipe io.ReadCloser) chan string {
 	}()
 
 	return resChan
+}
+
+var outputVarPattern = regexp.MustCompile(`^::set-var +([^ ]+) +(.*)$`)
+
+func (t *Task) parseOutputVars(line string) {
+	match := outputVarPattern.FindStringSubmatch(line)
+	if match != nil {
+		var varValue interface{}
+
+		err := json.Unmarshal([]byte(match[2]), &varValue)
+		if err != nil {
+			t.logger.Warnf("error parsing ::set-var expression: %v", err.Error())
+		} else {
+			t.ctx.Vars.SetVar(match[1], varValue)
+			t.logger.Infof("set variable %v: %v", match[1], varValue)
+		}
+	}
 }

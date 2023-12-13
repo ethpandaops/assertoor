@@ -142,7 +142,7 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 	}
 
 	taskScheduler := test.GetTaskScheduler()
-	if taskScheduler != nil {
+	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
 		indentationMap := map[uint64]int{}
 
 		for _, task := range taskScheduler.GetAllTasks() {
