@@ -5,6 +5,7 @@ import (
 
 	checkclientsarehealthy "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_clients_are_healthy"
 	checkconsensusblockproposals "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_block_proposals"
+	checkconsensusfinality "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_finality"
 	checkconsensussyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_sync_status"
 	checkexecutionsyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_execution_sync_status"
 	generateblschanges "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_bls_changes"
@@ -21,6 +22,7 @@ import (
 var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkclientsarehealthy.TaskDescriptor,
 	checkconsensusblockproposals.TaskDescriptor,
+	checkconsensusfinality.TaskDescriptor,
 	checkconsensussyncstatus.TaskDescriptor,
 	checkexecutionsyncstatus.TaskDescriptor,
 	generateblschanges.TaskDescriptor,

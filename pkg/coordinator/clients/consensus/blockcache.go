@@ -162,6 +162,13 @@ func (cache *BlockCache) InitWallclock() {
 	})
 }
 
+func (cache *BlockCache) GetWallclock() *ethwallclock.EthereumBeaconChain {
+	cache.wallclockMutex.Lock()
+	defer cache.wallclockMutex.Unlock()
+
+	return cache.wallclock
+}
+
 func (cache *BlockCache) SetFinalizedCheckpoint(finalizedEpoch phase0.Epoch, finalizedRoot phase0.Root) {
 	cache.finalizedMutex.Lock()
 	if finalizedEpoch <= cache.finalizedEpoch {
