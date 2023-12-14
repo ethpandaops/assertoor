@@ -97,9 +97,13 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	for {
 		checkResult := t.runFinalityCheck()
-		if checkResult {
+
+		switch {
+		case checkResult:
 			t.ctx.SetResult(types.TaskResultSuccess)
-		} else {
+		case t.config.FailOnCheckMiss:
+			t.ctx.SetResult(types.TaskResultFailure)
+		default:
 			t.ctx.SetResult(types.TaskResultNone)
 		}
 

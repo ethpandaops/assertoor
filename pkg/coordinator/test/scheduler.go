@@ -339,13 +339,9 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 		}
 	}
 
-	if err != nil {
-		return fmt.Errorf("task failed: %w", err)
-	}
-
 	if taskState.taskResult == types.TaskResultFailure {
-		task.Logger().Warnf("task failed with failure result")
-		return fmt.Errorf("task failed")
+		task.Logger().Warnf("task failed with failure result: %v", taskState.taskError)
+		return fmt.Errorf("task failed: %w", taskState.taskError)
 	}
 
 	task.Logger().Infof("task completed")
