@@ -14,6 +14,7 @@ type Block struct {
 	Root        phase0.Root
 	Slot        phase0.Slot
 	headerMutex sync.Mutex
+	headerChan  chan bool
 	header      *phase0.SignedBeaconBlockHeader
 	blockMutex  sync.Mutex
 	blockChan   chan bool
@@ -46,6 +47,20 @@ func (block *Block) SetSeenBy(client *Client) {
 }
 
 func (block *Block) GetHeader() *phase0.SignedBeaconBlockHeader {
+	return block.header
+}
+
+func (block *Block) AwaitHeader(ctx context.Context, timeout time.Duration) *phase0.SignedBeaconBlockHeader {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	select {
+	case <-block.headerChan:
+	case <-time.After(timeout):
+	case <-ctx.Done():
+	}
+
 	return block.header
 }
 
@@ -97,6 +112,7 @@ func (block *Block) EnsureHeader(loadHeader func() (*phase0.SignedBeaconBlockHea
 	}
 
 	block.header = header
+	close(block.headerChan)
 
 	return nil
 }

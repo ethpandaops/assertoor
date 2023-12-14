@@ -206,10 +206,11 @@ func (cache *BlockCache) AddBlock(root phase0.Root, slot phase0.Slot) (*Block, b
 	}
 
 	cacheBlock := &Block{
-		Root:      root,
-		Slot:      slot,
-		seenMap:   make(map[uint16]*Client),
-		blockChan: make(chan bool),
+		Root:       root,
+		Slot:       slot,
+		seenMap:    make(map[uint16]*Client),
+		headerChan: make(chan bool),
+		blockChan:  make(chan bool),
 	}
 	cache.rootMap[root] = cacheBlock
 
