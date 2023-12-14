@@ -126,7 +126,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		defer subscription.Unsubscribe()
 	}
 
-	genesis, validators, err := t.loadChainState(ctx)
+	validators, err := t.loadChainState(ctx)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateBlsChange(ctx, accountIdx, genesis, validators)
+		err := t.generateBlsChange(ctx, accountIdx, validators)
 		if err != nil {
 			t.logger.Errorf("error generating bls change: %v", err.Error())
 		} else {
@@ -170,23 +170,19 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) loadChainState(ctx context.Context) (*v1.Genesis, map[phase0.ValidatorIndex]*v1.Validator, error) {
+func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v1.Validator, error) {
 	client := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
-
-	genesis, err := client.GetRPCClient().GetGenesis(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	validators, err := client.GetRPCClient().GetStateValidators(ctx, "head")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return genesis, validators, nil
+	return validators, nil
 }
 
-func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64, genesis *v1.Genesis, validators map[phase0.ValidatorIndex]*v1.Validator) error {
+func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator) error {
+	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
 	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, validatorKeyPath)
@@ -237,6 +233,7 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64, genesis
 	}
 
 	msgRoot := msg.HashTreeRoot(tree.GetHashFn())
+	genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
 	dom := common.ComputeDomain(common.DOMAIN_BLS_TO_EXECUTION_CHANGE, common.Version(genesis.GenesisForkVersion), tree.Root(genesis.GenesisValidatorsRoot))
 	signingRoot := common.ComputeSigningRoot(msgRoot, dom)
 	sig := secKey.SignHash(signingRoot[:])
@@ -253,7 +250,6 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64, genesis
 
 	var client *consensus.Client
 
-	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
 	if t.config.ClientPattern == "" {
 		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 	} else {

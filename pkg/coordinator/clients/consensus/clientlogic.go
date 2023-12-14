@@ -68,7 +68,18 @@ func (client *Client) checkClient() error {
 	client.versionStr = nodeVersion
 	client.parseClientVersion(nodeVersion)
 
-	// get & comare chain specs
+	// get & compare genesis
+	genesis, err := client.rpcClient.GetGenesis(ctx)
+	if err != nil {
+		return fmt.Errorf("error while fetching genesis: %v", err)
+	}
+
+	err = client.pool.blockCache.SetGenesis(genesis)
+	if err != nil {
+		return fmt.Errorf("invalid genesis: %v", err)
+	}
+
+	// get & compare chain specs
 	specs, err := client.rpcClient.GetConfigSpecs(ctx)
 	if err != nil {
 		return fmt.Errorf("error while fetching specs: %v", err)

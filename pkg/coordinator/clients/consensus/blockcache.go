@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/mashingan/smapping"
 	"github.com/sirupsen/logrus"
@@ -18,6 +19,8 @@ type BlockCache struct {
 	followDistance       uint64
 	specMutex            sync.RWMutex
 	specs                *ChainSpec
+	genesisMutex         sync.Mutex
+	genesis              *v1.Genesis
 	finalizedMutex       sync.RWMutex
 	finalizedEpoch       phase0.Epoch
 	finalizedRoot        phase0.Root
@@ -79,6 +82,29 @@ func (cache *BlockCache) SetMinFollowDistance(followDistance uint64) {
 	if followDistance > cache.followDistance {
 		cache.followDistance = followDistance
 	}
+}
+
+func (cache *BlockCache) SetGenesis(genesis *v1.Genesis) error {
+	cache.genesisMutex.Lock()
+	defer cache.genesisMutex.Unlock()
+
+	if cache.genesis != nil {
+		if cache.genesis.GenesisTime != genesis.GenesisTime {
+			return fmt.Errorf("genesis mismatch: GenesisTime")
+		}
+
+		if !bytes.Equal(cache.genesis.GenesisValidatorsRoot[:], genesis.GenesisValidatorsRoot[:]) {
+			return fmt.Errorf("genesis mismatch: GenesisValidatorsRoot")
+		}
+	} else {
+		cache.genesis = genesis
+	}
+
+	return nil
+}
+
+func (cache *BlockCache) GetGenesis() *v1.Genesis {
+	return cache.genesis
 }
 
 func (cache *BlockCache) SetClientSpecs(specValues map[string]interface{}) error {

@@ -137,7 +137,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		defer subscription.Unsubscribe()
 	}
 
-	genesis, validators, err := t.loadChainState(ctx)
+	validators, err := t.loadChainState(ctx)
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateDeposit(ctx, accountIdx, genesis, validators, nil)
+		err := t.generateDeposit(ctx, accountIdx, validators, nil)
 		if err != nil {
 			t.logger.Errorf("error generating deposit: %v", err.Error())
 		} else {
@@ -181,23 +181,19 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) loadChainState(ctx context.Context) (*v1.Genesis, map[phase0.ValidatorIndex]*v1.Validator, error) {
+func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v1.Validator, error) {
 	client := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
-
-	genesis, err := client.GetRPCClient().GetGenesis(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	validators, err := client.GetRPCClient().GetStateValidators(ctx, "head")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return genesis, validators, nil
+	return validators, nil
 }
 
-func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, genesis *v1.Genesis, validators map[phase0.ValidatorIndex]*v1.Validator, onConfirm func()) error {
+func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator, onConfirm func()) error {
+	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
 
@@ -248,6 +244,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, genesis *
 		return fmt.Errorf("cannot convert validator priv key")
 	}
 
+	genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
 	dom := common.ComputeDomain(common.DOMAIN_DEPOSIT, common.Version(genesis.GenesisForkVersion), common.Root{})
 	msg := common.ComputeSigningRoot(msgRoot, dom)
 	sig := secKey.SignHash(msg[:])
@@ -259,7 +256,6 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, genesis *
 
 	var client *execution.Client
 
-	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
 	if t.config.ClientPattern == "" {
 		client = clientPool.GetExecutionPool().GetReadyEndpoint(execution.UnspecifiedClient)
 	} else {

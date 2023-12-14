@@ -118,7 +118,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		defer subscription.Unsubscribe()
 	}
 
-	genesis, fork, validators, err := t.loadChainState(ctx)
+	fork, validators, err := t.loadChainState(ctx)
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateVoluntaryExit(ctx, accountIdx, genesis, fork, validators)
+		err := t.generateVoluntaryExit(ctx, accountIdx, fork, validators)
 		if err != nil {
 			t.logger.Errorf("error generating voluntary exit: %v", err.Error())
 		} else {
@@ -162,28 +162,23 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) loadChainState(ctx context.Context) (*v1.Genesis, *phase0.Fork, map[phase0.ValidatorIndex]*v1.Validator, error) {
+func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, map[phase0.ValidatorIndex]*v1.Validator, error) {
 	client := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
-
-	genesis, err := client.GetRPCClient().GetGenesis(ctx)
-	if err != nil {
-		return nil, nil, nil, err
-	}
 
 	fork, err := client.GetRPCClient().GetForkState(ctx, "head")
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	validators, err := client.GetRPCClient().GetStateValidators(ctx, "head")
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	return genesis, fork, validators, nil
+	return fork, validators, nil
 }
 
-func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, genesis *v1.Genesis, fork *phase0.Fork, validators map[phase0.ValidatorIndex]*v1.Validator) error {
+func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, fork *phase0.Fork, validators map[phase0.ValidatorIndex]*v1.Validator) error {
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
 	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, validatorKeyPath)
@@ -251,6 +246,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, gen
 		forkVersion = specs.CappellaForkVersion
 	}
 
+	genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
 	dom := common.ComputeDomain(common.DOMAIN_VOLUNTARY_EXIT, common.Version(forkVersion), tree.Root(genesis.GenesisValidatorsRoot))
 	signingRoot := common.ComputeSigningRoot(root, dom)
 	sig := secKey.SignHash(signingRoot[:])
