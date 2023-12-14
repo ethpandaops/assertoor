@@ -205,6 +205,20 @@ func (bc *BeaconClient) GetBlockBodyByBlockroot(ctx context.Context, blockroot p
 	return result, nil
 }
 
+func (bc *BeaconClient) GetState(ctx context.Context, stateRef string) (*spec.VersionedBeaconState, error) {
+	provider, isProvider := bc.clientSvc.(eth2client.BeaconStateProvider)
+	if !isProvider {
+		return nil, fmt.Errorf("get beacon state not supported")
+	}
+
+	result, err := provider.BeaconState(ctx, stateRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (bc *BeaconClient) GetStateValidators(ctx context.Context, stateRef string) (map[phase0.ValidatorIndex]*v1.Validator, error) {
 	provider, isProvider := bc.clientSvc.(eth2client.ValidatorsProvider)
 	if !isProvider {
@@ -212,6 +226,20 @@ func (bc *BeaconClient) GetStateValidators(ctx context.Context, stateRef string)
 	}
 
 	result, err := provider.Validators(ctx, stateRef, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (bc *BeaconClient) GetCommitteeDuties(ctx context.Context, stateRef string, epoch uint64) ([]*v1.BeaconCommittee, error) {
+	provider, isProvider := bc.clientSvc.(eth2client.BeaconCommitteesProvider)
+	if !isProvider {
+		return nil, fmt.Errorf("get beacon committees not supported")
+	}
+
+	result, err := provider.BeaconCommitteesAtEpoch(ctx, stateRef, phase0.Epoch(epoch))
 	if err != nil {
 		return nil, err
 	}

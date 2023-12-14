@@ -149,7 +149,7 @@ func (cache *BlockCache) InitWallclock() {
 	}
 
 	specs := cache.GetSpecs()
-	if specs == nil || cache.genesis != nil {
+	if specs == nil || cache.genesis == nil {
 		return
 	}
 
@@ -231,6 +231,21 @@ func (cache *BlockCache) GetCachedBlockByRoot(root phase0.Root) *Block {
 	defer cache.cacheMutex.RUnlock()
 
 	return cache.rootMap[root]
+}
+
+func (cache *BlockCache) GetCachedBlocksBySlot(slot phase0.Slot) []*Block {
+	cache.cacheMutex.RLock()
+	defer cache.cacheMutex.RUnlock()
+
+	blocks := cache.slotMap[slot]
+	if len(blocks) == 0 {
+		return blocks
+	}
+
+	res := make([]*Block, len(blocks))
+	copy(res, blocks)
+
+	return res
 }
 
 func (cache *BlockCache) GetCachedBlocks() []*Block {

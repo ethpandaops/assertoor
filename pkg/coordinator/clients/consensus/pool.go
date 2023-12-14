@@ -36,6 +36,7 @@ func NewPool(config *PoolConfig) (*Pool, error) {
 	pool := Pool{
 		config:        config,
 		clients:       make([]*Client, 0),
+		forkCache:     map[int64][]*HeadFork{},
 		rrLastIndexes: map[ClientType]uint16{},
 	}
 
