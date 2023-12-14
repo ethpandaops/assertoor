@@ -11,25 +11,31 @@ import (
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/ethwallclock"
 	"github.com/mashingan/smapping"
 	"github.com/sirupsen/logrus"
 )
 
 type BlockCache struct {
-	followDistance       uint64
-	specMutex            sync.RWMutex
-	specs                *ChainSpec
-	genesisMutex         sync.Mutex
-	genesis              *v1.Genesis
-	finalizedMutex       sync.RWMutex
-	finalizedEpoch       phase0.Epoch
-	finalizedRoot        phase0.Root
-	cacheMutex           sync.RWMutex
-	slotMap              map[phase0.Slot][]*Block
-	rootMap              map[phase0.Root]*Block
-	maxSlotIdx           int64
-	blockDispatcher      Dispatcher[*Block]
-	checkpointDispatcher Dispatcher[*FinalizedCheckpoint]
+	followDistance uint64
+	specMutex      sync.RWMutex
+	specs          *ChainSpec
+	genesisMutex   sync.Mutex
+	genesis        *v1.Genesis
+	wallclockMutex sync.Mutex
+	wallclock      *ethwallclock.EthereumBeaconChain
+	finalizedMutex sync.RWMutex
+	finalizedEpoch phase0.Epoch
+	finalizedRoot  phase0.Root
+	cacheMutex     sync.RWMutex
+	slotMap        map[phase0.Slot][]*Block
+	rootMap        map[phase0.Root]*Block
+	maxSlotIdx     int64
+
+	blockDispatcher          Dispatcher[*Block]
+	checkpointDispatcher     Dispatcher[*FinalizedCheckpoint]
+	wallclockEpochDispatcher Dispatcher[*ethwallclock.Epoch]
+	wallclockSlotDispatcher  Dispatcher[*ethwallclock.Slot]
 }
 
 func NewBlockCache(followDistance uint64) (*BlockCache, error) {
@@ -59,23 +65,20 @@ func (cache *BlockCache) SubscribeBlockEvent(capacity int) *Subscription[*Block]
 	return cache.blockDispatcher.Subscribe(capacity)
 }
 
-func (cache *BlockCache) UnsubscribeBlockEvent(subscription *Subscription[*Block]) {
-	cache.blockDispatcher.Unsubscribe(subscription)
-}
-
 func (cache *BlockCache) SubscribeFinalizedEvent(capacity int) *Subscription[*FinalizedCheckpoint] {
 	return cache.checkpointDispatcher.Subscribe(capacity)
 }
 
-func (cache *BlockCache) UnsubscribeFinalizedEvent(subscription *Subscription[*FinalizedCheckpoint]) {
-	cache.checkpointDispatcher.Unsubscribe(subscription)
+func (cache *BlockCache) SubscribeWallclockEpochEvent(capacity int) *Subscription[*ethwallclock.Epoch] {
+	return cache.wallclockEpochDispatcher.Subscribe(capacity)
+}
+
+func (cache *BlockCache) SubscribeWallclockSlotEvent(capacity int) *Subscription[*ethwallclock.Slot] {
+	return cache.wallclockSlotDispatcher.Subscribe(capacity)
 }
 
 func (cache *BlockCache) notifyBlockReady(block *Block) {
-	err := cache.blockDispatcher.Fire(block)
-	if err != nil {
-		logrus.WithError(err).Errorf("uncaught panic in consensus block event dispatcher: %v, stack: %v", err, string(debug.Stack()))
-	}
+	cache.blockDispatcher.Fire(block)
 }
 
 func (cache *BlockCache) SetMinFollowDistance(followDistance uint64) {
@@ -137,6 +140,28 @@ func (cache *BlockCache) GetSpecs() *ChainSpec {
 	return cache.specs
 }
 
+func (cache *BlockCache) InitWallclock() {
+	cache.wallclockMutex.Lock()
+	defer cache.wallclockMutex.Unlock()
+
+	if cache.wallclock != nil {
+		return
+	}
+
+	specs := cache.GetSpecs()
+	if specs == nil || cache.genesis != nil {
+		return
+	}
+
+	cache.wallclock = ethwallclock.NewEthereumBeaconChain(cache.genesis.GenesisTime, specs.SecondsPerSlot, specs.SlotsPerEpoch)
+	cache.wallclock.OnEpochChanged(func(current ethwallclock.Epoch) {
+		cache.wallclockEpochDispatcher.Fire(&current)
+	})
+	cache.wallclock.OnSlotChanged(func(current ethwallclock.Slot) {
+		cache.wallclockSlotDispatcher.Fire(&current)
+	})
+}
+
 func (cache *BlockCache) SetFinalizedCheckpoint(finalizedEpoch phase0.Epoch, finalizedRoot phase0.Root) {
 	cache.finalizedMutex.Lock()
 	if finalizedEpoch <= cache.finalizedEpoch {
@@ -148,13 +173,10 @@ func (cache *BlockCache) SetFinalizedCheckpoint(finalizedEpoch phase0.Epoch, fin
 	cache.finalizedRoot = finalizedRoot
 	cache.finalizedMutex.Unlock()
 
-	err := cache.checkpointDispatcher.Fire(&FinalizedCheckpoint{
+	cache.checkpointDispatcher.Fire(&FinalizedCheckpoint{
 		Epoch: finalizedEpoch,
 		Root:  finalizedRoot,
 	})
-	if err != nil {
-		logrus.WithError(err).Errorf("uncaught panic in consensus checkpoint event dispatcher: %v, stack: %v", err, string(debug.Stack()))
-	}
 }
 
 func (cache *BlockCache) GetFinalizedCheckpoint() (phase0.Epoch, phase0.Root) {

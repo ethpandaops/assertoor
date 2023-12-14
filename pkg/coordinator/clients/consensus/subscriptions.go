@@ -64,7 +64,7 @@ func (d *Dispatcher[T]) Unsubscribe(subscription *Subscription[T]) {
 	}
 }
 
-func (d *Dispatcher[T]) Fire(data T) error {
+func (d *Dispatcher[T]) Fire(data T) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -74,6 +74,4 @@ func (d *Dispatcher[T]) Fire(data T) error {
 		default:
 		}
 	}
-
-	return nil
 }

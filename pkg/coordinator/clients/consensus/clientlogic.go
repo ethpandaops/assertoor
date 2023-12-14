@@ -90,6 +90,9 @@ func (client *Client) checkClient() error {
 		return fmt.Errorf("invalid node specs: %v", err)
 	}
 
+	// init wallclock
+	client.pool.blockCache.InitWallclock()
+
 	// check synchronization state
 	syncStatus, err := client.rpcClient.GetNodeSyncing(ctx)
 	if err != nil {
@@ -292,11 +295,7 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 	client.headMutex.Unlock()
 
 	client.pool.resetHeadForkCache()
-
-	err = client.blockDispatcher.Fire(cachedBlock)
-	if err != nil {
-		return fmt.Errorf("error in client block dispatcher: %w", err)
-	}
+	client.blockDispatcher.Fire(cachedBlock)
 
 	return nil
 }
@@ -313,14 +312,10 @@ func (client *Client) setFinalizedHead(epoch phase0.Epoch, root phase0.Root) err
 	client.headMutex.Unlock()
 
 	client.pool.blockCache.SetFinalizedCheckpoint(epoch, root)
-
-	err := client.checkpointDispatcher.Fire(&FinalizedCheckpoint{
+	client.checkpointDispatcher.Fire(&FinalizedCheckpoint{
 		Epoch: epoch,
 		Root:  root,
 	})
-	if err != nil {
-		return fmt.Errorf("error in client checkpoint dispatcher: %w", err)
-	}
 
 	return nil
 }

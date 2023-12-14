@@ -58,10 +58,7 @@ func (cache *BlockCache) UnsubscribeBlockEvent(subscription *Subscription[*Block
 }
 
 func (cache *BlockCache) notifyBlockReady(block *Block) {
-	err := cache.blockDispatcher.Fire(block)
-	if err != nil {
-		logrus.WithError(err).Errorf("uncaught panic in consensus block event dispatcher: %v, stack: %v", err, string(debug.Stack()))
-	}
+	cache.blockDispatcher.Fire(block)
 }
 
 func (cache *BlockCache) SetMinFollowDistance(followDistance uint64) {
