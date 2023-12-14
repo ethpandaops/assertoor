@@ -101,16 +101,22 @@ func (t *Task) Execute(ctx context.Context) error {
 		select {
 		case block := <-blockSubscription.Channel():
 			matches := t.checkBlock(ctx, block)
-			if !matches {
-				break
+			if matches {
+				t.logger.Infof("matching block %v [0x%x]", block.Slot, block.Root)
+				totalMatches++
 			}
 
-			t.logger.Infof("matching block %v [0x%x]", block.Slot, block.Root)
-
-			totalMatches++
-			if totalMatches >= t.config.BlockCount {
-				t.ctx.SetResult(types.TaskResultSuccess)
-				return nil
+			if t.config.BlockCount > 0 {
+				if totalMatches >= t.config.BlockCount {
+					t.ctx.SetResult(types.TaskResultSuccess)
+					return nil
+				}
+			} else {
+				if matches {
+					t.ctx.SetResult(types.TaskResultSuccess)
+				} else {
+					t.ctx.SetResult(types.TaskResultNone)
+				}
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -135,6 +141,11 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 		return false
 	}
 
+	// check attestation count
+	if t.config.MinAttestationCount > 0 && !t.checkBlockAttestations(block, blockData) {
+		return false
+	}
+
 	// check deposit count
 	if t.config.MinDepositCount > 0 && !t.checkBlockDeposits(block, blockData) {
 		return false
@@ -147,6 +158,16 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 
 	// check slashing count
 	if t.config.MinSlashingCount > 0 && !t.checkBlockSlashings(block, blockData) {
+		return false
+	}
+
+	// check attester slashing count
+	if t.config.MinAttesterSlashingCount > 0 && !t.checkBlockAttesterSlashings(block, blockData) {
+		return false
+	}
+
+	// check proposer slashing count
+	if t.config.MinProposerSlashingCount > 0 && !t.checkBlockProposerSlashings(block, blockData) {
 		return false
 	}
 
@@ -217,6 +238,21 @@ func (t *Task) checkBlockValidatorName(block *consensus.Block, blockData *spec.V
 	return true
 }
 
+func (t *Task) checkBlockAttestations(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
+	attestations, err := blockData.Attestations()
+	if err != nil {
+		t.logger.Warnf("could not get attestations for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		return false
+	}
+
+	if len(attestations) < t.config.MinAttestationCount {
+		t.logger.Debugf("check failed for block %v [0x%x]: not enough attestations (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinAttestationCount, len(attestations))
+		return false
+	}
+
+	return true
+}
+
 func (t *Task) checkBlockDeposits(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
 	deposits, err := blockData.Deposits()
 	if err != nil {
@@ -263,6 +299,38 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 	slashingCount := len(attSlashings) + len(propSlashings)
 	if slashingCount < t.config.MinSlashingCount {
 		t.logger.Debugf("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinSlashingCount, slashingCount)
+		return false
+	}
+
+	return true
+}
+
+func (t *Task) checkBlockAttesterSlashings(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
+	attSlashings, err := blockData.AttesterSlashings()
+	if err != nil {
+		t.logger.Warnf("could not get attester slashings for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		return false
+	}
+
+	slashingCount := len(attSlashings)
+	if slashingCount < t.config.MinAttesterSlashingCount {
+		t.logger.Debugf("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinAttesterSlashingCount, slashingCount)
+		return false
+	}
+
+	return true
+}
+
+func (t *Task) checkBlockProposerSlashings(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
+	propSlashings, err := blockData.ProposerSlashings()
+	if err != nil {
+		t.logger.Warnf("could not get attester slashings for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		return false
+	}
+
+	slashingCount := len(propSlashings)
+	if slashingCount < t.config.MinProposerSlashingCount {
+		t.logger.Debugf("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinProposerSlashingCount, slashingCount)
 		return false
 	}
 
