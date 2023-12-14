@@ -7,8 +7,9 @@ import (
 )
 
 type Config struct {
-	// child tasks
-	Tasks []helper.RawMessage `yaml:"tasks" json:"tasks"`
+	Tasks             []helper.RawMessage `yaml:"tasks" json:"tasks"`
+	ExpectFailure     bool                `yaml:"expectFailure" json:"expectFailure"`
+	ContinueOnFailure bool                `yaml:"continueOnFailure" json:"continueOnFailure"`
 }
 
 func DefaultConfig() Config {

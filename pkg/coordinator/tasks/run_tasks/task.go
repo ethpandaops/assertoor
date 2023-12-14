@@ -86,12 +86,12 @@ func (t *Task) LoadConfig() error {
 	for i := range config.Tasks {
 		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
 		if err != nil {
-			return fmt.Errorf("failed parsing child task config #%v : %w", i, err)
+			return fmt.Errorf("failed parsing child task config #%v : %w", i+1, err)
 		}
 
 		task, err := t.ctx.NewTask(taskOpts, nil)
 		if err != nil {
-			return fmt.Errorf("failed initializing child task #%v : %w", i, err)
+			return fmt.Errorf("failed initializing child task #%v : %w", i+1, err)
 		}
 
 		childTasks = append(childTasks, task)
@@ -106,8 +106,20 @@ func (t *Task) LoadConfig() error {
 func (t *Task) Execute(ctx context.Context) error {
 	for i, task := range t.tasks {
 		err := t.ctx.Scheduler.ExecuteTask(ctx, task, t.ctx.Scheduler.WatchTaskPass)
-		if err != nil {
-			return fmt.Errorf("child task #%v failed: %w", i, err)
+
+		switch {
+		case t.config.ExpectFailure:
+			if err == nil {
+				return fmt.Errorf("child task #%v succeeded, but should have failed", i+1)
+			}
+		case t.config.ContinueOnFailure:
+			if err != nil {
+				t.logger.Warnf("child task #%v failed: %w", i+1, err)
+			}
+		default:
+			if err != nil {
+				return fmt.Errorf("child task #%v failed: %w", i+1, err)
+			}
 		}
 	}
 
