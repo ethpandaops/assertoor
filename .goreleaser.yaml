@@ -27,6 +27,27 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.BuildRelease={{.Tag}} -X github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.BuildVersion={{.ShortCommit}}
+    overrides:
+      - goos: linux
+        goarch: arm64
+        env:
+          - CC=aarch64-linux-gnu-gcc
+      - goos: darwin
+        goarch: amd64
+        goamd64: v1
+        env:
+          - CC=/home/runner/work/osxcross/target/bin/o64-clang
+          - CXX=/home/runner/work/osxcross/target/bin/o64-clang++
+      - goos: darwin
+        goarch: arm64
+        env:
+          - CC=/home/runner/work/osxcross/target/bin/o64-clang
+          - CXX=/home/runner/work/osxcross/target/bin/o64-clang++
+      - goos: windows
+        goarch: amd64
+        goamd64: v1
+        env:
+          - CC=x86_64-w64-mingw32-cpp
 checksum:
   name_template: 'checksums.txt'
 snapshot:
