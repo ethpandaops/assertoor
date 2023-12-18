@@ -4,7 +4,7 @@ WORKDIR /src
 COPY go.sum go.mod ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o /bin/app .
+RUN CGO_ENABLED=1 go build -o /bin/app .
 
 FROM ubuntu:latest  
 RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
