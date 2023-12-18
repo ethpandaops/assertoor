@@ -31,7 +31,7 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	return &Task{
 		ctx:         ctx,
 		options:     options,
-		logger:      ctx.Scheduler.GetLogger().WithField("task", TaskName),
+		logger:      ctx.Logger.GetLogger(),
 		firstHeight: map[uint16]uint64{},
 	}, nil
 }

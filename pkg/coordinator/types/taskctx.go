@@ -5,11 +5,10 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
-	"github.com/sirupsen/logrus"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 )
 
 type TaskScheduler interface {
-	GetLogger() logrus.FieldLogger
 	GetCoordinator() Coordinator
 	ParseTaskOptions(rawtask *helper.RawMessage) (*TaskOptions, error)
 	ExecuteTask(ctx context.Context, task Task, taskWatchFn func(ctx context.Context, cancelFn context.CancelFunc, task Task)) error
@@ -38,6 +37,7 @@ type TaskContext struct {
 	Scheduler TaskScheduler
 	Index     uint64
 	Vars      Variables
+	Logger    *logger.LogScope
 	NewTask   func(options *TaskOptions, variables Variables) (Task, error)
 	SetResult func(result TaskResult)
 }

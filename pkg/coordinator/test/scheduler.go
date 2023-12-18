@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/tasks"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
@@ -55,10 +56,6 @@ func NewTaskScheduler(logger logrus.FieldLogger, coordinator types.Coordinator, 
 		taskStateMap: make(map[types.Task]*taskExecutionState),
 		coordinator:  coordinator,
 	}
-}
-
-func (ts *TaskScheduler) GetLogger() logrus.FieldLogger {
-	return ts.logger
 }
 
 func (ts *TaskScheduler) GetTaskCount() int {
@@ -146,6 +143,10 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskEx
 		Scheduler: ts,
 		Index:     taskIdx,
 		Vars:      variables,
+		Logger: logger.NewLogger(&logger.ScopeOptions{
+			Parent:      ts.logger.WithField("task", taskDescriptor.Name),
+			HistorySize: 1000,
+		}),
 		NewTask: func(options *types.TaskOptions, variables types.Variables) (types.Task, error) {
 			return ts.newTask(options, taskState, variables, isCleanupTask)
 		},
