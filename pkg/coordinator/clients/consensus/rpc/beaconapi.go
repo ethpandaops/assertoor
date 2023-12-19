@@ -233,6 +233,20 @@ func (bc *BeaconClient) GetStateValidators(ctx context.Context, stateRef string)
 	return result, nil
 }
 
+func (bc *BeaconClient) GetProposerDuties(ctx context.Context, epoch uint64) ([]*v1.ProposerDuty, error) {
+	provider, isProvider := bc.clientSvc.(eth2client.ProposerDutiesProvider)
+	if !isProvider {
+		return nil, fmt.Errorf("get beacon committees not supported")
+	}
+
+	result, err := provider.ProposerDuties(ctx, phase0.Epoch(epoch), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (bc *BeaconClient) GetCommitteeDuties(ctx context.Context, stateRef string, epoch uint64) ([]*v1.BeaconCommittee, error) {
 	provider, isProvider := bc.clientSvc.(eth2client.BeaconCommitteesProvider)
 	if !isProvider {
