@@ -131,17 +131,17 @@ func (t *Task) runFinalityCheck() bool {
 	unfinalizedEpochs := currentEpoch.Number() - uint64(finalizedEpoch)
 
 	if t.config.MinUnfinalizedEpochs > 0 && unfinalizedEpochs < t.config.MinUnfinalizedEpochs {
-		t.logger.Debugf("check failed: minUnfinalizedEpochs (have: %v, want >= %v)", unfinalizedEpochs, t.config.MinUnfinalizedEpochs)
+		t.logger.Infof("check failed: minUnfinalizedEpochs (have: %v, want >= %v)", unfinalizedEpochs, t.config.MinUnfinalizedEpochs)
 		return false
 	}
 
 	if t.config.MaxUnfinalizedEpochs > 0 && unfinalizedEpochs > t.config.MaxUnfinalizedEpochs {
-		t.logger.Debugf("check failed: maxUnfinalizedEpochs (have: %v, want <= %v)", unfinalizedEpochs, t.config.MaxUnfinalizedEpochs)
+		t.logger.Infof("check failed: maxUnfinalizedEpochs (have: %v, want <= %v)", unfinalizedEpochs, t.config.MaxUnfinalizedEpochs)
 		return false
 	}
 
 	if t.config.MinFinalizedEpochs > 0 && uint64(finalizedEpoch) < t.config.MinFinalizedEpochs {
-		t.logger.Debugf("check failed: minFinalizedEpochs (have: %v, want >= %v)", finalizedEpoch, t.config.MinFinalizedEpochs)
+		t.logger.Infof("check failed: minFinalizedEpochs (have: %v, want >= %v)", finalizedEpoch, t.config.MinFinalizedEpochs)
 		return false
 	}
 

@@ -118,11 +118,13 @@ func (t *Task) Execute(ctx context.Context) error {
 
 				if t.config.MaxReorgDistance > 0 && t.maxReorgDistance > t.config.MaxReorgDistance {
 					t.ctx.SetResult(types.TaskResultFailure)
+					t.logger.Infof("task failed: max reorg distance (%v) exceeded, reorg distance around slot %v: %v", t.config.MaxReorgDistance, block.Slot, t.maxReorgDistance)
+
 					return fmt.Errorf("max reorg distance (%v) exceeded:  %v -> %v (%v)", t.config.MaxReorgDistance, lastBlock.Root.String(), block.Root.String(), t.maxReorgDistance)
 				}
-
-				t.ctx.SetResult(t.runCheck())
 			}
+
+			t.ctx.SetResult(t.runCheck())
 
 			lastBlock = block
 		case <-ctx.Done():
@@ -136,16 +138,19 @@ func (t *Task) runCheck() types.TaskResult {
 
 	_, currentEpoch, err := consensusPool.GetBlockCache().GetWallclock().Now()
 	if err != nil {
+		t.logger.Warnf("check missed: could not get current epoch from wall clock")
 		return types.TaskResultNone
 	}
 
 	epochCount := currentEpoch.Number() - t.startEpoch
 
 	if t.config.MinCheckEpochCount > 0 && epochCount < t.config.MinCheckEpochCount {
+		t.logger.Warnf("Check missed: checked %v epochs, but need >= %v", epochCount, t.config.MinCheckEpochCount)
 		return types.TaskResultNone
 	}
 
 	if t.config.MaxReorgsPerEpoch > 0 && epochCount > 0 && float64(t.totalReorgs)/float64(epochCount) > t.config.MaxReorgsPerEpoch {
+		t.logger.Warnf("check failed: max reorgs per epoch exceeded. (have: %v, want <= %v)", float64(t.totalReorgs)/float64(epochCount), t.config.MaxReorgsPerEpoch)
 		return types.TaskResultFailure
 	}
 

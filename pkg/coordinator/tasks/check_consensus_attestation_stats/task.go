@@ -117,6 +117,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	// start vote counting from next epoch as current epoch might be incomplete
 	lastCheckedEpoch := currentEpoch.Number()
 
+	t.logger.Infof("current epoch: %v, starting attestation aggregation at epoch %v", lastCheckedEpoch, lastCheckedEpoch+1)
+
 	t.attesterDutyMap = map[uint64]map[phase0.Root]*attesterDuties{}
 	defer func() {
 		t.attesterDutyMap = nil
@@ -139,7 +141,6 @@ func (t *Task) Execute(ctx context.Context) error {
 				break
 			}
 
-			t.logger.Infof("check epoch %v votes", checkEpoch)
 			t.runAttestationStatsCheck(ctx, checkEpoch)
 
 			lastCheckedEpoch = checkEpoch
@@ -252,6 +253,8 @@ func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64) {
 				t.ctx.SetResult(types.TaskResultNone)
 			}
 		}
+
+		t.logger.Infof("epoch %v attestation check result: %v. passed checks: %v, want: %v", epoch, result, t.passedEpochs, t.config.MinCheckedEpochs)
 
 		break
 	}
