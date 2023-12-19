@@ -33,6 +33,7 @@ type taskExecutionState struct {
 	task             types.Task
 	taskDepth        uint64
 	taskVars         types.Variables
+	logger           *logger.LogScope
 	parentState      *taskExecutionState
 	isStarted        bool
 	isRunning        bool
@@ -46,9 +47,9 @@ type taskExecutionState struct {
 	resultMutex      sync.RWMutex
 }
 
-func NewTaskScheduler(logger logrus.FieldLogger, coordinator types.Coordinator, variables types.Variables) *TaskScheduler {
+func NewTaskScheduler(log logrus.FieldLogger, coordinator types.Coordinator, variables types.Variables) *TaskScheduler {
 	return &TaskScheduler{
-		logger:       logger,
+		logger:       log,
 		rootVars:     variables,
 		taskCount:    1,
 		rootTasks:    make([]types.Task, 0),
@@ -132,6 +133,10 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskEx
 		index:       taskIdx,
 		parentState: parentState,
 		taskVars:    variables,
+		logger: logger.NewLogger(&logger.ScopeOptions{
+			Parent:      ts.logger.WithField("task", taskDescriptor.Name),
+			HistorySize: 1000,
+		}),
 	}
 
 	if parentState != nil {
@@ -143,10 +148,7 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskEx
 		Scheduler: ts,
 		Index:     taskIdx,
 		Vars:      variables,
-		Logger: logger.NewLogger(&logger.ScopeOptions{
-			Parent:      ts.logger.WithField("task", taskDescriptor.Name),
-			HistorySize: 1000,
-		}),
+		Logger:    taskState.logger,
 		NewTask: func(options *types.TaskOptions, variables types.Variables) (types.Task, error) {
 			return ts.newTask(options, taskState, variables, isCleanupTask)
 		},
@@ -454,6 +456,7 @@ func (ts *TaskScheduler) GetTaskStatus(task types.Task) *types.TaskStatus {
 		StopTime:    taskState.stopTime,
 		Result:      taskState.taskResult,
 		Error:       taskState.taskError,
+		Logger:      taskState.logger,
 	}
 	if taskState.parentState != nil {
 		taskStatus.ParentIndex = taskState.parentState.index

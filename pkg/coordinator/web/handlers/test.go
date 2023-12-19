@@ -26,22 +26,31 @@ type TestPage struct {
 }
 
 type TestPageTask struct {
-	Index       uint64        `json:"index"`
-	ParentIndex uint64        `json:"parent_index"`
-	IndentPx    uint64        `json:"indent_px"`
-	Name        string        `json:"name"`
-	Title       string        `json:"title"`
-	IsStarted   bool          `json:"started"`
-	IsCompleted bool          `json:"completed"`
-	StartTime   time.Time     `json:"start_time"`
-	StopTime    time.Time     `json:"stop_time"`
-	Timeout     time.Duration `json:"timeout"`
-	HasTimeout  bool          `json:"has_timeout"`
-	RunTime     time.Duration `json:"runtime"`
-	HasRunTime  bool          `json:"has_runtime"`
-	Status      string        `json:"status"`
-	Result      string        `json:"result"`
-	ResultError string        `json:"result_error"`
+	Index       uint64             `json:"index"`
+	ParentIndex uint64             `json:"parent_index"`
+	IndentPx    uint64             `json:"indent_px"`
+	Name        string             `json:"name"`
+	Title       string             `json:"title"`
+	IsStarted   bool               `json:"started"`
+	IsCompleted bool               `json:"completed"`
+	StartTime   time.Time          `json:"start_time"`
+	StopTime    time.Time          `json:"stop_time"`
+	Timeout     time.Duration      `json:"timeout"`
+	HasTimeout  bool               `json:"has_timeout"`
+	RunTime     time.Duration      `json:"runtime"`
+	HasRunTime  bool               `json:"has_runtime"`
+	Status      string             `json:"status"`
+	Result      string             `json:"result"`
+	ResultError string             `json:"result_error"`
+	Log         []*TestPageTaskLog `json:"log"`
+}
+
+type TestPageTaskLog struct {
+	Time    time.Time         `json:"time"`
+	Level   uint64            `json:"level"`
+	Message string            `json:"msg"`
+	DataLen uint64            `json:"datalen"`
+	Data    map[string]string `json:"data"`
 }
 
 // Test will return the "test" page using a go template
@@ -193,6 +202,25 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 
 			if taskStatus.Error != nil {
 				taskData.ResultError = taskStatus.Error.Error()
+			}
+
+			taskLog := taskStatus.Logger.GetLogEntries()
+			taskData.Log = make([]*TestPageTaskLog, len(taskLog))
+
+			for i, log := range taskLog {
+				logData := &TestPageTaskLog{
+					Time:    log.Time,
+					Level:   uint64(log.Level),
+					Message: log.Message,
+					Data:    map[string]string{},
+					DataLen: uint64(len(log.Data)),
+				}
+
+				for dataKey, dataVal := range log.Data {
+					logData.Data[dataKey] = fmt.Sprintf("%v", dataVal)
+				}
+
+				taskData.Log[i] = logData
 			}
 
 			pageData.Tasks = append(pageData.Tasks, taskData)

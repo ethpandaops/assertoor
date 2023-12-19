@@ -188,6 +188,45 @@
                         </div>
                       </div>
                       {{ end }}
+
+                      <div class="row">
+                        <div class="col-12">Log:</div>
+                        <div class="col-12" style="max-height:400px; overflow-y:auto;">
+                          <div class="container">
+                          {{ range $i, $log := .Log }}
+                            <div class="row">
+                              <div class="col-5 col-lg-2">
+                                {{ formatDateTime $log.Time.UTC }}
+                              </div>
+                              <div class="col-3 col-lg-1">
+                                {{ if eq $log.Level 0 }}
+                                  <span class="loglevel-0">PANIC</span>
+                                {{ else if eq $log.Level 1 }}
+                                  <span class="loglevel-1">FATAL</span>
+                                {{ else if eq $log.Level 2 }}
+                                  <span class="loglevel-2">ERROR</span>
+                                {{ else if eq $log.Level 3 }}
+                                  <span class="loglevel-3">WARN</span>
+                                {{ else if eq $log.Level 4 }}
+                                  <span class="loglevel-4">INFO</span>
+                                {{ else if eq $log.Level 5 }}
+                                  <span class="loglevel-5">DEBUG</span>
+                                {{ else if eq $log.Level 6 }}
+                                  <span class="loglevel-6">TRACE</span>
+                                {{ end }}
+                              </div>
+                              <div class="col-3 col-lg-1">
+                                <span class="badge rounded-pill text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" data-bs-title="{{ range $key, $val := .Data }}{{ $key }}: {{ $val }}<br>{{ end }}">{{ $log.DataLen }} Fields</span>
+                              </div>
+                              <div class="col-12 col-lg-8">
+                                {{ $log.Message }}
+                              </div>
+                            </div>
+                          {{ end }}
+                          </div>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 </div>

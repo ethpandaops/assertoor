@@ -97,3 +97,23 @@ func (lh *logHistory) Fire(entry *logrus.Entry) error {
 func (ls *LogScope) GetLogger() *logrus.Logger {
 	return ls.logger
 }
+
+func (ls *LogScope) GetLogEntries() []*logrus.Entry {
+	ls.bufMtx.Lock()
+	defer ls.bufMtx.Unlock()
+
+	var entries []*logrus.Entry
+
+	if ls.bufIdx >= ls.options.HistorySize {
+		entries = make([]*logrus.Entry, ls.options.HistorySize)
+		firstIdx := ls.bufIdx % ls.options.HistorySize
+
+		copy(entries, ls.buf[firstIdx:])
+		copy(entries[ls.options.HistorySize-firstIdx:], ls.buf[0:firstIdx])
+	} else {
+		entries = make([]*logrus.Entry, ls.bufIdx)
+		copy(entries, ls.buf)
+	}
+
+	return entries
+}

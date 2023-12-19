@@ -31,6 +31,7 @@ type TaskStatus struct {
 	StopTime    time.Time
 	Result      TaskResult
 	Error       error
+	Logger      *logger.LogScope
 }
 
 type TaskContext struct {
