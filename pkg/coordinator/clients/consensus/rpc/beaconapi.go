@@ -201,18 +201,21 @@ func (bc *BeaconClient) GetNodeSyncStatus(ctx context.Context) (*SyncStatus, err
 	return &syncStatus, nil
 }
 
+type apiNodeVersion struct {
+	Data struct {
+		Version string `json:"version"`
+	} `json:"data"`
+}
+
 func (bc *BeaconClient) GetNodeVersion(ctx context.Context) (string, error) {
-	provider, isProvider := bc.clientSvc.(eth2client.NodeVersionProvider)
-	if !isProvider {
-		return "", fmt.Errorf("get node version not supported")
-	}
+	var nodeVersion apiNodeVersion
 
-	result, err := provider.NodeVersion(ctx)
+	err := bc.getJSON(ctx, fmt.Sprintf("%s/eth/v1/node/version", bc.endpoint), &nodeVersion)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error retrieving node version: %v", err)
 	}
 
-	return result, nil
+	return nodeVersion.Data.Version, nil
 }
 
 func (bc *BeaconClient) GetConfigSpecs(ctx context.Context) (map[string]interface{}, error) {
