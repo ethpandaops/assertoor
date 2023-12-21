@@ -15,6 +15,7 @@ import (
 	generateblschanges "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_bls_changes"
 	generatedeposits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_deposits"
 	generateexits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_exits"
+	generateslashings "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_slashings"
 	runcommand "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_command"
 	runshell "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_shell"
 	runtaskmatrix "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_task_matrix"
@@ -37,6 +38,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generateblschanges.TaskDescriptor,
 	generatedeposits.TaskDescriptor,
 	generateexits.TaskDescriptor,
+	generateslashings.TaskDescriptor,
 	runcommand.TaskDescriptor,
 	runshell.TaskDescriptor,
 	runtaskmatrix.TaskDescriptor,

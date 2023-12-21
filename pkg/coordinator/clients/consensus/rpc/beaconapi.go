@@ -1,8 +1,12 @@
 package rpc
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	nethttp "net/http"
 	"strings"
 	"time"
 
@@ -60,6 +64,100 @@ func (bc *BeaconClient) Initialize(ctx context.Context) error {
 	}
 
 	bc.clientSvc = clientSvc
+
+	return nil
+}
+
+func (bc *BeaconClient) getJSON(ctx context.Context, requrl string, returnValue interface{}) error {
+	logurl := getRedactedURL(requrl)
+
+	req, err := nethttp.NewRequestWithContext(ctx, "GET", requrl, nethttp.NoBody)
+	if err != nil {
+		return err
+	}
+
+	for headerKey, headerVal := range bc.headers {
+		req.Header.Set(headerKey, headerVal)
+	}
+
+	client := &nethttp.Client{Timeout: time.Second * 300}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != nethttp.StatusOK {
+		if resp.StatusCode == nethttp.StatusNotFound {
+			return fmt.Errorf("not found")
+		}
+
+		data, _ := io.ReadAll(resp.Body)
+		logger.WithField("client", bc.name).Debugf("RPC Error %v: %v", resp.StatusCode, data)
+
+		return fmt.Errorf("url: %v, error-response: %s", logurl, data)
+	}
+
+	dec := json.NewDecoder(resp.Body)
+
+	err = dec.Decode(&returnValue)
+	if err != nil {
+		return fmt.Errorf("error parsing json response: %v", err)
+	}
+
+	return nil
+}
+
+func (bc *BeaconClient) postJSON(ctx context.Context, requrl string, postData, returnValue interface{}) error {
+	logurl := getRedactedURL(requrl)
+
+	postDataBytes, err := json.Marshal(postData)
+	if err != nil {
+		return fmt.Errorf("error encoding json request: %v", err)
+	}
+
+	reader := bytes.NewReader(postDataBytes)
+	req, err := nethttp.NewRequestWithContext(ctx, "POST", requrl, reader)
+
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	for headerKey, headerVal := range bc.headers {
+		req.Header.Set(headerKey, headerVal)
+	}
+
+	client := &nethttp.Client{Timeout: time.Second * 300}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != nethttp.StatusOK {
+		if resp.StatusCode == nethttp.StatusNotFound {
+			return fmt.Errorf("not found")
+		}
+
+		data, _ := io.ReadAll(resp.Body)
+
+		return fmt.Errorf("url: %v, error-response: %s", logurl, data)
+	}
+
+	if returnValue != nil {
+		dec := json.NewDecoder(resp.Body)
+
+		err = dec.Decode(&returnValue)
+		if err != nil {
+			return fmt.Errorf("error parsing json response: %v", err)
+		}
+	}
 
 	return nil
 }
@@ -296,6 +394,24 @@ func (bc *BeaconClient) SubmitVoluntaryExits(ctx context.Context, exit *phase0.S
 	}
 
 	err := submitter.SubmitVoluntaryExit(ctx, exit)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (bc *BeaconClient) SubmitAttesterSlashing(ctx context.Context, slashing *phase0.AttesterSlashing) error {
+	err := bc.postJSON(ctx, fmt.Sprintf("%s/eth/v1/beacon/pool/attester_slashings", bc.endpoint), slashing, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (bc *BeaconClient) SubmitProposerSlashing(ctx context.Context, slashing *phase0.ProposerSlashing) error {
+	err := bc.postJSON(ctx, fmt.Sprintf("%s/eth/v1/beacon/pool/proposer_slashings", bc.endpoint), slashing, nil)
 	if err != nil {
 		return err
 	}
