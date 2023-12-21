@@ -40,7 +40,6 @@ type Task struct {
 	withdrSeed []byte
 	nextIndex  uint64
 	lastIndex  uint64
-	targetAddr common.Eth1Address
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -99,11 +98,6 @@ func (t *Task) LoadConfig() error {
 	t.withdrSeed, err = t.mnemonicToSeed(config.Mnemonic)
 	if err != nil {
 		return err
-	}
-
-	err = t.targetAddr.UnmarshalText([]byte(config.TargetAddress))
-	if err != nil {
-		return fmt.Errorf("cannot decode execution addr: %w", err)
 	}
 
 	t.config = config
@@ -351,7 +345,7 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 	signingRoot1 := common.ComputeSigningRoot(msgRoot1, dom)
 	sig1 := secKey.SignHash(signingRoot1[:])
 
-	msgRoot2, err := attestationData1.HashTreeRoot()
+	msgRoot2, err := attestationData2.HashTreeRoot()
 	if err != nil {
 		return nil, fmt.Errorf("cannot build attestation2 data tree root: %v", err)
 	}

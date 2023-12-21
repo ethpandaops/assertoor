@@ -11,7 +11,6 @@ type Config struct {
 	Mnemonic      string `yaml:"mnemonic" json:"mnemonic"`
 	StartIndex    int    `yaml:"startIndex" json:"startIndex"`
 	IndexCount    int    `yaml:"indexCount" json:"indexCount"`
-	TargetAddress string `yaml:"targetAddress" json:"targetAddress"`
 	ClientPattern string `yaml:"clientPattern" json:"clientPattern"`
 }
 
@@ -28,10 +27,6 @@ func (c *Config) Validate() error {
 
 	if c.Mnemonic == "" {
 		return errors.New("mnemonic must be set")
-	}
-
-	if c.TargetAddress == "" {
-		return errors.New("targetAddress must be set")
 	}
 
 	return nil
