@@ -3,8 +3,6 @@ package execution
 import (
 	"fmt"
 	"sync"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 type SchedulerMode uint8
@@ -30,9 +28,6 @@ type Pool struct {
 	schedulerMode  SchedulerMode
 	schedulerMutex sync.Mutex
 	rrLastIndexes  map[ClientType]uint16
-
-	walletsMutex sync.Mutex
-	walletsMap   map[common.Address]*Wallet
 }
 
 func NewPool(config *PoolConfig) (*Pool, error) {
@@ -41,7 +36,6 @@ func NewPool(config *PoolConfig) (*Pool, error) {
 		clients:       make([]*Client, 0),
 		forkCache:     map[int64][]*HeadFork{},
 		rrLastIndexes: map[ClientType]uint16{},
-		walletsMap:    map[common.Address]*Wallet{},
 	}
 
 	var err error
@@ -84,6 +78,13 @@ func (pool *Pool) GetAllEndpoints() []*Client {
 }
 
 func (pool *Pool) GetReadyEndpoint(clientType ClientType) *Client {
+	readyClients := pool.GetReadyEndpoints()
+	selectedClient := pool.runClientScheduler(readyClients, clientType)
+
+	return selectedClient
+}
+
+func (pool *Pool) GetReadyEndpoints() []*Client {
 	canonicalFork := pool.GetCanonicalFork(-1)
 	if canonicalFork == nil {
 		return nil
@@ -94,9 +95,7 @@ func (pool *Pool) GetReadyEndpoint(clientType ClientType) *Client {
 		return nil
 	}
 
-	selectedClient := pool.runClientScheduler(readyClients, clientType)
-
-	return selectedClient
+	return readyClients
 }
 
 func (pool *Pool) IsClientReady(client *Client) bool {

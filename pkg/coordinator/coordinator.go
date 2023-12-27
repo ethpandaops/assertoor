@@ -12,6 +12,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -22,6 +23,7 @@ type Coordinator struct {
 	Config          *Config
 	log             logrus.FieldLogger
 	clientPool      *clients.ClientPool
+	walletManager   *wallet.Manager
 	webserver       *server.WebServer
 	validatorNames  *names.ValidatorNames
 	tests           []types.Test
@@ -54,6 +56,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	}
 
 	c.clientPool = clientPool
+	c.walletManager = wallet.NewManager(clientPool.GetExecutionPool(), c.log.WithField("module", "wallet"))
 
 	for idx := range c.Config.Endpoints {
 		err = clientPool.AddClient(&c.Config.Endpoints[idx])
@@ -126,6 +129,10 @@ func (c *Coordinator) NewVariables(parentScope types.Variables) types.Variables 
 
 func (c *Coordinator) ClientPool() *clients.ClientPool {
 	return c.clientPool
+}
+
+func (c *Coordinator) WalletManager() *wallet.Manager {
+	return c.walletManager
 }
 
 func (c *Coordinator) ValidatorNames() *names.ValidatorNames {

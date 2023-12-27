@@ -271,7 +271,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 		return fmt.Errorf("cannot create bound instance of DepositContract: %w", err)
 	}
 
-	wallet, err := clientPool.GetExecutionPool().GetWalletByPrivkey(t.walletPrivKey)
+	wallet, err := t.ctx.Scheduler.GetCoordinator().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
 	if err != nil {
 		return fmt.Errorf("cannot initialize wallet: %w", err)
 	}

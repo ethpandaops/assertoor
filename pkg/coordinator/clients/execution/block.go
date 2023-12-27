@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"sort"
 	"sync"
 	"time"
@@ -45,10 +46,15 @@ func (block *Block) GetBlock() *types.Block {
 	return block.block
 }
 
-func (block *Block) AwaitBlock(timeout time.Duration) *types.Block {
+func (block *Block) AwaitBlock(ctx context.Context, timeout time.Duration) *types.Block {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	select {
 	case <-block.blockChan:
 	case <-time.After(timeout):
+	case <-ctx.Done():
 	}
 
 	return block.block
