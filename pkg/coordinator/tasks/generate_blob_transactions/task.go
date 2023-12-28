@@ -1,4 +1,4 @@
-package generateeoatransactions
+package generateblobtransactions
 
 import (
 	"context"
@@ -14,14 +14,16 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet/blobtx"
+	"github.com/holiman/uint256"
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	TaskName       = "generate_eoa_transactions"
+	TaskName       = "generate_blob_transactions"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Generates normal eoa transactions and sends them to the network",
+		Description: "Generates blob transactions and sends them to the network",
 		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
@@ -240,27 +242,36 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		txWallet = t.walletPool.GetNextChildWallet()
 	}
 
+	blobRef := "identifier,random"
+	if t.config.BlobData != "" {
+		blobRef = t.config.BlobData
+	}
+
+	blobRefs := []string{}
+	for i := 0; i < int(t.config.BlobSidecars); i++ {
+		blobRefs = append(blobRefs, blobRef)
+	}
+
+	blobHashes, blobSidecar, err := blobtx.GenerateBlobSidecar(blobRefs, transactionIdx, 0)
+	if err != nil {
+		return err
+	}
+
 	tx, err := txWallet.BuildTransaction(ctx, func(ctx context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
-		var toAddr *common.Address
-
-		if !t.config.ContractDeployment {
-			addr := txWallet.GetAddress()
-			if t.config.RandomTarget {
-				addrBytes := make([]byte, 20)
-				//nolint:errcheck // ignore
-				rand.Read(addrBytes)
-				addr = common.Address(addrBytes)
-			} else if t.config.TargetAddress != "" {
-				addr = t.targetAddr
-			}
-
-			toAddr = &addr
+		toAddr := txWallet.GetAddress()
+		if t.config.RandomTarget {
+			addrBytes := make([]byte, 20)
+			//nolint:errcheck // ignore
+			rand.Read(addrBytes)
+			toAddr = common.Address(addrBytes)
+		} else if t.config.TargetAddress != "" {
+			toAddr = t.targetAddr
 		}
 
 		txAmount := new(big.Int).Set(t.config.Amount)
 		if t.config.RandomAmount {
-			n, err := rand.Int(rand.Reader, txAmount)
-			if err == nil {
+			n, err2 := rand.Int(rand.Reader, txAmount)
+			if err2 == nil {
 				txAmount = n
 			}
 		}
@@ -270,29 +281,20 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 			txData = t.transactionData
 		}
 
-		var txObj ethtypes.TxData
-
-		if t.config.LegacyTxType {
-			txObj = &ethtypes.LegacyTx{
-				Nonce:    nonce,
-				GasPrice: t.config.FeeCap,
-				Gas:      t.config.GasLimit,
-				To:       toAddr,
-				Value:    txAmount,
-				Data:     txData,
-			}
-		} else {
-			txObj = &ethtypes.DynamicFeeTx{
-				ChainID:   t.ctx.Scheduler.GetCoordinator().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
-				Nonce:     nonce,
-				GasTipCap: t.config.TipCap,
-				GasFeeCap: t.config.FeeCap,
-				Gas:       t.config.GasLimit,
-				To:        toAddr,
-				Value:     txAmount,
-				Data:      txData,
-			}
+		txObj := &ethtypes.BlobTx{
+			ChainID:    uint256.MustFromBig(t.ctx.Scheduler.GetCoordinator().ClientPool().GetExecutionPool().GetBlockCache().GetChainID()),
+			Nonce:      nonce,
+			BlobFeeCap: uint256.MustFromBig(t.config.BlobFeeCap),
+			GasTipCap:  uint256.MustFromBig(t.config.TipCap),
+			GasFeeCap:  uint256.MustFromBig(t.config.FeeCap),
+			Gas:        t.config.GasLimit,
+			To:         toAddr,
+			Value:      uint256.MustFromBig(txAmount),
+			Data:       txData,
+			BlobHashes: blobHashes,
+			Sidecar:    blobSidecar,
 		}
+
 		return ethtypes.NewTx(txObj), nil
 	})
 	if err != nil {

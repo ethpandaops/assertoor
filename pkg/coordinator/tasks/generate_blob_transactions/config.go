@@ -1,4 +1,4 @@
-package generateeoatransactions
+package generateblobtransactions
 
 import (
 	"errors"
@@ -19,16 +19,17 @@ type Config struct {
 	RefillAmount       *big.Int `yaml:"refillAmount" json:"refillAmount"`
 	RefillMinBalance   *big.Int `yaml:"refillMinBalance" json:"refillMinBalance"`
 
-	LegacyTxType       bool     `yaml:"legacyTxType" json:"legacyTxType"`
-	FeeCap             *big.Int `yaml:"feeCap" json:"feeCap"`
-	TipCap             *big.Int `yaml:"tipCap" json:"tipCap"`
-	GasLimit           uint64   `yaml:"gasLimit" json:"gasLimit"`
-	TargetAddress      string   `yaml:"targetAddress" json:"targetAddress"`
-	RandomTarget       bool     `yaml:"randomTarget" json:"randomTarget"`
-	ContractDeployment bool     `yaml:"contractDeployment" json:"contractDeployment"`
-	CallData           string   `yaml:"callData" json:"callData"`
-	RandomAmount       bool     `yaml:"randomAmount" json:"randomAmount"`
-	Amount             *big.Int `yaml:"amount" json:"amount"`
+	BlobSidecars  uint64   `yaml:"blobSidecars" json:"blobSidecars"`
+	BlobFeeCap    *big.Int `yaml:"blobFeeCap" json:"blobFeeCap"`
+	FeeCap        *big.Int `yaml:"feeCap" json:"feeCap"`
+	TipCap        *big.Int `yaml:"tipCap" json:"tipCap"`
+	GasLimit      uint64   `yaml:"gasLimit" json:"gasLimit"`
+	TargetAddress string   `yaml:"targetAddress" json:"targetAddress"`
+	RandomTarget  bool     `yaml:"randomTarget" json:"randomTarget"`
+	CallData      string   `yaml:"callData" json:"callData"`
+	BlobData      string   `yaml:"blobData" json:"blobData"`
+	RandomAmount  bool     `yaml:"randomAmount" json:"randomAmount"`
+	Amount        *big.Int `yaml:"amount" json:"amount"`
 
 	ClientPattern string `yaml:"clientPattern" json:"clientPattern"`
 }
@@ -40,9 +41,11 @@ func DefaultConfig() Config {
 		RefillTipCap:       big.NewInt(1000000000),          // 1 Gwei
 		RefillAmount:       big.NewInt(1000000000000000000), // 1 ETH
 		RefillMinBalance:   big.NewInt(500000000000000000),  // 0.5 ETH
-		FeeCap:             big.NewInt(100000000000),        // 100 Gwei
-		TipCap:             big.NewInt(1000000000),          // 1 Gwei
-		GasLimit:           50000,
+		BlobSidecars:       1,
+		BlobFeeCap:         big.NewInt(10000000000),  // 10 Gwei
+		FeeCap:             big.NewInt(100000000000), // 100 Gwei
+		TipCap:             big.NewInt(2000000000),   // 2 Gwei
+		GasLimit:           100000,
 		Amount:             big.NewInt(0),
 	}
 }
