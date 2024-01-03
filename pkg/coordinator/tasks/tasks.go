@@ -18,6 +18,7 @@ import (
 	generateeoatransactions "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_eoa_transactions"
 	generateexits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_exits"
 	generateslashings "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_slashings"
+	generatetransaction "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_transaction"
 	runcommand "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_command"
 	runshell "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_shell"
 	runtaskmatrix "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_task_matrix"
@@ -43,6 +44,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generatedeposits.TaskDescriptor,
 	generateexits.TaskDescriptor,
 	generateslashings.TaskDescriptor,
+	generatetransaction.TaskDescriptor,
 	runcommand.TaskDescriptor,
 	runshell.TaskDescriptor,
 	runtaskmatrix.TaskDescriptor,

@@ -272,10 +272,12 @@ func (wallet *Wallet) loadTransactionReceipt(block *execution.Block, tx *types.T
 			return receipt
 		}
 
-		wallet.manager.logger.WithFields(logrus.Fields{
-			"client": client.GetName(),
-			"txhash": tx.Hash(),
-		}).Warnf("could not load tx receipt: %v", err)
+		if retryCount > 2 {
+			wallet.manager.logger.WithFields(logrus.Fields{
+				"client": client.GetName(),
+				"txhash": tx.Hash(),
+			}).Warnf("could not load tx receipt: %v", err)
+		}
 
 		if retryCount < 5 {
 			time.Sleep(1 * time.Second)

@@ -3,4 +3,4 @@ bin
 tmp
 example/config/test.yaml
 test.yaml
-test-*
+test-*.yaml
