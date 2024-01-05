@@ -128,7 +128,7 @@ func (t *Task) watchTaskResult(ctx context.Context, cancelFn context.CancelFunc)
 	currentResult := types.TaskResultNone
 
 	for {
-		updateChan := t.ctx.Scheduler.GetTaskResultUpdateChan(t.task, types.TaskResultNone)
+		updateChan := t.ctx.Scheduler.GetTaskResultUpdateChan(t.task, currentResult)
 		if updateChan != nil {
 			select {
 			case <-ctx.Done():

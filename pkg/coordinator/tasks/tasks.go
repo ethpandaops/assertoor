@@ -22,6 +22,7 @@ import (
 	generatetransaction "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_transaction"
 	runcommand "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_command"
 	runshell "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_shell"
+	runtaskbackground "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_task_background"
 	runtaskmatrix "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_task_matrix"
 	runtaskoptions "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_task_options"
 	runtasks "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_tasks"
@@ -49,6 +50,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generatetransaction.TaskDescriptor,
 	runcommand.TaskDescriptor,
 	runshell.TaskDescriptor,
+	runtaskbackground.TaskDescriptor,
 	runtaskmatrix.TaskDescriptor,
 	runtaskoptions.TaskDescriptor,
 	runtasks.TaskDescriptor,
