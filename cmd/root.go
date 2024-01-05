@@ -60,11 +60,10 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ethereum-metrics-exporter.yaml)")
-	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "json", "log format (default is text). Valid values are 'text', 'json'")
-	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Help message for toggle")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
+	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text", "log format (default is text). Valid values are 'text', 'json'")
+	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 
 	rootCmd.Flags().IntVarP(&metricsPort, "metrics-port", "", 9090, "Port to serve Prometheus metrics on")
 	rootCmd.Flags().IntVarP(&lameDuckSeconds, "lame-duck-seconds", "", 30, "Lame duck period in seconds (wait for this long after completion before terminating")
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
