@@ -3,7 +3,10 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
@@ -16,6 +19,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 )
 
 type Coordinator struct {
@@ -89,19 +93,17 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		variables.SetVar(name, value)
 	}
 
-	// initialize tests
-	for _, testCfg := range c.Config.Tests {
-		testRef, err := test.CreateTest(c, testCfg, variables)
-		if err != nil {
-			return fmt.Errorf("failed initializing test '%v': %w", testCfg.Name, err)
-		}
-
-		c.tests = append(c.tests, testRef)
-	}
-
 	// load validator names
 	c.validatorNames = names.NewValidatorNames(c.Config.ValidatorNames)
 	c.validatorNames.LoadValidatorNames()
+
+	// load tests
+	err = c.loadTests(ctx, variables)
+	if err != nil {
+		return err
+	}
+
+	c.log.Infof("Loaded %v tests", len(c.tests))
 
 	// run tests
 	c.runTests(ctx)
@@ -156,6 +158,96 @@ func (c *Coordinator) startMetrics() error {
 	err := http.ListenAndServe(fmt.Sprintf(":%v", c.metricsPort), nil)
 
 	return err
+}
+
+func (c *Coordinator) loadTests(ctx context.Context, globalVars types.Variables) error {
+	// load configured tests
+	for _, testCfg := range c.Config.Tests {
+		testRef, err := test.CreateTest(c, testCfg, globalVars)
+		if err != nil {
+			return fmt.Errorf("failed initializing test '%v': %w", testCfg.Name, err)
+		}
+
+		c.tests = append(c.tests, testRef)
+	}
+
+	// load external tests
+	for _, extTestCfg := range c.Config.ExternalTests {
+		testConfig, err := c.loadExternalTestConfig(ctx, extTestCfg)
+		if err != nil {
+			return err
+		}
+
+		if extTestCfg.Name != "" {
+			testConfig.Name = extTestCfg.Name
+		}
+
+		if extTestCfg.Timeout != nil {
+			testConfig.Timeout = *extTestCfg.Timeout
+		}
+
+		for k, v := range extTestCfg.Config {
+			testConfig.Config[k] = v
+		}
+
+		for k, v := range extTestCfg.ConfigVars {
+			testConfig.ConfigVars[k] = v
+		}
+
+		testRef, err := test.CreateTest(c, testConfig, globalVars)
+		if err != nil {
+			return fmt.Errorf("failed initializing external test '%v': %w", testConfig.Name, err)
+		}
+
+		c.tests = append(c.tests, testRef)
+	}
+
+	return nil
+}
+
+func (c *Coordinator) loadExternalTestConfig(ctx context.Context, extTestCfg *test.ExternalConfig) (*test.Config, error) {
+	var reader io.Reader
+
+	if strings.HasPrefix(extTestCfg.File, "http://") || strings.HasPrefix(extTestCfg.File, "https://") {
+		client := &http.Client{Timeout: time.Second * 120}
+
+		req, err := http.NewRequestWithContext(ctx, "GET", extTestCfg.File, http.NoBody)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("error loading test config from url: %v, result: %v %v", extTestCfg.File, resp.StatusCode, resp.Status)
+		}
+
+		reader = resp.Body
+	} else {
+		f, err := os.Open(extTestCfg.File)
+		if err != nil {
+			return nil, fmt.Errorf("error loading test config from file %v: %w", extTestCfg.File, err)
+		}
+
+		defer f.Close()
+
+		reader = f
+	}
+
+	decoder := yaml.NewDecoder(reader)
+	testConfig := &test.Config{}
+
+	err := decoder.Decode(testConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding external test config %v: %v", extTestCfg.File, err)
+	}
+
+	return testConfig, nil
 }
 
 func (c *Coordinator) runTests(ctx context.Context) {

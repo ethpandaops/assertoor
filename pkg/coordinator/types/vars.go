@@ -7,4 +7,5 @@ type Variables interface {
 	NewScope() Variables
 	ResolvePlaceholders(str string) string
 	ConsumeVars(config interface{}, consumeMap map[string]string) error
+	CopyVars(source Variables, copyMap map[string]string)
 }

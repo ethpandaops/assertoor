@@ -94,14 +94,12 @@ func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string
 		applyMap[cfgName] = varValue
 	}
 
-	// apply to confiy by generating a yaml, which is then parsed with the config types
-	// dirty hack, but we don't have to care about types this way
+	// apply to config by generating a yaml, which is then parsed with the target config types.
+	// that's a bit hacky, but we don't have to care about types.
 	applyYaml, err := yaml.Marshal(&applyMap)
 	if err != nil {
 		return fmt.Errorf("could not marshal dynamic config vars")
 	}
-
-	fmt.Printf("merge config: %v", string(applyYaml))
 
 	err = yaml.Unmarshal(applyYaml, config)
 	if err != nil {
@@ -109,4 +107,15 @@ func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string
 	}
 
 	return nil
+}
+
+func (v *Variables) CopyVars(source types.Variables, copyMap map[string]string) {
+	for targetName, varName := range copyMap {
+		varValue, varFound := source.LookupVar(varName)
+		if !varFound {
+			continue
+		}
+
+		v.SetVar(targetName, varValue)
+	}
 }

@@ -25,6 +25,9 @@ type Config struct {
 
 	// List of Test configurations.
 	Tests []*test.Config `yaml:"tests" json:"tests"`
+
+	// List of yaml files with test configurations
+	ExternalTests []*test.ExternalConfig `yaml:"externalTests" json:"externalTests"`
 }
 
 // DefaultConfig represents a sane-default configuration.
@@ -37,10 +40,9 @@ func DefaultConfig() *Config {
 				ConsensusURL: "http://localhost:5052",
 			},
 		},
-		GlobalVars: make(map[string]interface{}),
-		Tests: []*test.Config{
-			test.BasicSynced(),
-		},
+		GlobalVars:    make(map[string]interface{}),
+		Tests:         []*test.Config{},
+		ExternalTests: []*test.ExternalConfig{},
 	}
 }
 

@@ -37,9 +37,11 @@ func CreateTest(coordinator types.Coordinator, config *Config, variables types.V
 	} else {
 		// set test variables
 		testVars := variables.NewScope()
-		for name, value := range config.TestVars {
+		for name, value := range config.Config {
 			testVars.SetVar(name, value)
 		}
+
+		testVars.CopyVars(variables, config.ConfigVars)
 
 		// parse tasks
 		test.taskScheduler = NewTaskScheduler(test.log, coordinator, testVars)
