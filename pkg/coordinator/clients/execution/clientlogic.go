@@ -9,13 +9,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/sirupsen/logrus"
 )
 
 func (client *Client) runClientLoop() {
 	defer func() {
 		if err := recover(); err != nil {
-			logrus.WithError(err.(error)).Errorf("uncaught panic in executionClient.runClientLoop subroutine: %v, stack: %v", err, string(debug.Stack()))
+			client.logger.WithError(err.(error)).Errorf("uncaught panic in executionClient.runClientLoop subroutine: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 

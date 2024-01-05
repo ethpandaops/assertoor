@@ -13,6 +13,7 @@ import (
 )
 
 type ClientPool struct {
+	logger        logrus.FieldLogger
 	consensusPool *consensus.Pool
 	executionPool *execution.Pool
 	clients       []*PoolClient
@@ -32,11 +33,11 @@ type ClientConfig struct {
 	ExecutionHeaders map[string]string `yaml:"executionHeaders"`
 }
 
-func NewClientPool() (*ClientPool, error) {
+func NewClientPool(logger logrus.FieldLogger) (*ClientPool, error) {
 	consensusPool, err := consensus.NewPool(&consensus.PoolConfig{
 		FollowDistance: 10,
 		ForkDistance:   1,
-	})
+	}, logger.WithField("module", "consensus"))
 	if err != nil {
 		return nil, fmt.Errorf("could not init consensus pool: %w", err)
 	}
@@ -44,12 +45,13 @@ func NewClientPool() (*ClientPool, error) {
 	executionPool, err := execution.NewPool(&execution.PoolConfig{
 		FollowDistance: 10,
 		ForkDistance:   1,
-	})
+	}, logger.WithField("module", "execution"))
 	if err != nil {
 		return nil, fmt.Errorf("could not init execution pool: %w", err)
 	}
 
 	return &ClientPool{
+		logger:        logger.WithField("module", "clients"),
 		consensusPool: consensusPool,
 		executionPool: executionPool,
 		clients:       make([]*PoolClient, 0),
@@ -95,19 +97,19 @@ func (pool *ClientPool) processConsensusBlockNotification(poolClient *PoolClient
 	for block := range subscription.Channel() {
 		versionedBlock := block.AwaitBlock(context.Background(), 2*time.Second)
 		if versionedBlock == nil {
-			logrus.Warnf("cl/el block notification failed: AwaitBlock timeout (client: %v, slot: %v, root: 0x%x)", poolClient.Config.Name, block.Slot, block.Root)
+			pool.logger.Warnf("cl/el block notification failed: AwaitBlock timeout (client: %v, slot: %v, root: 0x%x)", poolClient.Config.Name, block.Slot, block.Root)
 			break
 		}
 
 		hash, err := versionedBlock.ExecutionBlockHash()
 		if err != nil {
-			logrus.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
+			pool.logger.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
 			break
 		}
 
 		number, err := versionedBlock.ExecutionBlockNumber()
 		if err != nil {
-			logrus.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
+			pool.logger.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
 			break
 		}
 

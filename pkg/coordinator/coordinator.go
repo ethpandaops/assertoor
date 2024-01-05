@@ -54,7 +54,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		Info("starting coordinator")
 
 	// init client pool
-	clientPool, err := clients.NewClientPool()
+	clientPool, err := clients.NewClientPool(c.log)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	}
 
 	// load validator names
-	c.validatorNames = names.NewValidatorNames(c.Config.ValidatorNames)
+	c.validatorNames = names.NewValidatorNames(c.Config.ValidatorNames, c.log)
 	c.validatorNames.LoadValidatorNames()
 
 	// load tests

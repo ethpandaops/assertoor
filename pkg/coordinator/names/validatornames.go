@@ -16,17 +16,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var logger = logrus.StandardLogger().WithField("module", "names")
-
 type ValidatorNames struct {
 	config     *Config
+	logger     logrus.FieldLogger
 	namesMutex sync.RWMutex
 	names      map[uint64]string
 }
 
-func NewValidatorNames(config *Config) *ValidatorNames {
+func NewValidatorNames(config *Config, logger logrus.FieldLogger) *ValidatorNames {
 	return &ValidatorNames{
 		config: config,
+		logger: logger.WithField("module", "names"),
 	}
 }
 
@@ -53,21 +53,21 @@ func (vn *ValidatorNames) LoadValidatorNames() {
 	if vn.config.InventoryYaml != "" {
 		err := vn.loadFromYaml(vn.config.InventoryYaml)
 		if err != nil {
-			logger.WithError(err).Errorf("error while loading validator names from yaml")
+			vn.logger.WithError(err).Errorf("error while loading validator names from yaml")
 		}
 	}
 
 	if vn.config.InventoryURL != "" {
 		err := vn.loadFromRangesAPI(vn.config.InventoryURL)
 		if err != nil {
-			logger.WithError(err).Errorf("error while loading validator names inventory")
+			vn.logger.WithError(err).Errorf("error while loading validator names inventory")
 		}
 	}
 
 	if vn.config.Inventory != nil {
 		nameCount := vn.parseNamesMap(vn.config.Inventory)
 		if nameCount > 0 {
-			logger.Infof("loaded %v validator names from config", nameCount)
+			vn.logger.Infof("loaded %v validator names from config", nameCount)
 		}
 	}
 }
@@ -88,7 +88,7 @@ func (vn *ValidatorNames) loadFromYaml(fileName string) error {
 	}
 
 	nameCount := vn.parseNamesMap(namesYaml)
-	logger.Infof("loaded %v validator names from yaml (%v)", nameCount, fileName)
+	vn.logger.Infof("loaded %v validator names from yaml (%v)", nameCount, fileName)
 
 	return nil
 }
@@ -126,7 +126,7 @@ type validatorNamesRangesResponse struct {
 }
 
 func (vn *ValidatorNames) loadFromRangesAPI(apiURL string) error {
-	logger.Debugf("Loading validator names from inventory: %v", apiURL)
+	vn.logger.Debugf("Loading validator names from inventory: %v", apiURL)
 
 	client := &http.Client{Timeout: time.Second * 120}
 	resp, err := client.Get(apiURL)
@@ -139,7 +139,7 @@ func (vn *ValidatorNames) loadFromRangesAPI(apiURL string) error {
 
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {
-			logger.Errorf("could not fetch inventory (%v): not found", getRedactedURL(apiURL))
+			vn.logger.Errorf("could not fetch inventory (%v): not found", getRedactedURL(apiURL))
 			return nil
 		}
 
@@ -180,7 +180,7 @@ func (vn *ValidatorNames) loadFromRangesAPI(apiURL string) error {
 		}
 	}
 
-	logger.Infof("loaded %v validator names from inventory api (%v)", nameCount, getRedactedURL(apiURL))
+	vn.logger.Infof("loaded %v validator names from inventory api (%v)", nameCount, getRedactedURL(apiURL))
 
 	return nil
 }

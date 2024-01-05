@@ -62,7 +62,7 @@ func (pool *Pool) newPoolClient(clientIdx uint16, endpoint *ClientConfig) (*Clie
 		endpointConfig: endpoint,
 		rpcClient:      rpcClient,
 		updateChan:     make(chan *clientBlockNotification, 10),
-		logger:         logrus.WithField("client", endpoint.Name),
+		logger:         pool.logger.WithField("client", endpoint.Name),
 	}
 	client.resetContext()
 

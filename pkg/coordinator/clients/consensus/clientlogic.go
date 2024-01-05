@@ -11,13 +11,12 @@ import (
 	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus/rpc"
-	"github.com/sirupsen/logrus"
 )
 
 func (client *Client) runClientLoop() {
 	defer func() {
 		if err := recover(); err != nil {
-			logrus.WithError(err.(error)).Errorf("uncaught panic in PoolClient.runPoolClientLoop subroutine: %v, stack: %v", err, string(debug.Stack()))
+			client.logger.WithError(err.(error)).Errorf("uncaught panic in PoolClient.runPoolClientLoop subroutine: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 

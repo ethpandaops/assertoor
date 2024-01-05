@@ -38,7 +38,7 @@ type BlockCache struct {
 	wallclockSlotDispatcher  Dispatcher[*ethwallclock.Slot]
 }
 
-func NewBlockCache(followDistance uint64) (*BlockCache, error) {
+func NewBlockCache(logger logrus.FieldLogger, followDistance uint64) (*BlockCache, error) {
 	if followDistance == 0 {
 		return nil, fmt.Errorf("cannot initialize block cache without follow distance")
 	}
@@ -52,7 +52,7 @@ func NewBlockCache(followDistance uint64) (*BlockCache, error) {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				logrus.WithError(err.(error)).Errorf("uncaught panic in BlockCache.runCacheCleanup subroutine: %v, stack: %v", err, string(debug.Stack()))
+				logger.WithError(err.(error)).Errorf("uncaught panic in BlockCache.runCacheCleanup subroutine: %v, stack: %v", err, string(debug.Stack()))
 			}
 		}()
 		cache.runCacheCleanup()
