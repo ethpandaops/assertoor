@@ -66,14 +66,8 @@ func (ec *ExecutionClient) GetChainSpec(ctx context.Context) (*ChainSpec, error)
 		return nil, err
 	}
 
-	networkID, err := ec.ethClient.NetworkID(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	return &ChainSpec{
-		ChainID:   chainID.String(),
-		NetworkID: networkID.String(),
+		ChainID: chainID.String(),
 	}, nil
 }
 

@@ -5,8 +5,7 @@ import (
 )
 
 type ChainSpec struct {
-	NetworkID string
-	ChainID   string
+	ChainID string
 }
 
 func (chain *ChainSpec) CheckMismatch(chain2 *ChainSpec) []string {
