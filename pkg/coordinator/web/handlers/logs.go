@@ -30,6 +30,7 @@ func (fh *FrontendHandler) LogsData(w http.ResponseWriter, r *http.Request) {
 	sinceTime, err := strconv.ParseInt(vars["since"], 10, 64)
 	if err != nil {
 		fmt.Printf("err: %v", err)
+
 		sinceTime = 0
 	}
 
