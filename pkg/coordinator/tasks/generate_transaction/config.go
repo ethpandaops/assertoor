@@ -21,6 +21,7 @@ type Config struct {
 
 	ClientPattern string `yaml:"clientPattern" json:"clientPattern"`
 
+	AwaitReceipt  bool `yaml:"awaitReceipt" json:"awaitReceipt"`
 	FailOnReject  bool `yaml:"failOnReject" json:"failOnReject"`
 	FailOnSuccess bool `yaml:"failOnSuccess" json:"failOnSuccess"`
 	ExpectEvents  []struct {
@@ -29,14 +30,18 @@ type Config struct {
 		Topic2 string `yaml:"topic2" json:"topic2"`
 		Data   string `yaml:"data" json:"data"`
 	} `yaml:"expectEvents" json:"expectEvents"`
+
+	TransactionHashResultVar string `yaml:"transactionHashResultVar" json:"transactionHashResultVar"`
+	ContractAddressResultVar string `yaml:"contractAddressResultVar" json:"contractAddressResultVar"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		FeeCap:   big.NewInt(100000000000), // 100 Gwei
-		TipCap:   big.NewInt(1000000000),   // 1 Gwei
-		GasLimit: 50000,
-		Amount:   big.NewInt(0),
+		FeeCap:       big.NewInt(100000000000), // 100 Gwei
+		TipCap:       big.NewInt(1000000000),   // 1 Gwei
+		GasLimit:     50000,
+		Amount:       big.NewInt(0),
+		AwaitReceipt: true,
 	}
 }
 

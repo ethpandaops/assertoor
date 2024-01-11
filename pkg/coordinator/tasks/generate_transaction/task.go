@@ -156,54 +156,64 @@ func (t *Task) Execute(ctx context.Context) error {
 		return err
 	}
 
-	receipt, err := t.wallet.AwaitTransaction(ctx, tx)
-	if err != nil {
-		t.logger.Warnf("failed waiting for tx receipt: %v", err)
-		return fmt.Errorf("failed waiting for tx receipt: %v", err)
+	if t.config.TransactionHashResultVar != "" {
+		t.ctx.Vars.SetVar(t.config.TransactionHashResultVar, tx.Hash().Hex())
 	}
 
-	if receipt == nil {
-		return fmt.Errorf("tx receipt not found")
-	}
+	if t.config.AwaitReceipt {
+		receipt, err := t.wallet.AwaitTransaction(ctx, tx)
+		if err != nil {
+			t.logger.Warnf("failed waiting for tx receipt: %v", err)
+			return fmt.Errorf("failed waiting for tx receipt: %v", err)
+		}
 
-	t.logger.Infof("transaction %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
+		if receipt == nil {
+			return fmt.Errorf("tx receipt not found")
+		}
 
-	if t.config.FailOnSuccess && receipt.Status > 0 {
-		return fmt.Errorf("transaction succeeded, but expected rejection")
-	}
+		t.logger.Infof("transaction %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
 
-	if t.config.FailOnReject && receipt.Status == 0 {
-		return fmt.Errorf("transaction rejected, but expected success")
-	}
+		if t.config.FailOnSuccess && receipt.Status > 0 {
+			return fmt.Errorf("transaction succeeded, but expected rejection")
+		}
 
-	if len(t.config.ExpectEvents) > 0 {
-		for _, expectedEvent := range t.config.ExpectEvents {
-			foundEvent := false
+		if t.config.FailOnReject && receipt.Status == 0 {
+			return fmt.Errorf("transaction rejected, but expected success")
+		}
 
-			for _, log := range receipt.Logs {
-				if expectedEvent.Topic0 != "" && (len(log.Topics) < 1 || !bytes.Equal(common.FromHex(expectedEvent.Topic0), log.Topics[0][:])) {
-					continue
+		if t.config.ContractAddressResultVar != "" {
+			t.ctx.Vars.SetVar(t.config.ContractAddressResultVar, receipt.ContractAddress.Hex())
+		}
+
+		if len(t.config.ExpectEvents) > 0 {
+			for _, expectedEvent := range t.config.ExpectEvents {
+				foundEvent := false
+
+				for _, log := range receipt.Logs {
+					if expectedEvent.Topic0 != "" && (len(log.Topics) < 1 || !bytes.Equal(common.FromHex(expectedEvent.Topic0), log.Topics[0][:])) {
+						continue
+					}
+
+					if expectedEvent.Topic1 != "" && (len(log.Topics) < 2 || !bytes.Equal(common.FromHex(expectedEvent.Topic1), log.Topics[1][:])) {
+						continue
+					}
+
+					if expectedEvent.Topic2 != "" && (len(log.Topics) < 3 || !bytes.Equal(common.FromHex(expectedEvent.Topic2), log.Topics[2][:])) {
+						continue
+					}
+
+					if expectedEvent.Data != "" && !bytes.Equal(common.FromHex(expectedEvent.Data), log.Data) {
+						continue
+					}
+
+					foundEvent = true
+
+					break
 				}
 
-				if expectedEvent.Topic1 != "" && (len(log.Topics) < 2 || !bytes.Equal(common.FromHex(expectedEvent.Topic1), log.Topics[1][:])) {
-					continue
+				if !foundEvent {
+					return fmt.Errorf("expected event not fired: %v", expectedEvent)
 				}
-
-				if expectedEvent.Topic2 != "" && (len(log.Topics) < 3 || !bytes.Equal(common.FromHex(expectedEvent.Topic2), log.Topics[2][:])) {
-					continue
-				}
-
-				if expectedEvent.Data != "" && !bytes.Equal(common.FromHex(expectedEvent.Data), log.Data) {
-					continue
-				}
-
-				foundEvent = true
-
-				break
-			}
-
-			if !foundEvent {
-				return fmt.Errorf("expected event not fired: %v", expectedEvent)
 			}
 		}
 	}
