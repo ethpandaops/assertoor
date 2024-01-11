@@ -79,6 +79,7 @@ func (ws *WebServer) StartFrontend(config *types.FrontendConfig, coordinator coo
 		ws.router.HandleFunc("/", frontendHandler.Index).Methods("GET")
 		ws.router.HandleFunc("/test/{testIdx}", frontendHandler.Test).Methods("GET")
 		ws.router.HandleFunc("/clients", frontendHandler.Clients).Methods("GET")
+		ws.router.HandleFunc("/logs/{since}", frontendHandler.LogsData).Methods("GET")
 
 		ws.router.PathPrefix("/").Handler(frontend)
 	}

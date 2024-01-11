@@ -117,3 +117,15 @@ func (ls *LogScope) GetLogEntries() []*logrus.Entry {
 
 	return entries
 }
+
+func (ls *LogScope) GetLogEntriesSince(since int64) []*logrus.Entry {
+	entries := ls.GetLogEntries()
+
+	for idx, entry := range entries {
+		if entry.Time.UnixNano() > since {
+			return entries[idx:]
+		}
+	}
+
+	return []*logrus.Entry{}
+}

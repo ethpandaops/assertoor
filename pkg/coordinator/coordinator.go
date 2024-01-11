@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
@@ -25,7 +26,7 @@ import (
 type Coordinator struct {
 	// Config is the coordinator configuration.
 	Config          *Config
-	log             logrus.FieldLogger
+	log             *logger.LogScope
 	clientPool      *clients.ClientPool
 	walletManager   *wallet.Manager
 	webserver       *server.WebServer
@@ -37,7 +38,10 @@ type Coordinator struct {
 
 func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, lameDuckSeconds int) *Coordinator {
 	return &Coordinator{
-		log:             log,
+		log: logger.NewLogger(&logger.ScopeOptions{
+			Parent:      log,
+			HistorySize: 5000,
+		}),
 		Config:          config,
 		tests:           []types.Test{},
 		metricsPort:     metricsPort,
@@ -47,20 +51,20 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, lameDuc
 
 // Run executes the coordinator until completion.
 func (c *Coordinator) Run(ctx context.Context) error {
-	c.log.
+	c.log.GetLogger().
 		WithField("build_version", buildinfo.GetVersion()).
 		WithField("metrics_port", c.metricsPort).
 		WithField("lame_duck_seconds", c.lameDuckSeconds).
 		Info("starting coordinator")
 
 	// init client pool
-	clientPool, err := clients.NewClientPool(c.log)
+	clientPool, err := clients.NewClientPool(c.log.GetLogger())
 	if err != nil {
 		return err
 	}
 
 	c.clientPool = clientPool
-	c.walletManager = wallet.NewManager(clientPool.GetExecutionPool(), c.log.WithField("module", "wallet"))
+	c.walletManager = wallet.NewManager(clientPool.GetExecutionPool(), c.log.GetLogger().WithField("module", "wallet"))
 
 	for idx := range c.Config.Endpoints {
 		err = clientPool.AddClient(&c.Config.Endpoints[idx])
@@ -71,7 +75,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 
 	// init webserver
 	if c.Config.Web != nil && c.Config.Web.Server != nil {
-		c.webserver, err = server.NewWebServer(c.Config.Web.Server, c.log)
+		c.webserver, err = server.NewWebServer(c.Config.Web.Server, c.log.GetLogger())
 		if err != nil {
 			return err
 		}
@@ -94,7 +98,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	}
 
 	// load validator names
-	c.validatorNames = names.NewValidatorNames(c.Config.ValidatorNames, c.log)
+	c.validatorNames = names.NewValidatorNames(c.Config.ValidatorNames, c.log.GetLogger())
 	c.validatorNames.LoadValidatorNames()
 
 	// load tests
@@ -103,25 +107,29 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		return err
 	}
 
-	c.log.Infof("Loaded %v tests", len(c.tests))
+	c.log.GetLogger().Infof("Loaded %v tests", len(c.tests))
 
 	// run tests
 	c.runTests(ctx)
 
 	if c.webserver == nil {
-		c.log.WithField("seconds", c.lameDuckSeconds).Info("Initiating lame duck")
+		c.log.GetLogger().WithField("seconds", c.lameDuckSeconds).Info("Initiating lame duck")
 		time.Sleep(time.Duration(c.lameDuckSeconds) * time.Second)
-		c.log.Info("lame duck complete")
+		c.log.GetLogger().Info("lame duck complete")
 	} else {
 		<-ctx.Done()
 	}
 
-	c.log.Info("Shutting down..")
+	c.log.GetLogger().Info("Shutting down..")
 
 	return nil
 }
 
 func (c *Coordinator) Logger() logrus.FieldLogger {
+	return c.log.GetLogger()
+}
+
+func (c *Coordinator) LogScope() *logger.LogScope {
 	return c.log
 }
 
@@ -149,7 +157,7 @@ func (c *Coordinator) GetTests() []types.Test {
 }
 
 func (c *Coordinator) startMetrics() error {
-	c.log.
+	c.log.GetLogger().
 		Info(fmt.Sprintf("Starting metrics server on :%v", c.metricsPort))
 
 	http.Handle("/metrics", promhttp.Handler())
