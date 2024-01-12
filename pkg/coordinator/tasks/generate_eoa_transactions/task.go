@@ -160,14 +160,6 @@ func (t *Task) Execute(ctx context.Context) error {
 	totalCount := 0
 
 	for {
-		if pendingChan != nil {
-			select {
-			case <-ctx.Done():
-				return nil
-			case pendingChan <- true:
-			}
-		}
-
 		txIndex := t.txIndex
 		t.txIndex++
 
@@ -185,6 +177,14 @@ func (t *Task) Execute(ctx context.Context) error {
 		if err != nil {
 			t.logger.Errorf("error generating transaction: %v", err.Error())
 		} else {
+			if pendingChan != nil {
+				select {
+				case <-ctx.Done():
+					return nil
+				case pendingChan <- true:
+				}
+			}
+
 			perBlockCount++
 			totalCount++
 		}
@@ -317,13 +317,21 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		}
 	}
 
-	client := clients[transactionIdx%uint64(len(clients))]
+	err = nil
 
-	t.logger.WithFields(logrus.Fields{
-		"client": client.GetName(),
-	}).Infof("sending tx %v: %v", transactionIdx, tx.Hash().Hex())
+	for i := 0; i < len(clients); i++ {
+		client := clients[(transactionIdx+uint64(i))%uint64(len(clients))]
 
-	err = client.GetRPCClient().SendTransaction(ctx, tx)
+		t.logger.WithFields(logrus.Fields{
+			"client": client.GetName(),
+		}).Infof("sending tx %v: %v", transactionIdx, tx.Hash().Hex())
+
+		err = client.GetRPCClient().SendTransaction(ctx, tx)
+		if err == nil {
+			break
+		}
+	}
+
 	if err != nil {
 		return err
 	}
