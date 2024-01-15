@@ -19,10 +19,12 @@ import (
 type Wallet struct {
 	manager *Manager
 
-	address   common.Address
-	privkey   *ecdsa.PrivateKey
-	isReady   bool
-	readyChan chan bool
+	address      common.Address
+	privkey      *ecdsa.PrivateKey
+	isReady      bool
+	isSyncing    bool
+	readyChan    chan bool
+	syncingMutex sync.Mutex
 
 	txBuildMutex   sync.Mutex
 	pendingNonce   uint64
@@ -52,6 +54,20 @@ func (manager *Manager) newWallet(address common.Address) *Wallet {
 }
 
 func (wallet *Wallet) loadState() {
+	wallet.syncingMutex.Lock()
+	alreadySyncing := false
+
+	if wallet.isSyncing {
+		alreadySyncing = true
+	} else {
+		wallet.isSyncing = true
+	}
+	wallet.syncingMutex.Unlock()
+
+	if alreadySyncing {
+		return
+	}
+
 	wallet.readyChan = make(chan bool)
 
 	go func() {
@@ -85,12 +101,17 @@ func (wallet *Wallet) loadState() {
 			wallet.pendingBalance = new(big.Int).Set(balance)
 			wallet.confirmedBalance = new(big.Int).Set(balance)
 			wallet.isReady = true
+			wallet.isSyncing = false
 			close(wallet.readyChan)
 			cancel()
 
 			break
 		}
 	}()
+}
+
+func (wallet *Wallet) ResyncState() {
+	wallet.loadState()
 }
 
 func (wallet *Wallet) GetAddress() common.Address {

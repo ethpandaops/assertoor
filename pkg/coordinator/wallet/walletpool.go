@@ -143,7 +143,7 @@ func (pool *WalletPool) EnsureFunding(ctx context.Context, minBalance, refillAmo
 
 	sentIdx := uint64(0)
 	headFork := pool.manager.clientPool.GetCanonicalFork(0)
-	client := headFork.ReadyClients[0]
+	clients := headFork.ReadyClients
 	txChan := make(chan bool, pendingLimit)
 	txWg := sync.WaitGroup{}
 
@@ -157,9 +157,17 @@ func (pool *WalletPool) EnsureFunding(ctx context.Context, minBalance, refillAmo
 		tx := refillTxs[sentIdx]
 		sentIdx++
 
-		err := client.GetRPCClient().SendTransaction(ctx, tx)
+		var err error
+
+		for i := 0; i < len(clients); i++ {
+			err = clients[i].GetRPCClient().SendTransaction(ctx, tx)
+			if err == nil {
+				break
+			}
+		}
+
 		if err != nil {
-			pool.logger.Warnf("failed sensing child wallet refill tx: %v", err)
+			pool.logger.Warnf("failed sending child wallet refill tx: %v", err)
 			refillError = err
 
 			break

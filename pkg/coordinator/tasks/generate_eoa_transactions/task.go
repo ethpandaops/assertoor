@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -333,6 +334,9 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 	}
 
 	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "nonce") {
+			txWallet.ResyncState()
+		}
 		return err
 	}
 
