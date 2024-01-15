@@ -145,13 +145,21 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	client := clients[0]
+	err = nil
 
-	t.logger.WithFields(logrus.Fields{
-		"client": client.GetName(),
-	}).Infof("sending tx: %v", tx.Hash().Hex())
+	for i := 0; i < len(clients); i++ {
+		client := clients[i%len(clients)]
 
-	err = client.GetRPCClient().SendTransaction(ctx, tx)
+		t.logger.WithFields(logrus.Fields{
+			"client": client.GetName(),
+		}).Infof("sending tx: %v", tx.Hash().Hex())
+
+		err = client.GetRPCClient().SendTransaction(ctx, tx)
+		if err == nil {
+			break
+		}
+	}
+
 	if err != nil {
 		return err
 	}
