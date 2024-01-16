@@ -10,6 +10,7 @@ import (
 	checkconsensusforks "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_forks"
 	checkconsensusproposerduty "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_proposer_duty"
 	checkconsensusreorgs "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_reorgs"
+	checkconsensusslotrange "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_slot_range"
 	checkconsensussyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_sync_status"
 	checkconsensusvalidatorstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_validator_status"
 	checkexecutionsyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_execution_sync_status"
@@ -38,6 +39,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkconsensusforks.TaskDescriptor,
 	checkconsensusproposerduty.TaskDescriptor,
 	checkconsensusreorgs.TaskDescriptor,
+	checkconsensusslotrange.TaskDescriptor,
 	checkconsensussyncstatus.TaskDescriptor,
 	checkconsensusvalidatorstatus.TaskDescriptor,
 	checkexecutionsyncstatus.TaskDescriptor,

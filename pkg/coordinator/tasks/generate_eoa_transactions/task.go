@@ -337,6 +337,7 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		if strings.Contains(strings.ToLower(err.Error()), "nonce") {
 			txWallet.ResyncState()
 		}
+
 		return err
 	}
 
