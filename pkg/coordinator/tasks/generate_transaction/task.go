@@ -121,6 +121,7 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
+//nolint:gocyclo // ignore
 func (t *Task) Execute(ctx context.Context) error {
 	tx, err := t.generateTransaction(ctx)
 	if err != nil {
