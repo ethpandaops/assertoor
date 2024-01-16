@@ -1,0 +1,61 @@
+name: "State Bloat"
+timeout: 1h
+config:
+  #walletPrivkey: ""
+  #validatorPairNames: []
+  #clientPairNames: []
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: run_task_background
+  title: "Bloat state while epoch <= 100"
+  config:
+    exitOnForegroundSuccess: true
+    exitOnForegroundFailure: true
+    OnBackgroundComplete: "fail"
+    foregroundTask:
+      name: check_sonsensus_slot_range
+      title: "Check if epoch <= 100"
+      config:
+        minEpochNumber: 100
+
+    backgroundTask:
+      name: run_tasks_concurrent
+      title: "Bloat chain state"
+      config:
+        succeedTaskCount: 1
+        tasks:
+        - name: generate_eoa_transactions
+          title: "Generate 1000 EOA transaction per block"
+          config:
+            childWallets: 1000
+            walletSeed: "eoa1"
+            limitPending: 1000
+            limitPerBlock: 1000
+            randomTarget: true
+            amount: 1000000
+            randomAmount: true
+          configVars:
+            privateKey: "walletPrivkey"
+        - name: generate_eoa_transactions
+          title: "Generate 500 legacy EOA transaction per block"
+          config:
+            childWallets: 500
+            walletSeed: "eoa2"
+            limitPending: 500
+            limitPerBlock: 500
+            randomTarget: true
+            amount: 1000000
+            randomAmount: true
+            legacyTxType: true
+          configVars:
+            privateKey: "walletPrivkey"
+
+- name: "sleep"
+  title: "Wait 30sec to clear up pending transactions"
+  config:
+    duration: 30s
