@@ -110,4 +110,8 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 			}
 		}
 	}
+
+	for _, wallet := range wallets {
+		wallet.processStaleConfirmations(block)
+	}
 }

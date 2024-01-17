@@ -32,6 +32,7 @@ type Wallet struct {
 
 	confirmedNonce   uint64
 	confirmedBalance *big.Int
+	lastConfirmation uint64
 
 	txNonceChans map[uint64]*nonceStatus
 	txNonceMutex sync.Mutex
@@ -246,6 +247,8 @@ func (wallet *Wallet) processTransactionInclusion(block *execution.Block, tx *ty
 		return
 	}
 
+	wallet.lastConfirmation = block.Number
+
 	if receipt != nil {
 		wallet.confirmedBalance = wallet.confirmedBalance.Sub(wallet.confirmedBalance, tx.Value())
 		txFee := new(big.Int).Mul(receipt.EffectiveGasPrice, big.NewInt(int64(receipt.GasUsed)))
@@ -268,6 +271,38 @@ func (wallet *Wallet) processTransactionInclusion(block *execution.Block, tx *ty
 	if wallet.confirmedNonce > wallet.pendingNonce {
 		wallet.pendingNonce = wallet.confirmedNonce
 		wallet.pendingBalance = new(big.Int).Set(wallet.confirmedBalance)
+	}
+}
+
+func (wallet *Wallet) processStaleConfirmations(block *execution.Block) {
+	if !wallet.isReady {
+		return
+	}
+
+	if len(wallet.txNonceChans) > 0 && block.Number > wallet.lastConfirmation+10 {
+		wallet.lastConfirmation = block.Number
+		clients := block.GetSeenBy()
+		client := clients[0]
+
+		lastNonce, err := client.GetRPCClient().GetNonceAt(context.Background(), wallet.address, big.NewInt(int64(block.Number)))
+		if err != nil {
+			return
+		}
+
+		wallet.txNonceMutex.Lock()
+		defer wallet.txNonceMutex.Unlock()
+
+		if wallet.confirmedNonce >= lastNonce {
+			return
+		}
+
+		for n := range wallet.txNonceChans {
+			if n < lastNonce {
+				logrus.WithError(err).Warnf("recovering stale confirmed transactions for %v (nonce %v)", wallet.address.String(), n)
+				close(wallet.txNonceChans[n].channel)
+				delete(wallet.txNonceChans, n)
+			}
+		}
 	}
 }
 
