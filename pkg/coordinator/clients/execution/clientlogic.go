@@ -118,7 +118,21 @@ func (client *Client) runClientLogic() error {
 
 		select {
 		case updateNotification := <-client.updateChan:
-			err := client.processBlock(updateNotification.hash, updateNotification.number, nil, "notified")
+			var err error
+
+			retryCount := 0
+
+			for retryCount < 3 {
+				err = client.processBlock(updateNotification.hash, updateNotification.number, nil, "notified")
+				if err == nil {
+					break
+				}
+
+				retryCount++
+
+				time.Sleep(1 * time.Second)
+			}
+
 			if err != nil {
 				client.logger.Warnf("error processing execution block update: %v", err)
 			} else {
