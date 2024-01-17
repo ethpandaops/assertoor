@@ -134,7 +134,7 @@ func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskEx
 		parentState: parentState,
 		taskVars:    variables,
 		logger: logger.NewLogger(&logger.ScopeOptions{
-			Parent:      ts.logger.WithField("task", taskDescriptor.Name),
+			Parent:      ts.logger.WithField("task", taskDescriptor.Name).WithField("taskidx", taskIdx),
 			HistorySize: 1000,
 		}),
 	}
