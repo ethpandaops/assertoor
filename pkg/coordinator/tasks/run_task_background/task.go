@@ -138,6 +138,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	result := <-t.resultChan
 	t.ctx.SetResult(result.result)
+
+	t.resultChanMtx.Lock()
+	t.resultChan = nil
+	t.resultChanMtx.Unlock()
 	cancel()
 
 	<-t.foregroundChan
@@ -196,10 +200,6 @@ func (t *Task) execForegroundTask(ctx context.Context) {
 	err := t.ctx.Scheduler.ExecuteTask(ctx, t.foregroundTask, func(ctx context.Context, cancelFn context.CancelFunc, _ types.Task) {
 		t.watchTaskResult(ctx, cancelFn)
 	})
-
-	if ctx.Err() != nil {
-		return
-	}
 
 	taskResult := t.ctx.Scheduler.GetTaskStatus(t.foregroundTask)
 

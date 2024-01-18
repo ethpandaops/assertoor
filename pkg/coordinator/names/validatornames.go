@@ -49,6 +49,10 @@ func (vn *ValidatorNames) LoadValidatorNames() {
 
 	vn.names = make(map[uint64]string)
 
+	if vn.config == nil {
+		return
+	}
+
 	// load names
 	if vn.config.InventoryYaml != "" {
 		err := vn.loadFromYaml(vn.config.InventoryYaml)
