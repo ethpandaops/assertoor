@@ -9,6 +9,8 @@ type Config struct {
 	PrivateKey string `yaml:"privateKey" json:"privateKey"`
 
 	LegacyTxType       bool     `yaml:"legacyTxType" json:"legacyTxType"`
+	BlobTxType         bool     `yaml:"blobTxType" json:"blobTxType"`
+	BlobFeeCap         *big.Int `yaml:"blobFeeCap" json:"blobFeeCap"`
 	FeeCap             *big.Int `yaml:"feeCap" json:"feeCap"`
 	TipCap             *big.Int `yaml:"tipCap" json:"tipCap"`
 	GasLimit           uint64   `yaml:"gasLimit" json:"gasLimit"`
@@ -16,6 +18,7 @@ type Config struct {
 	RandomTarget       bool     `yaml:"randomTarget" json:"randomTarget"`
 	ContractDeployment bool     `yaml:"contractDeployment" json:"contractDeployment"`
 	CallData           string   `yaml:"callData" json:"callData"`
+	BlobData           string   `yaml:"blobData" json:"blobData"`
 	RandomAmount       bool     `yaml:"randomAmount" json:"randomAmount"`
 	Amount             *big.Int `yaml:"amount" json:"amount"`
 

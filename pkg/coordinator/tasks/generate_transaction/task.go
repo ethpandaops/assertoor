@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -15,6 +16,8 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet/blobtx"
+	"github.com/holiman/uint256"
 	"github.com/sirupsen/logrus"
 )
 
@@ -263,7 +266,8 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 
 		var txObj ethtypes.TxData
 
-		if t.config.LegacyTxType {
+		switch {
+		case t.config.LegacyTxType:
 			txObj = &ethtypes.LegacyTx{
 				Nonce:    nonce,
 				GasPrice: t.config.FeeCap,
@@ -272,7 +276,34 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				Value:    txAmount,
 				Data:     txData,
 			}
-		} else {
+		case t.config.BlobTxType:
+			if toAddr == nil {
+				return nil, fmt.Errorf("contract deployment not supported with blob transactions")
+			}
+
+			blobData := t.config.BlobData
+			if blobData == "" {
+				blobData = "identifier"
+			}
+
+			blobHashes, blobSidecar, err := blobtx.GenerateBlobSidecar(strings.Split(blobData, ";"), 0, 0)
+			if err != nil {
+				return nil, err
+			}
+
+			txObj = &ethtypes.BlobTx{
+				Nonce:      nonce,
+				BlobFeeCap: uint256.MustFromBig(t.config.BlobFeeCap),
+				GasTipCap:  uint256.MustFromBig(t.config.TipCap),
+				GasFeeCap:  uint256.MustFromBig(t.config.FeeCap),
+				Gas:        t.config.GasLimit,
+				To:         *toAddr,
+				Value:      uint256.MustFromBig(txAmount),
+				Data:       txData,
+				BlobHashes: blobHashes,
+				Sidecar:    blobSidecar,
+			}
+		default:
 			txObj = &ethtypes.DynamicFeeTx{
 				ChainID:   t.ctx.Scheduler.GetCoordinator().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
 				Nonce:     nonce,
