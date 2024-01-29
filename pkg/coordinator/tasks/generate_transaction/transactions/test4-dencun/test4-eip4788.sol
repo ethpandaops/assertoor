@@ -25,11 +25,12 @@ contract EIP4788_Main {
 
 contract EIP4788_Child {
     function getBeaconRoot(uint256 time) public view returns (bytes32) {
+        uint256 zero = 0;
         assembly {
 			mstore(0, time)
 			let ok := staticcall(gas(), 0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02, 0, 32, 0, 32)
 			if iszero(ok) {
-				revert(0,0)
+                mstore(0, zero)
 			}
 			return(0, 32)
 		}
