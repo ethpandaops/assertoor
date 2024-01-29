@@ -70,6 +70,47 @@ tasks:
   configVars:
     privateKey: "walletPrivkey"
 
+- name: generate_transaction
+  title: "Generate test transaction with STOP opcode"
+  config:
+    feeCap: 5000000000 # 5 gwei
+    gasLimit: 100000
+    contractDeployment: true
+    callData: "006000388082803990f3"
+    awaitReceipt: false
+  configVars:
+    privateKey: "walletPrivkey"
+- name: generate_transaction
+  title: "Generate test transaction with RETURN opcode"
+  config:
+    feeCap: 5000000000 # 5 gwei
+    gasLimit: 100000
+    contractDeployment: true
+    callData: "61053960005260206000f3"
+    awaitReceipt: false
+  configVars:
+    privateKey: "walletPrivkey"
+- name: generate_transaction
+  title: "Generate test transaction with REVERT opcode"
+  config:
+    feeCap: 5000000000 # 5 gwei
+    gasLimit: 100000
+    contractDeployment: true
+    callData: "61053960005260206000fd"
+    awaitReceipt: false
+  configVars:
+    privateKey: "walletPrivkey"
+- name: generate_transaction
+  title: "Generate test transaction with INVALID opcode"
+  config:
+    feeCap: 5000000000 # 5 gwei
+    gasLimit: 100000
+    contractDeployment: true
+    callData: "610539600052fe"
+    awaitReceipt: false
+  configVars:
+    privateKey: "walletPrivkey"
+
 - name: run_tasks_concurrent
   title: "Check chain stability"
   timeout: 1h
