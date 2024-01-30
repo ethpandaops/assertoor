@@ -1,4 +1,5 @@
-# Assertoor: Ethereum Testnet Testing Tool
+<img align="left" src="./.github/resources/assertoor.png" width="60">
+<h1>Assertoor: Ethereum Testnet Testing Tool</h1>
 
 ## Overview
 Assertoor is a robust and versatile tool designed for comprehensive testing of the Ethereum network. It orchestrates a series of tests from a YAML file, with each test comprising a sequence of tasks executed in a defined order to assess various aspects of the Ethereum network.
@@ -27,19 +28,28 @@ Assertoor is a robust and versatile tool designed for comprehensive testing of t
 - **Web Interface for Monitoring**:\
   A user-friendly web interface displays real-time test and task status, logs, and results for easy monitoring and analysis.
 
-- **Web API**: 
+- **Web API**:\
   An API interface provides real-time test and task status, logs, and results for easy programmatic access. \
-  This feature enables seamless integration with other systems and facilitates automated monitoring and analysis workflows.\
+  This feature enables simple integration with other systems and facilitates automated monitoring and analysis workflows.\
   eg. for running [scheduled tests with github workflows](https://github.com/ethpandaops/assertoor-test)
 
 ## Getting Started
 
-1. **Configure Your Tests**:\
+1. **Clone the repository & build the tool**:
+    ```
+    git clone https://github.com/ethpandaops/assertoor.git
+    cd assertoor
+    make build
+    ```
+2. **Configure Your Tests**:\
    Prepare tests in a YAML file. See example configurations [here](https://github.com/ethpandaops/assertoor/tree/master/example/config). \
   Provide RPC URLs for at least one Client Pair (consensus & execution).
-2. **Run Assertoor**:\
+3. **Run Assertoor**:\
    Launch the tool to execute defined tests.
-3. **Monitor and Analyze**:\
+   ```
+   ./bin/assertoor --config=./example/config/check_proposals.yaml
+   ```
+4. **Monitor and Analyze**:\
    Use the web interface to track progress, view logs, and analyze results in real-time.
 
 ## Documentation and Examples
