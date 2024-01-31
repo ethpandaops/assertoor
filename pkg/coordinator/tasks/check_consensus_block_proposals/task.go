@@ -383,7 +383,7 @@ func (t *Task) checkBlockTransactions(block *consensus.Block, blockData *spec.Ve
 }
 
 func (t *Task) checkBlockBlobs(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	blobs, err := blockData.BlobKzgCommitments()
+	blobs, err := blockData.BlobKZGCommitments()
 	if err != nil {
 		t.logger.Warnf("could not get blobs for block %v [0x%x]: %v", block.Slot, block.Root, err)
 		return false
