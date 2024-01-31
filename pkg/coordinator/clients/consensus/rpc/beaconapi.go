@@ -408,6 +408,7 @@ func (bc *BeaconClient) GetCommitteeDuties(ctx context.Context, stateRef string,
 	}
 
 	epochRef := phase0.Epoch(epoch)
+
 	result, err := provider.BeaconCommittees(ctx, &api.BeaconCommitteesOpts{
 		State: stateRef,
 		Epoch: &epochRef,
