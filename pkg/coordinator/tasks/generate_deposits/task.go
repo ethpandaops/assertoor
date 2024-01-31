@@ -276,6 +276,13 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 		return fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
+	err = wallet.AwaitReady(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot load wallet state: %w", err)
+	}
+
+	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
+
 	tx, err := wallet.BuildTransaction(ctx, func(ctx context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
 		amount := big.NewInt(int64(data.Amount))
 		amount.Mul(amount, big.NewInt(1000000000))

@@ -126,6 +126,13 @@ func (t *Task) LoadConfig() error {
 
 //nolint:gocyclo // ignore
 func (t *Task) Execute(ctx context.Context) error {
+	err := t.wallet.AwaitReady(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot load wallet state: %w", err)
+	}
+
+	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
+
 	tx, err := t.generateTransaction(ctx)
 	if err != nil {
 		return err
