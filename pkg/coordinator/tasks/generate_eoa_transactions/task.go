@@ -132,6 +132,8 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	if t.walletPool != nil {
+		t.logger.Infof("funding wallet: %v [nonce: %v]  %v ETH", t.walletPool.GetRootWallet().GetAddress().Hex(), t.walletPool.GetRootWallet().GetNonce(), t.walletPool.GetRootWallet().GetReadableBalance(18, 0, 4, false, false))
+
 		err := t.ensureChildWalletFunding(ctx)
 		if err != nil {
 			t.logger.Infof("failed ensuring child wallet funding: %v", err)
@@ -139,10 +141,12 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 
 		for idx, wallet := range t.walletPool.GetChildWallets() {
-			t.logger.Infof("wallet #%v: %v [nonce: %v]", idx, wallet.GetAddress().Hex(), wallet.GetNonce())
+			t.logger.Infof("wallet #%v: %v [nonce: %v]  %v ETH", idx, wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
 		}
 
 		go t.runChildWalletFundingRoutine(ctx)
+	} else {
+		t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
 	}
 
 	var subscription *execution.Subscription[*execution.Block]
