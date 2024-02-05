@@ -142,6 +142,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		if err != nil {
 			t.logger.Errorf("error generating bls change: %v", err.Error())
 		} else {
+			t.ctx.SetResult(types.TaskResultSuccess)
 			perSlotCount++
 			totalCount++
 		}
