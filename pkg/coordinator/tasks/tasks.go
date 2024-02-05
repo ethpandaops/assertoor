@@ -16,6 +16,7 @@ import (
 	checkexecutionsyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_execution_sync_status"
 	generateblobtransactions "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_blob_transactions"
 	generateblschanges "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_bls_changes"
+	generatechildwallet "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_child_wallet"
 	generatedeposits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_deposits"
 	generateeoatransactions "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_eoa_transactions"
 	generateexits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_exits"
@@ -45,6 +46,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkexecutionsyncstatus.TaskDescriptor,
 	generateblobtransactions.TaskDescriptor,
 	generateblschanges.TaskDescriptor,
+	generatechildwallet.TaskDescriptor,
 	generateeoatransactions.TaskDescriptor,
 	generatedeposits.TaskDescriptor,
 	generateexits.TaskDescriptor,

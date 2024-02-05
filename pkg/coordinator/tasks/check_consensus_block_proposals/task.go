@@ -208,7 +208,7 @@ func (t *Task) checkBlockGraffiti(block *consensus.Block, blockData *spec.Versio
 	}
 
 	if !matched {
-		t.logger.Debugf("check failed for block %v [0x%x]: unmatched graffiti", block.Slot, block.Root)
+		t.logger.Infof("check failed for block %v [0x%x]: unmatched graffiti", block.Slot, block.Root)
 		return false
 	}
 
@@ -231,7 +231,7 @@ func (t *Task) checkBlockValidatorName(block *consensus.Block, blockData *spec.V
 	}
 
 	if !matched {
-		t.logger.Debugf("check failed for block %v [0x%x]: unmatched validator name", block.Slot, block.Root)
+		t.logger.Infof("check failed for block %v [0x%x]: unmatched validator name (have: %v, want: %v)", block.Slot, block.Root, validatorName, t.config.ValidatorNamePattern)
 		return false
 	}
 
@@ -246,7 +246,7 @@ func (t *Task) checkBlockAttestations(block *consensus.Block, blockData *spec.Ve
 	}
 
 	if len(attestations) < t.config.MinAttestationCount {
-		t.logger.Debugf("check failed for block %v [0x%x]: not enough attestations (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinAttestationCount, len(attestations))
+		t.logger.Infof("check failed for block %v [0x%x]: not enough attestations (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinAttestationCount, len(attestations))
 		return false
 	}
 
@@ -261,7 +261,7 @@ func (t *Task) checkBlockDeposits(block *consensus.Block, blockData *spec.Versio
 	}
 
 	if len(deposits) < t.config.MinDepositCount {
-		t.logger.Debugf("check failed for block %v [0x%x]: not enough deposits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinDepositCount, len(deposits))
+		t.logger.Infof("check failed for block %v [0x%x]: not enough deposits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinDepositCount, len(deposits))
 		return false
 	}
 
@@ -276,7 +276,7 @@ func (t *Task) checkBlockExits(block *consensus.Block, blockData *spec.Versioned
 	}
 
 	if len(exits) < t.config.MinExitCount {
-		t.logger.Debugf("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinExitCount, len(exits))
+		t.logger.Infof("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinExitCount, len(exits))
 		return false
 	}
 
@@ -298,7 +298,7 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 
 	slashingCount := len(attSlashings) + len(propSlashings)
 	if slashingCount < t.config.MinSlashingCount {
-		t.logger.Debugf("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinSlashingCount, slashingCount)
+		t.logger.Infof("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinSlashingCount, slashingCount)
 		return false
 	}
 
@@ -314,7 +314,7 @@ func (t *Task) checkBlockAttesterSlashings(block *consensus.Block, blockData *sp
 
 	slashingCount := len(attSlashings)
 	if slashingCount < t.config.MinAttesterSlashingCount {
-		t.logger.Debugf("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinAttesterSlashingCount, slashingCount)
+		t.logger.Infof("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinAttesterSlashingCount, slashingCount)
 		return false
 	}
 
@@ -330,7 +330,7 @@ func (t *Task) checkBlockProposerSlashings(block *consensus.Block, blockData *sp
 
 	slashingCount := len(propSlashings)
 	if slashingCount < t.config.MinProposerSlashingCount {
-		t.logger.Debugf("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinProposerSlashingCount, slashingCount)
+		t.logger.Infof("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinProposerSlashingCount, slashingCount)
 		return false
 	}
 
@@ -345,7 +345,7 @@ func (t *Task) checkBlockBlsChanges(block *consensus.Block, blockData *spec.Vers
 	}
 
 	if len(blsChanges) < t.config.MinBlsChangeCount {
-		t.logger.Debugf("check failed for block %v [0x%x]: not enough bls changes (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinBlsChangeCount, len(blsChanges))
+		t.logger.Infof("check failed for block %v [0x%x]: not enough bls changes (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinBlsChangeCount, len(blsChanges))
 		return false
 	}
 
@@ -360,7 +360,7 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 	}
 
 	if len(withdrawals) < t.config.MinWithdrawalCount {
-		t.logger.Debugf("check failed for block %v [0x%x]: not enough withdrawals (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinWithdrawalCount, len(withdrawals))
+		t.logger.Infof("check failed for block %v [0x%x]: not enough withdrawals (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinWithdrawalCount, len(withdrawals))
 		return false
 	}
 
@@ -375,7 +375,7 @@ func (t *Task) checkBlockTransactions(block *consensus.Block, blockData *spec.Ve
 	}
 
 	if len(transactions) < t.config.MinTransactionCount {
-		t.logger.Debugf("check failed for block %v [0x%x]: not enough transactions (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinTransactionCount, len(transactions))
+		t.logger.Infof("check failed for block %v [0x%x]: not enough transactions (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinTransactionCount, len(transactions))
 		return false
 	}
 
@@ -390,7 +390,7 @@ func (t *Task) checkBlockBlobs(block *consensus.Block, blockData *spec.Versioned
 	}
 
 	if len(blobs) < t.config.MinBlobCount {
-		t.logger.Debugf("check failed for block %v [0x%x]: not enough blobs (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinBlobCount, len(blobs))
+		t.logger.Infof("check failed for block %v [0x%x]: not enough blobs (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinBlobCount, len(blobs))
 		return false
 	}
 

@@ -120,12 +120,23 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// add env vars
 	for envName, varName := range t.config.EnvVars {
-		varValue, varFound := t.ctx.Vars.LookupVar(varName)
+		varValue, varFound, err2 := t.ctx.Vars.ResolveQuery(varName)
+		if err2 != nil {
+			cmdLogger.Errorf("failed parsing var query for env variable %v: %v", envName, err2)
+			return err2
+		}
+
 		if !varFound {
 			continue
 		}
 
-		command.Env = append(command.Env, fmt.Sprintf("%v=%v", envName, varValue))
+		varJSON, err3 := json.Marshal(varValue)
+		if err3 != nil {
+			cmdLogger.Errorf("failed encoding env variable %v: %v", envName, err3)
+			return err3
+		}
+
+		command.Env = append(command.Env, fmt.Sprintf("%v=%v", envName, string(varJSON)))
 	}
 
 	// start shell
@@ -197,9 +208,16 @@ func (t *Task) readOutputStream(pipe io.ReadCloser) chan string {
 }
 
 var outputVarPattern = regexp.MustCompile(`^::set-var +([^ ]+) +(.*)$`)
+var outputJSONPattern = regexp.MustCompile(`^::set-json +([^ ]+) +(.*)$`)
 
 func (t *Task) parseOutputVars(line string) {
 	match := outputVarPattern.FindStringSubmatch(line)
+	if match != nil {
+		t.ctx.Vars.SetVar(match[1], match[2])
+		t.logger.Infof("set variable %v: (string) %v", match[1], match[2])
+	}
+
+	match = outputJSONPattern.FindStringSubmatch(line)
 	if match != nil {
 		var varValue interface{}
 
@@ -208,7 +226,7 @@ func (t *Task) parseOutputVars(line string) {
 			t.logger.Warnf("error parsing ::set-var expression: %v", err.Error())
 		} else {
 			t.ctx.Vars.SetVar(match[1], varValue)
-			t.logger.Infof("set variable %v: %v", match[1], varValue)
+			t.logger.Infof("set variable %v: (json) %v", match[1], varValue)
 		}
 	}
 }

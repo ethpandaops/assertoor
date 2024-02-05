@@ -59,3 +59,16 @@ jobs:
 
     - name: Run tests
       run: go test -race -vet=off ./...
+
+    - name: Check if all tasks have a README.md
+      run: |
+        for taskdir in pkg/coordinator/tasks/*/; do
+          taskdir=${taskdir%*/}
+          taskname=${taskdir##*/}
+
+          if [[ ! -f "$taskdir/README.md" ]]; then
+            echo "Could not find $taskdir/README.md"
+            echo "Please add documentation for $taskname task"
+            exit 1
+          fi
+        done
