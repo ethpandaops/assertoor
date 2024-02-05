@@ -132,9 +132,14 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	if t.walletPool != nil {
+		err := t.walletPool.GetRootWallet().AwaitReady(ctx)
+		if err != nil {
+			return err
+		}
+
 		t.logger.Infof("funding wallet: %v [nonce: %v]  %v ETH", t.walletPool.GetRootWallet().GetAddress().Hex(), t.walletPool.GetRootWallet().GetNonce(), t.walletPool.GetRootWallet().GetReadableBalance(18, 0, 4, false, false))
 
-		err := t.ensureChildWalletFunding(ctx)
+		err = t.ensureChildWalletFunding(ctx)
 		if err != nil {
 			t.logger.Infof("failed ensuring child wallet funding: %v", err)
 			return err
@@ -146,6 +151,11 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		go t.runChildWalletFundingRoutine(ctx)
 	} else {
+		err := t.wallet.AwaitReady(ctx)
+		if err != nil {
+			return err
+		}
+
 		t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
 	}
 
