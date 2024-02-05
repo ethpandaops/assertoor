@@ -11,6 +11,9 @@ The `check_consensus_proposer_duty` task is designed to check for a specific pro
 - **`validatorIndex`**:\
   The index of a specific validator to be checked. If this is set, the task focuses on the validator with this index. If it is `null`, the task does not filter by a specific validator index.
 
+- **`minSlotDistance`**:\
+  The minimum slot distance from the current slot at which to start checking for the validator's proposer duty. A value of 0 indicates the current slot.
+
 - **`maxSlotDistance`**:\
   The maximum number of slots (individual time periods in the blockchain) within which the validator is expected to propose a block. The task succeeds if a matching validator is scheduled for block proposal within this slot distance.
 
