@@ -33,7 +33,11 @@ The `generate_deposits` task focuses on creating deposit transactions and sendin
   The maximum tip cap for each deposit transaction. This controls the tip or priority fee for each transaction.
 
 - **`clientPattern`**:\
-  A regex pattern for selecting a specific client endpoint to send the deposit transactions. If left empty, any available endpoint will be used.
+  A regex pattern to select specific client endpoints for sending deposit transactions. If left blank, any available endpoint will be used.
+
+- **`excludeClientPattern`**:\
+  A regex pattern to exclude certain clients from being used for deposit transactions. This parameter adds an extra layer of control over client selection.
+
 
 ### Defaults
 
@@ -52,4 +56,5 @@ Default settings for the `generate_deposits` task:
     depositTxFeeCap: 100000000000
     depositTxTipCap: 1000000000
     clientPattern: ""
+    excludeClientPattern: ""
 ```

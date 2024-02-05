@@ -21,7 +21,11 @@ The `generate_exits` task is designed to create and send voluntary exit transact
   The number of validator keys to generate from the mnemonic, determining how many unique exit transactions will be created.
 
 - **`clientPattern`**:\
-  A regex pattern for selecting a specific client endpoint for sending the exit transactions. If left empty, any available endpoint will be used.
+  A regex pattern for selecting specific client endpoints for sending the exit transactions. If left empty, any available endpoint will be used.
+
+- **`excludeClientPattern`**:\
+  A regex pattern to exclude certain client endpoints from being used for exit transactions. This parameter adds a layer of control by allowing the exclusion of specific clients, which can be useful for testing under various network scenarios.
+
 
 ### Defaults
 
@@ -36,4 +40,5 @@ Default settings for the `generate_exits` task:
     startIndex: 0
     indexCount: 0
     clientPattern: ""
+    excludeClientPattern: ""
 ```

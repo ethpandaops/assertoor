@@ -5,8 +5,8 @@ The `check_execution_sync_status` task checks the synchronization status of exec
 
 ### Configuration Parameters
 
-- **`clientNamePatterns`**:\
-  Regular expression patterns for selecting specific execution clients by name. The default pattern `".*"` targets all clients.
+- **`clientPattern`**:\
+  A regular expression pattern used to specify which clients to check. This allows for targeted health checks of specific clients or groups of clients within the network. A blank pattern targets all clients.
 
 - **`pollInterval`**:\
   The interval at which the task checks the clients' sync status. This defines the frequency of the synchronization checks.
@@ -33,7 +33,7 @@ These are the default settings for the `check_execution_sync_status` task:
 ```yaml
 - name: check_execution_sync_status
   config:
-    clientNamePatterns: [".*"]
+    clientPattern: ""
     pollInterval: 5s
     expectSyncing: false
     expectMinPercent: 100

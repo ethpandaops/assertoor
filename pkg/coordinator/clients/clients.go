@@ -132,16 +132,24 @@ func (pool *ClientPool) GetAllClients() []*PoolClient {
 	return clients
 }
 
-func (pool *ClientPool) GetClientsByNamePatterns(patterns []string) []*PoolClient {
+func (pool *ClientPool) GetClientsByNamePatterns(includePattern, excludePattern string) []*PoolClient {
 	clients := []*PoolClient{}
 	for _, client := range pool.clients {
-		for _, pattern := range patterns {
-			matched, _ := regexp.MatchString(pattern, client.Config.Name)
-			if matched {
-				clients = append(clients, client)
-				break
+		if includePattern != "" {
+			matched, _ := regexp.MatchString(includePattern, client.Config.Name)
+			if !matched {
+				continue
 			}
 		}
+
+		if excludePattern != "" {
+			matched, _ := regexp.MatchString(excludePattern, client.Config.Name)
+			if matched {
+				continue
+			}
+		}
+
+		clients = append(clients, client)
 	}
 
 	return clients

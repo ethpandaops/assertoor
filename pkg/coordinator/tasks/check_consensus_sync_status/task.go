@@ -105,7 +105,7 @@ func (t *Task) processCheck(ctx context.Context) {
 	allResultsPass := true
 	failedClients := []string{}
 
-	for _, client := range t.ctx.Scheduler.GetCoordinator().ClientPool().GetClientsByNamePatterns(t.config.ClientNamePatterns) {
+	for _, client := range t.ctx.Scheduler.GetCoordinator().ClientPool().GetClientsByNamePatterns(t.config.ClientPattern, "") {
 		var checkResult bool
 
 		checkLogger := t.logger.WithField("client", client.Config.Name)

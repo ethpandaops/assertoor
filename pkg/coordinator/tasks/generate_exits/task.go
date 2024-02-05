@@ -210,10 +210,10 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	var client *consensus.Client
 
 	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
-	if t.config.ClientPattern == "" {
+	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 	} else {
-		clients := clientPool.GetClientsByNamePatterns([]string{t.config.ClientPattern})
+		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(clients) == 0 {
 			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}

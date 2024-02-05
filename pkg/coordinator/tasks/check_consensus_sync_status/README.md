@@ -5,8 +5,8 @@ The `check_consensus_sync_status` task checks the synchronization status of cons
 
 ### Configuration Parameters
 
-- **`clientNamePatterns`**:\
-  Regex patterns for selecting specific consensus clients by name. The default `".*"` targets all clients.
+- **`clientPattern`**:\
+  A regular expression pattern used to specify which clients to check. This allows for targeted health checks of specific clients or groups of clients within the network. A blank pattern targets all clients.
 
 - **`pollInterval`**:\
   The frequency for checking the clients' sync status.
@@ -36,7 +36,7 @@ Default settings for the `check_consensus_sync_status` task:
 ```yaml
 - name: check_consensus_sync_status
   config:
-    clientNamePatterns: [".*"]
+    clientPattern: ""
     pollInterval: 5s
     expectSyncing: false
     expectOptimistic: false
