@@ -5,6 +5,7 @@ type Variables interface {
 	LookupVar(name string) (interface{}, bool)
 	SetVar(name string, value interface{})
 	NewScope() Variables
+	GetVarsMap() map[string]any
 	ResolvePlaceholders(str string) string
 	ConsumeVars(config interface{}, consumeMap map[string]string) error
 	CopyVars(source Variables, copyMap map[string]string)

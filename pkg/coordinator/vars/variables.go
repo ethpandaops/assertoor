@@ -1,11 +1,14 @@
 package vars
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/itchyny/gojq"
 	"gopkg.in/yaml.v2"
 )
 
@@ -82,16 +85,47 @@ func (v *Variables) ResolvePlaceholders(str string) string {
 	})
 }
 
+func (v *Variables) GetVarsMap() map[string]any {
+	var varsMap map[string]any
+
+	if v.parentScope != nil {
+		varsMap = v.parentScope.GetVarsMap()
+	} else {
+		varsMap = map[string]any{}
+	}
+
+	for varName, varData := range v.varsMap {
+		varsMap[varName] = varData.value
+	}
+
+	return varsMap
+}
+
 func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string) error {
 	applyMap := map[string]interface{}{}
 
-	for cfgName, varName := range consumeMap {
-		varValue, varFound := v.LookupVar(varName)
-		if !varFound {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	varsMap := v.GetVarsMap()
+
+	for cfgName, varQuery := range consumeMap {
+		queryStr := fmt.Sprintf(".%v", varQuery)
+
+		query, err := gojq.Parse(queryStr)
+		if err != nil {
+			return fmt.Errorf("could not parse variable query '%v': %v", queryStr, err)
+		}
+
+		iter := query.RunWithContext(ctx, varsMap)
+
+		val, ok := iter.Next()
+		if !ok {
+			// no query result, skip variable assignment
 			continue
 		}
 
-		applyMap[cfgName] = varValue
+		applyMap[cfgName] = val
 	}
 
 	// apply to config by generating a yaml, which is then parsed with the target config types.
