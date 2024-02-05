@@ -12,6 +12,8 @@ type Config struct {
 	InvertResult     bool               `yaml:"invertResult" json:"invertResult"`
 	ExpectFailure    bool               `yaml:"expectFailure" json:"expectFailure"`
 	IgnoreFailure    bool               `yaml:"ignoreFailure" json:"ignoreFailure"`
+	RetryOnFailure   bool               `yaml:"retryOnFailure" json:"retryOnFailure"`
+	MaxRetryCount    uint               `yaml:"maxRetryCount" json:"maxRetryCount"`
 	NewVariableScope bool               `yaml:"newVariableScope" json:"newVariableScope"`
 }
 

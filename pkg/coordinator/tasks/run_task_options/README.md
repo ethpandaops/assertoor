@@ -20,6 +20,12 @@ The `run_task_options` task is designed to execute a single task with configurab
 - **`ignoreFailure`**:\
   When `true`, any failure result from the child task is ignored, and the `run_task_options` task will return a success result instead. This is useful for cases where the child task's failure is an acceptable outcome.
 
+- **`retryOnFailure`**:\
+  If set to `true`, the task will retry the execution of the child task if it fails, up to the maximum number of retries specified by `maxRetryCount`.
+
+- **`maxRetryCount`**:\
+  The maximum number of times the child task will be retried if it fails and `retryOnFailure` is true. A value of 0 means no retries.
+
 - **`newVariableScope`**:\
   Determines whether to create a new variable scope for the child task. If `false`, the current scope is passed through, allowing the child task to share the same variable context as the `run_task_options` task.
 
@@ -35,5 +41,7 @@ Default settings for the `run_task_options` task:
     invertResult: false
     expectFailure: false
     ignoreFailure: false
+    retryOnFailure: false
+    maxRetryCount: 0
     newVariableScope: false
 ```

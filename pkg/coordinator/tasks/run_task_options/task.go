@@ -80,45 +80,60 @@ func (t *Task) LoadConfig() error {
 		return err2
 	}
 
-	// init child task
-	taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(config.Task)
-	if err != nil {
-		return fmt.Errorf("failed parsing child task config: %w", err)
-	}
-
-	taskVars := t.ctx.Vars
-	if config.NewVariableScope {
-		taskVars = taskVars.NewScope()
-	}
-
-	t.task, err = t.ctx.NewTask(taskOpts, taskVars)
-	if err != nil {
-		return fmt.Errorf("failed initializing child task: %w", err)
-	}
-
 	t.config = config
 
 	return nil
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	err := t.ctx.Scheduler.ExecuteTask(ctx, t.task, func(ctx context.Context, cancelFn context.CancelFunc, _ types.Task) {
-		t.watchTaskResult(ctx, cancelFn)
-	})
+	retryCount := uint(0)
 
-	switch {
-	case t.config.ExpectFailure:
-		if err == nil {
-			return fmt.Errorf("child task succeeded, but should have failed")
-		}
-	case t.config.IgnoreFailure:
+	for {
+		// init child task
+		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(t.config.Task)
 		if err != nil {
-			t.logger.Warnf("child task failed: %w", err)
+			return fmt.Errorf("failed parsing child task config: %w", err)
 		}
-	default:
+
+		taskVars := t.ctx.Vars
+		if t.config.NewVariableScope {
+			taskVars = taskVars.NewScope()
+		}
+
+		t.task, err = t.ctx.NewTask(taskOpts, taskVars)
 		if err != nil {
-			return fmt.Errorf("child task failed: %w", err)
+			return fmt.Errorf("failed initializing child task: %w", err)
 		}
+
+		// execute task
+		err = t.ctx.Scheduler.ExecuteTask(ctx, t.task, func(ctx context.Context, cancelFn context.CancelFunc, _ types.Task) {
+			t.watchTaskResult(ctx, cancelFn)
+		})
+
+		switch {
+		case t.config.RetryOnFailure && retryCount < t.config.MaxRetryCount:
+			if err != nil {
+				retryCount++
+
+				t.logger.Warnf("child task failed: %w (retrying)", err)
+
+				continue
+			}
+		case t.config.ExpectFailure:
+			if err == nil {
+				return fmt.Errorf("child task succeeded, but should have failed")
+			}
+		case t.config.IgnoreFailure:
+			if err != nil {
+				t.logger.Warnf("child task failed: %w", err)
+			}
+		default:
+			if err != nil {
+				return fmt.Errorf("child task failed: %w", err)
+			}
+		}
+
+		break
 	}
 
 	return nil
