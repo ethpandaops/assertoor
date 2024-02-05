@@ -22,7 +22,8 @@ type Config struct {
 	RandomAmount       bool     `yaml:"randomAmount" json:"randomAmount"`
 	Amount             *big.Int `yaml:"amount" json:"amount"`
 
-	ClientPattern string `yaml:"clientPattern" json:"clientPattern"`
+	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
+	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
 
 	AwaitReceipt  bool `yaml:"awaitReceipt" json:"awaitReceipt"`
 	FailOnReject  bool `yaml:"failOnReject" json:"failOnReject"`
@@ -34,8 +35,9 @@ type Config struct {
 		Data   string `yaml:"data" json:"data"`
 	} `yaml:"expectEvents" json:"expectEvents"`
 
-	TransactionHashResultVar string `yaml:"transactionHashResultVar" json:"transactionHashResultVar"`
-	ContractAddressResultVar string `yaml:"contractAddressResultVar" json:"contractAddressResultVar"`
+	TransactionHashResultVar    string `yaml:"transactionHashResultVar" json:"transactionHashResultVar"`
+	TransactionReceiptResultVar string `yaml:"transactionReceiptResultVar" json:"transactionReceiptResultVar"`
+	ContractAddressResultVar    string `yaml:"contractAddressResultVar" json:"contractAddressResultVar"`
 }
 
 func DefaultConfig() Config {

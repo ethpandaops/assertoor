@@ -70,7 +70,11 @@ The task is intended for mass transaction generation.
   The amount of ETH (in wei) to be sent in each transaction.
 
 - **`clientPattern`**:\
-  A regex pattern for selecting a specific client endpoint for transaction sending.
+  A regex pattern for selecting specific client endpoints for sending the transactions. This allows targeting particular clients or groups for transaction dispatch.
+
+- **`excludeClientPattern`**:\
+  A regex pattern to exclude certain client endpoints from being used to send the transactions. This feature provides an additional layer of control by allowing the exclusion of specific clients, which can be useful for testing under various network scenarios.
+
 
 ### Defaults
 
@@ -101,4 +105,5 @@ Default settings for the `generate_eoa_transactions` task:
     randomAmount: false
     amount: "0"
     clientPattern: ""
+    excludeClientPattern: ""
 ```

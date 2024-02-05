@@ -24,7 +24,11 @@ The `generate_bls_changes` task is responsible for generating BLS changes and se
   The address to which the validators' withdrawal credentials will be set. This defines the new target for the validators' funds after the BLS key change.
 
 - **`clientPattern`**:\
-  A regex pattern to select the specific client endpoint for sending BLS change operations. If empty, any available endpoint is used.
+  A regex pattern for selecting specific client endpoints to send the BLS change operations. If unspecified, any available endpoint is used.
+
+- **`excludeClientPattern`**:\
+  A regex pattern to exclude certain client endpoints from being utilized for BLS change operations. This parameter allows for excluding specific clients from the task, offering finer control over client selection.
+
 
 ### Defaults
 
@@ -40,4 +44,5 @@ Default settings for the `generate_bls_changes` task:
     indexCount: 0
     targetAddress: ""
     clientPattern: ""
+    excludeClientPattern: ""
 ```

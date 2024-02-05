@@ -30,7 +30,8 @@ type Config struct {
 	RandomAmount       bool     `yaml:"randomAmount" json:"randomAmount"`
 	Amount             *big.Int `yaml:"amount" json:"amount"`
 
-	ClientPattern string `yaml:"clientPattern" json:"clientPattern"`
+	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
+	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
 }
 
 func DefaultConfig() Config {

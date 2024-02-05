@@ -48,7 +48,10 @@ The `generate_transaction` task creates and sends a single transaction to the ne
   The amount of cryptocurrency to be sent in the transaction.
 
 - **`clientPattern`**:\
-  A regex pattern for selecting a specific client endpoint for sending the transaction.
+  A regex pattern to select specific client endpoints for sending the transaction.
+
+- **`excludeClientPattern`**:\
+  A regex pattern to exclude certain clients from being used for sending the transaction.
 
 - **`awaitReceipt`**:\
   If `false`, the task succeeds immediately after sending the transaction without waiting for the receipt. If `true`, it waits for the receipt.
@@ -68,6 +71,9 @@ The `generate_transaction` task creates and sends a single transaction to the ne
 
 - **`transactionHashResultVar`**:\
   The variable name to store the transaction hash, available for use by subsequent tasks.
+
+- **`transactionReceiptResultVar`**:\
+  The variable name to store the full transaction receipt, available for use by subsequent tasks.
 
 - **`contractAddressResultVar`**:\
   The variable name to store the deployed contract address if the transaction was a contract deployment, available for use by subsequent tasks.
@@ -94,10 +100,12 @@ Default settings for the `generate_transaction` task:
     randomAmount: false
     amount: "0"
     clientPattern: ""
+    excludeClientPattern: ""
     awaitReceipt: true
     failOnReject: false
     failOnSuccess: false
     expectEvents: []
     transactionHashResultVar: ""
+    transactionReceiptResultVar: ""
     contractAddressResultVar: ""
 ```

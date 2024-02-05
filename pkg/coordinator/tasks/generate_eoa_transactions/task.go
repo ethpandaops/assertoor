@@ -318,10 +318,10 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 
 	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
 
-	if t.config.ClientPattern == "" {
+	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
 	} else {
-		poolClients := clientPool.GetClientsByNamePatterns([]string{t.config.ClientPattern})
+		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(poolClients) == 0 {
 			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}

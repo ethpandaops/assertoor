@@ -5,8 +5,8 @@ The `check_clients_are_healthy` task is designed to ensure the health of specifi
 
 ### Configuration Parameters
 
-- **`clientNamePatterns`**:\
-  An array of endpoint names to be checked. If left empty, the task checks all clients. Use this to target specific clients for health checks.
+- **`clientPattern`**:\
+  A regular expression pattern used to specify which clients to check. This allows for targeted health checks of specific clients or groups of clients within the network. A blank pattern targets all clients.
 
 - **`pollInterval`**:\
   The interval at which the health check is performed. Set this to define how frequently the task should check the clients' health.
@@ -30,7 +30,7 @@ These are the default settings for the `check_clients_are_healthy` task:
 ```yaml
 - name: check_clients_are_healthy
   config:
-    clientNamePatterns: []
+    clientPattern: ""
     pollInterval: 5s
     skipConsensusCheck: false
     skipExecutionCheck: false

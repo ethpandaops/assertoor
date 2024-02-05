@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -142,10 +143,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
 
-	if t.config.ClientPattern == "" {
+	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
 	} else {
-		poolClients := clientPool.GetClientsByNamePatterns([]string{t.config.ClientPattern})
+		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(poolClients) == 0 {
 			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
@@ -202,6 +203,22 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		if t.config.ContractAddressResultVar != "" {
 			t.ctx.Vars.SetVar(t.config.ContractAddressResultVar, receipt.ContractAddress.Hex())
+		}
+
+		if t.config.TransactionReceiptResultVar != "" {
+			receiptJSON, err := json.Marshal(receipt)
+			if err == nil {
+				receiptMap := map[string]interface{}{}
+				err = json.Unmarshal(receiptJSON, &receiptMap)
+
+				if err == nil {
+					t.ctx.Vars.SetVar(t.config.TransactionReceiptResultVar, receiptMap)
+				} else {
+					t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
+				}
+			} else {
+				t.logger.Errorf("could not marshal transaction receipt for result var: %v", err)
+			}
 		}
 
 		if len(t.config.ExpectEvents) > 0 {

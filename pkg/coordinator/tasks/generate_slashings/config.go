@@ -5,13 +5,14 @@ import (
 )
 
 type Config struct {
-	SlashingType  string `yaml:"slashingType" json:"slashingType"`
-	LimitPerSlot  int    `yaml:"limitPerSlot" json:"limitPerSlot"`
-	LimitTotal    int    `yaml:"limitTotal" json:"limitTotal"`
-	Mnemonic      string `yaml:"mnemonic" json:"mnemonic"`
-	StartIndex    int    `yaml:"startIndex" json:"startIndex"`
-	IndexCount    int    `yaml:"indexCount" json:"indexCount"`
-	ClientPattern string `yaml:"clientPattern" json:"clientPattern"`
+	SlashingType         string `yaml:"slashingType" json:"slashingType"`
+	LimitPerSlot         int    `yaml:"limitPerSlot" json:"limitPerSlot"`
+	LimitTotal           int    `yaml:"limitTotal" json:"limitTotal"`
+	Mnemonic             string `yaml:"mnemonic" json:"mnemonic"`
+	StartIndex           int    `yaml:"startIndex" json:"startIndex"`
+	IndexCount           int    `yaml:"indexCount" json:"indexCount"`
+	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
+	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
 }
 
 func DefaultConfig() Config {

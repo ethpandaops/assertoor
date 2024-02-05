@@ -72,7 +72,11 @@ The `generate_blob_transactions` task creates and sends a large number of blob t
   The amount of ETH (in Wei) to be sent in each blob transaction.
 
 - **`clientPattern`**:\
-  A regex pattern to select the specific client endpoint for sending transactions. If empty, any endpoint is used.
+  A regex pattern for selecting specific client endpoints to send transactions. If unspecified, transactions are sent through any available endpoint.
+
+- **`excludeClientPattern`**:\
+  A regex pattern to exclude certain client endpoints from being used for sending transactions. This allows for more precise control over which clients are utilized.
+
 
 ### Defaults
 
@@ -104,4 +108,5 @@ Default settings for the `generate_blob_transactions` task:
     randomAmount: false
     amount: "0"
     clientPattern: ""
+    excludeClientPattern: ""
 ```

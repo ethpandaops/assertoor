@@ -25,8 +25,12 @@ It's important to note that while the slashing operations are sent to the networ
 - **`indexCount`**:\
   The number of validator keys to generate from the mnemonic, indicating how many distinct slashing operations will be created.
 
-- **`clientPattern`**:\
-  A regex pattern to select specific client endpoints for sending the slashing operations. If not specified, the task will use any available endpoint.
+  - **`clientPattern`**:\
+  A regex pattern for selecting specific client endpoints to send the slashing operations. If not specified, the task will use any available endpoint.
+
+- **`excludeClientPattern`**:
+  A regex pattern to exclude certain clients from being used for slashing operations. This feature provides an additional layer of control by allowing the exclusion of specific clients, which can be useful for testing under various network conditions.
+
 
 ### Defaults
 
@@ -42,4 +46,5 @@ Default settings for the `generate_slashings` task:
     startIndex: 0
     indexCount: 0
     clientPattern: ""
+    excludeClientPattern: ""
 ```
