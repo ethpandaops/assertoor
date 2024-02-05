@@ -3,6 +3,7 @@ package types
 type Variables interface {
 	GetVar(name string) interface{}
 	LookupVar(name string) (interface{}, bool)
+	ResolveQuery(query string) (interface{}, bool, error)
 	SetVar(name string, value interface{})
 	NewScope() Variables
 	GetVarsMap() map[string]any

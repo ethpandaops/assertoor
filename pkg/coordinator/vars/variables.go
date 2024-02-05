@@ -101,6 +101,29 @@ func (v *Variables) GetVarsMap() map[string]any {
 	return varsMap
 }
 
+func (v *Variables) ResolveQuery(queryStr string) (interface{}, bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	varsMap := v.GetVarsMap()
+	queryStr = fmt.Sprintf(".%v", queryStr)
+
+	query, err := gojq.Parse(queryStr)
+	if err != nil {
+		return nil, false, fmt.Errorf("could not parse variable query '%v': %v", queryStr, err)
+	}
+
+	iter := query.RunWithContext(ctx, varsMap)
+
+	val, ok := iter.Next()
+	if !ok {
+		// no query result, skip variable assignment
+		return nil, false, nil
+	}
+
+	return val, true, nil
+}
+
 func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string) error {
 	applyMap := map[string]interface{}{}
 
