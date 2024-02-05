@@ -1,7 +1,7 @@
 ## `run_tasks` Task
 
 ### Description
-The `run_tasks` task is designed for executing a series of tasks sequentially, ensuring each task is completed before starting the next. This setup is essential for tests requiring a specific order of task execution.
+The `run_tasks` task executes a series of specified tasks sequentially. This is particularly useful for scenarios where tasks need to be performed in a specific order, with the outcome of one potentially affecting the subsequent ones.
 
 #### Task Behavior
 - The task starts the child tasks one after the other in the order they are listed.
@@ -14,6 +14,9 @@ An important aspect of this task is that it cancels tasks once they return a res
 
 - **`tasks`**:\
   An array of tasks to be executed one after the other. Each task is defined according to the standard task structure.
+
+- **`stopChildOnResult`**:\
+  If set to `true`, each child task in the sequence is stopped as soon as it sets a result (either "success" or "failure"). This ensures that once a task has reached a outcome, it does not continue to run unnecessarily, allowing the next task in the sequence to commence.
 
 - **`expectFailure`**:\
   If set to `true`, this option expects each task in the sequence to fail. The task sequence stops with a "failure" result if any task does not fail as expected.
@@ -29,6 +32,7 @@ Default settings for the `run_tasks` task:
 - name: run_tasks
   config:
     tasks: []
+    stopChildOnResult: true
     expectFailure: false
     continueOnFailure: false
 ```

@@ -86,6 +86,8 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
+	var taskErr error
+
 	retryCount := uint(0)
 
 	for {
@@ -106,37 +108,37 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 
 		// execute task
-		err = t.ctx.Scheduler.ExecuteTask(ctx, t.task, func(ctx context.Context, cancelFn context.CancelFunc, _ types.Task) {
+		taskErr = t.ctx.Scheduler.ExecuteTask(ctx, t.task, func(ctx context.Context, cancelFn context.CancelFunc, _ types.Task) {
 			t.watchTaskResult(ctx, cancelFn)
 		})
 
 		switch {
 		case t.config.RetryOnFailure && retryCount < t.config.MaxRetryCount:
-			if err != nil {
+			if taskErr != nil {
 				retryCount++
 
-				t.logger.Warnf("child task failed: %w (retrying)", err)
+				t.logger.Warnf("child task failed: %w (retrying)", taskErr)
 
 				continue
 			}
 		case t.config.ExpectFailure:
-			if err == nil {
+			if taskErr == nil {
 				return fmt.Errorf("child task succeeded, but should have failed")
 			}
 		case t.config.IgnoreFailure:
-			if err != nil {
-				t.logger.Warnf("child task failed: %w", err)
+			if taskErr != nil {
+				t.logger.Warnf("child task failed: %w", taskErr)
 			}
 		default:
-			if err != nil {
-				return fmt.Errorf("child task failed: %w", err)
+			if taskErr != nil {
+				return fmt.Errorf("child task failed: %w", taskErr)
 			}
 		}
 
 		break
 	}
 
-	return nil
+	return taskErr
 }
 
 func (t *Task) watchTaskResult(ctx context.Context, cancelFn context.CancelFunc) {
@@ -173,7 +175,9 @@ func (t *Task) watchTaskResult(ctx context.Context, cancelFn context.CancelFunc)
 			}
 		}
 
-		t.ctx.SetResult(taskResult)
+		if t.config.PropagateResult {
+			t.ctx.SetResult(taskResult)
+		}
 
 		if t.config.ExitOnResult {
 			cancelFn()

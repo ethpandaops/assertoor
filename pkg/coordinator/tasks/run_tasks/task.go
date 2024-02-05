@@ -105,7 +105,11 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	for i, task := range t.tasks {
-		err := t.ctx.Scheduler.ExecuteTask(ctx, task, t.ctx.Scheduler.WatchTaskPass)
+		err := t.ctx.Scheduler.ExecuteTask(ctx, task, func(ctx context.Context, cancelFn context.CancelFunc, task types.Task) {
+			if t.config.StopChildOnResult {
+				t.ctx.Scheduler.WatchTaskPass(ctx, cancelFn, task)
+			}
+		})
 
 		switch {
 		case t.config.ExpectFailure:

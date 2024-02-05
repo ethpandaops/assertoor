@@ -8,13 +8,15 @@ import (
 
 type Config struct {
 	Tasks             []helper.RawMessage `yaml:"tasks" json:"tasks"`
+	StopChildOnResult bool                `yaml:"stopChildOnResult" json:"stopChildOnResult"`
 	ExpectFailure     bool                `yaml:"expectFailure" json:"expectFailure"`
 	ContinueOnFailure bool                `yaml:"continueOnFailure" json:"continueOnFailure"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Tasks: []helper.RawMessage{},
+		Tasks:             []helper.RawMessage{},
+		StopChildOnResult: true,
 	}
 }
 

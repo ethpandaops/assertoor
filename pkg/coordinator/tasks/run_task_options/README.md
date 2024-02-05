@@ -8,6 +8,9 @@ The `run_task_options` task is designed to execute a single task with configurab
 - **`task`**:\
   The task to be executed. This is defined following the standard task definition format.
 
+- **`propagateResult`**:\
+  This setting controls how the result of the child task influences the result of the `run_task_options` task. If set to `true`, any change in the result of the child task (success or failure) is immediately reflected in the result of the parent `run_task_options` task. If `false`, the child task's result is only propagated to the parent task after the child task has completed its execution.
+
 - **`exitOnResult`**:\
   If set to `true`, the task will cancel the child task as soon as it sets a result, whether it is "success" or "failure." This option is useful for scenarios where immediate response to the child task's result is necessary.
 
@@ -37,6 +40,7 @@ Default settings for the `run_task_options` task:
 - name: run_task_options
   config:
     task: null
+    propagateResult: false
     exitOnResult: false
     invertResult: false
     expectFailure: false
