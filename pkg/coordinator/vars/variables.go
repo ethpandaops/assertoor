@@ -101,6 +101,7 @@ func (v *Variables) GetVarsMap() map[string]any {
 	return varsMap
 }
 
+//nolint:gocritic // ignore
 func (v *Variables) ResolveQuery(queryStr string) (interface{}, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
