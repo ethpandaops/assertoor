@@ -36,4 +36,4 @@ These are the default settings for the `check_clients_are_healthy` task:
     skipExecutionCheck: false
     expectUnhealthy: false
     minClientCount: 0
- ```
+```

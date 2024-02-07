@@ -127,25 +127,34 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.taskCtx = taskCtx
 
-	var taskWaitChan chan bool
-	if !t.config.RunConcurrent {
-		taskWaitChan = make(chan bool, 1)
-	}
+	var currentTaskWaitChan, previousTaskWaitChan chan bool
 
 	// start child tasks
 	for i := range t.tasks {
 		taskWaitGroup.Add(1)
 
+		if !t.config.RunConcurrent {
+			previousTaskWaitChan = currentTaskWaitChan
+			currentTaskWaitChan = make(chan bool)
+		}
+
 		t.taskIdxMap[t.tasks[i]] = i
 
-		go func(i int) {
+		go func(i int, taskWaitChan, prevTaskWaitChan chan bool) {
 			defer taskWaitGroup.Done()
 
-			if taskWaitChan != nil {
-				taskWaitChan <- true
-				defer func() {
-					<-taskWaitChan
-				}()
+			if !t.config.RunConcurrent {
+				if prevTaskWaitChan != nil {
+					// wait for previous task to be executed
+					select {
+					case <-prevTaskWaitChan:
+					case <-ctx.Done():
+						return
+					}
+				}
+
+				// allow next task to run once this finishes
+				defer close(taskWaitChan)
 			}
 
 			task := t.tasks[i]
@@ -158,7 +167,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			//nolint:errcheck // ignore
 			t.ctx.Scheduler.ExecuteTask(taskCtx, task, t.watchChildTask)
-		}(i)
+		}(i, currentTaskWaitChan, previousTaskWaitChan)
 	}
 
 	// watch result updates

@@ -182,6 +182,11 @@ func (t *Task) runProposerDutyCheck(slot uint64) bool {
 			}
 		}
 
+		if t.config.MinSlotDistance > 0 && slot-1-currentSlot < t.config.MinSlotDistance {
+			t.logger.Errorf("slot %v check failed: matching duty too early: in %v slots, min distance: %v", slot, slot-1-currentSlot, t.config.MinSlotDistance)
+			return false
+		}
+
 		return true
 	}
 }
