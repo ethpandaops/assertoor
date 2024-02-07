@@ -7,6 +7,7 @@ import (
 type Config struct {
 	LimitPerSlot         int    `yaml:"limitPerSlot" json:"limitPerSlot"`
 	LimitTotal           int    `yaml:"limitTotal" json:"limitTotal"`
+	LimitPending         int    `yaml:"limitPending" json:"limitPending"`
 	Mnemonic             string `yaml:"mnemonic" json:"mnemonic"`
 	StartIndex           int    `yaml:"startIndex" json:"startIndex"`
 	IndexCount           int    `yaml:"indexCount" json:"indexCount"`

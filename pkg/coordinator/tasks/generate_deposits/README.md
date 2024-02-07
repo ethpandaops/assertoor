@@ -11,6 +11,9 @@ The `generate_deposits` task focuses on creating deposit transactions and sendin
 - **`limitTotal`**:\
   The total limit on the number of deposit transactions that this task will generate.
 
+- **`limitPending`**:\
+  The limit based on the number of pending deposit transactions.
+
 - **`mnemonic`**:\
   A mnemonic phrase used to generate validator keys. These keys are essential for creating valid deposit transactions.
 
@@ -48,6 +51,7 @@ Default settings for the `generate_deposits` task:
   config:
     limitPerSlot: 0
     limitTotal: 0
+    limitPending: 0
     mnemonic: ""
     startIndex: 0
     indexCount: 0

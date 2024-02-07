@@ -142,6 +142,12 @@ func (t *Task) Execute(ctx context.Context) error {
 		return err
 	}
 
+	var pendingChan chan bool
+
+	if t.config.LimitPending > 0 {
+		pendingChan = make(chan bool, t.config.LimitPending)
+	}
+
 	perSlotCount := 0
 	totalCount := 0
 
@@ -149,10 +155,26 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateDeposit(ctx, accountIdx, validators, nil)
+		err := t.generateDeposit(ctx, accountIdx, validators, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
+			if pendingChan != nil {
+				<-pendingChan
+			}
+
+			if receipt != nil {
+				t.logger.Infof("deposit %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
+			}
+		})
 		if err != nil {
 			t.logger.Errorf("error generating deposit: %v", err.Error())
 		} else {
+			if pendingChan != nil {
+				select {
+				case <-ctx.Done():
+					return nil
+				case pendingChan <- true:
+				}
+			}
+
 			t.ctx.SetResult(types.TaskResultSuccess)
 			perSlotCount++
 			totalCount++
@@ -193,7 +215,7 @@ func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v
 	return validators, nil
 }
 
-func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator, onConfirm func()) error {
+func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) error {
 	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
@@ -310,8 +332,12 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 	}
 
 	go func() {
+		var receipt *ethtypes.Receipt
+
 		if onConfirm != nil {
-			defer onConfirm()
+			defer func() {
+				onConfirm(tx, receipt)
+			}()
 		}
 
 		receipt, err := wallet.AwaitTransaction(ctx, tx)
@@ -322,11 +348,6 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 
 		if err != nil {
 			t.logger.Errorf("failed awaiting transaction receipt: %w", err)
-			return
-		}
-
-		if receipt == nil {
-			t.logger.Errorf("transaction replaced")
 			return
 		}
 	}()
