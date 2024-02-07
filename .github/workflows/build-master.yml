@@ -61,6 +61,7 @@ jobs:
             echo "$line" >> ./wiki.md
           fi
           done <<< $(cat $filename)
+          echo "" >> ./wiki.md
         done
 
         cp ./wiki.md ./wiki/Home.md
