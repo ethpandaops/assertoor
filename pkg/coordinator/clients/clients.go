@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"time"
 
@@ -150,6 +151,10 @@ func (pool *ClientPool) GetClientsByNamePatterns(includePattern, excludePattern 
 		}
 
 		clients = append(clients, client)
+	}
+
+	for i, v := range rand.Perm(len(clients)) {
+		clients[v], clients[i] = clients[i], clients[v]
 	}
 
 	return clients
