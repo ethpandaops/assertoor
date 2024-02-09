@@ -3,12 +3,15 @@ package checkconsensusblockproposals
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"regexp"
 	"time"
 
+	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/juliangruber/go-intersect"
 	"github.com/sirupsen/logrus"
 )
 
@@ -23,11 +26,12 @@ var (
 )
 
 type Task struct {
-	ctx         *types.TaskContext
-	options     *types.TaskOptions
-	config      Config
-	logger      logrus.FieldLogger
-	firstHeight map[uint16]uint64
+	ctx                 *types.TaskContext
+	options             *types.TaskOptions
+	config              Config
+	logger              logrus.FieldLogger
+	firstHeight         map[uint16]uint64
+	currentValidatorSet map[uint64]*v1.Validator
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -91,9 +95,15 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
-	blockSubscription := consensusPool.GetBlockCache().SubscribeBlockEvent(10)
 
+	blockSubscription := consensusPool.GetBlockCache().SubscribeBlockEvent(10)
 	defer blockSubscription.Unsubscribe()
+
+	wallclockEpochSubscription := consensusPool.GetBlockCache().SubscribeWallclockEpochEvent(10)
+	defer wallclockEpochSubscription.Unsubscribe()
+
+	// load current epoch duties
+	t.loadValidatorSet(ctx)
 
 	totalMatches := 0
 
@@ -118,12 +128,30 @@ func (t *Task) Execute(ctx context.Context) error {
 					t.ctx.SetResult(types.TaskResultNone)
 				}
 			}
+		case <-wallclockEpochSubscription.Channel():
+			t.loadValidatorSet(ctx)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
+func (t *Task) loadValidatorSet(ctx context.Context) {
+	client := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+	validatorSet, err := client.GetRPCClient().GetStateValidators(ctx, "head")
+
+	if err != nil {
+		t.logger.Errorf("error while fetching validator set: %v", err.Error())
+		return
+	}
+
+	t.currentValidatorSet = make(map[uint64]*v1.Validator)
+	for _, val := range validatorSet {
+		t.currentValidatorSet[uint64(val.Index)] = val
+	}
+}
+
+//nolint:gocyclo // ignore
 func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 	blockData := block.AwaitBlock(ctx, 2*time.Second)
 	if blockData == nil {
@@ -147,17 +175,17 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 	}
 
 	// check deposit count
-	if t.config.MinDepositCount > 0 && !t.checkBlockDeposits(block, blockData) {
+	if (t.config.MinDepositCount > 0 || len(t.config.ExpectDeposits) > 0) && !t.checkBlockDeposits(block, blockData) {
 		return false
 	}
 
 	// check exit count
-	if t.config.MinExitCount > 0 && !t.checkBlockExits(block, blockData) {
+	if (t.config.MinExitCount > 0 || len(t.config.ExpectExits) > 0) && !t.checkBlockExits(block, blockData) {
 		return false
 	}
 
 	// check slashing count
-	if t.config.MinSlashingCount > 0 && !t.checkBlockSlashings(block, blockData) {
+	if (t.config.MinSlashingCount > 0 || len(t.config.ExpectSlashings) > 0) && !t.checkBlockSlashings(block, blockData) {
 		return false
 	}
 
@@ -172,12 +200,12 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 	}
 
 	// check bls change count
-	if t.config.MinBlsChangeCount > 0 && !t.checkBlockBlsChanges(block, blockData) {
+	if (t.config.MinBlsChangeCount > 0 || len(t.config.ExpectBlsChanges) > 0) && !t.checkBlockBlsChanges(block, blockData) {
 		return false
 	}
 
 	// check withdrawal count
-	if t.config.MinWithdrawalCount > 0 && !t.checkBlockWithdrawals(block, blockData) {
+	if (t.config.MinWithdrawalCount > 0 || len(t.config.ExpectWithdrawals) > 0) && !t.checkBlockWithdrawals(block, blockData) {
 		return false
 	}
 
@@ -265,6 +293,24 @@ func (t *Task) checkBlockDeposits(block *consensus.Block, blockData *spec.Versio
 		return false
 	}
 
+	if len(t.config.ExpectDeposits) > 0 {
+		for _, pubkey := range t.config.ExpectDeposits {
+			found := false
+
+			for _, deposit := range deposits {
+				if deposit.Data.PublicKey.String() == pubkey {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				t.logger.Infof("check failed for block %v [0x%x]: expected deposit not found (pubkey: %v)", block.Slot, block.Root, pubkey)
+				return false
+			}
+		}
+	}
+
 	return true
 }
 
@@ -278,6 +324,34 @@ func (t *Task) checkBlockExits(block *consensus.Block, blockData *spec.Versioned
 	if len(exits) < t.config.MinExitCount {
 		t.logger.Infof("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinExitCount, len(exits))
 		return false
+	}
+
+	if len(t.config.ExpectExits) > 0 {
+		if t.currentValidatorSet == nil {
+			t.logger.Errorf("check failed: no validator set")
+			return false
+		}
+
+		for _, pubkey := range t.config.ExpectExits {
+			found := false
+
+			for _, exit := range exits {
+				validator := t.currentValidatorSet[uint64(exit.Message.ValidatorIndex)]
+				if validator == nil {
+					continue
+				}
+
+				if validator.Validator.PublicKey.String() == pubkey {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				t.logger.Infof("check failed for block %v [0x%x]: expected exit not found (pubkey: %v)", block.Slot, block.Root, pubkey)
+				return false
+			}
+		}
 	}
 
 	return true
@@ -300,6 +374,64 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 	if slashingCount < t.config.MinSlashingCount {
 		t.logger.Infof("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinSlashingCount, slashingCount)
 		return false
+	}
+
+	if len(t.config.ExpectSlashings) > 0 {
+		if t.currentValidatorSet == nil {
+			t.logger.Errorf("check failed: no validator set")
+			return false
+		}
+
+		for _, expectedSlashing := range t.config.ExpectSlashings {
+			found := false
+
+			if !found && (expectedSlashing.SlashingType == "" || expectedSlashing.SlashingType == "attester") {
+				for _, slashing := range attSlashings {
+					inter := intersect.Simple(slashing.Attestation1.AttestingIndices, slashing.Attestation2.AttestingIndices)
+					for _, j := range inter {
+						valIdx, ok := j.(uint64)
+						if !ok {
+							continue
+						}
+
+						validator := t.currentValidatorSet[valIdx]
+						if validator == nil {
+							continue
+						}
+
+						if validator.Validator.PublicKey.String() == expectedSlashing.PublicKey {
+							found = true
+							break
+						}
+					}
+
+					if found {
+						break
+					}
+				}
+			}
+
+			if !found && (expectedSlashing.SlashingType == "" || expectedSlashing.SlashingType == "proposer") {
+				for _, slashing := range propSlashings {
+					valIdx := uint64(slashing.SignedHeader1.Message.ProposerIndex)
+
+					validator := t.currentValidatorSet[valIdx]
+					if validator == nil {
+						continue
+					}
+
+					if validator.Validator.PublicKey.String() == expectedSlashing.PublicKey {
+						found = true
+						break
+					}
+				}
+			}
+
+			if !found {
+				t.logger.Infof("check failed for block %v [0x%x]: expected deposit not found (pubkey: %v)", block.Slot, block.Root, expectedSlashing.PublicKey)
+				return false
+			}
+		}
 	}
 
 	return true
@@ -349,6 +481,39 @@ func (t *Task) checkBlockBlsChanges(block *consensus.Block, blockData *spec.Vers
 		return false
 	}
 
+	if len(t.config.ExpectBlsChanges) > 0 {
+		if t.currentValidatorSet == nil {
+			t.logger.Errorf("check failed: no validator set")
+			return false
+		}
+
+		for _, expectedBlsChange := range t.config.ExpectBlsChanges {
+			found := false
+
+			for _, blsChange := range blsChanges {
+				validator := t.currentValidatorSet[uint64(blsChange.Message.ValidatorIndex)]
+				if validator == nil {
+					continue
+				}
+
+				if validator.Validator.PublicKey.String() == expectedBlsChange.PublicKey {
+					if expectedBlsChange.Address != "" && expectedBlsChange.Address != blsChange.Message.ToExecutionAddress.String() {
+						t.logger.Warnf("check failed: bls change found, but execution address does not match (have: %v, want: %v)", blsChange.Message.ToExecutionAddress.String(), expectedBlsChange.Address)
+					} else {
+						found = true
+					}
+
+					break
+				}
+			}
+
+			if !found {
+				t.logger.Infof("check failed for block %v [0x%x]: expected bls change not found (pubkey: %v)", block.Slot, block.Root, expectedBlsChange.PublicKey)
+				return false
+			}
+		}
+	}
+
 	return true
 }
 
@@ -362,6 +527,45 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 	if len(withdrawals) < t.config.MinWithdrawalCount {
 		t.logger.Infof("check failed for block %v [0x%x]: not enough withdrawals (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinWithdrawalCount, len(withdrawals))
 		return false
+	}
+
+	if len(t.config.ExpectWithdrawals) > 0 {
+		if t.currentValidatorSet == nil {
+			t.logger.Errorf("check failed: no validator set")
+			return false
+		}
+
+		for _, expectedWithdrawal := range t.config.ExpectWithdrawals {
+			found := false
+
+			for _, withdrawal := range withdrawals {
+				validator := t.currentValidatorSet[uint64(withdrawal.ValidatorIndex)]
+				if validator == nil {
+					continue
+				}
+
+				if validator.Validator.PublicKey.String() == expectedWithdrawal.PublicKey {
+					withdrawalAmount := big.NewInt(int64(withdrawal.Amount))
+					withdrawalAmount = withdrawalAmount.Mul(withdrawalAmount, big.NewInt(1000000000))
+
+					switch {
+					case expectedWithdrawal.Address != "" && expectedWithdrawal.Address != withdrawal.Address.String():
+						t.logger.Warnf("check failed: withdrawal found, but execution address does not match (have: %v, want: %v)", withdrawal.Address.String(), expectedWithdrawal.Address)
+					case expectedWithdrawal.MinAmount.Cmp(big.NewInt(0)) > 0 && expectedWithdrawal.MinAmount.Cmp(withdrawalAmount) < 0:
+						t.logger.Warnf("check failed: withdrawal found, but amount lower than minimum (have: %v, want >= %v)", withdrawalAmount, expectedWithdrawal.MinAmount)
+					default:
+						found = true
+					}
+
+					break
+				}
+			}
+
+			if !found {
+				t.logger.Infof("check failed for block %v [0x%x]: expected bls change not found (pubkey: %v)", block.Slot, block.Root, expectedWithdrawal.PublicKey)
+				return false
+			}
+		}
 	}
 
 	return true

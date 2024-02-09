@@ -125,7 +125,7 @@ func (t *Task) loadValidatorSet(ctx context.Context) {
 	validatorSet, err := client.GetRPCClient().GetStateValidators(ctx, "head")
 
 	if err != nil {
-		t.logger.Errorf("error while fetching epoch duties: %v", err.Error())
+		t.logger.Errorf("error while fetching validator set: %v", err.Error())
 		return
 	}
 

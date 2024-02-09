@@ -1,5 +1,7 @@
 package checkconsensusblockproposals
 
+import "math/big"
+
 type Config struct {
 	BlockCount               int    `yaml:"blockCount" json:"blockCount"`
 	GraffitiPattern          string `yaml:"graffitiPattern" json:"graffitiPattern"`
@@ -14,6 +16,22 @@ type Config struct {
 	MinWithdrawalCount       int    `yaml:"minWithdrawalCount" json:"minWithdrawalCount"`
 	MinTransactionCount      int    `yaml:"minTransactionCount" json:"minTransactionCount"`
 	MinBlobCount             int    `yaml:"minBlobCount" json:"minBlobCount"`
+
+	ExpectDeposits  []string `yaml:"expectDeposits" json:"expectDeposits"`
+	ExpectExits     []string `yaml:"expectExits" json:"expectExits"`
+	ExpectSlashings []struct {
+		PublicKey    string `yaml:"publicKey" json:"publicKey"`
+		SlashingType string `yaml:"slashingType" json:"slashingType"`
+	} `yaml:"expectSlashings" json:"expectSlashings"`
+	ExpectBlsChanges []struct {
+		PublicKey string `yaml:"publicKey" json:"publicKey"`
+		Address   string `yaml:"address" json:"address"`
+	} `yaml:"expectBlsChanges" json:"expectBlsChanges"`
+	ExpectWithdrawals []struct {
+		PublicKey string   `yaml:"publicKey" json:"publicKey"`
+		Address   string   `yaml:"address" json:"address"`
+		MinAmount *big.Int `yaml:"minAmount" json:"minAmount"`
+	} `yaml:"expectWithdrawals" json:"expectWithdrawals"`
 }
 
 func DefaultConfig() Config {
