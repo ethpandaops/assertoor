@@ -157,12 +157,12 @@ func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string
 	// that's a bit hacky, but we don't have to care about types.
 	applyYaml, err := yaml.Marshal(&applyMap)
 	if err != nil {
-		return fmt.Errorf("could not marshal dynamic config vars")
+		return fmt.Errorf("could not marshal dynamic config vars: %v", err)
 	}
 
 	err = yaml.Unmarshal(applyYaml, config)
 	if err != nil {
-		return fmt.Errorf("could not unmarshal dynamic config vars")
+		return fmt.Errorf("could not unmarshal dynamic config vars: %v\n%v", err, string(applyYaml))
 	}
 
 	return nil

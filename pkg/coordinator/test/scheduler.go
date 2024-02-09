@@ -281,6 +281,8 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, task types.Task, taskW
 	err := task.LoadConfig()
 	if err != nil {
 		task.Logger().Errorf("config validation failed: %v", err)
+		ts.setTaskResult(task, types.TaskResultFailure, false)
+
 		return fmt.Errorf("task %v config validation failed: %w", task.Name(), err)
 	}
 
