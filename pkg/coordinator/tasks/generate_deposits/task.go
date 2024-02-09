@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
@@ -122,6 +124,7 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
+//nolint:gocyclo // ignore
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.StartIndex > 0 {
 		t.nextIndex = uint64(t.config.StartIndex)
@@ -144,6 +147,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var pendingChan chan bool
 
+	pendingWg := sync.WaitGroup{}
+
 	if t.config.LimitPending > 0 {
 		pendingChan = make(chan bool, t.config.LimitPending)
 	}
@@ -151,14 +156,20 @@ func (t *Task) Execute(ctx context.Context) error {
 	perSlotCount := 0
 	totalCount := 0
 
+	depositTransactions := []string{}
+	validatorPubkeys := []string{}
+	depositReceipts := map[string]*ethtypes.Receipt{}
+
 	for {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateDeposit(ctx, accountIdx, validators, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
+		pubkey, tx, err := t.generateDeposit(ctx, accountIdx, validators, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
 			if pendingChan != nil {
 				<-pendingChan
 			}
+			pendingWg.Done()
+			depositReceipts[tx.Hash().Hex()] = receipt
 
 			if receipt != nil {
 				t.logger.Infof("deposit %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
@@ -174,10 +185,14 @@ func (t *Task) Execute(ctx context.Context) error {
 				case pendingChan <- true:
 				}
 			}
+			pendingWg.Add(1)
 
 			t.ctx.SetResult(types.TaskResultSuccess)
 			perSlotCount++
 			totalCount++
+
+			validatorPubkeys = append(validatorPubkeys, pubkey.String())
+			depositTransactions = append(depositTransactions, tx.Hash().Hex())
 		}
 
 		if t.lastIndex > 0 && t.nextIndex >= t.lastIndex {
@@ -196,8 +211,68 @@ func (t *Task) Execute(ctx context.Context) error {
 				return nil
 			case <-subscription.Channel():
 			}
-		} else if err := ctx.Err(); err != nil {
-			return err
+		} else if ctx.Err() != nil {
+			return nil
+		}
+	}
+
+	if t.config.AwaitReceipt {
+		pendingWg.Wait()
+	}
+
+	if t.config.ValidatorPubkeysResultVar != "" {
+		t.ctx.Vars.SetVar(t.config.ValidatorPubkeysResultVar, validatorPubkeys)
+	}
+
+	if t.config.DepositTransactionsResultVar != "" {
+		t.ctx.Vars.SetVar(t.config.DepositTransactionsResultVar, depositTransactions)
+	}
+
+	if t.config.DepositReceiptsResultVar != "" {
+		receiptList := []interface{}{}
+
+		for _, txhash := range depositTransactions {
+			var receiptMap map[string]interface{}
+
+			receipt := depositReceipts[txhash]
+			if receipt == nil {
+				receiptMap = nil
+			} else {
+				receiptJSON, err := json.Marshal(receipt)
+				if err == nil {
+					receiptMap = map[string]interface{}{}
+					err = json.Unmarshal(receiptJSON, &receiptMap)
+
+					if err != nil {
+						t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
+						receiptMap = nil
+					}
+				} else {
+					t.logger.Errorf("could not marshal transaction receipt for result var: %v", err)
+				}
+			}
+
+			receiptList = append(receiptList, receiptMap)
+		}
+
+		t.ctx.Vars.SetVar(t.config.DepositReceiptsResultVar, receiptList)
+	}
+
+	if t.config.FailOnReject {
+		for _, txhash := range depositTransactions {
+			if depositReceipts[txhash] == nil {
+				t.logger.Errorf("no receipt for deposit transaction: %v", txhash)
+				t.ctx.SetResult(types.TaskResultFailure)
+
+				break
+			}
+
+			if depositReceipts[txhash].Status == 0 {
+				t.logger.Errorf("deposit transaction failed: %v", txhash)
+				t.ctx.SetResult(types.TaskResultFailure)
+
+				break
+			}
 		}
 	}
 
@@ -215,19 +290,19 @@ func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v
 	return validators, nil
 }
 
-func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) error {
+func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*common.BLSPubkey, *ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
 
 	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, validatorKeyPath)
 	if err != nil {
-		return fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
+		return nil, nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 	}
 
 	withdrPrivkey, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
 	if err != nil {
-		return fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
+		return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
 	}
 
 	var validator *v1.Validator
@@ -241,7 +316,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 	}
 
 	if validator != nil {
-		return fmt.Errorf("validator already exists on chain")
+		return nil, nil, fmt.Errorf("validator already exists on chain")
 	}
 
 	var pub, withdrPub common.BLSPubkey
@@ -264,7 +339,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 
 	err = secKey.Deserialize(validatorPrivkey.Marshal())
 	if err != nil {
-		return fmt.Errorf("cannot convert validator priv key")
+		return nil, nil, fmt.Errorf("cannot convert validator priv key")
 	}
 
 	genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
@@ -284,24 +359,24 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 	} else {
 		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(clients) == 0 {
-			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+			return nil, nil, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
 		client = clients[0].ExecutionClient
 	}
 
 	depositContract, err := depositcontract.NewDepositContract(t.depositContractAddr, client.GetRPCClient().GetEthClient())
 	if err != nil {
-		return fmt.Errorf("cannot create bound instance of DepositContract: %w", err)
+		return nil, nil, fmt.Errorf("cannot create bound instance of DepositContract: %w", err)
 	}
 
 	wallet, err := t.ctx.Scheduler.GetCoordinator().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
 	if err != nil {
-		return fmt.Errorf("cannot initialize wallet: %w", err)
+		return nil, nil, fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
 	err = wallet.AwaitReady(ctx)
 	if err != nil {
-		return fmt.Errorf("cannot load wallet state: %w", err)
+		return nil, nil, fmt.Errorf("cannot load wallet state: %w", err)
 	}
 
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
@@ -321,14 +396,14 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 		}, data.Pubkey[:], data.WithdrawalCredentials[:], data.Signature[:], dataRoot)
 	})
 	if err != nil {
-		return fmt.Errorf("cannot build deposit transaction: %w", err)
+		return nil, nil, fmt.Errorf("cannot build deposit transaction: %w", err)
 	}
 
 	t.logger.Infof("sending deposit transaction (account idx: %v, nonce: %v)", accountIdx, tx.Nonce())
 
 	err = client.GetRPCClient().SendTransaction(ctx, tx)
 	if err != nil {
-		return fmt.Errorf("failed sending deposit transaction: %w", err)
+		return nil, nil, fmt.Errorf("failed sending deposit transaction: %w", err)
 	}
 
 	go func() {
@@ -352,7 +427,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 		}
 	}()
 
-	return nil
+	return &pub, tx, nil
 }
 
 func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {

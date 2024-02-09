@@ -17,6 +17,12 @@ type Config struct {
 	DepositTxTipCap      int64  `yaml:"depositTxTipCap" json:"depositTxTipCap"`
 	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
 	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
+	AwaitReceipt         bool   `yaml:"awaitReceipt" json:"awaitReceipt"`
+	FailOnReject         bool   `yaml:"failOnReject" json:"failOnReject"`
+
+	DepositTransactionsResultVar string `yaml:"depositTransactionsResultVar" json:"depositTransactionsResultVar"`
+	DepositReceiptsResultVar     string `yaml:"depositReceiptsResultVar" json:"depositReceiptsResultVar"`
+	ValidatorPubkeysResultVar    string `yaml:"validatorPubkeysResultVar" json:"validatorPubkeysResultVar"`
 }
 
 func DefaultConfig() Config {
