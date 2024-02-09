@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -51,6 +52,12 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, lameDuc
 
 // Run executes the coordinator until completion.
 func (c *Coordinator) Run(ctx context.Context) error {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.WithError(err.(error)).Errorf("uncaught panic coordinator: %v, stack: %v", err, string(debug.Stack()))
+		}
+	}()
+
 	c.log.GetLogger().
 		WithField("build_version", buildinfo.GetVersion()).
 		WithField("metrics_port", c.metricsPort).
