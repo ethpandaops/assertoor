@@ -16,7 +16,7 @@ import (
 var tasksCmd = &cobra.Command{
 	Use:   "tasks",
 	Short: "Lists all available tasks",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		available := tasks.AvailableTasks()
 
 		yamlData, err := yaml.Marshal(&available)

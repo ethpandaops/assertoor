@@ -13,7 +13,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "assertoor",
 	Short: "Runs a configured test until completion or error",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		config, err := coordinator.NewConfig(cfgFile)
 		if err != nil {
 			log.Fatal(err)

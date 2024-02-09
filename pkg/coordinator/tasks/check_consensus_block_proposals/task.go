@@ -113,6 +113,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			matches := t.checkBlock(ctx, block)
 			if matches {
 				t.logger.Infof("matching block %v [0x%x]", block.Slot, block.Root)
+
 				totalMatches++
 			}
 

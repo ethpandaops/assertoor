@@ -143,6 +143,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			t.logger.Errorf("error generating bls change: %v", err.Error())
 		} else {
 			t.ctx.SetResult(types.TaskResultSuccess)
+
 			perSlotCount++
 			totalCount++
 		}
@@ -258,6 +259,7 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64, validat
 		if len(clients) == 0 {
 			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
+
 		client = clients[0].ConsensusClient
 	}
 

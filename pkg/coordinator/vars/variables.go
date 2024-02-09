@@ -81,6 +81,7 @@ func (v *Variables) ResolvePlaceholders(str string) string {
 		if varFound {
 			return fmt.Sprintf("%v", varValue)
 		}
+
 		return m
 	})
 }

@@ -117,7 +117,7 @@ func (pool *WalletPool) EnsureFunding(ctx context.Context, minBalance, refillAmo
 			}
 		}
 
-		tx, err := pool.rootWallet.BuildTransaction(ctx, func(ctx context.Context, nonce uint64, signer bind.SignerFn) (*types.Transaction, error) {
+		tx, err := pool.rootWallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*types.Transaction, error) {
 			toAddr := wallet.GetAddress()
 			txData := &types.DynamicFeeTx{
 				ChainID:   pool.manager.clientPool.GetBlockCache().GetChainID(),
@@ -128,6 +128,7 @@ func (pool *WalletPool) EnsureFunding(ctx context.Context, minBalance, refillAmo
 				To:        &toAddr,
 				Value:     amount,
 			}
+
 			return types.NewTx(txData), nil
 		})
 		if err != nil {

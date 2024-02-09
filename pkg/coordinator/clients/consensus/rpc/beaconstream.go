@@ -121,6 +121,7 @@ func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventst
 		}
 
 		fmt.Fprintf(&topics, "block")
+
 		topicsCount++
 	}
 
@@ -130,6 +131,7 @@ func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventst
 		}
 
 		fmt.Fprintf(&topics, "head")
+
 		topicsCount++
 	}
 
@@ -139,6 +141,7 @@ func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventst
 		}
 
 		fmt.Fprintf(&topics, "finalized_checkpoint")
+
 		topicsCount++
 	}
 

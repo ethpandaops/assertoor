@@ -255,11 +255,12 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		txWallet = t.walletPool.GetNextChildWallet()
 	}
 
-	tx, err := txWallet.BuildTransaction(ctx, func(ctx context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
+	tx, err := txWallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
 		var toAddr *common.Address
 
 		if !t.config.ContractDeployment {
 			addr := txWallet.GetAddress()
+
 			if t.config.RandomTarget {
 				addrBytes := make([]byte, 20)
 				//nolint:errcheck // ignore
@@ -308,6 +309,7 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 				Data:      txData,
 			}
 		}
+
 		return ethtypes.NewTx(txObj), nil
 	})
 	if err != nil {

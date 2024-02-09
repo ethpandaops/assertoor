@@ -189,12 +189,15 @@ func (client *Client) processBlock(hash common.Hash, number uint64, block *types
 		if block != nil {
 			return block, nil
 		}
+
 		ctx, cancel := context.WithTimeout(client.clientCtx, 10*time.Second)
 		defer cancel()
+
 		block, err := client.rpcClient.GetBlockByHash(ctx, cachedBlock.Hash)
 		if err != nil {
 			return nil, err
 		}
+
 		return block, nil
 	})
 	if err != nil {

@@ -168,7 +168,9 @@ func (t *Task) Execute(ctx context.Context) error {
 			if pendingChan != nil {
 				<-pendingChan
 			}
+
 			pendingWg.Done()
+
 			depositReceipts[tx.Hash().Hex()] = receipt
 
 			if receipt != nil {
@@ -185,9 +187,11 @@ func (t *Task) Execute(ctx context.Context) error {
 				case pendingChan <- true:
 				}
 			}
+
 			pendingWg.Add(1)
 
 			t.ctx.SetResult(types.TaskResultSuccess)
+
 			perSlotCount++
 			totalCount++
 
@@ -245,6 +249,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 					if err != nil {
 						t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
+
 						receiptMap = nil
 					}
 				} else {
@@ -361,6 +366,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 		if len(clients) == 0 {
 			return nil, nil, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
+
 		client = clients[0].ExecutionClient
 	}
 
@@ -381,9 +387,11 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
 
-	tx, err := wallet.BuildTransaction(ctx, func(ctx context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
+	tx, err := wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
 		amount := big.NewInt(int64(data.Amount))
+
 		amount.Mul(amount, big.NewInt(1000000000))
+
 		return depositContract.Deposit(&bind.TransactOpts{
 			From:      wallet.GetAddress(),
 			Nonce:     big.NewInt(int64(nonce)),

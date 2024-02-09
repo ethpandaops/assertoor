@@ -72,13 +72,16 @@ func parseBlobRefs(blobRefs string, txIdx uint64, blobIdx int, replacementIdx ui
 				if len(refParts) != 3 {
 					return nil, fmt.Errorf("invalid repeat ref format: %v", blobRef)
 				}
+
 				repeatCount, err2 := strconv.Atoi(refParts[2])
 				if err2 != nil {
 					return nil, fmt.Errorf("invalid repeat count: %v", refParts[2])
 				}
+
 				repeatBytes := common.FromHex(refParts[1])
 				repeatBytesLen := len(repeatBytes)
 				blobRefBytes = make([]byte, repeatCount*repeatBytesLen)
+
 				for i := 0; i < repeatCount; i++ {
 					copy(blobRefBytes[(i*repeatBytesLen):], repeatBytes)
 				}
@@ -97,6 +100,7 @@ func parseBlobRefs(blobRefs string, txIdx uint64, blobIdx int, replacementIdx ui
 					//nolint:gosec // ignore
 					blobLen = mathRand.Intn((params.BlobTxFieldElementsPerBlob * (params.BlobTxBytesPerFieldElement - 1)) - len(blobBytes))
 				}
+
 				blobRefBytes, err = randomBlobData(blobLen)
 				if err != nil {
 					return nil, err

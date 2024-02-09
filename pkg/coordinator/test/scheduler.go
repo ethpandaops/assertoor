@@ -414,9 +414,11 @@ func (ts *TaskScheduler) sortTaskList(taskList []types.Task) {
 	sort.Slice(taskList, func(a, b int) bool {
 		taskStateA := ts.taskStateMap[taskList[a]]
 		taskStateB := ts.taskStateMap[taskList[b]]
+
 		if taskStateA.parentState == taskStateB.parentState {
 			return taskStateA.index < taskStateB.index
 		}
+
 		for {
 			switch {
 			case taskStateA.parentState == taskStateB:
@@ -431,6 +433,7 @@ func (ts *TaskScheduler) sortTaskList(taskList []types.Task) {
 				taskStateA = taskStateA.parentState
 				taskStateB = taskStateB.parentState
 			}
+
 			if taskStateA.parentState == taskStateB.parentState {
 				return taskStateA.index < taskStateB.index
 			}

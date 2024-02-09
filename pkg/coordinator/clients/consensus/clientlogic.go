@@ -253,12 +253,15 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 		if header != nil {
 			return header, nil
 		}
+
 		ctx, cancel := context.WithTimeout(client.clientCtx, 10*time.Second)
 		defer cancel()
+
 		header, err := client.rpcClient.GetBlockHeaderByBlockroot(ctx, cachedBlock.Root)
 		if err != nil {
 			return nil, err
 		}
+
 		return header.Header, nil
 	})
 	if err != nil {
@@ -273,6 +276,7 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 		if err2 != nil {
 			return nil, err2
 		}
+
 		return block, nil
 	})
 	if err != nil {

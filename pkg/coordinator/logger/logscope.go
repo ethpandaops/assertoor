@@ -89,6 +89,7 @@ func (lh *logHistory) Fire(entry *logrus.Entry) error {
 	} else {
 		lh.logger.buf = append(lh.logger.buf, entry)
 	}
+
 	lh.logger.bufIdx++
 
 	return nil

@@ -137,6 +137,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			t.logger.Errorf("error generating slashing: %v", err.Error())
 		} else {
 			t.ctx.SetResult(types.TaskResultSuccess)
+
 			perSlotCount++
 			totalCount++
 		}
@@ -238,6 +239,7 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, validato
 		if len(clients) == 0 {
 			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
+
 		client = clients[0].ConsensusClient
 	}
 

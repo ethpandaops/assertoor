@@ -50,6 +50,7 @@ func CreateTest(coordinator types.Coordinator, config *Config, variables types.V
 			if err != nil {
 				return nil, err
 			}
+
 			_, err = test.taskScheduler.AddRootTask(taskOptions)
 			if err != nil {
 				return nil, err
@@ -61,6 +62,7 @@ func CreateTest(coordinator types.Coordinator, config *Config, variables types.V
 			if err != nil {
 				return nil, err
 			}
+
 			_, err = test.taskScheduler.AddCleanupTask(taskOptions)
 			if err != nil {
 				return nil, err
