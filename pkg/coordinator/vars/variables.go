@@ -134,12 +134,25 @@ func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string
 
 	varsMap := v.GetVarsMap()
 
+	// this is a bit hacky, but we're marshalling & unmarshalling varsMap here to generalize the types.
+	// ie. []string should be a []interface{} of strings
+	varsMapYaml, err := yaml.Marshal(&varsMap)
+	if err != nil {
+		return fmt.Errorf("could not marshal scope variables: %v", err)
+	}
+
+	err = yaml.Unmarshal(varsMapYaml, varsMap)
+	if err != nil {
+		return fmt.Errorf("could not unmarshal scope variables: %v", err)
+	}
+
+	// now execute dynamic queries with gojq
 	for cfgName, varQuery := range consumeMap {
 		queryStr := fmt.Sprintf(".%v", varQuery)
 
-		query, err := gojq.Parse(queryStr)
-		if err != nil {
-			return fmt.Errorf("could not parse variable query '%v': %v", queryStr, err)
+		query, err2 := gojq.Parse(queryStr)
+		if err2 != nil {
+			return fmt.Errorf("could not parse variable query '%v': %v", queryStr, err2)
 		}
 
 		iter := query.RunWithContext(ctx, varsMap)
@@ -154,7 +167,7 @@ func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string
 	}
 
 	// apply to config by generating a yaml, which is then parsed with the target config types.
-	// that's a bit hacky, but we don't have to care about types.
+	// that's a bit hacky again, but we don't have to care about types.
 	applyYaml, err := yaml.Marshal(&applyMap)
 	if err != nil {
 		return fmt.Errorf("could not marshal dynamic config vars: %v", err)
