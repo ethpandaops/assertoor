@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/tasks"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
@@ -69,15 +68,6 @@ func (ts *TaskScheduler) GetTaskCount() int {
 
 func (ts *TaskScheduler) GetServices() types.TaskServices {
 	return ts.services
-}
-
-func (ts *TaskScheduler) ParseTaskOptions(rawtask *helper.RawMessage) (*types.TaskOptions, error) {
-	options := &types.TaskOptions{}
-	if err := rawtask.Unmarshal(&options); err != nil {
-		return nil, fmt.Errorf("error parsing task: %w", err)
-	}
-
-	return options, nil
 }
 
 func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.Task, error) {
