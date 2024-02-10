@@ -90,7 +90,7 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	blockSubscription := consensusPool.GetBlockCache().SubscribeBlockEvent(10)
 
 	defer blockSubscription.Unsubscribe()
@@ -134,7 +134,7 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) runCheck() types.TaskResult {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	_, currentEpoch, err := consensusPool.GetBlockCache().GetWallclock().Now()
 	if err != nil {
@@ -158,7 +158,7 @@ func (t *Task) runCheck() types.TaskResult {
 }
 
 func (t *Task) processChainReorg(oldHead, newHead *consensus.Block) {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	parentHead := oldHead
 	newHeadDistance := uint64(0)
 	oldHeadDistance := uint64(0)

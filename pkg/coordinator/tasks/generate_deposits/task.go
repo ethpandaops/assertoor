@@ -136,7 +136,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var subscription *consensus.Subscription[*consensus.Block]
 	if t.config.LimitPerSlot > 0 {
-		subscription = t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
+		subscription = t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
 		defer subscription.Unsubscribe()
 	}
 
@@ -285,7 +285,7 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v1.Validator, error) {
-	client := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 
 	validators, err := client.GetRPCClient().GetStateValidators(ctx, "head")
 	if err != nil {
@@ -296,7 +296,7 @@ func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v
 }
 
 func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*common.BLSPubkey, *ethtypes.Transaction, error) {
-	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
 
@@ -375,7 +375,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 		return nil, nil, fmt.Errorf("cannot create bound instance of DepositContract: %w", err)
 	}
 
-	wallet, err := t.ctx.Scheduler.GetCoordinator().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
+	wallet, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot initialize wallet: %w", err)
 	}

@@ -1,4 +1,4 @@
-package test
+package scheduler
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 )
 
 type TaskScheduler struct {
-	coordinator      types.Coordinator
+	services         types.TaskServices
 	logger           logrus.FieldLogger
 	rootVars         types.Variables
 	taskCount        uint64
@@ -47,7 +47,7 @@ type taskExecutionState struct {
 	resultMutex      sync.RWMutex
 }
 
-func NewTaskScheduler(log logrus.FieldLogger, coordinator types.Coordinator, variables types.Variables) *TaskScheduler {
+func NewTaskScheduler(log logrus.FieldLogger, services types.TaskServices, variables types.Variables) *TaskScheduler {
 	return &TaskScheduler{
 		logger:       log,
 		rootVars:     variables,
@@ -55,7 +55,7 @@ func NewTaskScheduler(log logrus.FieldLogger, coordinator types.Coordinator, var
 		rootTasks:    make([]types.Task, 0),
 		allTasks:     make([]types.Task, 0),
 		taskStateMap: make(map[types.Task]*taskExecutionState),
-		coordinator:  coordinator,
+		services:     services,
 	}
 }
 
@@ -67,8 +67,8 @@ func (ts *TaskScheduler) GetTaskCount() int {
 	return len(ts.allTasks)
 }
 
-func (ts *TaskScheduler) GetCoordinator() types.Coordinator {
-	return ts.coordinator
+func (ts *TaskScheduler) GetServices() types.TaskServices {
+	return ts.services
 }
 
 func (ts *TaskScheduler) ParseTaskOptions(rawtask *helper.RawMessage) (*types.TaskOptions, error) {

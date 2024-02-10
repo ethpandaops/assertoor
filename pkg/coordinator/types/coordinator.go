@@ -14,6 +14,5 @@ type Coordinator interface {
 	ClientPool() *clients.ClientPool
 	WalletManager() *wallet.Manager
 	ValidatorNames() *names.ValidatorNames
-	NewVariables(parentScope Variables) Variables
 	GetTests() []Test
 }

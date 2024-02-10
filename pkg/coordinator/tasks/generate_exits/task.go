@@ -114,7 +114,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var subscription *consensus.Subscription[*consensus.Block]
 	if t.config.LimitPerSlot > 0 {
-		subscription = t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
+		subscription = t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
 		defer subscription.Unsubscribe()
 	}
 
@@ -165,7 +165,7 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, map[phase0.ValidatorIndex]*v1.Validator, error) {
-	client := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 
 	fork, err := client.GetRPCClient().GetForkState(ctx, "head")
 	if err != nil {
@@ -211,7 +211,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	// select client
 	var client *consensus.Client
 
-	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 	} else {

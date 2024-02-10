@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/scheduler"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 
 type Test struct {
 	name          string
-	taskScheduler *TaskScheduler
-	log           logrus.FieldLogger
+	taskScheduler *scheduler.TaskScheduler
+	logger        logrus.FieldLogger
 	config        *Config
 
 	status    types.TestStatus
@@ -24,7 +25,7 @@ type Test struct {
 func CreateTest(coordinator types.Coordinator, config *Config, variables types.Variables) (types.Test, error) {
 	test := &Test{
 		name:   config.Name,
-		log:    coordinator.Logger().WithField("component", "test").WithField("test", config.Name),
+		logger: coordinator.Logger().WithField("component", "test").WithField("test", config.Name),
 		config: config,
 		status: types.TestStatusPending,
 	}
@@ -44,7 +45,7 @@ func CreateTest(coordinator types.Coordinator, config *Config, variables types.V
 		testVars.CopyVars(variables, config.ConfigVars)
 
 		// parse tasks
-		test.taskScheduler = NewTaskScheduler(test.log, coordinator, testVars)
+		test.taskScheduler = scheduler.NewTaskScheduler(test.logger, coordinator, testVars)
 		for i := range config.Tasks {
 			taskOptions, err := test.taskScheduler.ParseTaskOptions(&config.Tasks[i])
 			if err != nil {
@@ -94,7 +95,7 @@ func (t *Test) Status() types.TestStatus {
 }
 
 func (t *Test) Logger() logrus.FieldLogger {
-	return t.log
+	return t.logger
 }
 
 func (t *Test) Validate() error {
@@ -128,17 +129,17 @@ func (t *Test) Run(ctx context.Context) error {
 	}()
 
 	// run test tasks
-	t.log.WithField("timeout", t.timeout.String()).Info("starting test")
+	t.logger.WithField("timeout", t.timeout.String()).Info("starting test")
 
 	err := t.taskScheduler.RunTasks(ctx, t.timeout)
 	if err != nil {
-		t.log.Info("test failed!")
+		t.logger.Info("test failed!")
 		t.status = types.TestStatusFailure
 
 		return err
 	}
 
-	t.log.Info("test completed!")
+	t.logger.Info("test completed!")
 	t.status = types.TestStatusSuccess
 
 	return nil

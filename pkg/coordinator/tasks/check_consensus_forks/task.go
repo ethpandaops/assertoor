@@ -86,7 +86,7 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	blockSubscription := consensusPool.GetBlockCache().SubscribeBlockEvent(10)
 
 	defer blockSubscription.Unsubscribe()
@@ -109,7 +109,7 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) runCheck() types.TaskResult {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	headForks := consensusPool.GetHeadForks(int64(t.config.MaxForkDistance))
 	if len(headForks)-1 > int(t.config.MaxForkCount) {

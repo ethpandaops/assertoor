@@ -89,7 +89,7 @@ func (t *Task) LoadConfig() error {
 		return err
 	}
 
-	t.wallet, err = t.ctx.Scheduler.GetCoordinator().WalletManager().GetWalletByPrivkey(privKey)
+	t.wallet, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
 	if err != nil {
 		return fmt.Errorf("cannot initialize wallet: %w", err)
 	}
@@ -112,7 +112,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		walletSeed = t.randStringBytes(20)
 	}
 
-	walletPool, err := t.ctx.Scheduler.GetCoordinator().WalletManager().GetWalletPoolByPrivkey(t.wallet.GetPrivateKey(), 1, walletSeed)
+	walletPool, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletPoolByPrivkey(t.wallet.GetPrivateKey(), 1, walletSeed)
 	if err != nil {
 		return err
 	}

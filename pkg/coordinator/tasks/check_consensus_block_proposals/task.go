@@ -94,7 +94,7 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	blockSubscription := consensusPool.GetBlockCache().SubscribeBlockEvent(10)
 	defer blockSubscription.Unsubscribe()
@@ -138,7 +138,7 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) loadValidatorSet(ctx context.Context) {
-	client := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 	validatorSet, err := client.GetRPCClient().GetStateValidators(ctx, "head")
 
 	if err != nil {
@@ -251,7 +251,7 @@ func (t *Task) checkBlockValidatorName(block *consensus.Block, blockData *spec.V
 		return false
 	}
 
-	validatorName := t.ctx.Scheduler.GetCoordinator().ValidatorNames().GetValidatorName(uint64(proposerIndex))
+	validatorName := t.ctx.Scheduler.GetServices().ValidatorNames().GetValidatorName(uint64(proposerIndex))
 
 	matched, err := regexp.MatchString(t.config.ValidatorNamePattern, validatorName)
 	if err != nil {

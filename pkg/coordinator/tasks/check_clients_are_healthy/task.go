@@ -106,7 +106,7 @@ func (t *Task) processCheck() {
 	totalClientCount := 0
 	failedClients := []string{}
 
-	for _, client := range t.ctx.Scheduler.GetCoordinator().ClientPool().GetClientsByNamePatterns(t.config.ClientPattern, "") {
+	for _, client := range t.ctx.Scheduler.GetServices().ClientPool().GetClientsByNamePatterns(t.config.ClientPattern, "") {
 		totalClientCount++
 
 		checkResult := t.processClientCheck(client)
