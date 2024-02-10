@@ -21,7 +21,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type Coordinator struct {

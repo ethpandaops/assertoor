@@ -7,7 +7,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	web_types "github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {

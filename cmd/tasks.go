@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/tasks"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // tasksCmd represents the tasks command
