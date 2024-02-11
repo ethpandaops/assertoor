@@ -72,10 +72,9 @@ func (v *Variables) NewScope() types.Variables {
 }
 
 func (v *Variables) ResolvePlaceholders(str string) string {
-	r := regexp.MustCompile(`\${([^}]+)}`)
-
-	return r.ReplaceAllStringFunc(str, func(m string) string {
-		parts := r.FindStringSubmatch(m)
+	r1 := regexp.MustCompile(`\${([^}]+)}`)
+	str = r1.ReplaceAllStringFunc(str, func(m string) string {
+		parts := r1.FindStringSubmatch(m)
 
 		varValue, varFound := v.LookupVar(parts[1])
 		if varFound {
@@ -84,6 +83,24 @@ func (v *Variables) ResolvePlaceholders(str string) string {
 
 		return m
 	})
+
+	r2 := regexp.MustCompile(`\${{(.*?)}}`)
+	str = r2.ReplaceAllStringFunc(str, func(m string) string {
+		parts := r2.FindStringSubmatch(m)
+
+		varValue, varFound, err := v.ResolveQuery(parts[1])
+		if err != nil {
+			return "?"
+		}
+
+		if varFound {
+			return fmt.Sprintf("%v", varValue)
+		}
+
+		return "?"
+	})
+
+	return str
 }
 
 func (v *Variables) GetVarsMap() map[string]any {
@@ -102,12 +119,34 @@ func (v *Variables) GetVarsMap() map[string]any {
 	return varsMap
 }
 
+func (v *Variables) getGeneralizedVarsMap() (map[string]any, error) {
+	varsMap := v.GetVarsMap()
+
+	// this is a bit hacky, but we're marshalling & unmarshalling varsMap here to generalize the types.
+	// ie. []string should be a []interface{} of strings
+	varsMapYaml, err := yaml.Marshal(&varsMap)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal scope variables: %v", err)
+	}
+
+	err = yaml.Unmarshal(varsMapYaml, varsMap)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal scope variables: %v", err)
+	}
+
+	return varsMap, nil
+}
+
 //nolint:gocritic // ignore
 func (v *Variables) ResolveQuery(queryStr string) (interface{}, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	varsMap := v.GetVarsMap()
+	varsMap, err := v.getGeneralizedVarsMap()
+	if err != nil {
+		return nil, false, fmt.Errorf("could not get generalized variables: %v", err)
+	}
+
 	queryStr = fmt.Sprintf(".%v", queryStr)
 
 	query, err := gojq.Parse(queryStr)
@@ -129,22 +168,13 @@ func (v *Variables) ResolveQuery(queryStr string) (interface{}, bool, error) {
 func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string) error {
 	applyMap := map[string]interface{}{}
 
+	varsMap, err := v.getGeneralizedVarsMap()
+	if err != nil {
+		return fmt.Errorf("could not get generalized variables: %v", err)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	varsMap := v.GetVarsMap()
-
-	// this is a bit hacky, but we're marshalling & unmarshalling varsMap here to generalize the types.
-	// ie. []string should be a []interface{} of strings
-	varsMapYaml, err := yaml.Marshal(&varsMap)
-	if err != nil {
-		return fmt.Errorf("could not marshal scope variables: %v", err)
-	}
-
-	err = yaml.Unmarshal(varsMapYaml, varsMap)
-	if err != nil {
-		return fmt.Errorf("could not unmarshal scope variables: %v", err)
-	}
 
 	// now execute dynamic queries with gojq
 	for cfgName, varQuery := range consumeMap {
