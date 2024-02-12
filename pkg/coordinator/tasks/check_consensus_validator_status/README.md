@@ -20,6 +20,9 @@ The `check_consensus_validator_status` task is focused on verifying the status o
 - **`failOnCheckMiss`**:\
   Determines the task's behavior if the validator's status does not match any of the statuses in `validatorStatus`. If `false`, the task will continue running and wait for the validator to match the expected status. If `true`, the task will fail immediately upon a status mismatch.
 
+- **`validatorInfoResultVar`**:\
+  The name of the variable where the resulting information about the validator will be stored. This includes status, index, balance and any other relevant data fetched during the check.
+
 ### Defaults
 
 These are the default settings for the `check_consensus_validator_status` task:

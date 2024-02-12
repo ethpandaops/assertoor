@@ -3,6 +3,7 @@ package checkconsensusvalidatorstatus
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"time"
@@ -175,6 +176,24 @@ func (t *Task) runValidatorStatusCheck() bool {
 
 			if !bytes.Equal(pubkey, validator.Validator.PublicKey[:]) {
 				continue
+			}
+		}
+
+		// found a matching validator
+
+		if t.config.ValidatorInfoResultVar != "" {
+			validatorJSON, err := json.Marshal(validator)
+			if err == nil {
+				validatorMap := map[string]interface{}{}
+				err = json.Unmarshal(validatorJSON, &validatorMap)
+
+				if err == nil {
+					t.ctx.Vars.SetVar(t.config.ValidatorInfoResultVar, validatorMap)
+				} else {
+					t.logger.Errorf("could not unmarshal validator info for result var: %v", err)
+				}
+			} else {
+				t.logger.Errorf("could not marshal validator info for result var: %v", err)
 			}
 		}
 
