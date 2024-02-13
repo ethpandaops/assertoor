@@ -132,7 +132,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		err := t.generateVoluntaryExit(ctx, accountIdx, fork, validators)
 		if err != nil {
-			t.logger.Errorf("error generating voluntary exit: %v", err.Error())
+			t.logger.Errorf("error generating voluntary exit for index %v: %v", accountIdx, err.Error())
 		} else {
 			t.ctx.SetResult(types.TaskResultSuccess)
 
@@ -159,6 +159,10 @@ func (t *Task) Execute(ctx context.Context) error {
 		} else if err := ctx.Err(); err != nil {
 			return err
 		}
+	}
+
+	if totalCount == 0 {
+		t.ctx.SetResult(types.TaskResultFailure)
 	}
 
 	return nil
@@ -201,7 +205,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 
 	// check validator status
 	if validator == nil {
-		return fmt.Errorf("validator not found")
+		return fmt.Errorf("validator not found: 0x%x", validatorPubkey)
 	}
 
 	if validator.Validator.ExitEpoch != 18446744073709551615 {

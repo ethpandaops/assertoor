@@ -99,22 +99,13 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// load current epoch duties
 	t.loadValidatorSet(ctx)
+	t.runCheck()
 
 	for {
 		select {
 		case <-wallclockEpochSubscription.Channel():
 			t.loadValidatorSet(ctx)
-
-			checkResult := t.runValidatorStatusCheck()
-
-			switch {
-			case checkResult:
-				t.ctx.SetResult(types.TaskResultSuccess)
-			case t.config.FailOnCheckMiss:
-				t.ctx.SetResult(types.TaskResultFailure)
-			default:
-				t.ctx.SetResult(types.TaskResultNone)
-			}
+			t.runCheck()
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -136,6 +127,22 @@ func (t *Task) loadValidatorSet(ctx context.Context) {
 	}
 }
 
+func (t *Task) runCheck() {
+	checkResult := t.runValidatorStatusCheck()
+
+	_, epoch, _ := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().GetWallclock().Now()
+	t.logger.Infof("epoch %v check result: %v", epoch.Number(), checkResult)
+
+	switch {
+	case checkResult:
+		t.ctx.SetResult(types.TaskResultSuccess)
+	case t.config.FailOnCheckMiss:
+		t.ctx.SetResult(types.TaskResultFailure)
+	default:
+		t.ctx.SetResult(types.TaskResultNone)
+	}
+}
+
 func (t *Task) runValidatorStatusCheck() bool {
 	if t.currentValidatorSet == nil {
 		t.logger.Errorf("check failed: no validator set")
@@ -147,7 +154,6 @@ func (t *Task) runValidatorStatusCheck() bool {
 	for {
 		validator := t.currentValidatorSet[currentIndex]
 		if validator == nil {
-			t.logger.Errorf("check failed: no matching validator found")
 			return false
 		}
 
@@ -175,11 +181,13 @@ func (t *Task) runValidatorStatusCheck() bool {
 			pubkey := common.FromHex(t.config.ValidatorPubKey)
 
 			if !bytes.Equal(pubkey, validator.Validator.PublicKey[:]) {
+				t.logger.Infof("check failed: no matching validator found")
 				continue
 			}
 		}
 
 		// found a matching validator
+		t.logger.Infof("validator found: index %v, status: %v", validator.Index, validator.Status.String())
 
 		if t.config.ValidatorInfoResultVar != "" {
 			validatorJSON, err := json.Marshal(validator)
