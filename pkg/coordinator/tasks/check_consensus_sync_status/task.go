@@ -116,7 +116,7 @@ func (t *Task) processCheck(ctx context.Context) {
 		}
 
 		if err != nil {
-			checkLogger.Warnf("errof fetching sync status: %v", err)
+			checkLogger.Warnf("error fetching sync status: %v", err)
 
 			checkResult = false
 		} else {

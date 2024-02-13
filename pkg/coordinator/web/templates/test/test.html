@@ -71,8 +71,9 @@
                 <div class="accordion-button task-header collapsed">
                   <div class="container">
                     <div class="row">
+                      <div class="col-6 col-sm-1 col-lg-1">ID</div>
                       <div class="col-6 col-sm-3 col-lg-3">Name</div>
-                      <div class="col-6 col-sm-6 col-lg-7">Title</div>
+                      <div class="col-6 col-sm-5 col-lg-6">Title</div>
                       <div class="col-6 col-sm-3 col-lg-2">Run Time</div>
                     </div>
                   </div>
@@ -82,16 +83,19 @@
             </div>
             {{ range $i, $task := .Tasks }}
               <div class="accordion-item">
-                <h2 class="accordion-header" style="padding-left: {{ $task.IndentPx }}px">
-                  <button class="accordion-button task-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#task{{ $task.Index }}-panel" aria-expanded="true" aria-controls="task{{ $task.Index }}-panel">
+                <h2 class="accordion-header">
+                  <button class="accordion-button task-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#task{{ $task.Index }}-panel" aria-expanded="true" aria-controls="task{{ $task.Index }}-panel" style="padding-left: {{ $task.IndentPx }}px">
                     <div class="container">
                       <div class="row">
+
+                        <div class="d-sm-none col-3 px-0">ID:</div>
+                        <div class="col-7 col-sm-1 col-lg-1">{{ $task.Index }}</div>
 
                         <div class="d-sm-none col-3 px-0">Name:</div>
                         <div class="col-7 col-sm-3 col-lg-3">{{ $task.Name }}</div>
 
                         <div class="d-sm-none col-3 px-0">Title:</div>
-                        <div class="col-7 col-sm-6 col-lg-7">{{ $task.Title }}</div>
+                        <div class="col-7 col-sm-5 col-lg-6">{{ $task.Title }}</div>
 
                         <div class="d-sm-none col-3 px-0">Run Time:</div>
                         <div class="col-7 col-sm-3 col-lg-2">{{ if $task.HasRunTime }}{{ $task.RunTime }}{{ else }}?{{ end }}{{ if $task.HasTimeout }} / {{ $task.Timeout }}{{ end }}</div>
@@ -125,7 +129,7 @@
                     </div>
                   </button>
                 </h2>
-                <div id="task{{ $task.Index }}-panel" class="accordion-collapse collapse">
+                <div id="task{{ $task.Index }}-panel" class="accordion-collapse collapse task-panel">
                   <div class="accordion-body">
                     <div class="container">
                       <div class="row">
@@ -189,40 +193,57 @@
                       </div>
                       {{ end }}
 
-                      <div class="row">
-                        <div class="col-12">Log:</div>
-                        <div class="col-12" style="max-height:400px; overflow-y:auto;">
-                          <div class="container">
-                          {{ range $i, $log := .Log }}
-                            <div class="row">
-                              <div class="col-5 col-lg-2">
-                                {{ formatDateTime $log.Time.UTC }}
-                              </div>
-                              <div class="col-3 col-lg-1">
-                                {{ if eq $log.Level 0 }}
-                                  <span class="loglevel-0">PANIC</span>
-                                {{ else if eq $log.Level 1 }}
-                                  <span class="loglevel-1">FATAL</span>
-                                {{ else if eq $log.Level 2 }}
-                                  <span class="loglevel-2">ERROR</span>
-                                {{ else if eq $log.Level 3 }}
-                                  <span class="loglevel-3">WARN</span>
-                                {{ else if eq $log.Level 4 }}
-                                  <span class="loglevel-4">INFO</span>
-                                {{ else if eq $log.Level 5 }}
-                                  <span class="loglevel-5">DEBUG</span>
-                                {{ else if eq $log.Level 6 }}
-                                  <span class="loglevel-6">TRACE</span>
-                                {{ end }}
-                              </div>
-                              <div class="col-3 col-lg-1">
-                                <span class="badge rounded-pill text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" data-bs-title="{{ range $key, $val := .Data }}{{ $key }}: {{ $val }}<br>{{ end }}">{{ $log.DataLen }} Fields</span>
-                              </div>
-                              <div class="col-12 col-lg-8">
-                                {{ $log.Message }}
+
+                      <ul class="nav nav-tabs" id="task{{ $task.Index }}-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                          <button class="nav-link active" id="task{{ $task.Index }}-logs-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-logs" type="button" role="tab" aria-controls="task{{ $task.Index }}-logs" aria-selected="true">Logs</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                          <button class="nav-link" id="task{{ $task.Index }}-config-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-config" type="button" role="tab" aria-controls="task{{ $task.Index }}-config" aria-selected="false">Config</button>
+                        </li>
+                      </ul>
+                      <div class="card">
+                        <div class="tab-content card-body" id="task{{ $task.Index }}-tabcontent">
+                          <div class="tab-pane fade show active" id="task{{ $task.Index }}-logs" role="tabpanel" aria-labelledby="task{{ $task.Index }}-logs-tab">
+                            <div style="max-height:400px; overflow-y:auto;">
+                              <div class="container">
+                              {{ range $i, $log := .Log }}
+                                <div class="row">
+                                  <div class="col-5 col-lg-2">
+                                    {{ formatDateTime $log.Time.UTC }}
+                                  </div>
+                                  <div class="col-3 col-lg-1">
+                                    {{ if eq $log.Level 0 }}
+                                      <span class="loglevel-0 text-danger">PANIC</span>
+                                    {{ else if eq $log.Level 1 }}
+                                      <span class="loglevel-1 text-danger">FATAL</span>
+                                    {{ else if eq $log.Level 2 }}
+                                      <span class="loglevel-2 text-danger">ERROR</span>
+                                    {{ else if eq $log.Level 3 }}
+                                      <span class="loglevel-3 text-warning">WARN</span>
+                                    {{ else if eq $log.Level 4 }}
+                                      <span class="loglevel-4 text-info">INFO</span>
+                                    {{ else if eq $log.Level 5 }}
+                                      <span class="loglevel-5 text-secondary">DEBUG</span>
+                                    {{ else if eq $log.Level 6 }}
+                                      <span class="loglevel-6 text-secondary">TRACE</span>
+                                    {{ end }}
+                                  </div>
+                                  <div class="col-3 col-lg-1">
+                                    <span class="badge rounded-pill text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" title="{{ range $key, $val := .Data }}{{ $key }}: {{ $val }}<br>{{ end }}">{{ $log.DataLen }} Fields</span>
+                                  </div>
+                                  <div class="col-12 col-lg-8">
+                                    {{ $log.Message }}
+                                  </div>
+                                </div>
+                              {{ end }}
                               </div>
                             </div>
-                          {{ end }}
+                          </div>
+                          <div class="tab-pane fade card-body" id="task{{ $task.Index }}-config" role="tabpanel" aria-labelledby="task{{ $task.Index }}-config-tab">
+<pre>
+{{ $task.ConfigYaml }}</pre>
+
                           </div>
                         </div>
                       </div>
@@ -244,4 +265,25 @@
 {{ define "js" }}
 {{ end }}
 {{ define "css" }}
+<style>
+.task-panel .accordion-body {
+  padding: 8px;
+  background-color: #fbfbfb;
+}
+
+.task-panel .card {
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.task-panel .tab-content {
+  padding: 4px;
+}
+
+.task-panel .nav-tabs .nav-link {
+  padding: 2px 16px;
+}
+
+</style>
 {{ end }}

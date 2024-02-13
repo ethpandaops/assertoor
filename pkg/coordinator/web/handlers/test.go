@@ -11,6 +11,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
 
 type TestPage struct {
@@ -43,6 +44,7 @@ type TestPageTask struct {
 	Result      string             `json:"result"`
 	ResultError string             `json:"result_error"`
 	Log         []*TestPageTaskLog `json:"log"`
+	ConfigYaml  string             `json:"config_yaml"`
 }
 
 type TestPageTaskLog struct {
@@ -221,6 +223,13 @@ func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
 				}
 
 				taskData.Log[i] = logData
+			}
+
+			taskConfig, err := yaml.Marshal(task.Config())
+			if err != nil {
+				taskData.ConfigYaml = fmt.Sprintf("failed marshalling config: %v", err)
+			} else {
+				taskData.ConfigYaml = string(taskConfig)
 			}
 
 			pageData.Tasks = append(pageData.Tasks, taskData)
