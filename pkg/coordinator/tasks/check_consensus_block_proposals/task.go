@@ -429,7 +429,7 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 			}
 
 			if !found {
-				t.logger.Infof("check failed for block %v [0x%x]: expected deposit not found (pubkey: %v)", block.Slot, block.Root, expectedSlashing.PublicKey)
+				t.logger.Infof("check failed for block %v [0x%x]: expected slashing not found (pubkey: %v)", block.Slot, block.Root, expectedSlashing.PublicKey)
 				return false
 			}
 		}
@@ -563,7 +563,7 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 			}
 
 			if !found {
-				t.logger.Infof("check failed for block %v [0x%x]: expected bls change not found (pubkey: %v)", block.Slot, block.Root, expectedWithdrawal.PublicKey)
+				t.logger.Infof("check failed for block %v [0x%x]: expected withdrawal not found (pubkey: %v)", block.Slot, block.Root, expectedWithdrawal.PublicKey)
 				return false
 			}
 		}
