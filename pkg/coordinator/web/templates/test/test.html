@@ -194,6 +194,7 @@
                       {{ end }}
 
 
+                      {{ if $task.IsStarted }}
                       <ul class="nav nav-tabs" id="task{{ $task.Index }}-tabs" role="tablist">
                         <li class="nav-item" role="presentation">
                           <button class="nav-link active" id="task{{ $task.Index }}-logs-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-logs" type="button" role="tab" aria-controls="task{{ $task.Index }}-logs" aria-selected="true">Logs</button>
@@ -247,6 +248,7 @@
                           </div>
                         </div>
                       </div>
+                      {{ end }}
 
                     </div>
                   </div>
