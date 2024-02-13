@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"regexp"
+	"runtime/debug"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,6 +16,8 @@ import (
 
 type ClientPool struct {
 	logger        logrus.FieldLogger
+	ctx           context.Context
+	ctxCancel     context.CancelFunc
 	consensusPool *consensus.Pool
 	executionPool *execution.Pool
 	clients       []*PoolClient
@@ -35,28 +38,42 @@ type ClientConfig struct {
 }
 
 func NewClientPool(logger logrus.FieldLogger) (*ClientPool, error) {
-	consensusPool, err := consensus.NewPool(&consensus.PoolConfig{
+	return NewClientPoolWithContext(context.Background(), logger)
+}
+
+func NewClientPoolWithContext(ctx context.Context, logger logrus.FieldLogger) (*ClientPool, error) {
+	poolCtx, ctxCancel := context.WithCancel(ctx)
+
+	consensusPool, err := consensus.NewPool(poolCtx, &consensus.PoolConfig{
 		FollowDistance: 10,
 		ForkDistance:   1,
 	}, logger.WithField("module", "consensus"))
 	if err != nil {
+		ctxCancel()
 		return nil, fmt.Errorf("could not init consensus pool: %w", err)
 	}
 
-	executionPool, err := execution.NewPool(&execution.PoolConfig{
+	executionPool, err := execution.NewPool(poolCtx, &execution.PoolConfig{
 		FollowDistance: 10,
 		ForkDistance:   1,
 	}, logger.WithField("module", "execution"))
 	if err != nil {
+		ctxCancel()
 		return nil, fmt.Errorf("could not init execution pool: %w", err)
 	}
 
 	return &ClientPool{
 		logger:        logger.WithField("module", "clients"),
+		ctx:           poolCtx,
+		ctxCancel:     ctxCancel,
 		consensusPool: consensusPool,
 		executionPool: executionPool,
 		clients:       make([]*PoolClient, 0),
 	}, nil
+}
+
+func (pool *ClientPool) Close() {
+	pool.ctxCancel()
 }
 
 func (pool *ClientPool) AddClient(config *ClientConfig) error {
@@ -92,29 +109,40 @@ func (pool *ClientPool) AddClient(config *ClientConfig) error {
 }
 
 func (pool *ClientPool) processConsensusBlockNotification(poolClient *PoolClient) {
+	defer func() {
+		if err := recover(); err != nil {
+			pool.logger.WithError(err.(error)).Errorf("uncaught panic in processConsensusBlockNotification subroutine: %v, stack: %v", err, string(debug.Stack()))
+		}
+	}()
+
 	subscription := poolClient.ConsensusClient.SubscribeBlockEvent(100)
 	defer subscription.Unsubscribe()
 
-	for block := range subscription.Channel() {
-		versionedBlock := block.AwaitBlock(context.Background(), 2*time.Second)
-		if versionedBlock == nil {
-			pool.logger.Warnf("cl/el block notification failed: AwaitBlock timeout (client: %v, slot: %v, root: 0x%x)", poolClient.Config.Name, block.Slot, block.Root)
-			break
-		}
+	for {
+		select {
+		case <-pool.ctx.Done():
+			return
+		case block := <-subscription.Channel():
+			versionedBlock := block.AwaitBlock(context.Background(), 2*time.Second)
+			if versionedBlock == nil {
+				pool.logger.Warnf("cl/el block notification failed: AwaitBlock timeout (client: %v, slot: %v, root: 0x%x)", poolClient.Config.Name, block.Slot, block.Root)
+				break
+			}
 
-		hash, err := versionedBlock.ExecutionBlockHash()
-		if err != nil {
-			pool.logger.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
-			break
-		}
+			hash, err := versionedBlock.ExecutionBlockHash()
+			if err != nil {
+				pool.logger.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
+				break
+			}
 
-		number, err := versionedBlock.ExecutionBlockNumber()
-		if err != nil {
-			pool.logger.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
-			break
-		}
+			number, err := versionedBlock.ExecutionBlockNumber()
+			if err != nil {
+				pool.logger.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
+				break
+			}
 
-		poolClient.ExecutionClient.NotifyNewBlock(common.Hash(hash), number)
+			poolClient.ExecutionClient.NotifyNewBlock(common.Hash(hash), number)
+		}
 	}
 }
 

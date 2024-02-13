@@ -35,4 +35,5 @@ These are the default settings for the `check_consensus_validator_status` task:
     validatorIndex: null
     validatorStatus: []
     failOnCheckMiss: false
+    validatorInfoResultVar: ""
 ```

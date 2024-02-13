@@ -1,12 +1,12 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
@@ -27,23 +27,25 @@ type BeaconStreamEvent struct {
 }
 
 type BeaconStream struct {
-	runMutex     sync.Mutex
+	ctx          context.Context
+	ctxCancel    context.CancelFunc
 	running      bool
-	ready        bool
 	events       uint16
 	client       *BeaconClient
-	killChan     chan bool
 	ReadyChan    chan bool
 	EventChan    chan *BeaconStreamEvent
 	lastHeadSeen time.Time
 }
 
-func (bc *BeaconClient) NewBlockStream(events uint16) *BeaconStream {
+func (bc *BeaconClient) NewBlockStream(ctx context.Context, events uint16) *BeaconStream {
+	streamCtx, ctxCancel := context.WithCancel(ctx)
+
 	blockStream := BeaconStream{
+		ctx:       streamCtx,
+		ctxCancel: ctxCancel,
 		running:   true,
 		events:    events,
 		client:    bc,
-		killChan:  make(chan bool),
 		ReadyChan: make(chan bool, 10),
 		EventChan: make(chan *BeaconStreamEvent, 10),
 	}
@@ -52,37 +54,23 @@ func (bc *BeaconClient) NewBlockStream(events uint16) *BeaconStream {
 	return &blockStream
 }
 
-func (bs *BeaconStream) Start() {
-	if bs.running {
-		return
-	}
-
-	bs.running = true
-	go bs.startStream()
-}
-
 func (bs *BeaconStream) Close() {
-	if bs.running {
-		bs.running = false
-		close(bs.killChan)
-	}
-
-	bs.runMutex.Lock()
-	//nolint:gocritic // ignore
-	defer bs.runMutex.Unlock()
+	bs.ctxCancel()
 }
 
 func (bs *BeaconStream) startStream() {
-	bs.runMutex.Lock()
-	defer bs.runMutex.Unlock()
+	defer func() {
+		bs.running = false
+	}()
 
 	stream := bs.subscribeStream(bs.client.endpoint, bs.events)
 	if stream != nil {
-		bs.ready = true
-		running := true
+		defer stream.Close()
 
-		for running {
+		for {
 			select {
+			case <-bs.ctx.Done():
+				return
 			case evt := <-stream.Events:
 				switch evt.Event() {
 				case "block":
@@ -92,22 +80,17 @@ func (bs *BeaconStream) startStream() {
 				case "finalized_checkpoint":
 					bs.processFinalizedEvent(evt)
 				}
-			case <-bs.killChan:
-				running = false
 			case <-stream.Ready:
 				bs.ReadyChan <- true
 			case err := <-stream.Errors:
 				logger.WithField("client", bs.client.name).Warnf("beacon block stream error: %v", err)
-				bs.ReadyChan <- false
+				select {
+				case bs.ReadyChan <- false:
+				case <-bs.ctx.Done():
+				}
 			}
 		}
 	}
-
-	if stream != nil {
-		stream.Close()
-	}
-
-	bs.running = false
 }
 
 func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventstream.Stream {
@@ -153,7 +136,7 @@ func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventst
 		var stream *eventstream.Stream
 
 		streamURL := fmt.Sprintf("%s/eth/v1/events?topics=%v", endpoint, topics.String())
-		req, err := http.NewRequest("GET", streamURL, http.NoBody)
+		req, err := http.NewRequestWithContext(bs.ctx, "GET", streamURL, http.NoBody)
 
 		if err == nil {
 			for headerKey, headerVal := range bs.client.headers {
@@ -166,7 +149,7 @@ func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventst
 		if err != nil {
 			logger.WithField("client", bs.client.name).Warnf("Error while subscribing beacon event stream %v: %v", getRedactedURL(streamURL), err)
 			select {
-			case <-bs.killChan:
+			case <-bs.ctx.Done():
 				return nil
 			case <-time.After(10 * time.Second):
 			}

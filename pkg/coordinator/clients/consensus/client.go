@@ -75,7 +75,7 @@ func (client *Client) resetContext() {
 		client.clientCtxCancel()
 	}
 
-	client.clientCtx, client.clientCtxCancel = context.WithCancel(context.Background())
+	client.clientCtx, client.clientCtxCancel = context.WithCancel(client.pool.ctx)
 }
 
 func (client *Client) SubscribeBlockEvent(capacity int) *Subscription[*Block] {

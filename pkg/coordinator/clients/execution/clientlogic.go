@@ -48,7 +48,7 @@ func (client *Client) runClientLoop() {
 }
 
 func (client *Client) checkClient() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(client.clientCtx, 60*time.Second)
 	defer cancel()
 
 	err := client.rpcClient.Initialize(ctx)
@@ -117,6 +117,8 @@ func (client *Client) runClientLogic() error {
 		}
 
 		select {
+		case <-client.clientCtx.Done():
+			return nil
 		case updateNotification := <-client.updateChan:
 			var err error
 

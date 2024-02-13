@@ -2,6 +2,7 @@ package execution
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/big"
 	"runtime/debug"
@@ -26,7 +27,7 @@ type BlockCache struct {
 	blockDispatcher Dispatcher[*Block]
 }
 
-func NewBlockCache(logger logrus.FieldLogger, followDistance uint64) (*BlockCache, error) {
+func NewBlockCache(ctx context.Context, logger logrus.FieldLogger, followDistance uint64) (*BlockCache, error) {
 	if followDistance == 0 {
 		return nil, fmt.Errorf("cannot initialize block cache without follow distance")
 	}
@@ -43,7 +44,7 @@ func NewBlockCache(logger logrus.FieldLogger, followDistance uint64) (*BlockCach
 				logger.WithError(err.(error)).Errorf("uncaught panic in BlockCache.runCacheCleanup subroutine: %v, stack: %v", err, string(debug.Stack()))
 			}
 		}()
-		cache.runCacheCleanup()
+		cache.runCacheCleanup(ctx)
 	}()
 
 	return &cache, nil
@@ -170,9 +171,13 @@ func (cache *BlockCache) GetCachedBlocks() []*Block {
 	return blocks
 }
 
-func (cache *BlockCache) runCacheCleanup() {
+func (cache *BlockCache) runCacheCleanup(ctx context.Context) {
 	for {
-		time.Sleep(30 * time.Second)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(30 * time.Second):
+		}
 
 		cache.cleanupCache()
 	}

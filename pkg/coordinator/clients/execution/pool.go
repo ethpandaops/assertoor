@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -21,6 +22,7 @@ type PoolConfig struct {
 
 type Pool struct {
 	config         *PoolConfig
+	ctx            context.Context
 	logger         logrus.FieldLogger
 	clientCounter  uint16
 	clients        []*Client
@@ -33,9 +35,10 @@ type Pool struct {
 	rrLastIndexes  map[ClientType]uint16
 }
 
-func NewPool(config *PoolConfig, logger logrus.FieldLogger) (*Pool, error) {
+func NewPool(ctx context.Context, config *PoolConfig, logger logrus.FieldLogger) (*Pool, error) {
 	pool := Pool{
 		config:        config,
+		ctx:           ctx,
 		logger:        logger,
 		clients:       make([]*Client, 0),
 		forkCache:     map[int64][]*HeadFork{},
@@ -51,7 +54,7 @@ func NewPool(config *PoolConfig, logger logrus.FieldLogger) (*Pool, error) {
 		return nil, fmt.Errorf("unknown pool schedulerMode: %v", config.SchedulerMode)
 	}
 
-	pool.blockCache, err = NewBlockCache(logger, config.FollowDistance)
+	pool.blockCache, err = NewBlockCache(ctx, logger, config.FollowDistance)
 	if err != nil {
 		return nil, err
 	}
