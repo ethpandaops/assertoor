@@ -116,16 +116,7 @@ func (fh *FrontendHandler) TestData(w http.ResponseWriter, r *http.Request) {
 }
 
 func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
-	var test types.Test
-
-	allTests := fh.coordinator.GetTests()
-	for idx := range allTests {
-		if int64(idx) == testIdx {
-			test = allTests[idx]
-			break
-		}
-	}
-
+	test := fh.coordinator.GetTestByRunID(uint64(testIdx))
 	if test == nil {
 		return nil, fmt.Errorf("Test not found")
 	}

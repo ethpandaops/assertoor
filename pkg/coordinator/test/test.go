@@ -11,10 +11,12 @@ import (
 )
 
 type Test struct {
-	name          string
+	runID         uint64
 	taskScheduler *scheduler.TaskScheduler
 	logger        logrus.FieldLogger
-	config        *Config
+	descriptor    types.TestDescriptor
+	config        *types.TestConfig
+	variables     types.Variables
 
 	status    types.TestStatus
 	startTime time.Time
@@ -22,60 +24,64 @@ type Test struct {
 	timeout   time.Duration
 }
 
-func CreateTest(coordinator types.Coordinator, config *Config, variables types.Variables) (types.Test, error) {
+func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.FieldLogger, services types.TaskServices, variables types.Variables) (types.Test, error) {
 	test := &Test{
-		name:   config.Name,
-		logger: coordinator.Logger().WithField("component", "test").WithField("test", config.Name),
-		config: config,
-		status: types.TestStatusPending,
+		runID:      runID,
+		logger:     logger.WithField("RunID", runID),
+		descriptor: descriptor,
+		config:     descriptor.Config(),
+		status:     types.TestStatusPending,
 	}
 	if test.config.Timeout.Duration > 0 {
 		test.timeout = test.config.Timeout.Duration
 	}
 
-	if config.Disable {
-		test.status = types.TestStatusSkipped
-	} else {
-		// set test variables
-		testVars := variables.NewScope()
-		for name, value := range config.Config {
-			testVars.SetVar(name, value)
+	// set test variables
+	test.variables = variables.NewScope()
+	for name, value := range test.config.Config {
+		test.variables.SetVar(name, value)
+	}
+
+	err := test.variables.CopyVars(variables, test.config.ConfigVars)
+	if err != nil {
+		return nil, err
+	}
+
+	// parse tasks
+	test.taskScheduler = scheduler.NewTaskScheduler(test.logger, services, test.variables)
+	for i := range test.config.Tasks {
+		taskOptions, err := test.taskScheduler.ParseTaskOptions(&test.config.Tasks[i])
+		if err != nil {
+			return nil, err
 		}
 
-		testVars.CopyVars(variables, config.ConfigVars)
+		_, err = test.taskScheduler.AddRootTask(taskOptions)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-		// parse tasks
-		test.taskScheduler = scheduler.NewTaskScheduler(test.logger, coordinator, testVars)
-		for i := range config.Tasks {
-			taskOptions, err := test.taskScheduler.ParseTaskOptions(&config.Tasks[i])
-			if err != nil {
-				return nil, err
-			}
-
-			_, err = test.taskScheduler.AddRootTask(taskOptions)
-			if err != nil {
-				return nil, err
-			}
+	for i := range test.config.CleanupTasks {
+		taskOptions, err := test.taskScheduler.ParseTaskOptions(&test.config.CleanupTasks[i])
+		if err != nil {
+			return nil, err
 		}
 
-		for i := range config.CleanupTasks {
-			taskOptions, err := test.taskScheduler.ParseTaskOptions(&config.CleanupTasks[i])
-			if err != nil {
-				return nil, err
-			}
-
-			_, err = test.taskScheduler.AddCleanupTask(taskOptions)
-			if err != nil {
-				return nil, err
-			}
+		_, err = test.taskScheduler.AddCleanupTask(taskOptions)
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	return test, nil
 }
 
+func (t *Test) RunID() uint64 {
+	return t.runID
+}
+
 func (t *Test) Name() string {
-	return t.name
+	return t.config.Name
 }
 
 func (t *Test) StartTime() time.Time {
@@ -105,7 +111,7 @@ func (t *Test) Validate() error {
 
 	if t.taskScheduler.GetTaskCount() == 0 {
 		t.status = types.TestStatusFailure
-		return fmt.Errorf("test %s has no tasks", t.name)
+		return fmt.Errorf("test %s has no tasks", t.config.Name)
 	}
 
 	return nil
@@ -147,6 +153,10 @@ func (t *Test) Run(ctx context.Context) error {
 
 func (t *Test) GetTaskScheduler() types.TaskScheduler {
 	return t.taskScheduler
+}
+
+func (t *Test) GetTestVariables() types.Variables {
+	return t.variables
 }
 
 func (t *Test) Percent() float64 {

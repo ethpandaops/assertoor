@@ -11,14 +11,22 @@ import (
 )
 
 type IndexPage struct {
-	ClientCount  uint64           `json:"client_count"`
-	CLReadyCount uint64           `json:"cl_ready_count"`
-	CLHeadSlot   uint64           `json:"cl_head_slot"`
-	CLHeadRoot   []byte           `json:"cl_head_root"`
-	ELReadyCount uint64           `json:"el_ready_count"`
-	ELHeadNumber uint64           `json:"el_head_number"`
-	ELHeadHash   []byte           `json:"el_head_hash"`
-	Tests        []*IndexPageTest `json:"tests"`
+	ClientCount     uint64                     `json:"client_count"`
+	CLReadyCount    uint64                     `json:"cl_ready_count"`
+	CLHeadSlot      uint64                     `json:"cl_head_slot"`
+	CLHeadRoot      []byte                     `json:"cl_head_root"`
+	ELReadyCount    uint64                     `json:"el_ready_count"`
+	ELHeadNumber    uint64                     `json:"el_head_number"`
+	ELHeadHash      []byte                     `json:"el_head_hash"`
+	TestDescriptors []*IndexPageTestDescriptor `json:"test_descriptors"`
+	Tests           []*IndexPageTest           `json:"tests"`
+}
+
+type IndexPageTestDescriptor struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Source string `json:"source"`
+	Config string `json:"config"`
 }
 
 type IndexPageTest struct {
@@ -114,7 +122,7 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 	// tasks list
 	pageData.Tests = []*IndexPageTest{}
 
-	for idx, test := range fh.coordinator.GetTests() {
+	for idx, test := range fh.coordinator.GetTestHistory() {
 		testData := &IndexPageTest{
 			Index:      uint64(idx),
 			Name:       test.Name(),

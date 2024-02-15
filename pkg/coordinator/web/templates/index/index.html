@@ -1,5 +1,47 @@
 {{ define "page" }}
-  <div class="container mt-2">
+  <div class="d-flex flex-column flex-shrink-0 p-3 bg-light" style="width: 280px;">
+    <ul class="nav nav-pills flex-column mb-auto">
+      <li class="nav-item">
+        <a href="#" class="nav-link active" aria-current="page">
+          All Test Runs
+        </a>
+      </li>
+      <li class="my-1">
+        <hr>
+      </li>
+      <li>
+        <a href="#" class="nav-link link-dark">
+          Test 1
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link link-dark">
+          Test 2
+        </a>
+      </li>
+    </ul>
+    <hr>
+    <div class="container-fluid text-secondary">
+      <div class="row">
+        <div class="col-7">
+          CL Clients: {{ .CLReadyCount }} / {{ .ClientCount }}
+        </div>
+        <div class="col-5">
+          Slot: {{ .CLHeadSlot }}
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-7">
+          EL Clients: {{ .ELReadyCount }} / {{ .ClientCount }}
+        </div>
+        <div class="col-5">
+          Block: {{ .ELHeadNumber }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex flex-column flex-grow-1 m-2">
     <h2 class="py-2">Assertoor: Testnet Testing Tool</h2>
     
     <!-- client pool status -->
@@ -230,4 +272,12 @@
 {{ define "js" }}
 {{ end }}
 {{ define "css" }}
+<style>
+body main {
+  display: flex;
+  min-height: calc(100vh - 64px)!important;
+  overflow: hidden;
+}
+
+</style>
 {{ end }}

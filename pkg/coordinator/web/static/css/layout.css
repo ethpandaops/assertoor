@@ -4,13 +4,15 @@ body main {
 }
 
 .header {
-    height: 70px;
+    height: 64px;
 }
 
 .footer {
     margin-top: 30px;
     margin-bottom: 20px;
 }
+
+
 
 header.header-bar {
     position: fixed;
@@ -26,8 +28,20 @@ header.header-bar {
     }
 }
 
+header.header-bar .main-navigation {
+    padding: 0;
+    height: 100%
+}
+
+header.header-bar .navbar-items {
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
 header.header-bar .navbar-brand {
-    margin-right: 0;
+    width: 280px;
+    padding-left: 24px;
 }
 
 .test-list .accordion-item.test-list-header .test-header .row > * {
