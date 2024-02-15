@@ -30,12 +30,18 @@
         {{ template "header" . }}
       </div>
       <main>
-        {{ template "page" .Data }}
+        {{ template "sidebar" .Data }}
+        <div class="main-content">
+          <div class="main-page">
+            {{ template "page" .Data }}
+          </div>
+          <div class="footer">
+            <hr>
+            {{ template "footer" . }}
+          </div>
+        </div>
       </main>
-      <div class="footer">
-        <hr>
-        {{ template "footer" . }}
-      </div>
+      
       <script src="/js/jquery.min.js"></script>
       <script src="/js/bootstrap.bundle.min.js"></script>
       <script src="/js/clipboard.min.js"></script>

@@ -1,6 +1,8 @@
 
 body main {
-    min-height: calc(100vh - 180px)!important;
+    display: flex;
+    overflow: hidden;
+    min-height: calc(100vh - 64px)!important;
 }
 
 .header {
@@ -43,6 +45,23 @@ header.header-bar .navbar-brand {
     width: 280px;
     padding-left: 24px;
 }
+
+
+main .main-content {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+main .main-page {
+    flex-grow: 1;
+}
+
+.test-list .details-table .details-row {
+    padding: 0 !important;
+}
+
+
 
 .test-list .accordion-item.test-list-header .test-header .row > * {
     font-weight: 600;

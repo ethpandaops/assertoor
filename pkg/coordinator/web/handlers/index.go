@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/sirupsen/logrus"
@@ -18,6 +19,7 @@ type IndexPage struct {
 	ELReadyCount    uint64                     `json:"el_ready_count"`
 	ELHeadNumber    uint64                     `json:"el_head_number"`
 	ELHeadHash      []byte                     `json:"el_head_hash"`
+	Version         string                     `json:"version"`
 	TestDescriptors []*IndexPageTestDescriptor `json:"test_descriptors"`
 	Tests           []*IndexPageTest           `json:"tests"`
 }
@@ -55,6 +57,7 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 	templateFiles := web.LayoutTemplateFiles
 	templateFiles = append(templateFiles,
 		"index/index.html",
+		"index/test_runs.html",
 	)
 	pageTemplate := web.GetTemplate(templateFiles...)
 	data := web.InitPageData(w, r, "index", "/", "Index", templateFiles)
@@ -98,7 +101,9 @@ func (fh *FrontendHandler) IndexData(w http.ResponseWriter, r *http.Request) {
 
 //nolint:unparam // ignore
 func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
-	pageData := &IndexPage{}
+	pageData := &IndexPage{
+		Version: buildinfo.GetVersion(),
+	}
 
 	// client pool status
 	clientPool := fh.coordinator.ClientPool()
@@ -122,7 +127,8 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 	// tasks list
 	pageData.Tests = []*IndexPageTest{}
 
-	for idx, test := range fh.coordinator.GetTestHistory() {
+	testInstances := append(fh.coordinator.GetTestHistory(), fh.coordinator.GetTestQueue()...)
+	for idx, test := range testInstances {
 		testData := &IndexPageTest{
 			Index:      uint64(idx),
 			Name:       test.Name(),

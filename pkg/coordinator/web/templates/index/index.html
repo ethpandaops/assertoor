@@ -1,5 +1,29 @@
-{{ define "page" }}
+{{ define "sidebar" }}
   <div class="d-flex flex-column flex-shrink-0 p-3 bg-light" style="width: 280px;">
+    <div class="container-fluid text-secondary">
+      <div class="row">
+        <div class="col-12">
+          Connected Clients:
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-6">
+          CL: {{ .CLReadyCount }} / {{ .ClientCount }}
+        </div>
+        <div class="col-6">
+          Slot: {{ .CLHeadSlot }}
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-6">
+          EL: {{ .ELReadyCount }} / {{ .ClientCount }}
+        </div>
+        <div class="col-6">
+          Block: {{ .ELHeadNumber }}
+        </div>
+      </div>
+    </div>
+    <hr>
     <ul class="nav nav-pills flex-column mb-auto">
       <li class="nav-item">
         <a href="#" class="nav-link active" aria-current="page">
@@ -8,6 +32,7 @@
       </li>
       <li class="my-1">
         <hr>
+        Tests:
       </li>
       <li>
         <a href="#" class="nav-link link-dark">
@@ -20,169 +45,14 @@
         </a>
       </li>
     </ul>
-    <hr>
-    <div class="container-fluid text-secondary">
-      <div class="row">
-        <div class="col-7">
-          CL Clients: {{ .CLReadyCount }} / {{ .ClientCount }}
-        </div>
-        <div class="col-5">
-          Slot: {{ .CLHeadSlot }}
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-7">
-          EL Clients: {{ .ELReadyCount }} / {{ .ClientCount }}
-        </div>
-        <div class="col-5">
-          Block: {{ .ELHeadNumber }}
-        </div>
-      </div>
-    </div>
   </div>
+{{ end }}
 
-  <div class="d-flex flex-column flex-grow-1 m-2">
-    <h2 class="py-2">Assertoor: Testnet Testing Tool</h2>
+{{ define "page" }}
+  <div class="d-flex flex-column flex-grow-1 m-3">
+    <h2 class="py-2">All Test Runs</h2>
     
-    <!-- client pool status -->
-    <div class="row">
-      <div class="col-6 col-sm-4 col-lg-3">
-        Consensus Clients:
-      </div>
-      <div class="col-6 col-sm-8 col-lg-9">
-        {{ .CLReadyCount }} / {{ .ClientCount }}  (Slot: {{ .CLHeadSlot }})
-      </div>
-    </div>
-    <div class="row">
-      <div class="col-6 col-sm-4 col-lg-3">
-        Execution Clients:
-      </div>
-      <div class="col-6 col-sm-8 col-lg-9">
-        {{ .ELReadyCount }} / {{ .ClientCount }}  (Block: {{ .ELHeadNumber }})
-      </div>
-    </div>
-    
-    <!-- test list -->
-    <div class="test-list">
-      <div class="card mt-2">
-        <div class="card-body px-0 py-1">
-          <h4 class="px-2 py-1 my-0">Tests</h4>
-          <div class="accordion accordion-flush" id="testsList">
-            <div class="accordion-item d-none d-sm-block test-list-header">
-              <h2 class="accordion-header">
-                <div class="accordion-button test-header collapsed">
-                  <div class="container">
-                    <div class="row">
-                      <div class="col-6 col-sm-8 col-lg-9">Name</div>
-                      <div class="col-6 col-sm-4 col-lg-3">Run Time</div>
-                    </div>
-                  </div>
-                  <div class="test-status"></div>
-                </div>
-              </h2>
-            </div>
-            {{ range $i, $test := .Tests }}
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button test-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#test{{ $test.Index }}-panel" aria-expanded="true" aria-controls="test{{ $test.Index }}-panel">
-                    <div class="container">
-                      <div class="row">
-
-                        <div class="d-sm-none col-3 px-0">Name:</div>
-                        <div class="col-7 col-sm-8 col-lg-9">{{ $test.Name }}</div>
-
-                        <div class="d-sm-none col-3 px-0">Run Time:</div>
-                        <div class="col-7 col-sm-4 col-lg-3">
-                          {{ if $test.HasRunTime }}{{ $test.RunTime }}{{ else }}?{{ end }}{{ if $test.HasTimeout }} / {{ $test.Timeout }}{{ end }}
-                        </div>
-
-                      </div>
-                    </div>
-                    <div class="test-status">
-                      {{ if eq $test.Status "pending" }}
-                        <span class="badge rounded-pill text-bg-secondary">
-                          <i class="far fa-hourglass-half"></i>
-                        </span>
-                      {{ else if eq $test.Status "running" }}
-                        <span class="badge rounded-pill text-bg-primary">
-                          <i class="far fa-play-circle"></i>
-                        </span>
-                      {{ else if eq $test.Status "success" }}
-                        <span class="badge rounded-pill text-bg-success">
-                          <i class="fas fa-check-circle"></i>
-                        </span>
-                      {{ else if eq $test.Status "failure" }}
-                        <span class="badge rounded-pill text-bg-danger">
-                          <i class="fas fa-times-circle"></i>
-                        </span>
-                      {{ else }}
-                        <span class="badge rounded-pill text-bg-warning">
-                          {{ $test.Status }}
-                        </span>
-                      {{ end }}
-                    </div>
-                  </button>
-                </h2>
-                <div id="test{{ $test.Index }}-panel" class="accordion-collapse collapse">
-                  <div class="accordion-body">
-                    <div class="container">
-                      <div class="row">
-                        <div class="col-6 col-sm-3 col-lg-2">Status:</div>
-                        <div class="col-6 col-sm-3 col-lg-10">
-                          {{ if eq $test.Status "pending" }}
-                            <span class="badge rounded-pill text-bg-secondary">
-                              <i class="far fa-hourglass-half"></i> Pending
-                            </span>
-                          {{ else if eq $test.Status "running" }}
-                            <span class="badge rounded-pill text-bg-primary">
-                              <i class="far fa-play-circle"></i> Running
-                            </span>
-                          {{ else if eq $test.Status "success" }}
-                            <span class="badge rounded-pill text-bg-success">
-                              <i class="fas fa-check-circle"></i> Success
-                            </span>
-                          {{ else if eq $test.Status "failure" }}
-                            <span class="badge rounded-pill text-bg-danger">
-                              <i class="fas fa-times-circle"></i> Failure
-                            </span>
-                          {{ else }}
-                            <span class="badge rounded-pill text-bg-warning">
-                              {{ $test.Status }}
-                            </span>
-                          {{ end }}
-                        </div>
-                      </div>
-                      {{ if $test.IsStarted }}
-                      <div class="row">
-                        <div class="col-6 col-sm-3 col-lg-2">Start Time:</div>
-                        <div class="col-6 col-sm-3 col-lg-10">{{ formatDateTime $test.StartTime.UTC }}</div>
-                      </div>
-                      {{ end }}
-                      {{ if $test.IsCompleted }}
-                      <div class="row">
-                        <div class="col-6 col-sm-3 col-lg-2">Finish Time:</div>
-                        <div class="col-6 col-sm-3 col-lg-10">{{ formatDateTime $test.StopTime.UTC }}</div>
-                      </div>
-                      {{ end }}
-                      <div class="row">
-                        <div class="col-6 col-sm-3 col-lg-2">Tasks:</div>
-                        <div class="col-6 col-sm-3 col-lg-10">{{ .TaskCount }}</div>
-                      </div>
-                      <div class="row">
-                        <div class="col">
-                          <a href="/test/{{ $test.Index }}">View Test Details</a>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            {{ end }}
-
-          </div>
-        </div>
-      </div>
-    </div>
+    {{ template "test_runs" .Tests }}
 
   </div>
 {{ end }}
@@ -273,11 +143,8 @@
 {{ end }}
 {{ define "css" }}
 <style>
-body main {
-  display: flex;
-  min-height: calc(100vh - 64px)!important;
-  overflow: hidden;
+.main-navigation {
+  max-width: none !important;
 }
-
 </style>
 {{ end }}
