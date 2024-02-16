@@ -24,18 +24,33 @@
       <link rel="preload" as="font" href="/webfonts/fa-brands-400.woff2" crossorigin />
       <link id="app-style" rel="stylesheet" href="/css/layout.css" />
       {{ template "css" .Data }}
+      {{ if .ShowSidebar }}
+      <style>
+        .main-navigation {
+          max-width: none !important;
+        }
+        </style>
+      {{ end }}
     </head>
     <body>
       <div class="header">
         {{ template "header" . }}
       </div>
       <main>
-        {{ template "page" .Data }}
+        {{ if .ShowSidebar }}
+          {{ template "sidebar" .SidebarData }}
+        {{ end }}
+        <div class="main-content">
+          <div class="main-page">
+            {{ template "page" .Data }}
+          </div>
+          <div class="footer">
+            <hr>
+            {{ template "footer" . }}
+          </div>
+        </div>
       </main>
-      <div class="footer">
-        <hr>
-        {{ template "footer" . }}
-      </div>
+      
       <script src="/js/jquery.min.js"></script>
       <script src="/js/bootstrap.bundle.min.js"></script>
       <script src="/js/clipboard.min.js"></script>

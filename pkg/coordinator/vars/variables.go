@@ -211,13 +211,19 @@ func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string
 	return nil
 }
 
-func (v *Variables) CopyVars(source types.Variables, copyMap map[string]string) {
-	for targetName, varName := range copyMap {
-		varValue, varFound := source.LookupVar(varName)
-		if !varFound {
+func (v *Variables) CopyVars(source types.Variables, copyMap map[string]string) error {
+	for cfgName, varQuery := range copyMap {
+		val, ok, err := source.ResolveQuery(varQuery)
+		if err != nil {
+			return err
+		}
+
+		if !ok {
 			continue
 		}
 
-		v.SetVar(targetName, varValue)
+		v.SetVar(cfgName, val)
 	}
+
+	return nil
 }

@@ -8,8 +8,8 @@
         </p>
       </div>
       <div class="card-body">
-          Tech stuff for bug report: <i class="fa fa-copy text-muted p-1" role="button" data-bs-toggle="tooltip" title="Copy to clipboard" data-clipboard-target="#errormsg"></i>
-          <div class="error-message p-1">
+        Tech stuff for bug report: <i class="fa fa-copy text-muted p-1" role="button" data-bs-toggle="tooltip" title="Copy to clipboard" data-clipboard-target="#errormsg"></i>
+        <div class="error-message p-1">
 <pre id="errormsg" class="p-2">
 URL: {{ .CallURL }}
 Time: {{ .CallTime }}
@@ -21,11 +21,12 @@ Error:
 Stack Trace:
 {{ .StackTrace }}
 </pre>
-          </div>
         </div>
       </div>
     </div>
   </div>
+{{ end }}
+{{ define "sidebar" }}
 {{ end }}
 {{ define "js" }}
 {{ end }}

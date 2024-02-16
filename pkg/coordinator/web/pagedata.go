@@ -21,6 +21,8 @@ var LayoutTemplateFiles = []string{
 type PageData struct {
 	Active         string
 	Meta           *Meta
+	ShowSidebar    bool
+	SidebarData    interface{}
 	Data           interface{}
 	Version        string
 	Year           int

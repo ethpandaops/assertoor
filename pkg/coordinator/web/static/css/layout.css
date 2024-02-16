@@ -1,16 +1,20 @@
 
 body main {
-    min-height: calc(100vh - 180px)!important;
+    display: flex;
+    overflow: hidden;
+    min-height: calc(100vh - 64px)!important;
 }
 
 .header {
-    height: 70px;
+    height: 64px;
 }
 
 .footer {
     margin-top: 30px;
     margin-bottom: 20px;
 }
+
+
 
 header.header-bar {
     position: fixed;
@@ -26,40 +30,39 @@ header.header-bar {
     }
 }
 
+header.header-bar .main-navigation {
+    padding: 0;
+    height: 100%
+}
+
+header.header-bar .navbar-items {
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
 header.header-bar .navbar-brand {
-    margin-right: 0;
+    width: 280px;
+    padding-left: 24px;
 }
 
-.test-list .accordion-item.test-list-header .test-header .row > * {
-    font-weight: 600;
+
+main .main-content {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
 }
 
-.test-list .accordion-item.test-list-header .accordion-button::after {
-    visibility: hidden;
+main .main-page {
+    flex-grow: 1;
 }
 
-.test-list .accordion-item .test-header {
+.task-list .details-table .details-row,
+.test-list .details-table .details-row {
+    padding: 0 !important;
+}
+
+.task-list .details-table .details-row .details-content,
+.test-list .details-table .details-row .details-content {
     padding: 8px;
-}
-
-.test-list .accordion-item .test-header .test-status {
-    width: 40px;
-    min-width: 40px;
-}
-
-.task-list .accordion-item.task-list-header .task-header .row > * {
-    font-weight: 600;
-}
-
-.task-list .accordion-item.task-list-header .accordion-button::after {
-    visibility: hidden;
-}
-
-.task-list .accordion-item .task-header {
-    padding: 8px;
-}
-
-.task-list .accordion-item .task-header .task-status {
-    width: 60px;
-    min-width: 60px;
 }

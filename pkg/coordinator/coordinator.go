@@ -3,11 +3,9 @@ package coordinator
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"runtime/debug"
-	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
@@ -19,34 +17,47 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/server"
+	"github.com/gorhill/cronexpr"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 )
 
 type Coordinator struct {
 	// Config is the coordinator configuration.
-	Config          *Config
-	log             *logger.LogScope
-	clientPool      *clients.ClientPool
-	walletManager   *wallet.Manager
-	webserver       *server.WebServer
-	validatorNames  *names.ValidatorNames
-	tests           []types.Test
-	metricsPort     int
-	lameDuckSeconds int
+	Config         *Config
+	log            *logger.LogScope
+	clientPool     *clients.ClientPool
+	walletManager  *wallet.Manager
+	webserver      *server.WebServer
+	validatorNames *names.ValidatorNames
+	globalVars     types.Variables
+	metricsPort    int
+
+	runIDCounter       uint64
+	lastExecutedRunID  uint64
+	testSchedulerMutex sync.Mutex
+
+	testDescriptors      []types.TestDescriptor
+	testRunMap           map[uint64]types.Test
+	testQueue            []types.Test
+	testHistory          []types.Test
+	testRegistryMutex    sync.RWMutex
+	testNotificationChan chan bool
 }
 
-func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, lameDuckSeconds int) *Coordinator {
+func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Coordinator {
 	return &Coordinator{
 		log: logger.NewLogger(&logger.ScopeOptions{
 			Parent:      log,
 			HistorySize: 5000,
 		}),
-		Config:          config,
-		tests:           []types.Test{},
-		metricsPort:     metricsPort,
-		lameDuckSeconds: lameDuckSeconds,
+		Config:      config,
+		metricsPort: metricsPort,
+
+		testRunMap:           map[uint64]types.Test{},
+		testQueue:            []types.Test{},
+		testHistory:          []types.Test{},
+		testNotificationChan: make(chan bool),
 	}
 }
 
@@ -54,15 +65,14 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, lameDuc
 func (c *Coordinator) Run(ctx context.Context) error {
 	defer func() {
 		if err := recover(); err != nil {
-			logrus.WithError(err.(error)).Errorf("uncaught panic coordinator: %v, stack: %v", err, string(debug.Stack()))
+			logrus.WithError(err.(error)).Errorf("uncaught panic in coordinator.Run: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 
 	c.log.GetLogger().
 		WithField("build_version", buildinfo.GetVersion()).
 		WithField("metrics_port", c.metricsPort).
-		WithField("lame_duck_seconds", c.lameDuckSeconds).
-		Info("starting coordinator")
+		Info("starting assertoor")
 
 	// init client pool
 	clientPool, err := clients.NewClientPool(c.log.GetLogger())
@@ -78,6 +88,12 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// init global variables
+	c.globalVars = vars.NewVariables(nil)
+	for name, value := range c.Config.GlobalVars {
+		c.globalVars.SetVar(name, value)
 	}
 
 	// init webserver
@@ -98,36 +114,18 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	//nolint:errcheck // ignore
 	go c.startMetrics()
 
-	// load global variables
-	variables := c.NewVariables(nil)
-	for name, value := range c.Config.GlobalVars {
-		variables.SetVar(name, value)
-	}
-
 	// load validator names
 	c.validatorNames = names.NewValidatorNames(c.Config.ValidatorNames, c.log.GetLogger())
 	c.validatorNames.LoadValidatorNames()
 
 	// load tests
-	err = c.loadTests(ctx, variables)
-	if err != nil {
-		return err
-	}
+	c.LoadTests(ctx)
 
-	c.log.GetLogger().Infof("Loaded %v tests", len(c.tests))
+	// start test scheduler
+	go c.runTestScheduler(ctx)
 
 	// run tests
-	c.runTests(ctx)
-
-	if c.webserver == nil {
-		c.log.GetLogger().WithField("seconds", c.lameDuckSeconds).Info("Initiating lame duck")
-		time.Sleep(time.Duration(c.lameDuckSeconds) * time.Second)
-		c.log.GetLogger().Info("lame duck complete")
-	} else {
-		<-ctx.Done()
-	}
-
-	c.log.GetLogger().Info("Shutting down..")
+	c.runTestExecutionLoop(ctx)
 
 	return nil
 }
@@ -138,10 +136,6 @@ func (c *Coordinator) Logger() logrus.FieldLogger {
 
 func (c *Coordinator) LogScope() *logger.LogScope {
 	return c.log
-}
-
-func (c *Coordinator) NewVariables(parentScope types.Variables) types.Variables {
-	return vars.NewVariables(parentScope)
 }
 
 func (c *Coordinator) ClientPool() *clients.ClientPool {
@@ -156,9 +150,53 @@ func (c *Coordinator) ValidatorNames() *names.ValidatorNames {
 	return c.validatorNames
 }
 
-func (c *Coordinator) GetTests() []types.Test {
-	tests := make([]types.Test, len(c.tests))
-	copy(tests, c.tests)
+func (c *Coordinator) LoadTests(ctx context.Context) {
+	descriptors := test.LoadTestDescriptors(ctx, c.Config.Tests, c.Config.ExternalTests)
+	errCount := 0
+
+	for _, descriptor := range descriptors {
+		if descriptor.Err() != nil {
+			c.log.GetLogger().Errorf("error while loading test '%v': %v", descriptor.ID(), descriptor.Err())
+
+			errCount++
+		}
+	}
+
+	c.log.GetLogger().Infof("loaded %v test descriptors (%v errors)", len(descriptors), errCount)
+	c.testDescriptors = descriptors
+}
+
+func (c *Coordinator) GetTestDescriptors() []types.TestDescriptor {
+	descriptors := make([]types.TestDescriptor, len(c.testDescriptors))
+
+	copy(descriptors, c.testDescriptors)
+
+	return descriptors
+}
+
+func (c *Coordinator) GetTestByRunID(runID uint64) types.Test {
+	c.testRegistryMutex.RLock()
+	defer c.testRegistryMutex.RUnlock()
+
+	return c.testRunMap[runID]
+}
+
+func (c *Coordinator) GetTestQueue() []types.Test {
+	c.testRegistryMutex.RLock()
+	defer c.testRegistryMutex.RUnlock()
+
+	tests := make([]types.Test, len(c.testQueue))
+	copy(tests, c.testQueue)
+
+	return tests
+}
+
+func (c *Coordinator) GetTestHistory() []types.Test {
+	c.testRegistryMutex.RLock()
+	defer c.testRegistryMutex.RUnlock()
+
+	tests := make([]types.Test, len(c.testHistory))
+	copy(tests, c.testHistory)
 
 	return tests
 }
@@ -175,107 +213,161 @@ func (c *Coordinator) startMetrics() error {
 	return err
 }
 
-func (c *Coordinator) loadTests(ctx context.Context, globalVars types.Variables) error {
-	// load configured tests
-	for _, testCfg := range c.Config.Tests {
-		testRef, err := test.CreateTest(c, testCfg, globalVars)
-		if err != nil {
-			return fmt.Errorf("failed initializing test '%v': %w", testCfg.Name, err)
-		}
-
-		c.tests = append(c.tests, testRef)
+func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any) (types.Test, error) {
+	if descriptor.Err() != nil {
+		return nil, fmt.Errorf("cannot create test from failed test descriptor: %w", descriptor.Err())
 	}
 
-	// load external tests
-	for _, extTestCfg := range c.Config.ExternalTests {
-		testConfig, err := c.loadExternalTestConfig(ctx, extTestCfg)
-		if err != nil {
-			return err
-		}
-
-		if extTestCfg.Name != "" {
-			testConfig.Name = extTestCfg.Name
-		}
-
-		if extTestCfg.Timeout != nil {
-			testConfig.Timeout = *extTestCfg.Timeout
-		}
-
-		for k, v := range extTestCfg.Config {
-			testConfig.Config[k] = v
-		}
-
-		for k, v := range extTestCfg.ConfigVars {
-			testConfig.ConfigVars[k] = v
-		}
-
-		testRef, err := test.CreateTest(c, testConfig, globalVars)
-		if err != nil {
-			return fmt.Errorf("failed initializing external test '%v': %w", testConfig.Name, err)
-		}
-
-		c.tests = append(c.tests, testRef)
-	}
-
-	return nil
-}
-
-func (c *Coordinator) loadExternalTestConfig(ctx context.Context, extTestCfg *test.ExternalConfig) (*test.Config, error) {
-	var reader io.Reader
-
-	if strings.HasPrefix(extTestCfg.File, "http://") || strings.HasPrefix(extTestCfg.File, "https://") {
-		client := &http.Client{Timeout: time.Second * 120}
-
-		req, err := http.NewRequestWithContext(ctx, "GET", extTestCfg.File, http.NoBody)
-		if err != nil {
-			return nil, err
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("error loading test config from url: %v, result: %v %v", extTestCfg.File, resp.StatusCode, resp.Status)
-		}
-
-		reader = resp.Body
-	} else {
-		f, err := os.Open(extTestCfg.File)
-		if err != nil {
-			return nil, fmt.Errorf("error loading test config from file %v: %w", extTestCfg.File, err)
-		}
-
-		defer f.Close()
-
-		reader = f
-	}
-
-	decoder := yaml.NewDecoder(reader)
-	testConfig := &test.Config{}
-
-	err := decoder.Decode(testConfig)
+	testRef, err := c.createTestRun(descriptor, configOverrides)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding external test config %v: %v", extTestCfg.File, err)
+		return nil, err
 	}
 
-	return testConfig, nil
+	select {
+	case c.testNotificationChan <- true:
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	return testRef, nil
 }
 
-func (c *Coordinator) runTests(ctx context.Context) {
-	// run tests
-	for _, testRef := range c.tests {
-		if err := testRef.Validate(); err != nil {
-			testRef.Logger().Errorf("test validation failed: %v", err)
+func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any) (types.Test, error) {
+	c.testSchedulerMutex.Lock()
+	defer c.testSchedulerMutex.Unlock()
+
+	c.runIDCounter++
+	runID := c.runIDCounter
+
+	testRef, err := test.CreateTest(runID, descriptor, c.Logger().WithField("module", "test"), c, c.globalVars)
+	if err != nil {
+		return nil, fmt.Errorf("failed initializing test run #%v '%v': %w", runID, descriptor.Config().Name, err)
+	}
+
+	if configOverrides != nil {
+		testVars := testRef.GetTestVariables()
+		for cfgKey, cfgValue := range configOverrides {
+			testVars.SetVar(cfgKey, cfgValue)
+		}
+	}
+
+	c.testRegistryMutex.Lock()
+	c.testQueue = append(c.testQueue, testRef)
+	c.testRunMap[runID] = testRef
+	c.testRegistryMutex.Unlock()
+
+	return testRef, nil
+}
+
+func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
+	for {
+		var nextTest types.Test
+
+		c.testRegistryMutex.Lock()
+		if len(c.testQueue) > 0 {
+			nextTest = c.testQueue[0]
+			c.testQueue = c.testQueue[1:]
+			c.testHistory = append(c.testHistory, nextTest)
+		}
+		c.testRegistryMutex.Unlock()
+
+		if nextTest != nil {
+			// run next test
+			c.runTest(ctx, nextTest)
+		} else {
+			// sleep and wait for queue notification
+			select {
+			case <-ctx.Done():
+				return
+			case <-c.testNotificationChan:
+			case <-time.After(60 * time.Second):
+			}
+		}
+	}
+}
+
+func (c *Coordinator) runTest(ctx context.Context, testRef types.Test) {
+	c.lastExecutedRunID = testRef.RunID()
+
+	if err := testRef.Validate(); err != nil {
+		testRef.Logger().Errorf("test validation failed: %v", err)
+		return
+	}
+
+	if err := testRef.Run(ctx); err != nil {
+		testRef.Logger().Errorf("test execution failed: %v", err)
+	}
+}
+
+func (c *Coordinator) runTestScheduler(ctx context.Context) {
+	// startup scheduler
+	for _, testDescr := range c.testDescriptors {
+		if testDescr.Err() != nil {
 			continue
 		}
 
-		if err := testRef.Run(ctx); err != nil {
-			testRef.Logger().Errorf("test execution failed: %v", err)
-			continue
+		testConfig := testDescr.Config()
+		if testConfig.Schedule == nil || testConfig.Schedule.Startup {
+			_, err := c.ScheduleTest(testDescr, nil)
+			if err != nil {
+				c.Logger().Errorf("could not schedule startup test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
+			}
+		}
+	}
+
+	// cron scheduler
+	cronTime := time.Unix((time.Now().Unix()/60)*60, 0)
+
+	for {
+		cronTime = cronTime.Add(1 * time.Minute)
+		cronTimeDiff := time.Since(cronTime)
+
+		if cronTimeDiff < 0 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(cronTimeDiff.Abs()):
+			}
+		}
+
+		for _, testDescr := range c.testDescriptors {
+			if testDescr.Err() != nil {
+				continue
+			}
+
+			testConfig := testDescr.Config()
+			if testConfig.Schedule == nil || len(testConfig.Schedule.Cron) == 0 {
+				continue
+			}
+
+			triggerTest := false
+
+			for _, cronExprStr := range testConfig.Schedule.Cron {
+				cronExpr, err := cronexpr.Parse(cronExprStr)
+				if err != nil {
+					c.Logger().Errorf("invalid cron expression for test %v (%v): %v", testDescr.ID(), testConfig.Name, err)
+					break
+				}
+
+				if cronExpr.Next(cronTime).IsZero() {
+					triggerTest = true
+					break
+				}
+			}
+
+			if !triggerTest {
+				continue
+			}
+
+			_, err := c.ScheduleTest(testDescr, nil)
+			if err != nil {
+				c.Logger().Errorf("could not schedule cron test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-c.testNotificationChan:
 		}
 	}
 }

@@ -31,7 +31,7 @@ var rootCmd = &cobra.Command{
 			logr.SetLevel(logrus.DebugLevel)
 		}
 
-		coord := coordinator.NewCoordinator(config, logr, metricsPort, lameDuckSeconds)
+		coord := coordinator.NewCoordinator(config, logr, metricsPort)
 
 		if err := coord.Run(cmd.Context()); err != nil {
 			log.Fatal(err)
@@ -41,11 +41,10 @@ var rootCmd = &cobra.Command{
 }
 
 var (
-	cfgFile         string
-	logFormat       string
-	verbose         bool
-	metricsPort     int
-	lameDuckSeconds int
+	cfgFile     string
+	logFormat   string
+	verbose     bool
+	metricsPort int
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -65,5 +64,4 @@ func init() {
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 
 	rootCmd.Flags().IntVarP(&metricsPort, "metrics-port", "", 9090, "Port to serve Prometheus metrics on")
-	rootCmd.Flags().IntVarP(&lameDuckSeconds, "lame-duck-seconds", "", 30, "Lame duck period in seconds (wait for this long after completion before terminating")
 }

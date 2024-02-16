@@ -77,7 +77,8 @@ func (ws *WebServer) StartFrontend(config *types.FrontendConfig, coordinator coo
 		// register frontend routes
 		frontendHandler := handlers.NewFrontendHandler(coordinator)
 		ws.router.HandleFunc("/", frontendHandler.Index).Methods("GET")
-		ws.router.HandleFunc("/test/{testIdx}", frontendHandler.Test).Methods("GET")
+		ws.router.HandleFunc("/test/{testId}", frontendHandler.TestPage).Methods("GET")
+		ws.router.HandleFunc("/run/{runId}", frontendHandler.TestRun).Methods("GET")
 		ws.router.HandleFunc("/clients", frontendHandler.Clients).Methods("GET")
 		ws.router.HandleFunc("/logs/{since}", frontendHandler.LogsData).Methods("GET")
 

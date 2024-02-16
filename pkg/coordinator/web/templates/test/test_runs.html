@@ -1,0 +1,106 @@
+
+{{ define "test_runs" }}
+
+  <!-- test list -->
+  <div class="test-list">
+    <table class="table table-condensed table-striped details-table">
+      <thead>
+        <tr>
+          <th style="width: 50px"></th>
+          <th>Run ID</th>
+          <th>Test Name</th>
+          <th style="width:20%; min-width:150px;">Run Time</th>
+          <th style="width:10%; min-width:100px;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range $i, $test := . }}
+        <tr data-bs-toggle="collapse" data-bs-target="#run-details-{{ $test.RunID }}" class="accordion-toggle">
+          <td class="p-0"><button class="btn btn-default btn-xs"><i class="fa fa-eye" aria-hidden="true"></i></button></td>
+          <td>{{ $test.RunID }}</td>
+          <td>{{ $test.Name }}</td>
+          <td>{{ if $test.HasRunTime }}{{ $test.RunTime }}{{ else }}?{{ end }}{{ if $test.HasTimeout }} / {{ $test.Timeout }}{{ end }}</td>
+          <td>
+            {{ if eq $test.Status "pending" }}
+              <span class="badge rounded-pill text-bg-secondary">
+                <i class="far fa-hourglass-half"></i>
+              </span>
+            {{ else if eq $test.Status "running" }}
+              <span class="badge rounded-pill text-bg-primary">
+                <i class="far fa-play-circle"></i>
+              </span>
+            {{ else if eq $test.Status "success" }}
+              <span class="badge rounded-pill text-bg-success">
+                <i class="fas fa-check-circle"></i>
+              </span>
+            {{ else if eq $test.Status "failure" }}
+              <span class="badge rounded-pill text-bg-danger">
+                <i class="fas fa-times-circle"></i>
+              </span>
+            {{ else }}
+              <span class="badge rounded-pill text-bg-warning">
+                {{ $test.Status }}
+              </span>
+            {{ end }}
+          </td>
+        </tr>
+        <tr>
+          <td colspan="12" class="details-row">
+            <div class="accordian-body collapse" id="run-details-{{ $test.RunID }}">
+              <div class="container-fluid details-content">
+                <div class="row">
+                  <div class="col-6 col-sm-3 col-lg-2">Status:</div>
+                  <div class="col-6 col-sm-3 col-lg-10">
+                    {{ if eq $test.Status "pending" }}
+                      <span class="badge rounded-pill text-bg-secondary">
+                        <i class="far fa-hourglass-half"></i> Pending
+                      </span>
+                    {{ else if eq $test.Status "running" }}
+                      <span class="badge rounded-pill text-bg-primary">
+                        <i class="far fa-play-circle"></i> Running
+                      </span>
+                    {{ else if eq $test.Status "success" }}
+                      <span class="badge rounded-pill text-bg-success">
+                        <i class="fas fa-check-circle"></i> Success
+                      </span>
+                    {{ else if eq $test.Status "failure" }}
+                      <span class="badge rounded-pill text-bg-danger">
+                        <i class="fas fa-times-circle"></i> Failure
+                      </span>
+                    {{ else }}
+                      <span class="badge rounded-pill text-bg-warning">
+                        {{ $test.Status }}
+                      </span>
+                    {{ end }}
+                  </div>
+                </div>
+                {{ if $test.IsStarted }}
+                <div class="row">
+                  <div class="col-6 col-sm-3 col-lg-2">Start Time:</div>
+                  <div class="col-6 col-sm-3 col-lg-10">{{ formatDateTime $test.StartTime.UTC }}</div>
+                </div>
+                {{ end }}
+                {{ if $test.IsCompleted }}
+                <div class="row">
+                  <div class="col-6 col-sm-3 col-lg-2">Finish Time:</div>
+                  <div class="col-6 col-sm-3 col-lg-10">{{ formatDateTime $test.StopTime.UTC }}</div>
+                </div>
+                {{ end }}
+                <div class="row">
+                  <div class="col-6 col-sm-3 col-lg-2">Tasks:</div>
+                  <div class="col-6 col-sm-3 col-lg-10">{{ .TaskCount }}</div>
+                </div>
+                <div class="row">
+                  <div class="col">
+                    <a href="/run/{{ $test.RunID }}">View Test Details</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+{{ end }}
