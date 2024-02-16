@@ -2,10 +2,153 @@ definitions:
   api.GetTestResponse:
     properties:
       config:
-        $ref: '#/definitions/types.TestConfig'
+        additionalProperties: {}
+        type: object
+      configVars:
+        additionalProperties:
+          type: string
+        type: object
       id:
         type: string
+      name:
+        type: string
+      schedule:
+        $ref: '#/definitions/types.TestSchedule'
       source:
+        type: string
+      timeout:
+        type: integer
+    type: object
+  api.GetTestRunDetailedTask:
+    properties:
+      completed:
+        type: boolean
+      config_yaml:
+        type: string
+      index:
+        type: integer
+      log:
+        items:
+          $ref: '#/definitions/api.GetTestRunDetailedTaskLog'
+        type: array
+      name:
+        type: string
+      parent_index:
+        type: integer
+      result:
+        type: string
+      result_error:
+        type: string
+      runtime:
+        type: integer
+      start_time:
+        type: integer
+      started:
+        type: boolean
+      status:
+        type: string
+      stop_time:
+        type: integer
+      timeout:
+        type: integer
+      title:
+        type: string
+    type: object
+  api.GetTestRunDetailedTaskLog:
+    properties:
+      data:
+        additionalProperties:
+          type: string
+        type: object
+      datalen:
+        type: integer
+      level:
+        type: integer
+      msg:
+        type: string
+      time:
+        type: string
+    type: object
+  api.GetTestRunDetailsResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      start_time:
+        type: integer
+      status:
+        $ref: '#/definitions/types.TestStatus'
+      stop_time:
+        type: integer
+      tasks:
+        items:
+          $ref: '#/definitions/api.GetTestRunDetailedTask'
+        type: array
+      test_id:
+        type: string
+    type: object
+  api.GetTestRunResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      start_time:
+        type: integer
+      status:
+        $ref: '#/definitions/types.TestStatus'
+      stop_time:
+        type: integer
+      tasks:
+        items:
+          $ref: '#/definitions/api.GetTestRunTask'
+        type: array
+      test_id:
+        type: string
+    type: object
+  api.GetTestRunTask:
+    properties:
+      completed:
+        type: boolean
+      index:
+        type: integer
+      name:
+        type: string
+      parent_index:
+        type: integer
+      result:
+        type: string
+      result_error:
+        type: string
+      runtime:
+        type: integer
+      start_time:
+        type: integer
+      started:
+        type: boolean
+      status:
+        type: string
+      stop_time:
+        type: integer
+      timeout:
+        type: integer
+      title:
+        type: string
+    type: object
+  api.GetTestRunsResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      start_time:
+        type: integer
+      status:
+        $ref: '#/definitions/types.TestStatus'
+      stop_time:
+        type: integer
+      test_id:
         type: string
     type: object
   api.GetTestsResponse:
@@ -23,85 +166,6 @@ definitions:
       status:
         type: string
     type: object
-  helper.RawMessage:
-    type: object
-  human.Duration:
-    properties:
-      time.Duration:
-        enum:
-        - -9223372036854775808
-        - 9223372036854775807
-        - 1
-        - 1000
-        - 1000000
-        - 1000000000
-        - 60000000000
-        - 3600000000000
-        - -9223372036854775808
-        - 9223372036854775807
-        - 1
-        - 1000
-        - 1000000
-        - 1000000000
-        - 60000000000
-        - 3600000000000
-        - 1
-        - 1000
-        - 1000000
-        - 1000000000
-        - 60000000000
-        type: integer
-        x-enum-varnames:
-        - minDuration
-        - maxDuration
-        - Nanosecond
-        - Microsecond
-        - Millisecond
-        - Second
-        - Minute
-        - Hour
-        - minDuration
-        - maxDuration
-        - Nanosecond
-        - Microsecond
-        - Millisecond
-        - Second
-        - Minute
-        - Hour
-        - Nanosecond
-        - Microsecond
-        - Millisecond
-        - Second
-        - Minute
-    type: object
-  types.TestConfig:
-    properties:
-      cleanupTasks:
-        items:
-          $ref: '#/definitions/helper.RawMessage'
-        type: array
-      config:
-        additionalProperties: true
-        type: object
-      configVars:
-        additionalProperties:
-          type: string
-        type: object
-      disable:
-        type: boolean
-      id:
-        type: string
-      name:
-        type: string
-      schedule:
-        $ref: '#/definitions/types.TestSchedule'
-      tasks:
-        items:
-          $ref: '#/definitions/helper.RawMessage'
-        type: array
-      timeout:
-        $ref: '#/definitions/human.Duration'
-    type: object
   types.TestSchedule:
     properties:
       cron:
@@ -111,6 +175,20 @@ definitions:
       file:
         type: boolean
     type: object
+  types.TestStatus:
+    enum:
+    - pending
+    - running
+    - success
+    - failure
+    - skipped
+    type: string
+    x-enum-varnames:
+    - TestStatusPending
+    - TestStatusRunning
+    - TestStatusSuccess
+    - TestStatusFailure
+    - TestStatusSkipped
 info:
   contact: {}
   description: API for querying information about Assertoor tests
@@ -149,6 +227,132 @@ paths:
       summary: Get test definition by test ID
       tags:
       - Test
+  /api/v1/test_run/{runId}:
+    get:
+      description: Returns the run details with given ID. Includes a summary and a
+        list of task with limited details
+      parameters:
+      - description: ID of the test run to get details for
+        in: path
+        name: runId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.GetTestRunResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Get test run by run ID
+      tags:
+      - TestRun
+  /api/v1/test_run/{runId}/details:
+    get:
+      description: Returns the run details with given ID. Includes a summary and a
+        list of task with all details (incl. logs & task configurations)
+      parameters:
+      - description: ID of the test run to get details for
+        in: path
+        name: runId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.GetTestRunDetailsResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Get detailed test run by run ID
+      tags:
+      - TestRun
+  /api/v1/test_run/{runId}/status:
+    get:
+      description: Returns the run status with given ID.
+      parameters:
+      - description: ID of the test run to get the status for
+        in: path
+        name: runId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Get test run status by run ID
+      tags:
+      - TestRun
+  /api/v1/test_runs:
+    get:
+      description: Returns a list of all test runs.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/api.GetTestRunsResponse'
+                  type: array
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Get list of test runs
+      tags:
+      - TestRun
   /api/v1/tests:
     get:
       description: Returns the list of test definitions. These test definitions can

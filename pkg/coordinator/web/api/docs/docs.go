@@ -68,6 +68,212 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/test_run/{runId}": {
+            "get": {
+                "description": "Returns the run details with given ID. Includes a summary and a list of task with limited details",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get test run by run ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run to get details for",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.GetTestRunResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_run/{runId}/details": {
+            "get": {
+                "description": "Returns the run details with given ID. Includes a summary and a list of task with all details (incl. logs \u0026 task configurations)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get detailed test run by run ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run to get details for",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.GetTestRunDetailsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_run/{runId}/status": {
+            "get": {
+                "description": "Returns the run status with given ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get test run status by run ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run to get the status for",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_runs": {
+            "get": {
+                "description": "Returns a list of all test runs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get list of test runs",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/api.GetTestRunsResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/tests": {
             "get": {
                 "description": "Returns the list of test definitions. These test definitions can be used to create new test runs and are supplied via the assertoor configuration.",
@@ -121,12 +327,229 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/types.TestConfig"
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "configVars": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 },
                 "id": {
                     "type": "string"
                 },
+                "name": {
+                    "type": "string"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/types.TestSchedule"
+                },
                 "source": {
+                    "type": "string"
+                },
+                "timeout": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.GetTestRunDetailedTask": {
+            "type": "object",
+            "properties": {
+                "completed": {
+                    "type": "boolean"
+                },
+                "config_yaml": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "log": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.GetTestRunDetailedTaskLog"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_index": {
+                    "type": "integer"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "result_error": {
+                    "type": "string"
+                },
+                "runtime": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "started": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunDetailedTaskLog": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "datalen": {
+                    "type": "integer"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunDetailsResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.TestStatus"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.GetTestRunDetailedTask"
+                    }
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.TestStatus"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.GetTestRunTask"
+                    }
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunTask": {
+            "type": "object",
+            "properties": {
+                "completed": {
+                    "type": "boolean"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_index": {
+                    "type": "integer"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "result_error": {
+                    "type": "string"
+                },
+                "runtime": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "started": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunsResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.TestStatus"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "test_id": {
                     "type": "string"
                 }
             }
@@ -154,105 +577,6 @@ const docTemplate = `{
                 }
             }
         },
-        "helper.RawMessage": {
-            "type": "object"
-        },
-        "human.Duration": {
-            "type": "object",
-            "properties": {
-                "time.Duration": {
-                    "type": "integer",
-                    "enum": [
-                        -9223372036854775808,
-                        9223372036854775807,
-                        1,
-                        1000,
-                        1000000,
-                        1000000000,
-                        60000000000,
-                        3600000000000,
-                        -9223372036854775808,
-                        9223372036854775807,
-                        1,
-                        1000,
-                        1000000,
-                        1000000000,
-                        60000000000,
-                        3600000000000,
-                        1,
-                        1000,
-                        1000000,
-                        1000000000,
-                        60000000000
-                    ],
-                    "x-enum-varnames": [
-                        "minDuration",
-                        "maxDuration",
-                        "Nanosecond",
-                        "Microsecond",
-                        "Millisecond",
-                        "Second",
-                        "Minute",
-                        "Hour",
-                        "minDuration",
-                        "maxDuration",
-                        "Nanosecond",
-                        "Microsecond",
-                        "Millisecond",
-                        "Second",
-                        "Minute",
-                        "Hour",
-                        "Nanosecond",
-                        "Microsecond",
-                        "Millisecond",
-                        "Second",
-                        "Minute"
-                    ]
-                }
-            }
-        },
-        "types.TestConfig": {
-            "type": "object",
-            "properties": {
-                "cleanupTasks": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/helper.RawMessage"
-                    }
-                },
-                "config": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "configVars": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "disable": {
-                    "type": "boolean"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "schedule": {
-                    "$ref": "#/definitions/types.TestSchedule"
-                },
-                "tasks": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/helper.RawMessage"
-                    }
-                },
-                "timeout": {
-                    "$ref": "#/definitions/human.Duration"
-                }
-            }
-        },
         "types.TestSchedule": {
             "type": "object",
             "properties": {
@@ -266,6 +590,23 @@ const docTemplate = `{
                     "type": "boolean"
                 }
             }
+        },
+        "types.TestStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "success",
+                "failure",
+                "skipped"
+            ],
+            "x-enum-varnames": [
+                "TestStatusPending",
+                "TestStatusRunning",
+                "TestStatusSuccess",
+                "TestStatusFailure",
+                "TestStatusSkipped"
+            ]
         }
     },
     "tags": [

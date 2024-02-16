@@ -1,0 +1,360 @@
+package api
+
+import (
+	"fmt"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/gorilla/mux"
+	"gopkg.in/yaml.v2"
+)
+
+type GetTestRunsResponse struct {
+	RunID     uint64           `json:"run_id"`
+	TestID    string           `json:"test_id"`
+	Name      string           `json:"name"`
+	Status    types.TestStatus `json:"status"`
+	StartTime int64            `json:"start_time"`
+	StopTime  int64            `json:"stop_time"`
+}
+
+// GetTests godoc
+// @Summary Get list of test runs
+// @Tags TestRun
+// @Description Returns a list of all test runs.
+// @Produce  json
+// @Success 200 {object} Response{data=[]GetTestRunsResponse} "Success"
+// @Failure 400 {object} Response "Failure"
+// @Failure 500 {object} Response "Server Error"
+// @Router /api/v1/test_runs [get]
+func (ah *APIHandler) GetTestRuns(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	testRuns := []*GetTestRunsResponse{}
+
+	testInstances := append(ah.coordinator.GetTestHistory(), ah.coordinator.GetTestQueue()...)
+	for _, testInstance := range testInstances {
+		testRun := &GetTestRunsResponse{
+			RunID:  testInstance.RunID(),
+			TestID: testInstance.TestID(),
+			Name:   testInstance.Name(),
+			Status: testInstance.Status(),
+		}
+
+		if !testInstance.StartTime().IsZero() {
+			testRun.StartTime = testInstance.StartTime().Unix()
+		}
+
+		if !testInstance.StopTime().IsZero() {
+			testRun.StopTime = testInstance.StopTime().Unix()
+		}
+
+		testRuns = append(testRuns, testRun)
+	}
+
+	ah.sendOKResponse(w, r.URL.String(), testRuns)
+}
+
+type GetTestRunResponse struct {
+	RunID     uint64            `json:"run_id"`
+	TestID    string            `json:"test_id"`
+	Name      string            `json:"name"`
+	Status    types.TestStatus  `json:"status"`
+	StartTime int64             `json:"start_time"`
+	StopTime  int64             `json:"stop_time"`
+	Tasks     []*GetTestRunTask `json:"tasks"`
+}
+
+type GetTestRunTask struct {
+	Index       uint64 `json:"index"`
+	ParentIndex uint64 `json:"parent_index"`
+	Name        string `json:"name"`
+	Title       string `json:"title"`
+	Started     bool   `json:"started"`
+	Completed   bool   `json:"completed"`
+	StartTime   int64  `json:"start_time"`
+	StopTime    int64  `json:"stop_time"`
+	Timeout     uint64 `json:"timeout"`
+	RunTime     uint64 `json:"runtime"`
+	Status      string `json:"status"`
+	Result      string `json:"result"`
+	ResultError string `json:"result_error"`
+}
+
+// GetTestRun godoc
+// @Summary Get test run by run ID
+// @Tags TestRun
+// @Description Returns the run details with given ID. Includes a summary and a list of task with limited details
+// @Produce json
+// @Param runId path string true "ID of the test run to get details for"
+// @Success 200 {object} Response{data=GetTestRunResponse} "Success"
+// @Failure 400 {object} Response "Failure"
+// @Failure 500 {object} Response "Server Error"
+// @Router /api/v1/test_run/{runId} [get]
+func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+
+	runID, err := strconv.ParseUint(vars["runId"], 10, 64)
+	if err != nil {
+		ah.sendErrorResponse(w, r.URL.String(), "invalid runId provided", http.StatusBadRequest)
+		return
+	}
+
+	testInstance := ah.coordinator.GetTestByRunID(runID)
+	if testInstance == nil {
+		ah.sendErrorResponse(w, r.URL.String(), "test run not found", http.StatusNotFound)
+		return
+	}
+
+	response := &GetTestRunResponse{
+		RunID:  testInstance.RunID(),
+		TestID: testInstance.TestID(),
+		Name:   testInstance.Name(),
+		Status: testInstance.Status(),
+		Tasks:  []*GetTestRunTask{},
+	}
+
+	if !testInstance.StartTime().IsZero() {
+		response.StartTime = testInstance.StartTime().Unix()
+	}
+
+	if !testInstance.StopTime().IsZero() {
+		response.StopTime = testInstance.StopTime().Unix()
+	}
+
+	taskScheduler := testInstance.GetTaskScheduler()
+	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
+		for _, task := range taskScheduler.GetAllTasks() {
+			taskStatus := taskScheduler.GetTaskStatus(task)
+
+			taskData := &GetTestRunTask{
+				Index:       taskStatus.Index,
+				ParentIndex: taskStatus.ParentIndex,
+				Name:        task.Name(),
+				Title:       task.Title(),
+				Started:     taskStatus.IsStarted,
+				Completed:   taskStatus.IsStarted && !taskStatus.IsRunning,
+				Timeout:     uint64(task.Timeout().Seconds()),
+			}
+
+			switch {
+			case !taskStatus.IsStarted:
+				taskData.Status = "pending"
+			case taskStatus.IsRunning:
+				taskData.Status = "running"
+				taskData.StartTime = taskStatus.StartTime.Unix()
+				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+			default:
+				taskData.Status = "complete"
+				taskData.StartTime = taskStatus.StartTime.Unix()
+				taskData.StopTime = taskStatus.StopTime.Unix()
+				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+			}
+
+			switch taskStatus.Result {
+			case types.TaskResultNone:
+				taskData.Result = "none"
+			case types.TaskResultSuccess:
+				taskData.Result = "success"
+			case types.TaskResultFailure:
+				taskData.Result = "failure"
+			}
+
+			if taskStatus.Error != nil {
+				taskData.ResultError = taskStatus.Error.Error()
+			}
+
+			response.Tasks = append(response.Tasks, taskData)
+		}
+	}
+
+	ah.sendOKResponse(w, r.URL.String(), response)
+}
+
+type GetTestRunDetailsResponse struct {
+	RunID     uint64                    `json:"run_id"`
+	TestID    string                    `json:"test_id"`
+	Name      string                    `json:"name"`
+	Status    types.TestStatus          `json:"status"`
+	StartTime int64                     `json:"start_time"`
+	StopTime  int64                     `json:"stop_time"`
+	Tasks     []*GetTestRunDetailedTask `json:"tasks"`
+}
+
+type GetTestRunDetailedTask struct {
+	Index       uint64                       `json:"index"`
+	ParentIndex uint64                       `json:"parent_index"`
+	Name        string                       `json:"name"`
+	Title       string                       `json:"title"`
+	Started     bool                         `json:"started"`
+	Completed   bool                         `json:"completed"`
+	StartTime   int64                        `json:"start_time"`
+	StopTime    int64                        `json:"stop_time"`
+	Timeout     uint64                       `json:"timeout"`
+	RunTime     uint64                       `json:"runtime"`
+	Status      string                       `json:"status"`
+	Result      string                       `json:"result"`
+	ResultError string                       `json:"result_error"`
+	Log         []*GetTestRunDetailedTaskLog `json:"log"`
+	ConfigYaml  string                       `json:"config_yaml"`
+}
+
+type GetTestRunDetailedTaskLog struct {
+	Time    time.Time         `json:"time"`
+	Level   uint64            `json:"level"`
+	Message string            `json:"msg"`
+	DataLen uint64            `json:"datalen"`
+	Data    map[string]string `json:"data"`
+}
+
+// GetTestRunDetails godoc
+// @Summary Get detailed test run by run ID
+// @Tags TestRun
+// @Description Returns the run details with given ID. Includes a summary and a list of task with all details (incl. logs & task configurations)
+// @Produce json
+// @Param runId path string true "ID of the test run to get details for"
+// @Success 200 {object} Response{data=GetTestRunDetailsResponse} "Success"
+// @Failure 400 {object} Response "Failure"
+// @Failure 500 {object} Response "Server Error"
+// @Router /api/v1/test_run/{runId}/details [get]
+func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+
+	runID, err := strconv.ParseUint(vars["runId"], 10, 64)
+	if err != nil {
+		ah.sendErrorResponse(w, r.URL.String(), "invalid runId provided", http.StatusBadRequest)
+		return
+	}
+
+	testInstance := ah.coordinator.GetTestByRunID(runID)
+	if testInstance == nil {
+		ah.sendErrorResponse(w, r.URL.String(), "test run not found", http.StatusNotFound)
+		return
+	}
+
+	response := &GetTestRunDetailsResponse{
+		RunID:  testInstance.RunID(),
+		TestID: testInstance.TestID(),
+		Name:   testInstance.Name(),
+		Status: testInstance.Status(),
+		Tasks:  []*GetTestRunDetailedTask{},
+	}
+
+	if !testInstance.StartTime().IsZero() {
+		response.StartTime = testInstance.StartTime().Unix()
+	}
+
+	if !testInstance.StopTime().IsZero() {
+		response.StopTime = testInstance.StopTime().Unix()
+	}
+
+	taskScheduler := testInstance.GetTaskScheduler()
+	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
+		for _, task := range taskScheduler.GetAllTasks() {
+			taskStatus := taskScheduler.GetTaskStatus(task)
+
+			taskData := &GetTestRunDetailedTask{
+				Index:       taskStatus.Index,
+				ParentIndex: taskStatus.ParentIndex,
+				Name:        task.Name(),
+				Title:       task.Title(),
+				Started:     taskStatus.IsStarted,
+				Completed:   taskStatus.IsStarted && !taskStatus.IsRunning,
+				Timeout:     uint64(task.Timeout().Seconds()),
+			}
+
+			switch {
+			case !taskStatus.IsStarted:
+				taskData.Status = "pending"
+			case taskStatus.IsRunning:
+				taskData.Status = "running"
+				taskData.StartTime = taskStatus.StartTime.Unix()
+				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+			default:
+				taskData.Status = "complete"
+				taskData.StartTime = taskStatus.StartTime.Unix()
+				taskData.StopTime = taskStatus.StopTime.Unix()
+				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+			}
+
+			switch taskStatus.Result {
+			case types.TaskResultNone:
+				taskData.Result = "none"
+			case types.TaskResultSuccess:
+				taskData.Result = "success"
+			case types.TaskResultFailure:
+				taskData.Result = "failure"
+			}
+
+			if taskStatus.Error != nil {
+				taskData.ResultError = taskStatus.Error.Error()
+			}
+
+			taskLog := taskStatus.Logger.GetLogEntries()
+			taskData.Log = make([]*GetTestRunDetailedTaskLog, len(taskLog))
+
+			for i, log := range taskLog {
+				logData := &GetTestRunDetailedTaskLog{
+					Time:    log.Time,
+					Level:   uint64(log.Level),
+					Message: log.Message,
+					Data:    map[string]string{},
+					DataLen: uint64(len(log.Data)),
+				}
+
+				for dataKey, dataVal := range log.Data {
+					logData.Data[dataKey] = fmt.Sprintf("%v", dataVal)
+				}
+
+				taskData.Log[i] = logData
+			}
+
+			taskConfig, err := yaml.Marshal(task.Config())
+			if err != nil {
+				taskData.ConfigYaml = fmt.Sprintf("failed marshalling config: %v", err)
+			} else {
+				taskData.ConfigYaml = string(taskConfig)
+			}
+
+			response.Tasks = append(response.Tasks, taskData)
+		}
+	}
+
+	ah.sendOKResponse(w, r.URL.String(), response)
+}
+
+// GetTestRunStatus godoc
+// @Summary Get test run status by run ID
+// @Tags TestRun
+// @Description Returns the run status with given ID.
+// @Produce json
+// @Param runId path string true "ID of the test run to get the status for"
+// @Success 200 {object} Response{data=string} "Success"
+// @Failure 400 {object} Response "Failure"
+// @Failure 500 {object} Response "Server Error"
+// @Router /api/v1/test_run/{runId}/status [get]
+func (ah *APIHandler) GetTestRunStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+
+	runID, err := strconv.ParseUint(vars["runId"], 10, 64)
+	if err != nil {
+		ah.sendErrorResponse(w, r.URL.String(), "invalid runId provided", http.StatusBadRequest)
+		return
+	}
+
+	testInstance := ah.coordinator.GetTestByRunID(runID)
+	if testInstance == nil {
+		ah.sendErrorResponse(w, r.URL.String(), "test run not found", http.StatusNotFound)
+		return
+	}
+
+	ah.sendOKResponse(w, r.URL.String(), string(testInstance.Status()))
+}

@@ -43,12 +43,16 @@ func (ah *APIHandler) GetTests(w http.ResponseWriter, r *http.Request) {
 }
 
 type GetTestResponse struct {
-	ID     string            `json:"id"`
-	Source string            `json:"source"`
-	Config *types.TestConfig `json:"config"`
+	ID         string             `json:"id"`
+	Source     string             `json:"source"`
+	Name       string             `json:"name"`
+	Timeout    uint64             `json:"timeout"`
+	Config     map[string]any     `json:"config"`
+	ConfigVars map[string]string  `json:"configVars"`
+	Schedule   types.TestSchedule `json:"schedule"`
 }
 
-// GetTests godoc
+// GetTest godoc
 // @Summary Get test definition by test ID
 // @Tags Test
 // @Description Returns the test definition with given ID.
@@ -85,9 +89,15 @@ func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	testConfig := testDescriptor.Config()
+
 	ah.sendOKResponse(w, r.URL.String(), &GetTestResponse{
-		ID:     testDescriptor.ID(),
-		Source: testDescriptor.Source(),
-		Config: testDescriptor.Config(),
+		ID:         testDescriptor.ID(),
+		Source:     testDescriptor.Source(),
+		Name:       testConfig.Name,
+		Timeout:    uint64(testConfig.Timeout.Duration.Seconds()),
+		Config:     testConfig.Config,
+		ConfigVars: testConfig.ConfigVars,
+		Schedule:   *testConfig.Schedule,
 	})
 }

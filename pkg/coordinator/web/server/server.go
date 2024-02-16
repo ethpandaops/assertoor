@@ -78,11 +78,14 @@ func (ws *WebServer) StartAPI(config *types.APIConfig, logger logrus.FieldLogger
 	apiHandler := api.NewAPIHandler(logger, coordinator)
 	ws.router.HandleFunc("/api/v1/tests", apiHandler.GetTests).Methods("GET")
 	ws.router.HandleFunc("/api/v1/test/{testId}", apiHandler.GetTest).Methods("GET")
-	//ws.router.HandleFunc("/api/v1/test/{testId}/run", apiHandler.PostTestRun).Methods("POST")
-	//ws.router.HandleFunc("/api/v1/test_runs", apiHandler.GetTestRuns).Methods("GET")
-	//ws.router.HandleFunc("/api/v1/test_run/{runId}", apiHandler.GetTestRun).Methods("GET")
-	//ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
-	//ws.router.HandleFunc("/api/v1/test_run/{runId}/cancel", apiHandler.PostTestRunCancel).Methods("POST")
+	//nolint:gocritic // TODO
+	// ws.router.HandleFunc("/api/v1/test/{testId}/run", apiHandler.PostTestRun).Methods("POST")
+	ws.router.HandleFunc("/api/v1/test_runs", apiHandler.GetTestRuns).Methods("GET")
+	ws.router.HandleFunc("/api/v1/test_run/{runId}", apiHandler.GetTestRun).Methods("GET")
+	ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
+	ws.router.HandleFunc("/api/v1/test_run/{runId}/status", apiHandler.GetTestRunStatus).Methods("GET")
+	//nolint:gocritic // TODO
+	// ws.router.HandleFunc("/api/v1/test_run/{runId}/cancel", apiHandler.PostTestRunCancel).Methods("POST")
 
 	return nil
 }
