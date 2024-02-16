@@ -12,6 +12,7 @@ test:
 
 build:
 	@echo version: $(VERSION)
+	go install github.com/swaggo/swag/cmd/swag@v1.16.3 && swag init -g web/api/handler.go -d pkg/coordinator --parseDependency -o pkg/coordinator/web/api/docs
 	env CGO_ENABLED=1 go build -v -o bin/ -ldflags="-s -w $(GOLDFLAGS)" .
 
 clean:

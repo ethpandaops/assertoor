@@ -60,9 +60,11 @@ main .main-page {
 .task-list .details-table .details-row,
 .test-list .details-table .details-row {
     padding: 0 !important;
+    border-bottom: 0;
 }
 
 .task-list .details-table .details-row .details-content,
 .test-list .details-table .details-row .details-content {
     padding: 8px;
+    border-bottom: var(--bs-border-width) solid var(--bs-table-border-color);
 }

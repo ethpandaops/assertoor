@@ -77,6 +77,7 @@
           </tr>
         </thead>
         <tbody>
+          <tr class="details-row"></tr>
           {{ range $i, $task := .Tasks }}
           <tr data-bs-toggle="collapse" data-bs-target="#task-details-{{ $task.Index }}" class="accordion-toggle">
             <td class="p-0"></td>

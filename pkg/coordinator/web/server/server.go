@@ -6,11 +6,16 @@ import (
 
 	coordinator_types "github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/web/api"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/handlers"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"github.com/urfave/negroni"
+
+	// import swagger docs
+	_ "github.com/ethpandaops/assertoor/pkg/coordinator/web/api/docs"
 )
 
 type WebServer struct {
@@ -60,6 +65,26 @@ func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*WebSe
 	}()
 
 	return ws, nil
+}
+
+func (ws *WebServer) StartAPI(config *types.APIConfig, logger logrus.FieldLogger, coordinator coordinator_types.Coordinator) error {
+	if !config.Enabled {
+		return nil
+	}
+
+	ws.router.PathPrefix("/api/docs/").Handler(httpSwagger.WrapHandler)
+
+	// register api routes
+	apiHandler := api.NewAPIHandler(logger, coordinator)
+	ws.router.HandleFunc("/api/v1/tests", apiHandler.GetTests).Methods("GET")
+	ws.router.HandleFunc("/api/v1/test/{testId}", apiHandler.GetTest).Methods("GET")
+	//ws.router.HandleFunc("/api/v1/test/{testId}/run", apiHandler.PostTestRun).Methods("POST")
+	//ws.router.HandleFunc("/api/v1/test_runs", apiHandler.GetTestRuns).Methods("GET")
+	//ws.router.HandleFunc("/api/v1/test_run/{runId}", apiHandler.GetTestRun).Methods("GET")
+	//ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
+	//ws.router.HandleFunc("/api/v1/test_run/{runId}/cancel", apiHandler.PostTestRunCancel).Methods("POST")
+
+	return nil
 }
 
 func (ws *WebServer) StartFrontend(config *types.FrontendConfig, coordinator coordinator_types.Coordinator) error {

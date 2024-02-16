@@ -1,0 +1,192 @@
+definitions:
+  api.GetTestResponse:
+    properties:
+      config:
+        $ref: '#/definitions/types.TestConfig'
+      id:
+        type: string
+      source:
+        type: string
+    type: object
+  api.GetTestsResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      source:
+        type: string
+    type: object
+  github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response:
+    properties:
+      data: {}
+      status:
+        type: string
+    type: object
+  helper.RawMessage:
+    type: object
+  human.Duration:
+    properties:
+      time.Duration:
+        enum:
+        - -9223372036854775808
+        - 9223372036854775807
+        - 1
+        - 1000
+        - 1000000
+        - 1000000000
+        - 60000000000
+        - 3600000000000
+        - -9223372036854775808
+        - 9223372036854775807
+        - 1
+        - 1000
+        - 1000000
+        - 1000000000
+        - 60000000000
+        - 3600000000000
+        - -9223372036854775808
+        - 9223372036854775807
+        - 1
+        - 1000
+        - 1000000
+        - 1000000000
+        - 60000000000
+        - 3600000000000
+        type: integer
+        x-enum-varnames:
+        - minDuration
+        - maxDuration
+        - Nanosecond
+        - Microsecond
+        - Millisecond
+        - Second
+        - Minute
+        - Hour
+        - minDuration
+        - maxDuration
+        - Nanosecond
+        - Microsecond
+        - Millisecond
+        - Second
+        - Minute
+        - Hour
+        - minDuration
+        - maxDuration
+        - Nanosecond
+        - Microsecond
+        - Millisecond
+        - Second
+        - Minute
+        - Hour
+    type: object
+  types.TestConfig:
+    properties:
+      cleanupTasks:
+        items:
+          $ref: '#/definitions/helper.RawMessage'
+        type: array
+      config:
+        additionalProperties: true
+        type: object
+      configVars:
+        additionalProperties:
+          type: string
+        type: object
+      disable:
+        type: boolean
+      id:
+        type: string
+      name:
+        type: string
+      schedule:
+        $ref: '#/definitions/types.TestSchedule'
+      tasks:
+        items:
+          $ref: '#/definitions/helper.RawMessage'
+        type: array
+      timeout:
+        $ref: '#/definitions/human.Duration'
+    type: object
+  types.TestSchedule:
+    properties:
+      cron:
+        items:
+          type: string
+        type: array
+      file:
+        type: boolean
+    type: object
+info:
+  contact: {}
+  description: API for querying information about Assertoor tests
+  title: Assertoor API Documentation
+  version: "1.0"
+paths:
+  /api/v1/test/{testId}:
+    get:
+      description: Returns the test definition with given ID.
+      parameters:
+      - description: ID of the test definition to get details for
+        in: path
+        name: testId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.GetTestResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Get test definition by test ID
+      tags:
+      - Test
+  /api/v1/tests:
+    get:
+      description: Returns the list of test definitions. These test definitions can
+        be used to create new test runs and are supplied via the assertoor configuration.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/api.GetTestsResponse'
+                  type: array
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Get list of test definitions
+      tags:
+      - Test
+swagger: "2.0"
+tags:
+- description: All endpoints related to test definitions
+  name: Test
+- description: All endpoints related to test runs
+  name: TestRun

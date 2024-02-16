@@ -103,6 +103,13 @@ func (c *Coordinator) Run(ctx context.Context) error {
 			return err
 		}
 
+		if c.Config.Web.API != nil {
+			err = c.webserver.StartAPI(c.Config.Web.API, c.log.GetLogger().WithField("module", "api"), c)
+			if err != nil {
+				return err
+			}
+		}
+
 		if c.Config.Web.Frontend != nil {
 			err = c.webserver.StartFrontend(c.Config.Web.Frontend, c)
 			if err != nil {

@@ -5,6 +5,7 @@ import "time"
 type WebConfig struct {
 	Server   *ServerConfig   `yaml:"server"`
 	Frontend *FrontendConfig `yaml:"frontend"`
+	API      *APIConfig      `yaml:"api"`
 }
 
 type ServerConfig struct {
@@ -22,4 +23,8 @@ type FrontendConfig struct {
 	Pprof    bool   `yaml:"pprof" envconfig:"WEB_FRONTEND_PPROF"`
 	Minify   bool   `yaml:"minify" envconfig:"WEB_FRONTEND_MINIFY"`
 	SiteName string `yaml:"siteName" envconfig:"WEB_FRONTEND_SITE_NAME"`
+}
+
+type APIConfig struct {
+	Enabled bool `yaml:"enabled" envconfig:"WEB_API_ENABLED"`
 }
