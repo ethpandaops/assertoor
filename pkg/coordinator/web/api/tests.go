@@ -52,8 +52,8 @@ type GetTestResponse struct {
 // @Summary Get test definition by test ID
 // @Tags Test
 // @Description Returns the test definition with given ID.
-// @Produce  json
-// @Param  testId path string true "ID of the test definition to get details for"
+// @Produce json
+// @Param testId path string true "ID of the test definition to get details for"
 // @Success 200 {object} Response{data=GetTestResponse} "Success"
 // @Failure 400 {object} Response "Failure"
 // @Failure 500 {object} Response "Server Error"
