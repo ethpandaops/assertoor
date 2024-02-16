@@ -25,6 +25,7 @@ const docTemplate = `{
                     "Test"
                 ],
                 "summary": "Get test definition by test ID",
+                "operationId": "getTest",
                 "parameters": [
                     {
                         "type": "string",
@@ -68,6 +69,69 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/test/{testId}/run": {
+            "post": {
+                "description": "Returns the test \u0026 run id of the scheduled test execution.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Schedule new test run by test ID",
+                "operationId": "postTestRun",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test definition to schedule a test run for",
+                        "name": "testId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Rest run options",
+                        "name": "runOptions",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.PostTestRunRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.PostTestRunResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/test_run/{runId}": {
             "get": {
                 "description": "Returns the run details with given ID. Includes a summary and a list of task with limited details",
@@ -78,6 +142,7 @@ const docTemplate = `{
                     "TestRun"
                 ],
                 "summary": "Get test run by run ID",
+                "operationId": "getTestRun",
                 "parameters": [
                     {
                         "type": "string",
@@ -131,6 +196,7 @@ const docTemplate = `{
                     "TestRun"
                 ],
                 "summary": "Get detailed test run by run ID",
+                "operationId": "getTestRunDetails",
                 "parameters": [
                     {
                         "type": "string",
@@ -184,6 +250,7 @@ const docTemplate = `{
                     "TestRun"
                 ],
                 "summary": "Get test run status by run ID",
+                "operationId": "getTestRunStatus",
                 "parameters": [
                     {
                         "type": "string",
@@ -237,6 +304,7 @@ const docTemplate = `{
                     "TestRun"
                 ],
                 "summary": "Get list of test runs",
+                "operationId": "getTestRuns",
                 "responses": {
                     "200": {
                         "description": "Success",
@@ -284,6 +352,7 @@ const docTemplate = `{
                     "Test"
                 ],
                 "summary": "Get list of test definitions",
+                "operationId": "getTests",
                 "responses": {
                     "200": {
                         "description": "Success",
@@ -564,6 +633,33 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "source": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestRunRequest": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                }
+            }
+        },
+        "api.PostTestRunResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "test_id": {
                     "type": "string"
                 }
             }
