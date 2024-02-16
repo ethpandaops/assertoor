@@ -80,6 +80,10 @@ func (t *Test) RunID() uint64 {
 	return t.runID
 }
 
+func (t *Test) TestID() string {
+	return t.descriptor.ID()
+}
+
 func (t *Test) Name() string {
 	return t.config.Name
 }

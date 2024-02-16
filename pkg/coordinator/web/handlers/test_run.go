@@ -14,40 +14,41 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type TestPage struct {
-	RunID       uint64          `json:"runId"`
-	Name        string          `json:"name"`
-	IsStarted   bool            `json:"started"`
-	IsCompleted bool            `json:"completed"`
-	StartTime   time.Time       `json:"start_time"`
-	StopTime    time.Time       `json:"stop_time"`
-	Timeout     time.Duration   `json:"timeout"`
-	Status      string          `json:"status"`
-	Tasks       []*TestPageTask `json:"tasks"`
+type TestRunPage struct {
+	RunID       uint64         `json:"runId"`
+	TestID      string         `json:"testId"`
+	Name        string         `json:"name"`
+	IsStarted   bool           `json:"started"`
+	IsCompleted bool           `json:"completed"`
+	StartTime   time.Time      `json:"start_time"`
+	StopTime    time.Time      `json:"stop_time"`
+	Timeout     time.Duration  `json:"timeout"`
+	Status      string         `json:"status"`
+	Tasks       []*TestRunTask `json:"tasks"`
 }
 
-type TestPageTask struct {
-	Index       uint64             `json:"index"`
-	ParentIndex uint64             `json:"parent_index"`
-	IndentPx    uint64             `json:"indent_px"`
-	Name        string             `json:"name"`
-	Title       string             `json:"title"`
-	IsStarted   bool               `json:"started"`
-	IsCompleted bool               `json:"completed"`
-	StartTime   time.Time          `json:"start_time"`
-	StopTime    time.Time          `json:"stop_time"`
-	Timeout     time.Duration      `json:"timeout"`
-	HasTimeout  bool               `json:"has_timeout"`
-	RunTime     time.Duration      `json:"runtime"`
-	HasRunTime  bool               `json:"has_runtime"`
-	Status      string             `json:"status"`
-	Result      string             `json:"result"`
-	ResultError string             `json:"result_error"`
-	Log         []*TestPageTaskLog `json:"log"`
-	ConfigYaml  string             `json:"config_yaml"`
+type TestRunTask struct {
+	Index       uint64            `json:"index"`
+	ParentIndex uint64            `json:"parent_index"`
+	IndentPx    uint64            `json:"indent_px"`
+	Name        string            `json:"name"`
+	Title       string            `json:"title"`
+	IsStarted   bool              `json:"started"`
+	IsCompleted bool              `json:"completed"`
+	StartTime   time.Time         `json:"start_time"`
+	StopTime    time.Time         `json:"stop_time"`
+	Timeout     time.Duration     `json:"timeout"`
+	HasTimeout  bool              `json:"has_timeout"`
+	RunTime     time.Duration     `json:"runtime"`
+	HasRunTime  bool              `json:"has_runtime"`
+	Status      string            `json:"status"`
+	Result      string            `json:"result"`
+	ResultError string            `json:"result_error"`
+	Log         []*TestRunTaskLog `json:"log"`
+	ConfigYaml  string            `json:"config_yaml"`
 }
 
-type TestPageTaskLog struct {
+type TestRunTaskLog struct {
 	Time    time.Time         `json:"time"`
 	Level   uint64            `json:"level"`
 	Message string            `json:"msg"`
@@ -66,21 +67,28 @@ func (fh *FrontendHandler) TestRun(w http.ResponseWriter, r *http.Request) {
 	templateFiles := web.LayoutTemplateFiles
 	templateFiles = append(templateFiles,
 		"test_run/test_run.html",
+		"sidebar/sidebar.html",
 	)
 	pageTemplate := web.GetTemplate(templateFiles...)
 	data := web.InitPageData(w, r, "test", "/", "Test ", templateFiles)
 
 	vars := mux.Vars(r)
 
+	var pageData *TestRunPage
+
 	runID, pageError := strconv.ParseInt(vars["runId"], 10, 64)
 	if pageError == nil {
-		data.Data, pageError = fh.getTestRunPageData(runID)
+		pageData, pageError = fh.getTestRunPageData(runID)
+		data.Data = pageData
 	}
 
 	if pageError != nil {
 		web.HandlePageError(w, r, pageError)
 		return
 	}
+
+	data.ShowSidebar = true
+	data.SidebarData = fh.getSidebarData(pageData.TestID)
 
 	w.Header().Set("Content-Type", "text/html")
 
@@ -90,7 +98,7 @@ func (fh *FrontendHandler) TestRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (fh *FrontendHandler) TestRunData(w http.ResponseWriter, r *http.Request) {
-	var pageData *TestPage
+	var pageData *TestRunPage
 
 	vars := mux.Vars(r)
 
@@ -115,14 +123,15 @@ func (fh *FrontendHandler) TestRunData(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestPage, error) {
+func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error) {
 	test := fh.coordinator.GetTestByRunID(uint64(runID))
 	if test == nil {
 		return nil, fmt.Errorf("test not found")
 	}
 
-	pageData := &TestPage{
+	pageData := &TestRunPage{
 		RunID:     uint64(runID),
+		TestID:    test.TestID(),
 		Name:      test.Name(),
 		StartTime: test.StartTime(),
 		StopTime:  test.StopTime(),
@@ -150,7 +159,7 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestPage, error) {
 		for _, task := range taskScheduler.GetAllTasks() {
 			taskStatus := taskScheduler.GetTaskStatus(task)
 
-			taskData := &TestPageTask{
+			taskData := &TestRunTask{
 				Index:       taskStatus.Index,
 				ParentIndex: taskStatus.ParentIndex,
 				Name:        task.Name(),
@@ -198,10 +207,10 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestPage, error) {
 			}
 
 			taskLog := taskStatus.Logger.GetLogEntries()
-			taskData.Log = make([]*TestPageTaskLog, len(taskLog))
+			taskData.Log = make([]*TestRunTaskLog, len(taskLog))
 
 			for i, log := range taskLog {
-				logData := &TestPageTaskLog{
+				logData := &TestRunTaskLog{
 					Time:    log.Time,
 					Level:   uint64(log.Level),
 					Message: log.Message,

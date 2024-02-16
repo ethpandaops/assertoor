@@ -5,23 +5,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/sirupsen/logrus"
 )
 
 type IndexPage struct {
-	ClientCount     uint64                     `json:"client_count"`
-	CLReadyCount    uint64                     `json:"cl_ready_count"`
-	CLHeadSlot      uint64                     `json:"cl_head_slot"`
-	CLHeadRoot      []byte                     `json:"cl_head_root"`
-	ELReadyCount    uint64                     `json:"el_ready_count"`
-	ELHeadNumber    uint64                     `json:"el_head_number"`
-	ELHeadHash      []byte                     `json:"el_head_hash"`
-	Version         string                     `json:"version"`
 	TestDescriptors []*IndexPageTestDescriptor `json:"test_descriptors"`
-	Tests           []*IndexPageTest           `json:"tests"`
+	Tests           []*TestRunData             `json:"tests"`
 }
 
 type IndexPageTestDescriptor struct {
@@ -31,7 +22,7 @@ type IndexPageTestDescriptor struct {
 	Config string `json:"config"`
 }
 
-type IndexPageTest struct {
+type TestRunData struct {
 	RunID       uint64        `json:"run_id"`
 	Index       uint64        `json:"index"`
 	Name        string        `json:"name"`
@@ -58,7 +49,8 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 	templateFiles := web.LayoutTemplateFiles
 	templateFiles = append(templateFiles,
 		"index/index.html",
-		"index/test_runs.html",
+		"sidebar/sidebar.html",
+		"test/test_runs.html",
 	)
 	pageTemplate := web.GetTemplate(templateFiles...)
 	data := web.InitPageData(w, r, "index", "/", "Index", templateFiles)
@@ -70,6 +62,9 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 		web.HandlePageError(w, r, pageError)
 		return
 	}
+
+	data.ShowSidebar = true
+	data.SidebarData = fh.getSidebarData("*")
 
 	w.Header().Set("Content-Type", "text/html")
 
@@ -102,72 +97,55 @@ func (fh *FrontendHandler) IndexData(w http.ResponseWriter, r *http.Request) {
 
 //nolint:unparam // ignore
 func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
-	pageData := &IndexPage{
-		Version: buildinfo.GetVersion(),
-	}
-
-	// client pool status
-	clientPool := fh.coordinator.ClientPool()
-	allClients := clientPool.GetAllClients()
-	pageData.ClientCount = uint64(len(allClients))
-
-	canonicalClFork := clientPool.GetConsensusPool().GetCanonicalFork(2)
-	if canonicalClFork != nil {
-		pageData.CLReadyCount = uint64(len(canonicalClFork.ReadyClients))
-		pageData.CLHeadSlot = uint64(canonicalClFork.Slot)
-		pageData.CLHeadRoot = canonicalClFork.Root[:]
-	}
-
-	canonicalElFork := clientPool.GetExecutionPool().GetCanonicalFork(2)
-	if canonicalElFork != nil {
-		pageData.ELReadyCount = uint64(len(canonicalElFork.ReadyClients))
-		pageData.ELHeadNumber = canonicalElFork.Number
-		pageData.ELHeadHash = canonicalElFork.Hash[:]
-	}
+	pageData := &IndexPage{}
 
 	// tasks list
-	pageData.Tests = []*IndexPageTest{}
+	pageData.Tests = []*TestRunData{}
 
 	testInstances := append(fh.coordinator.GetTestHistory(), fh.coordinator.GetTestQueue()...)
 	for idx, test := range testInstances {
-		testData := &IndexPageTest{
-			RunID:      test.RunID(),
-			Index:      uint64(idx),
-			Name:       test.Name(),
-			StartTime:  test.StartTime(),
-			StopTime:   test.StopTime(),
-			Timeout:    test.Timeout(),
-			HasTimeout: test.Timeout() > 0,
-			Status:     string(test.Status()),
-		}
-
-		switch test.Status() {
-		case types.TestStatusPending:
-		case types.TestStatusRunning:
-			testData.IsStarted = true
-		case types.TestStatusSuccess:
-			testData.IsStarted = true
-			testData.IsCompleted = true
-		case types.TestStatusFailure:
-			testData.IsStarted = true
-			testData.IsCompleted = true
-		case types.TestStatusSkipped:
-		}
-
-		if testData.IsCompleted {
-			testData.RunTime = testData.StopTime.Sub(testData.StartTime).Round(1 * time.Millisecond)
-			testData.HasRunTime = true
-		} else if testData.IsStarted {
-			testData.RunTime = time.Since(testData.StartTime).Round(1 * time.Millisecond)
-			testData.HasRunTime = true
-		}
-
-		if taskScheduler := test.GetTaskScheduler(); taskScheduler != nil {
-			testData.TaskCount = uint64(taskScheduler.GetTaskCount())
-		}
-
-		pageData.Tests = append(pageData.Tests, testData)
+		pageData.Tests = append(pageData.Tests, fh.getTestRunData(idx, test))
 	}
 
 	return pageData, nil
+}
+
+func (fh *FrontendHandler) getTestRunData(idx int, test types.Test) *TestRunData {
+	testData := &TestRunData{
+		RunID:      test.RunID(),
+		Index:      uint64(idx),
+		Name:       test.Name(),
+		StartTime:  test.StartTime(),
+		StopTime:   test.StopTime(),
+		Timeout:    test.Timeout(),
+		HasTimeout: test.Timeout() > 0,
+		Status:     string(test.Status()),
+	}
+
+	switch test.Status() {
+	case types.TestStatusPending:
+	case types.TestStatusRunning:
+		testData.IsStarted = true
+	case types.TestStatusSuccess:
+		testData.IsStarted = true
+		testData.IsCompleted = true
+	case types.TestStatusFailure:
+		testData.IsStarted = true
+		testData.IsCompleted = true
+	case types.TestStatusSkipped:
+	}
+
+	if testData.IsCompleted {
+		testData.RunTime = testData.StopTime.Sub(testData.StartTime).Round(1 * time.Millisecond)
+		testData.HasRunTime = true
+	} else if testData.IsStarted {
+		testData.RunTime = time.Since(testData.StartTime).Round(1 * time.Millisecond)
+		testData.HasRunTime = true
+	}
+
+	if taskScheduler := test.GetTaskScheduler(); taskScheduler != nil {
+		testData.TaskCount = uint64(taskScheduler.GetTaskCount())
+	}
+
+	return testData
 }

@@ -57,47 +57,12 @@ main .main-page {
     flex-grow: 1;
 }
 
+.task-list .details-table .details-row,
 .test-list .details-table .details-row {
     padding: 0 !important;
 }
 
+.task-list .details-table .details-row .details-content,
 .test-list .details-table .details-row .details-content {
     padding: 8px;
-}
-
-
-/*
-.test-list .accordion-item.test-list-header .test-header .row > * {
-    font-weight: 600;
-}
-
-.test-list .accordion-item.test-list-header .accordion-button::after {
-    visibility: hidden;
-}
-
-.test-list .accordion-item .test-header {
-    padding: 8px;
-}
-
-.test-list .accordion-item .test-header .test-status {
-    width: 40px;
-    min-width: 40px;
-}
-*/
-
-.task-list .accordion-item.task-list-header .task-header .row > * {
-    font-weight: 600;
-}
-
-.task-list .accordion-item.task-list-header .accordion-button::after {
-    visibility: hidden;
-}
-
-.task-list .accordion-item .task-header {
-    padding: 8px;
-}
-
-.task-list .accordion-item .task-header .task-status {
-    width: 60px;
-    min-width: 60px;
 }

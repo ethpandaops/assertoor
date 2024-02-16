@@ -23,6 +23,7 @@ type Test interface {
 	Validate() error
 	Run(ctx context.Context) error
 	RunID() uint64
+	TestID() string
 	Name() string
 	StartTime() time.Time
 	StopTime() time.Time
