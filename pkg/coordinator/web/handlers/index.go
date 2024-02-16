@@ -32,6 +32,7 @@ type IndexPageTestDescriptor struct {
 }
 
 type IndexPageTest struct {
+	RunID       uint64        `json:"run_id"`
 	Index       uint64        `json:"index"`
 	Name        string        `json:"name"`
 	IsStarted   bool          `json:"started"`
@@ -130,6 +131,7 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 	testInstances := append(fh.coordinator.GetTestHistory(), fh.coordinator.GetTestQueue()...)
 	for idx, test := range testInstances {
 		testData := &IndexPageTest{
+			RunID:      test.RunID(),
 			Index:      uint64(idx),
 			Name:       test.Name(),
 			StartTime:  test.StartTime(),

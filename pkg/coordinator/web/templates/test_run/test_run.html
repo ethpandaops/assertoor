@@ -1,6 +1,6 @@
 {{ define "page" }}
   <div class="container mt-2">
-    <h2 class="py-2">Test {{ .Index }}: {{ .Name }}</h2>
+    <h2 class="py-2">Test Run {{ .RunID }}: {{ .Name }}</h2>
     
     <!-- client pool status -->
     <div class="row">
@@ -264,6 +264,8 @@
   </div>
 {{ end }}
 
+{{ define "sidebar" }}
+{{ end }}
 {{ define "js" }}
 {{ end }}
 {{ define "css" }}

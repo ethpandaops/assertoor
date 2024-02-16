@@ -17,6 +17,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/server"
+	"github.com/gorhill/cronexpr"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
@@ -184,8 +185,8 @@ func (c *Coordinator) GetTestQueue() []types.Test {
 	c.testRegistryMutex.RLock()
 	defer c.testRegistryMutex.RUnlock()
 
-	tests := make([]types.Test, len(c.testHistory))
-	copy(tests, c.testHistory)
+	tests := make([]types.Test, len(c.testQueue))
+	copy(tests, c.testQueue)
 
 	return tests
 }
@@ -299,8 +300,70 @@ func (c *Coordinator) runTest(ctx context.Context, testRef types.Test) {
 
 func (c *Coordinator) runTestScheduler(ctx context.Context) {
 	// startup scheduler
+	for _, testDescr := range c.testDescriptors {
+		if testDescr.Err() != nil {
+			continue
+		}
+
+		testConfig := testDescr.Config()
+		if testConfig.Schedule == nil || testConfig.Schedule.Startup {
+			_, err := c.ScheduleTest(testDescr, nil)
+			if err != nil {
+				c.Logger().Errorf("could not schedule startup test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
+			}
+		}
+	}
+
 	// cron scheduler
+	cronTime := time.Unix((time.Now().Unix()/60)*60, 0)
+
 	for {
+		cronTime = cronTime.Add(1 * time.Minute)
+		cronTimeDiff := time.Since(cronTime)
+
+		if cronTimeDiff < 0 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(cronTimeDiff.Abs()):
+			}
+		}
+
+		for _, testDescr := range c.testDescriptors {
+			if testDescr.Err() != nil {
+				continue
+			}
+
+			testConfig := testDescr.Config()
+			if testConfig.Schedule == nil || len(testConfig.Schedule.Cron) == 0 {
+				continue
+			}
+
+			triggerTest := false
+
+			for _, cronExprStr := range testConfig.Schedule.Cron {
+				cronExpr, err := cronexpr.Parse(cronExprStr)
+				if err != nil {
+					c.Logger().Errorf("invalid cron expression for test %v (%v): %v", testDescr.ID(), testConfig.Name, err)
+					break
+				}
+
+				if cronExpr.Next(cronTime).IsZero() {
+					triggerTest = true
+					break
+				}
+			}
+
+			if !triggerTest {
+				continue
+			}
+
+			_, err := c.ScheduleTest(testDescr, nil)
+			if err != nil {
+				c.Logger().Errorf("could not schedule cron test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			return

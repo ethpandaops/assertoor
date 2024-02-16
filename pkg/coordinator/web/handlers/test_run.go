@@ -15,7 +15,7 @@ import (
 )
 
 type TestPage struct {
-	Index       uint64          `json:"index"`
+	RunID       uint64          `json:"runId"`
 	Name        string          `json:"name"`
 	IsStarted   bool            `json:"started"`
 	IsCompleted bool            `json:"completed"`
@@ -56,25 +56,25 @@ type TestPageTaskLog struct {
 }
 
 // Test will return the "test" page using a go template
-func (fh *FrontendHandler) Test(w http.ResponseWriter, r *http.Request) {
+func (fh *FrontendHandler) TestRun(w http.ResponseWriter, r *http.Request) {
 	urlArgs := r.URL.Query()
 	if urlArgs.Has("json") {
-		fh.TestData(w, r)
+		fh.TestRunData(w, r)
 		return
 	}
 
 	templateFiles := web.LayoutTemplateFiles
 	templateFiles = append(templateFiles,
-		"test/test.html",
+		"test_run/test_run.html",
 	)
 	pageTemplate := web.GetTemplate(templateFiles...)
 	data := web.InitPageData(w, r, "test", "/", "Test ", templateFiles)
 
 	vars := mux.Vars(r)
 
-	testIdx, pageError := strconv.ParseInt(vars["testIdx"], 10, 64)
+	runID, pageError := strconv.ParseInt(vars["runId"], 10, 64)
 	if pageError == nil {
-		data.Data, pageError = fh.getTestPageData(testIdx)
+		data.Data, pageError = fh.getTestRunPageData(runID)
 	}
 
 	if pageError != nil {
@@ -84,19 +84,19 @@ func (fh *FrontendHandler) Test(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 
-	if web.HandleTemplateError(w, r, "test.go", "Test", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
+	if web.HandleTemplateError(w, r, "test_run.go", "Test Run", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
 		return // an error has occurred and was processed
 	}
 }
 
-func (fh *FrontendHandler) TestData(w http.ResponseWriter, r *http.Request) {
+func (fh *FrontendHandler) TestRunData(w http.ResponseWriter, r *http.Request) {
 	var pageData *TestPage
 
 	vars := mux.Vars(r)
 
-	testIdx, pageError := strconv.ParseInt(vars["testIdx"], 10, 64)
+	runID, pageError := strconv.ParseInt(vars["runId"], 10, 64)
 	if pageError == nil {
-		pageData, pageError = fh.getTestPageData(testIdx)
+		pageData, pageError = fh.getTestRunPageData(runID)
 	}
 
 	if pageError != nil {
@@ -115,14 +115,14 @@ func (fh *FrontendHandler) TestData(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
-	test := fh.coordinator.GetTestByRunID(uint64(testIdx))
+func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestPage, error) {
+	test := fh.coordinator.GetTestByRunID(uint64(runID))
 	if test == nil {
-		return nil, fmt.Errorf("Test not found")
+		return nil, fmt.Errorf("test not found")
 	}
 
 	pageData := &TestPage{
-		Index:     uint64(testIdx),
+		RunID:     uint64(runID),
 		Name:      test.Name(),
 		StartTime: test.StartTime(),
 		StopTime:  test.StopTime(),

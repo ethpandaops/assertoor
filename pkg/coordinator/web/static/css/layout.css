@@ -61,8 +61,12 @@ main .main-page {
     padding: 0 !important;
 }
 
+.test-list .details-table .details-row .details-content {
+    padding: 8px;
+}
 
 
+/*
 .test-list .accordion-item.test-list-header .test-header .row > * {
     font-weight: 600;
 }
@@ -79,6 +83,7 @@ main .main-page {
     width: 40px;
     min-width: 40px;
 }
+*/
 
 .task-list .accordion-item.task-list-header .task-header .row > * {
     font-weight: 600;
