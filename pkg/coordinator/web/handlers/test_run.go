@@ -70,7 +70,7 @@ func (fh *FrontendHandler) TestRun(w http.ResponseWriter, r *http.Request) {
 		"sidebar/sidebar.html",
 	)
 	pageTemplate := web.GetTemplate(templateFiles...)
-	data := web.InitPageData(w, r, "test", "/", "Test ", templateFiles)
+	data := web.InitPageData(r, "test", "/", "Test ", templateFiles)
 
 	vars := mux.Vars(r)
 
@@ -150,6 +150,7 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 		pageData.IsStarted = true
 		pageData.IsCompleted = true
 	case types.TestStatusSkipped:
+	case types.TestStatusAborted:
 	}
 
 	taskScheduler := test.GetTaskScheduler()

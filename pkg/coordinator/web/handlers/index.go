@@ -53,7 +53,7 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 		"test/test_runs.html",
 	)
 	pageTemplate := web.GetTemplate(templateFiles...)
-	data := web.InitPageData(w, r, "index", "/", "Index", templateFiles)
+	data := web.InitPageData(r, "index", "/", "Index", templateFiles)
 
 	var pageError error
 	data.Data, pageError = fh.getIndexPageData()
@@ -133,6 +133,7 @@ func (fh *FrontendHandler) getTestRunData(idx int, test types.Test) *TestRunData
 		testData.IsStarted = true
 		testData.IsCompleted = true
 	case types.TestStatusSkipped:
+	case types.TestStatusAborted:
 	}
 
 	if testData.IsCompleted {

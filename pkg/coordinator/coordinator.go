@@ -104,14 +104,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		}
 
 		if c.Config.Web.API != nil {
-			err = c.webserver.StartAPI(c.Config.Web.API, c.log.GetLogger().WithField("module", "api"), c)
-			if err != nil {
-				return err
-			}
-		}
-
-		if c.Config.Web.Frontend != nil {
-			err = c.webserver.StartFrontend(c.Config.Web.Frontend, c)
+			err = c.webserver.ConfigureRoutes(c.Config.Web, c.log.GetLogger(), c)
 			if err != nil {
 				return err
 			}

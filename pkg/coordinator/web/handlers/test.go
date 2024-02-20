@@ -37,7 +37,7 @@ func (fh *FrontendHandler) TestPage(w http.ResponseWriter, r *http.Request) {
 	)
 	pageTemplate := web.GetTemplate(templateFiles...)
 	vars := mux.Vars(r)
-	data := web.InitPageData(w, r, "test", "/", "Test", templateFiles)
+	data := web.InitPageData(r, "test", "/", "Test", templateFiles)
 
 	var pageError error
 

@@ -46,6 +46,10 @@ header.header-bar .navbar-brand {
     padding-left: 24px;
 }
 
+header.header-bar .nav-item {
+    padding: 0 16px;
+}
+
 
 main .main-content {
     display: flex;
