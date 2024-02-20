@@ -25,6 +25,8 @@ type TaskScheduler struct {
 	rootCleanupTasks []types.Task
 	taskStateMutex   sync.RWMutex
 	taskStateMap     map[types.Task]*taskExecutionState
+	cancelTaskCtx    context.CancelFunc
+	cancelCleanupCtx context.CancelFunc
 }
 
 type taskExecutionState struct {
@@ -199,21 +201,19 @@ func (ts *TaskScheduler) setTaskResult(task types.Task, result types.TaskResult,
 }
 
 func (ts *TaskScheduler) RunTasks(ctx context.Context, timeout time.Duration) error {
-	defer ts.runCleanupTasks(ctx)
+	var cleanupCtx, tasksCtx context.Context
 
-	var tasksCtx context.Context
+	cleanupCtx, ts.cancelCleanupCtx = context.WithCancel(ctx)
+
+	defer ts.runCleanupTasks(cleanupCtx)
 
 	if timeout > 0 {
-		c, cancel := context.WithTimeout(ctx, timeout)
-		tasksCtx = c
-
-		defer cancel()
+		tasksCtx, ts.cancelTaskCtx = context.WithTimeout(ctx, timeout)
 	} else {
-		c, cancel := context.WithCancel(ctx)
-		tasksCtx = c
-
-		defer cancel()
+		tasksCtx, ts.cancelTaskCtx = context.WithCancel(ctx)
 	}
+
+	defer ts.cancelTaskCtx()
 
 	for _, task := range ts.rootTasks {
 		err := ts.ExecuteTask(tasksCtx, task, ts.WatchTaskPass)
@@ -360,6 +360,16 @@ func (ts *TaskScheduler) WatchTaskPass(ctx context.Context, cancelFn context.Can
 		if taskStatus.Result != types.TaskResultNone {
 			cancelFn()
 			return
+		}
+	}
+}
+
+func (ts *TaskScheduler) CancelTasks(cancelCleanup bool) {
+	if ts.cancelTaskCtx != nil {
+		ts.cancelTaskCtx()
+
+		if cancelCleanup {
+			ts.cancelCleanupCtx()
 		}
 	}
 }

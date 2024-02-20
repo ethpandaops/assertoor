@@ -130,6 +130,10 @@ func (t *Test) Run(ctx context.Context) error {
 		return fmt.Errorf("test has already been started")
 	}
 
+	if t.status == types.TestStatusAborted {
+		return nil
+	}
+
 	// track start/stop time
 	t.startTime = time.Now()
 	t.status = types.TestStatusRunning
@@ -142,6 +146,13 @@ func (t *Test) Run(ctx context.Context) error {
 	t.logger.WithField("timeout", t.timeout.String()).Info("starting test")
 
 	err := t.taskScheduler.RunTasks(ctx, t.timeout)
+
+	if t.status == types.TestStatusAborted {
+		t.logger.Info("test aborted!")
+
+		return fmt.Errorf("test aborted")
+	}
+
 	if err != nil {
 		t.logger.Info("test failed!")
 		t.status = types.TestStatusFailure
@@ -153,6 +164,14 @@ func (t *Test) Run(ctx context.Context) error {
 	t.status = types.TestStatusSuccess
 
 	return nil
+}
+
+func (t *Test) AbortTest(skipCleanup bool) {
+	t.status = types.TestStatusAborted
+
+	if t.taskScheduler != nil {
+		t.taskScheduler.CancelTasks(skipCleanup)
+	}
 }
 
 func (t *Test) GetTaskScheduler() types.TaskScheduler {

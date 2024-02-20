@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
@@ -52,18 +53,23 @@ type ErrorPageData struct {
 	Version    string
 }
 
-func InitPageData(_ http.ResponseWriter, r *http.Request, active, path, title string, mainTemplates []string) *PageData {
+func InitPageData(r *http.Request, active, path, title string, mainTemplates []string) *PageData {
 	fullTitle := fmt.Sprintf("%v - %v - %v", title, frontendConfig.SiteName, time.Now().Year())
 
 	if title == "" {
 		fullTitle = fmt.Sprintf("%v - %v", frontendConfig.SiteName, time.Now().Year())
 	}
 
+	host := ""
+	if r != nil {
+		host = r.Host
+	}
+
 	data := &PageData{
 		Meta: &Meta{
 			Title:       fullTitle,
 			Description: "assertoor: testnet testing tool",
-			Domain:      r.Host,
+			Domain:      host,
 			Path:        path,
 			Templates:   strings.Join(mainTemplates, ","),
 		},
@@ -76,17 +82,19 @@ func InitPageData(_ http.ResponseWriter, r *http.Request, active, path, title st
 		Debug:   frontendConfig.Debug,
 	}
 
-	acceptedLangs := strings.Split(r.Header.Get("Accept-Language"), ",")
-	if len(acceptedLangs) > 0 {
-		if strings.Contains(acceptedLangs[0], "ru") || strings.Contains(acceptedLangs[0], "RU") {
-			data.Lang = "ru-RU"
+	if r != nil {
+		acceptedLangs := strings.Split(r.Header.Get("Accept-Language"), ",")
+		if len(acceptedLangs) > 0 {
+			if strings.Contains(acceptedLangs[0], "ru") || strings.Contains(acceptedLangs[0], "RU") {
+				data.Lang = "ru-RU"
+			}
 		}
-	}
 
-	for _, v := range r.Cookies() {
-		if v.Name == "language" {
-			data.Lang = v.Value
-			break
+		for _, v := range r.Cookies() {
+			if v.Name == "language" {
+				data.Lang = v.Value
+				break
+			}
 		}
 	}
 
@@ -119,7 +127,8 @@ func HandlePageError(w http.ResponseWriter, r *http.Request, pageError error) {
 
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusInternalServerError)
-	data := InitPageData(w, r, "blockchain", r.URL.Path, "Internal Error", templateFiles)
+
+	data := InitPageData(r, "blockchain", r.URL.Path, "Internal Error", templateFiles)
 	errData := &ErrorPageData{
 		CallTime: time.Now(),
 		CallURL:  r.URL.String(),
@@ -143,7 +152,8 @@ func HandleNotFound(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusNotFound)
-	data := InitPageData(w, r, "blockchain", r.URL.Path, "Not Found", templateFiles)
+
+	data := InitPageData(r, "blockchain", r.URL.Path, "Not Found", templateFiles)
 
 	err := notFoundTemplate.ExecuteTemplate(w, "layout", data)
 	if err != nil {
@@ -151,4 +161,21 @@ func HandleNotFound(w http.ResponseWriter, r *http.Request) {
 		//nolint:gocritic // ignore
 		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
+}
+
+func BuildPageHeader() (string, error) {
+	templateFiles := LayoutTemplateFiles
+	templateFiles = append(templateFiles, "_layout/blank.html")
+	blankTemplate := GetTemplate(templateFiles...)
+
+	data := InitPageData(nil, "blank", "", "", templateFiles)
+
+	var outBuf bytes.Buffer
+
+	err := blankTemplate.ExecuteTemplate(&outBuf, "header", data)
+	if err != nil {
+		return "", fmt.Errorf("error executing blank template: %v", err)
+	}
+
+	return outBuf.String(), nil
 }

@@ -4,6 +4,14 @@
     
     <!-- client pool status -->
     <div class="row">
+      <div class="row">
+        <div class="col-6 col-sm-4 col-lg-3">
+          Test ID:
+        </div>
+        <div class="col-6 col-sm-8 col-lg-9">
+          {{ .TestID }}     
+        </div>
+      </div>
       <div class="col-6 col-sm-4 col-lg-3">
         Test Status:
       </div>
@@ -23,6 +31,10 @@
         {{ else if eq .Status "failure" }}
           <span class="badge rounded-pill text-bg-danger">
             <i class="fas fa-times-circle"></i> Failed
+          </span>
+        {{ else if eq .Status "aborted" }}
+          <span class="badge rounded-pill text-bg-secondary">
+            <i class="fas fa-times-circle"></i> Cancelled
           </span>
         {{ else }}
           <span class="badge rounded-pill text-bg-warning">
@@ -77,6 +89,7 @@
           </tr>
         </thead>
         <tbody>
+          <tr class="details-row"></tr>
           {{ range $i, $task := .Tasks }}
           <tr data-bs-toggle="collapse" data-bs-target="#task-details-{{ $task.Index }}" class="accordion-toggle">
             <td class="p-0"></td>

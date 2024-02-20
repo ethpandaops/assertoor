@@ -57,7 +57,7 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Co
 		testRunMap:           map[uint64]types.Test{},
 		testQueue:            []types.Test{},
 		testHistory:          []types.Test{},
-		testNotificationChan: make(chan bool),
+		testNotificationChan: make(chan bool, 1),
 	}
 }
 
@@ -103,8 +103,8 @@ func (c *Coordinator) Run(ctx context.Context) error {
 			return err
 		}
 
-		if c.Config.Web.Frontend != nil {
-			err = c.webserver.StartFrontend(c.Config.Web.Frontend, c)
+		if c.Config.Web.API != nil {
+			err = c.webserver.ConfigureRoutes(c.Config.Web, c.log.GetLogger(), c)
 			if err != nil {
 				return err
 			}
@@ -213,27 +213,35 @@ func (c *Coordinator) startMetrics() error {
 	return err
 }
 
-func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any) (types.Test, error) {
+func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.Test, error) {
 	if descriptor.Err() != nil {
 		return nil, fmt.Errorf("cannot create test from failed test descriptor: %w", descriptor.Err())
 	}
 
-	testRef, err := c.createTestRun(descriptor, configOverrides)
+	testRef, err := c.createTestRun(descriptor, configOverrides, allowDuplicate)
 	if err != nil {
 		return nil, err
 	}
 
 	select {
 	case c.testNotificationChan <- true:
-	case <-time.After(50 * time.Millisecond):
+	default:
 	}
 
 	return testRef, nil
 }
 
-func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any) (types.Test, error) {
+func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.Test, error) {
 	c.testSchedulerMutex.Lock()
 	defer c.testSchedulerMutex.Unlock()
+
+	if !allowDuplicate {
+		for _, queuedTest := range c.GetTestQueue() {
+			if queuedTest.TestID() == descriptor.ID() {
+				return nil, fmt.Errorf("test already in queue")
+			}
+		}
+	}
 
 	c.runIDCounter++
 	runID := c.runIDCounter
@@ -307,7 +315,7 @@ func (c *Coordinator) runTestScheduler(ctx context.Context) {
 
 		testConfig := testDescr.Config()
 		if testConfig.Schedule == nil || testConfig.Schedule.Startup {
-			_, err := c.ScheduleTest(testDescr, nil)
+			_, err := c.ScheduleTest(testDescr, nil, false)
 			if err != nil {
 				c.Logger().Errorf("could not schedule startup test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
 			}
@@ -348,7 +356,8 @@ func (c *Coordinator) runTestScheduler(ctx context.Context) {
 					break
 				}
 
-				if cronExpr.Next(cronTime).IsZero() {
+				next := cronExpr.Next(cronTime.Add(-1 * time.Second))
+				if next.Compare(cronTime) == 0 {
 					triggerTest = true
 					break
 				}
@@ -358,16 +367,10 @@ func (c *Coordinator) runTestScheduler(ctx context.Context) {
 				continue
 			}
 
-			_, err := c.ScheduleTest(testDescr, nil)
+			_, err := c.ScheduleTest(testDescr, nil, false)
 			if err != nil {
 				c.Logger().Errorf("could not schedule cron test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
 			}
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-c.testNotificationChan:
 		}
 	}
 }

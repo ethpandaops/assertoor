@@ -44,7 +44,7 @@ func (fh *FrontendHandler) Clients(w http.ResponseWriter, r *http.Request) {
 	)
 
 	pageTemplate := web.GetTemplate(templateFiles...)
-	data := web.InitPageData(w, r, "clients", "/clients", "Clients", templateFiles)
+	data := web.InitPageData(r, "clients", "/clients", "Clients", templateFiles)
 
 	var pageError error
 	data.Data, pageError = fh.getClientsPageData()

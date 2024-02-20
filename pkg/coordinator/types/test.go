@@ -17,6 +17,7 @@ const (
 	TestStatusSuccess TestStatus = "success"
 	TestStatusFailure TestStatus = "failure"
 	TestStatusSkipped TestStatus = "skipped"
+	TestStatusAborted TestStatus = "aborted"
 )
 
 type Test interface {
@@ -31,6 +32,7 @@ type Test interface {
 	Percent() float64
 	Status() TestStatus
 	Logger() logrus.FieldLogger
+	AbortTest(skipCleanup bool)
 	GetTaskScheduler() TaskScheduler
 	GetTestVariables() Variables
 }
@@ -38,7 +40,6 @@ type Test interface {
 type TestConfig struct {
 	ID           string                 `yaml:"id" json:"id"`
 	Name         string                 `yaml:"name" json:"name"`
-	Disable      bool                   `yaml:"disable" json:"disable"`
 	Timeout      human.Duration         `yaml:"timeout" json:"timeout"`
 	Config       map[string]interface{} `yaml:"config" json:"config"`
 	ConfigVars   map[string]string      `yaml:"configVars" json:"configVars"`

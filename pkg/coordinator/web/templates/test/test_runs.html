@@ -14,6 +14,7 @@
         </tr>
       </thead>
       <tbody>
+        <tr class="details-row"></tr>
         {{ range $i, $test := . }}
         <tr data-bs-toggle="collapse" data-bs-target="#run-details-{{ $test.RunID }}" class="accordion-toggle">
           <td class="p-0"><button class="btn btn-default btn-xs"><i class="fa fa-eye" aria-hidden="true"></i></button></td>
@@ -35,6 +36,10 @@
               </span>
             {{ else if eq $test.Status "failure" }}
               <span class="badge rounded-pill text-bg-danger">
+                <i class="fas fa-times-circle"></i>
+              </span>
+            {{ else if eq $test.Status "aborted" }}
+              <span class="badge rounded-pill text-bg-secondary">
                 <i class="fas fa-times-circle"></i>
               </span>
             {{ else }}
@@ -66,6 +71,10 @@
                     {{ else if eq $test.Status "failure" }}
                       <span class="badge rounded-pill text-bg-danger">
                         <i class="fas fa-times-circle"></i> Failure
+                      </span>
+                    {{ else if eq $test.Status "aborted" }}
+                      <span class="badge rounded-pill text-bg-secondary">
+                        <i class="fas fa-times-circle"></i> Cancelled
                       </span>
                     {{ else }}
                       <span class="badge rounded-pill text-bg-warning">
