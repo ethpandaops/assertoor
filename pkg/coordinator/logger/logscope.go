@@ -43,6 +43,7 @@ func NewLogger(options *ScopeOptions) *LogScope {
 	}
 
 	logger.logger.SetOutput(io.Discard)
+	logger.logger.SetLevel(logrus.DebugLevel)
 
 	if options.Parent != nil {
 		tmpEntry := options.Parent.WithFields(logrus.Fields{})
