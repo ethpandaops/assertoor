@@ -57,7 +57,7 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Co
 		testRunMap:           map[uint64]types.Test{},
 		testQueue:            []types.Test{},
 		testHistory:          []types.Test{},
-		testNotificationChan: make(chan bool),
+		testNotificationChan: make(chan bool, 1),
 	}
 }
 
@@ -232,7 +232,7 @@ func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverri
 
 	select {
 	case c.testNotificationChan <- true:
-	case <-time.After(50 * time.Millisecond):
+	default:
 	}
 
 	return testRef, nil
@@ -369,12 +369,6 @@ func (c *Coordinator) runTestScheduler(ctx context.Context) {
 			if err != nil {
 				c.Logger().Errorf("could not schedule cron test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
 			}
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-c.testNotificationChan:
 		}
 	}
 }
