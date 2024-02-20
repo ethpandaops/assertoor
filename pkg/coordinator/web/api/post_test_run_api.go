@@ -9,8 +9,9 @@ import (
 )
 
 type PostTestRunRequest struct {
-	TestID string         `json:"test_id"`
-	Config map[string]any `json:"config"`
+	TestID         string         `json:"test_id"`
+	Config         map[string]any `json:"config"`
+	AllowDuplicate bool           `json:"allow_duplicate"`
 }
 
 type PostTestRunResponse struct {
@@ -63,16 +64,8 @@ func (ah *APIHandler) PostTestRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// check if test is already scheduled
-	for _, testInstance := range ah.coordinator.GetTestQueue() {
-		if testInstance.TestID() == testDescriptor.ID() {
-			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("test already scheduled (run_id: %v)", testInstance.RunID()), http.StatusTooManyRequests)
-			return
-		}
-	}
-
 	// create test run
-	testInstance, err := ah.coordinator.ScheduleTest(testDescriptor, req.Config)
+	testInstance, err := ah.coordinator.ScheduleTest(testDescriptor, req.Config, req.AllowDuplicate)
 	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed creating test: %v", err), http.StatusInternalServerError)
 		return

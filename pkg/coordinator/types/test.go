@@ -17,6 +17,7 @@ const (
 	TestStatusSuccess TestStatus = "success"
 	TestStatusFailure TestStatus = "failure"
 	TestStatusSkipped TestStatus = "skipped"
+	TestStatusAborted TestStatus = "aborted"
 )
 
 type Test interface {
@@ -31,6 +32,7 @@ type Test interface {
 	Percent() float64
 	Status() TestStatus
 	Logger() logrus.FieldLogger
+	AbortTest(skipCleanup bool)
 	GetTaskScheduler() TaskScheduler
 	GetTestVariables() Variables
 }

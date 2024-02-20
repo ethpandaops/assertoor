@@ -38,6 +38,10 @@
               <span class="badge rounded-pill text-bg-danger">
                 <i class="fas fa-times-circle"></i>
               </span>
+            {{ else if eq $test.Status "aborted" }}
+              <span class="badge rounded-pill text-bg-secondary">
+                <i class="fas fa-times-circle"></i>
+              </span>
             {{ else }}
               <span class="badge rounded-pill text-bg-warning">
                 {{ $test.Status }}
@@ -67,6 +71,10 @@
                     {{ else if eq $test.Status "failure" }}
                       <span class="badge rounded-pill text-bg-danger">
                         <i class="fas fa-times-circle"></i> Failure
+                      </span>
+                    {{ else if eq $test.Status "aborted" }}
+                      <span class="badge rounded-pill text-bg-secondary">
+                        <i class="fas fa-times-circle"></i> Cancelled
                       </span>
                     {{ else }}
                       <span class="badge rounded-pill text-bg-warning">
