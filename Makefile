@@ -5,7 +5,7 @@ GOLDFLAGS += -X 'github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.Buil
 
 .PHONY: all docs test clean
 
-all: build
+all: docs build
 
 test:
 	go test ./...

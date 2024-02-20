@@ -171,6 +171,69 @@
                 }
             }
         },
+        "/api/v1/test_run/{runId}/cancel": {
+            "post": {
+                "description": "Returns the test/run id \u0026 status of the cancelled test.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Cancel test run by test ID",
+                "operationId": "postTestRunCancel",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run to cancel",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Test cancellation options",
+                        "name": "cancelOptions",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.PostTestRunCancelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.PostTestRunCancelResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/test_run/{runId}/details": {
             "get": {
                 "description": "Returns the run details with given ID. Includes a summary and a list of task with all details (incl. logs \u0026 task configurations)",
@@ -622,9 +685,40 @@
                 }
             }
         },
+        "api.PostTestRunCancelRequest": {
+            "type": "object",
+            "properties": {
+                "skip_cleanup": {
+                    "type": "boolean"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestRunCancelResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
         "api.PostTestRunRequest": {
             "type": "object",
             "properties": {
+                "allow_duplicate": {
+                    "type": "boolean"
+                },
                 "config": {
                     "type": "object",
                     "additionalProperties": {}
@@ -682,14 +776,16 @@
                 "running",
                 "success",
                 "failure",
-                "skipped"
+                "skipped",
+                "aborted"
             ],
             "x-enum-varnames": [
                 "TestStatusPending",
                 "TestStatusRunning",
                 "TestStatusSuccess",
                 "TestStatusFailure",
-                "TestStatusSkipped"
+                "TestStatusSkipped",
+                "TestStatusAborted"
             ]
         }
     },

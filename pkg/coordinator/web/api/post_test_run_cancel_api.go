@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 type PostTestRunCancelRequest struct {
 	TestID      string `json:"test_id"`
-	RunID       uint64 `json:"run_id"`
 	SkipCleanup bool   `json:"skip_cleanup"`
 }
 
@@ -25,11 +27,12 @@ type PostTestRunCancelResponse struct {
 // @Tags TestRun
 // @Description Returns the test/run id & status of the cancelled test.
 // @Produce json
-// @Param runOptions body PostTestRunCancelRequest true "Test cancellation options"
+// @Param runId path string true "ID of the test run to cancel"
+// @Param cancelOptions body PostTestRunCancelRequest true "Test cancellation options"
 // @Success 200 {object} Response{data=PostTestRunCancelResponse} "Success"
 // @Failure 400 {object} Response "Failure"
 // @Failure 500 {object} Response "Server Error"
-// @Router /api/v1/test_run [post]
+// @Router /api/v1/test_run/{runId}/cancel [post]
 func (ah *APIHandler) PostTestRunCancel(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -44,7 +47,15 @@ func (ah *APIHandler) PostTestRunCancel(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// get test run by id
-	testInstance := ah.coordinator.GetTestByRunID(req.RunID)
+	vars := mux.Vars(r)
+
+	runID, err := strconv.ParseUint(vars["runId"], 10, 64)
+	if err != nil {
+		ah.sendErrorResponse(w, r.URL.String(), "invalid runId provided", http.StatusBadRequest)
+		return
+	}
+
+	testInstance := ah.coordinator.GetTestByRunID(runID)
 	if testInstance == nil {
 		ah.sendErrorResponse(w, r.URL.String(), "test run not found", http.StatusNotFound)
 		return

@@ -160,8 +160,28 @@ definitions:
       source:
         type: string
     type: object
+  api.PostTestRunCancelRequest:
+    properties:
+      skip_cleanup:
+        type: boolean
+      test_id:
+        type: string
+    type: object
+  api.PostTestRunCancelResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      status:
+        type: string
+      test_id:
+        type: string
+    type: object
   api.PostTestRunRequest:
     properties:
+      allow_duplicate:
+        type: boolean
       config:
         additionalProperties: {}
         type: object
@@ -202,6 +222,7 @@ definitions:
     - success
     - failure
     - skipped
+    - aborted
     type: string
     x-enum-varnames:
     - TestStatusPending
@@ -209,6 +230,7 @@ definitions:
     - TestStatusSuccess
     - TestStatusFailure
     - TestStatusSkipped
+    - TestStatusAborted
 info:
   contact: {}
   description: API for querying information about Assertoor tests
@@ -314,6 +336,45 @@ paths:
           schema:
             $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
       summary: Get test run by run ID
+      tags:
+      - TestRun
+  /api/v1/test_run/{runId}/cancel:
+    post:
+      description: Returns the test/run id & status of the cancelled test.
+      operationId: postTestRunCancel
+      parameters:
+      - description: ID of the test run to cancel
+        in: path
+        name: runId
+        required: true
+        type: string
+      - description: Test cancellation options
+        in: body
+        name: cancelOptions
+        required: true
+        schema:
+          $ref: '#/definitions/api.PostTestRunCancelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.PostTestRunCancelResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Cancel test run by test ID
       tags:
       - TestRun
   /api/v1/test_run/{runId}/details:
