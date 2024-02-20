@@ -356,7 +356,8 @@ func (c *Coordinator) runTestScheduler(ctx context.Context) {
 					break
 				}
 
-				if cronExpr.Next(cronTime).IsZero() {
+				next := cronExpr.Next(cronTime.Add(-1 * time.Second))
+				if next.Compare(cronTime) == 0 {
 					triggerTest = true
 					break
 				}
