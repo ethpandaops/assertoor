@@ -448,6 +448,11 @@ paths:
     get:
       description: Returns a list of all test runs.
       operationId: getTestRuns
+      parameters:
+      - description: Return test runs for this test ID only
+        in: query
+        name: test_id
+        type: string
       produces:
       - application/json
       responses:

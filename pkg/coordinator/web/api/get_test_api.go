@@ -8,13 +8,13 @@ import (
 )
 
 type GetTestResponse struct {
-	ID         string             `json:"id"`
-	Source     string             `json:"source"`
-	Name       string             `json:"name"`
-	Timeout    uint64             `json:"timeout"`
-	Config     map[string]any     `json:"config"`
-	ConfigVars map[string]string  `json:"configVars"`
-	Schedule   types.TestSchedule `json:"schedule"`
+	ID         string              `json:"id"`
+	Source     string              `json:"source"`
+	Name       string              `json:"name"`
+	Timeout    uint64              `json:"timeout"`
+	Config     map[string]any      `json:"config"`
+	ConfigVars map[string]string   `json:"configVars"`
+	Schedule   *types.TestSchedule `json:"schedule"`
 }
 
 // GetTest godoc
@@ -64,6 +64,6 @@ func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
 		Timeout:    uint64(testConfig.Timeout.Duration.Seconds()),
 		Config:     testConfig.Config,
 		ConfigVars: testConfig.ConfigVars,
-		Schedule:   *testConfig.Schedule,
+		Schedule:   testConfig.Schedule,
 	})
 }

@@ -361,6 +361,14 @@ const docTemplate = `{
                 ],
                 "summary": "Get list of test runs",
                 "operationId": "getTestRuns",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Return test runs for this test ID only",
+                        "name": "test_id",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Success",

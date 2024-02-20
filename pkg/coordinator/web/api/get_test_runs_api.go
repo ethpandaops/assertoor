@@ -21,6 +21,7 @@ type GetTestRunsResponse struct {
 // @Tags TestRun
 // @Description Returns a list of all test runs.
 // @Produce  json
+// @Param  test_id query string false "Return test runs for this test ID only"
 // @Success 200 {object} Response{data=[]GetTestRunsResponse} "Success"
 // @Failure 400 {object} Response "Failure"
 // @Failure 500 {object} Response "Server Error"
@@ -28,10 +29,16 @@ type GetTestRunsResponse struct {
 func (ah *APIHandler) GetTestRuns(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	q := r.URL.Query()
+	filterTestID := q.Get("test_id")
 	testRuns := []*GetTestRunsResponse{}
 
 	testInstances := append(ah.coordinator.GetTestHistory(), ah.coordinator.GetTestQueue()...)
 	for _, testInstance := range testInstances {
+		if filterTestID != "" && filterTestID != testInstance.TestID() {
+			continue
+		}
+
 		testRun := &GetTestRunsResponse{
 			RunID:  testInstance.RunID(),
 			TestID: testInstance.TestID(),
