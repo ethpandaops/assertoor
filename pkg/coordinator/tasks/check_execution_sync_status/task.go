@@ -105,7 +105,7 @@ func (t *Task) processCheck(ctx context.Context) {
 	allResultsPass := true
 	failedClients := []string{}
 
-	for _, client := range t.ctx.Scheduler.GetCoordinator().ClientPool().GetClientsByNamePatterns(t.config.ClientPattern, "") {
+	for _, client := range t.ctx.Scheduler.GetServices().ClientPool().GetClientsByNamePatterns(t.config.ClientPattern, "") {
 		var checkResult bool
 
 		checkLogger := t.logger.WithField("client", client.Config.Name)
@@ -116,7 +116,7 @@ func (t *Task) processCheck(ctx context.Context) {
 		}
 
 		if err != nil {
-			checkLogger.Warnf("errof fetching sync status: %v", err)
+			checkLogger.Warnf("error fetching sync status: %v", err)
 
 			checkResult = false
 		} else {

@@ -109,7 +109,15 @@ func (pool *WalletPool) EnsureFunding(ctx context.Context, minBalance, refillAmo
 			continue
 		}
 
-		tx, err := pool.rootWallet.BuildTransaction(ctx, func(ctx context.Context, nonce uint64, signer bind.SignerFn) (*types.Transaction, error) {
+		amount := refillAmount
+		if amount.Cmp(minBalance) < 0 {
+			diffAmount := minBalance.Sub(minBalance, wallet.GetPendingBalance())
+			if diffAmount.Cmp(amount) > 0 {
+				amount = diffAmount
+			}
+		}
+
+		tx, err := pool.rootWallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*types.Transaction, error) {
 			toAddr := wallet.GetAddress()
 			txData := &types.DynamicFeeTx{
 				ChainID:   pool.manager.clientPool.GetBlockCache().GetChainID(),
@@ -118,8 +126,9 @@ func (pool *WalletPool) EnsureFunding(ctx context.Context, minBalance, refillAmo
 				GasFeeCap: gasFeeCap,
 				Gas:       50000,
 				To:        &toAddr,
-				Value:     refillAmount,
+				Value:     amount,
 			}
+
 			return types.NewTx(txData), nil
 		})
 		if err != nil {

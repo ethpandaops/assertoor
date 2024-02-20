@@ -87,7 +87,7 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	wallclockSubscription := consensusPool.GetBlockCache().SubscribeWallclockEpochEvent(10)
 	defer wallclockSubscription.Unsubscribe()
@@ -119,7 +119,7 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) runFinalityCheck() bool {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	_, currentEpoch, err := consensusPool.GetBlockCache().GetWallclock().Now()
 	if err != nil {

@@ -102,7 +102,7 @@ func (t *Task) LoadConfig() error {
 		return err
 	}
 
-	t.wallet, err = t.ctx.Scheduler.GetCoordinator().WalletManager().GetWalletByPrivkey(privKey)
+	t.wallet, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
 	if err != nil {
 		return fmt.Errorf("cannot initialize wallet: %w", err)
 	}
@@ -141,7 +141,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var clients []*execution.Client
 
-	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
@@ -258,11 +258,12 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, error) {
-	tx, err := t.wallet.BuildTransaction(ctx, func(ctx context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
+	tx, err := t.wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
 		var toAddr *common.Address
 
 		if !t.config.ContractDeployment {
 			addr := t.wallet.GetAddress()
+
 			if t.config.RandomTarget {
 				addrBytes := make([]byte, 20)
 				//nolint:errcheck // ignore
@@ -329,7 +330,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 			}
 		default:
 			txObj = &ethtypes.DynamicFeeTx{
-				ChainID:   t.ctx.Scheduler.GetCoordinator().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
+				ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
 				Nonce:     nonce,
 				GasTipCap: t.config.TipCap,
 				GasFeeCap: t.config.FeeCap,
@@ -339,6 +340,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				Data:      txData,
 			}
 		}
+
 		return ethtypes.NewTx(txObj), nil
 	})
 	if err != nil {

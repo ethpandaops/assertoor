@@ -50,7 +50,7 @@ func (client *Client) runClientLoop() {
 }
 
 func (client *Client) checkClient() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(client.clientCtx, 60*time.Second)
 	defer cancel()
 
 	err := client.rpcClient.Initialize(ctx)
@@ -132,7 +132,7 @@ func (client *Client) runClientLogic() error {
 	}
 
 	// start event stream
-	blockStream := client.rpcClient.NewBlockStream(rpc.StreamBlockEvent | rpc.StreamFinalizedEvent)
+	blockStream := client.rpcClient.NewBlockStream(client.clientCtx, rpc.StreamBlockEvent|rpc.StreamFinalizedEvent)
 	defer blockStream.Close()
 
 	// process events
@@ -147,6 +147,8 @@ func (client *Client) runClientLogic() error {
 		}
 
 		select {
+		case <-client.clientCtx.Done():
+			return nil
 		case evt := <-blockStream.EventChan:
 			now := time.Now()
 
@@ -253,12 +255,15 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 		if header != nil {
 			return header, nil
 		}
+
 		ctx, cancel := context.WithTimeout(client.clientCtx, 10*time.Second)
 		defer cancel()
+
 		header, err := client.rpcClient.GetBlockHeaderByBlockroot(ctx, cachedBlock.Root)
 		if err != nil {
 			return nil, err
 		}
+
 		return header.Header, nil
 	})
 	if err != nil {
@@ -273,6 +278,7 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 		if err2 != nil {
 			return nil, err2
 		}
+
 		return block, nil
 	})
 	if err != nil {

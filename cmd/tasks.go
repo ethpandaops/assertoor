@@ -9,14 +9,14 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/tasks"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // tasksCmd represents the tasks command
 var tasksCmd = &cobra.Command{
 	Use:   "tasks",
 	Short: "Lists all available tasks",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		available := tasks.AvailableTasks()
 
 		yamlData, err := yaml.Marshal(&available)

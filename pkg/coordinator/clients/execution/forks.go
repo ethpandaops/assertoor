@@ -99,6 +99,7 @@ func (pool *Pool) GetHeadForks(forkDistance int64) []*HeadFork {
 	sort.Slice(headForks, func(a, b int) bool {
 		countA := len(headForks[a].ReadyClients)
 		countB := len(headForks[b].ReadyClients)
+
 		return countA > countB
 	})
 

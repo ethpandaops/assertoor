@@ -4,98 +4,69 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
 
 type TestPage struct {
-	Index       uint64          `json:"index"`
-	Name        string          `json:"name"`
-	IsStarted   bool            `json:"started"`
-	IsCompleted bool            `json:"completed"`
-	StartTime   time.Time       `json:"start_time"`
-	StopTime    time.Time       `json:"stop_time"`
-	Timeout     time.Duration   `json:"timeout"`
-	Status      string          `json:"status"`
-	Tasks       []*TestPageTask `json:"tasks"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Source string `json:"source"`
+	Config string `json:"config"`
+
+	Tests []*TestRunData `json:"tests"`
 }
 
-type TestPageTask struct {
-	Index       uint64             `json:"index"`
-	ParentIndex uint64             `json:"parent_index"`
-	IndentPx    uint64             `json:"indent_px"`
-	Name        string             `json:"name"`
-	Title       string             `json:"title"`
-	IsStarted   bool               `json:"started"`
-	IsCompleted bool               `json:"completed"`
-	StartTime   time.Time          `json:"start_time"`
-	StopTime    time.Time          `json:"stop_time"`
-	Timeout     time.Duration      `json:"timeout"`
-	HasTimeout  bool               `json:"has_timeout"`
-	RunTime     time.Duration      `json:"runtime"`
-	HasRunTime  bool               `json:"has_runtime"`
-	Status      string             `json:"status"`
-	Result      string             `json:"result"`
-	ResultError string             `json:"result_error"`
-	Log         []*TestPageTaskLog `json:"log"`
-}
-
-type TestPageTaskLog struct {
-	Time    time.Time         `json:"time"`
-	Level   uint64            `json:"level"`
-	Message string            `json:"msg"`
-	DataLen uint64            `json:"datalen"`
-	Data    map[string]string `json:"data"`
-}
-
-// Test will return the "test" page using a go template
-func (fh *FrontendHandler) Test(w http.ResponseWriter, r *http.Request) {
+// Index will return the "index" page using a go template
+func (fh *FrontendHandler) TestPage(w http.ResponseWriter, r *http.Request) {
 	urlArgs := r.URL.Query()
 	if urlArgs.Has("json") {
-		fh.TestData(w, r)
+		fh.IndexData(w, r)
 		return
 	}
 
 	templateFiles := web.LayoutTemplateFiles
 	templateFiles = append(templateFiles,
 		"test/test.html",
+		"sidebar/sidebar.html",
+		"test/test_runs.html",
 	)
 	pageTemplate := web.GetTemplate(templateFiles...)
-	data := web.InitPageData(w, r, "test", "/", "Test ", templateFiles)
-
 	vars := mux.Vars(r)
+	data := web.InitPageData(r, "test", "/", "Test", templateFiles)
 
-	testIdx, pageError := strconv.ParseInt(vars["testIdx"], 10, 64)
-	if pageError == nil {
-		data.Data, pageError = fh.getTestPageData(testIdx)
-	}
+	var pageError error
 
+	var pageData *TestPage
+
+	pageData, pageError = fh.getTestPageData(vars["testId"])
 	if pageError != nil {
 		web.HandlePageError(w, r, pageError)
 		return
 	}
 
+	data.Data = pageData
+	data.ShowSidebar = true
+	data.SidebarData = fh.getSidebarData(pageData.ID)
+
 	w.Header().Set("Content-Type", "text/html")
 
-	if web.HandleTemplateError(w, r, "test.go", "Test", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
+	if web.HandleTemplateError(w, r, "index.go", "Index", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
 		return // an error has occurred and was processed
 	}
 }
 
-func (fh *FrontendHandler) TestData(w http.ResponseWriter, r *http.Request) {
+func (fh *FrontendHandler) TestPageData(w http.ResponseWriter, r *http.Request) {
 	var pageData *TestPage
 
-	vars := mux.Vars(r)
+	var pageError error
 
-	testIdx, pageError := strconv.ParseInt(vars["testIdx"], 10, 64)
-	if pageError == nil {
-		pageData, pageError = fh.getTestPageData(testIdx)
-	}
+	vars := mux.Vars(r)
+	pageData, pageError = fh.getTestPageData(vars["testId"])
 
 	if pageError != nil {
 		web.HandlePageError(w, r, pageError)
@@ -106,125 +77,57 @@ func (fh *FrontendHandler) TestData(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewEncoder(w).Encode(pageData)
 	if err != nil {
-		logrus.WithError(err).Error("error encoding test data")
+		logrus.WithError(err).Error("error encoding index data")
 
 		//nolint:gocritic // ignore
 		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
 }
 
-func (fh *FrontendHandler) getTestPageData(testIdx int64) (*TestPage, error) {
-	var test types.Test
+func (fh *FrontendHandler) getTestPageData(testID string) (*TestPage, error) {
+	var testDescriptor types.TestDescriptor
 
-	allTests := fh.coordinator.GetTests()
-	for idx := range allTests {
-		if int64(idx) == testIdx {
-			test = allTests[idx]
+	for _, testDescr := range fh.coordinator.GetTestDescriptors() {
+		if testDescr.Err() != nil {
+			continue
+		}
+
+		if testDescr.ID() == testID {
+			testDescriptor = testDescr
 			break
 		}
 	}
 
-	if test == nil {
-		return nil, fmt.Errorf("Test not found")
+	if testDescriptor == nil {
+		return nil, fmt.Errorf("unknown test id: %v", testID)
 	}
 
+	testConfig := testDescriptor.Config()
 	pageData := &TestPage{
-		Index:     uint64(testIdx),
-		Name:      test.Name(),
-		StartTime: test.StartTime(),
-		StopTime:  test.StopTime(),
-		Timeout:   test.Timeout(),
-		Status:    string(test.Status()),
+		ID:     testID,
+		Name:   testConfig.Name,
+		Source: testDescriptor.Source(),
 	}
 
-	switch test.Status() {
-	case types.TestStatusPending:
-	case types.TestStatusRunning:
-		pageData.IsStarted = true
-	case types.TestStatusSuccess:
-		pageData.IsStarted = true
-		pageData.IsCompleted = true
-	case types.TestStatusFailure:
-		pageData.IsStarted = true
-		pageData.IsCompleted = true
-	case types.TestStatusSkipped:
-	}
-
-	taskScheduler := test.GetTaskScheduler()
-	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
-		indentationMap := map[uint64]int{}
-
-		for _, task := range taskScheduler.GetAllTasks() {
-			taskStatus := taskScheduler.GetTaskStatus(task)
-
-			taskData := &TestPageTask{
-				Index:       taskStatus.Index,
-				ParentIndex: taskStatus.ParentIndex,
-				Name:        task.Name(),
-				Title:       task.Title(),
-				IsStarted:   taskStatus.IsStarted,
-				IsCompleted: taskStatus.IsStarted && !taskStatus.IsRunning,
-				StartTime:   taskStatus.StartTime,
-				StopTime:    taskStatus.StopTime,
-				Timeout:     task.Timeout(),
-				HasTimeout:  task.Timeout() > 0,
-			}
-
-			indentation := 0
-			if taskData.ParentIndex > 0 {
-				indentation = indentationMap[taskData.ParentIndex] + 1
-			}
-
-			indentationMap[taskData.Index] = indentation
-			taskData.IndentPx = uint64(20 * indentation)
-
-			switch {
-			case !taskStatus.IsStarted:
-				taskData.Status = "pending"
-			case taskStatus.IsRunning:
-				taskData.Status = "running"
-				taskData.HasRunTime = true
-				taskData.RunTime = time.Since(taskStatus.StartTime).Round(1 * time.Millisecond)
-			default:
-				taskData.Status = "complete"
-				taskData.HasRunTime = true
-				taskData.RunTime = taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond)
-			}
-
-			switch taskStatus.Result {
-			case types.TaskResultNone:
-				taskData.Result = "none"
-			case types.TaskResultSuccess:
-				taskData.Result = "success"
-			case types.TaskResultFailure:
-				taskData.Result = "failure"
-			}
-
-			if taskStatus.Error != nil {
-				taskData.ResultError = taskStatus.Error.Error()
-			}
-
-			taskLog := taskStatus.Logger.GetLogEntries()
-			taskData.Log = make([]*TestPageTaskLog, len(taskLog))
-
-			for i, log := range taskLog {
-				logData := &TestPageTaskLog{
-					Time:    log.Time,
-					Level:   uint64(log.Level),
-					Message: log.Message,
-					Data:    map[string]string{},
-					DataLen: uint64(len(log.Data)),
-				}
-
-				for dataKey, dataVal := range log.Data {
-					logData.Data[dataKey] = fmt.Sprintf("%v", dataVal)
-				}
-
-				taskData.Log[i] = logData
-			}
-
-			pageData.Tasks = append(pageData.Tasks, taskData)
+	if testConfig.Config != nil {
+		testCfgYaml, err := yaml.Marshal(testConfig.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed marshalling test config: %v", err)
 		}
+
+		pageData.Config = string(testCfgYaml)
+	}
+
+	// test runs
+	pageData.Tests = []*TestRunData{}
+
+	testInstances := append(fh.coordinator.GetTestHistory(), fh.coordinator.GetTestQueue()...)
+	for idx, test := range testInstances {
+		if test.TestID() != testID {
+			continue
+		}
+
+		pageData.Tests = append(pageData.Tests, fh.getTestRunData(idx, test))
 	}
 
 	return pageData, nil

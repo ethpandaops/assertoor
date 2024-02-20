@@ -7,6 +7,7 @@ import (
 type Config struct {
 	LimitPerSlot         int    `yaml:"limitPerSlot" json:"limitPerSlot"`
 	LimitTotal           int    `yaml:"limitTotal" json:"limitTotal"`
+	LimitPending         int    `yaml:"limitPending" json:"limitPending"`
 	Mnemonic             string `yaml:"mnemonic" json:"mnemonic"`
 	StartIndex           int    `yaml:"startIndex" json:"startIndex"`
 	IndexCount           int    `yaml:"indexCount" json:"indexCount"`
@@ -16,6 +17,12 @@ type Config struct {
 	DepositTxTipCap      int64  `yaml:"depositTxTipCap" json:"depositTxTipCap"`
 	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
 	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
+	AwaitReceipt         bool   `yaml:"awaitReceipt" json:"awaitReceipt"`
+	FailOnReject         bool   `yaml:"failOnReject" json:"failOnReject"`
+
+	DepositTransactionsResultVar string `yaml:"depositTransactionsResultVar" json:"depositTransactionsResultVar"`
+	DepositReceiptsResultVar     string `yaml:"depositReceiptsResultVar" json:"depositReceiptsResultVar"`
+	ValidatorPubkeysResultVar    string `yaml:"validatorPubkeysResultVar" json:"validatorPubkeysResultVar"`
 }
 
 func DefaultConfig() Config {

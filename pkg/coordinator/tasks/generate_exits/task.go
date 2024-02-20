@@ -114,7 +114,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var subscription *consensus.Subscription[*consensus.Block]
 	if t.config.LimitPerSlot > 0 {
-		subscription = t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
+		subscription = t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
 		defer subscription.Unsubscribe()
 	}
 
@@ -132,9 +132,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		err := t.generateVoluntaryExit(ctx, accountIdx, fork, validators)
 		if err != nil {
-			t.logger.Errorf("error generating voluntary exit: %v", err.Error())
+			t.logger.Errorf("error generating voluntary exit for index %v: %v", accountIdx, err.Error())
 		} else {
 			t.ctx.SetResult(types.TaskResultSuccess)
+
 			perSlotCount++
 			totalCount++
 		}
@@ -160,11 +161,15 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
+	if totalCount == 0 {
+		t.ctx.SetResult(types.TaskResultFailure)
+	}
+
 	return nil
 }
 
 func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, map[phase0.ValidatorIndex]*v1.Validator, error) {
-	client := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 
 	fork, err := client.GetRPCClient().GetForkState(ctx, "head")
 	if err != nil {
@@ -200,7 +205,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 
 	// check validator status
 	if validator == nil {
-		return fmt.Errorf("validator not found")
+		return fmt.Errorf("validator not found: 0x%x", validatorPubkey)
 	}
 
 	if validator.Validator.ExitEpoch != 18446744073709551615 {
@@ -210,7 +215,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	// select client
 	var client *consensus.Client
 
-	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 	} else {
@@ -218,6 +223,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 		if len(clients) == 0 {
 			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
+
 		client = clients[0].ConsensusClient
 	}
 

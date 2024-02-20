@@ -64,6 +64,7 @@ jobs:
     # build binaries
     - name: Build linux amd64 binary
       run: |
+        make docs
         make build
       env:
         RELEASE: ${{ inputs.release }}
@@ -103,6 +104,7 @@ jobs:
     # build binaries
     - name: Build linux arm64 binary
       run: |
+        make docs
         make build GOARCH=arm64 CC=/usr/bin/aarch64-linux-gnu-gcc
       env:
         RELEASE: ${{ inputs.release }}
@@ -136,6 +138,7 @@ jobs:
     # build binaries
     - name: Build windows binary
       run: |
+        make docs
         make build
       env:
         RELEASE: ${{ inputs.release }}
@@ -169,6 +172,7 @@ jobs:
     # build binaries
     - name: Build macos amd64 binary
       run: |
+        make docs
         make build
       env:
         RELEASE: ${{ inputs.release }}
@@ -202,6 +206,7 @@ jobs:
     # build binaries
     - name: Build macos arm64 binary
       run: |
+        make docs
         make build GOARCH=arm64
       env:
         RELEASE: ${{ inputs.release }}

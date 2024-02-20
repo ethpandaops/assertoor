@@ -136,7 +136,7 @@ func (stream *Stream) connect() (r io.ReadCloser, err error) {
 	stream.req.Header.Set("Cache-Control", "no-cache")
 	stream.req.Header.Set("Accept", "text/event-stream")
 
-	if len(stream.lastEventID) > 0 {
+	if stream.lastEventID != "" {
 		stream.req.Header.Set("Last-Event-ID", stream.lastEventID)
 	}
 
@@ -199,7 +199,7 @@ func (stream *Stream) receiveEvents(r io.ReadCloser) {
 			stream.retry = time.Duration(pub.Retry()) * time.Millisecond
 		}
 
-		if len(pub.Id()) > 0 {
+		if pub.Id() != "" {
 			stream.lastEventID = pub.Id()
 		}
 

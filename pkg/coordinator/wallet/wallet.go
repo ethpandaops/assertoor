@@ -189,7 +189,7 @@ func (wallet *Wallet) GetReadableBalance(unitDigits, maxPreCommaDigitsBeforeTrim
 		}
 
 		fullAmount = trimmedAmount
-		if len(postComma) > 0 {
+		if postComma != "" {
 			fullAmount += "." + postComma
 		}
 
@@ -199,7 +199,7 @@ func (wallet *Wallet) GetReadableBalance(unitDigits, maxPreCommaDigitsBeforeTrim
 		}
 
 		// set floating point
-		if len(postComma) > 0 {
+		if postComma != "" {
 			trimmedAmount += "." + postComma
 		}
 	}
@@ -256,6 +256,7 @@ func (wallet *Wallet) BuildTransaction(ctx context.Context, buildFn func(ctx con
 	}
 
 	wallet.pendingNonce++
+	wallet.pendingBalance = wallet.pendingBalance.Sub(wallet.pendingBalance, tx.Value())
 
 	return signedTx, nil
 }
@@ -413,6 +414,7 @@ func (wallet *Wallet) loadTransactionReceipt(block *execution.Block, tx *types.T
 
 		if retryCount < 5 {
 			time.Sleep(1 * time.Second)
+
 			retryCount++
 		} else {
 			return nil

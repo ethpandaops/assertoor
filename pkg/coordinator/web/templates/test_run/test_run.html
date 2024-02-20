@@ -1,0 +1,287 @@
+{{ define "page" }}
+<div class="d-flex flex-column flex-grow-1 mt-3 container-fluid">
+    <h2 class="py-2">Test Run {{ .RunID }}: {{ .Name }}</h2>
+    
+    <!-- client pool status -->
+    <div class="row">
+      <div class="row">
+        <div class="col-6 col-sm-4 col-lg-3">
+          Test ID:
+        </div>
+        <div class="col-6 col-sm-8 col-lg-9">
+          {{ .TestID }}     
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-lg-3">
+        Test Status:
+      </div>
+      <div class="col-6 col-sm-8 col-lg-9">
+        {{ if eq .Status "pending" }}
+          <span class="badge rounded-pill text-bg-secondary">
+            <i class="far fa-hourglass-half"></i> Pending
+          </span>
+        {{ else if eq .Status "running" }}
+          <span class="badge rounded-pill text-bg-primary">
+            <i class="far fa-play-circle"></i> Running
+          </span>
+        {{ else if eq .Status "success" }}
+          <span class="badge rounded-pill text-bg-success">
+            <i class="fas fa-check-circle"></i> Success
+          </span>
+        {{ else if eq .Status "failure" }}
+          <span class="badge rounded-pill text-bg-danger">
+            <i class="fas fa-times-circle"></i> Failed
+          </span>
+        {{ else if eq .Status "aborted" }}
+          <span class="badge rounded-pill text-bg-secondary">
+            <i class="fas fa-times-circle"></i> Cancelled
+          </span>
+        {{ else }}
+          <span class="badge rounded-pill text-bg-warning">
+            {{ .Status }}
+          </span>
+        {{ end }}
+      </div>
+    </div>
+    {{ if .IsStarted }}
+    <div class="row">
+      <div class="col-6 col-sm-4 col-lg-3">
+        Start Time:
+      </div>
+      <div class="col-6 col-sm-8 col-lg-9">
+        {{ formatDateTime .StartTime.UTC }}     
+      </div>
+    </div>
+    {{ end }}
+    {{ if .IsCompleted }}
+    <div class="row">
+      <div class="col-6 col-sm-4 col-lg-3">
+        Finish Time:
+      </div>
+      <div class="col-6 col-sm-8 col-lg-9">
+        {{ formatDateTime .StopTime.UTC }}     
+      </div>
+    </div>
+    {{ end }}
+    <div class="row">
+      <div class="col-6 col-sm-4 col-lg-3">
+        Timeout:
+      </div>
+      <div class="col-6 col-sm-8 col-lg-9">
+        {{ .Timeout }}     
+      </div>
+    </div>
+    
+    <!-- task list -->
+    <div class="task-list">
+      <h5 class="mt-3 mb-0">Tasks</h5>
+
+      <table class="table table-condensed table-striped details-table">
+        <thead>
+          <tr>
+            <th style="width:150px; min-width:150px;"></th>
+            <th style="width:100px;">ID</th>
+            <th style="width:20%; min-width:150px;">Action Name</th>
+            <th style="width:60%; min-width:250px;">Task Title</th>
+            <th style="width:10%; min-width:200px;">Run Time</th>
+            <th style="width:10%; min-width:100px;">Status</th>
+            <th style="width:50px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="details-row"></tr>
+          {{ range $i, $task := .Tasks }}
+          <tr data-bs-toggle="collapse" data-bs-target="#task-details-{{ $task.Index }}" class="accordion-toggle">
+            <td class="p-0"></td>
+            <td>{{ $task.Index }}</td>
+            <td>{{ $task.Name }}</td>
+            <td>{{ $task.Title }}</td>
+            <td>{{ if $task.HasRunTime }}{{ $task.RunTime }}{{ else }}?{{ end }}{{ if $task.HasTimeout }} / {{ $task.Timeout }}{{ end }}</td>
+            <td>
+              {{ if eq $task.Result "success" }}
+                <span class="badge rounded-pill text-bg-success">
+                  <i class="fas fa-check"></i>
+                </span>
+              {{ else if eq $task.Result "failure" }}
+                <span class="badge rounded-pill text-bg-danger">
+                  <i class="fas fa-times"></i>
+                </span>
+              {{ else }}
+                <span class="badge rounded-pill text-bg-secondary">
+                  <i class="fas fa-question"></i>
+                </span>
+              {{ end }}
+
+              {{ if eq $task.Status "pending" }}
+                <span class="badge rounded-pill text-bg-secondary">
+                  <i class="far fa-hourglass-half"></i>
+                </span>
+              {{ else if eq $task.Status "running" }}
+                <span class="badge rounded-pill text-bg-primary">
+                  <i class="far fa-play-circle"></i>
+                </span>
+              {{ end }}
+            </td>
+            <td class="p-0"><button class="btn btn-default btn-xs"><i class="fa fa-eye" aria-hidden="true"></i></button></td>
+          </tr>
+          <tr>
+            <td colspan="12" class="details-row task-panel">
+              <div class="accordian-body collapse" id="task-details-{{ $task.Index }}">
+                <div class="container-fluid details-content">
+                  <div class="row">
+                    <div class="col-6 col-sm-3 col-lg-2">Status:</div>
+                    <div class="col-6 col-sm-3 col-lg-10">
+                      {{ if eq $task.Status "pending" }}
+                        <span class="badge rounded-pill text-bg-secondary">
+                          <i class="far fa-hourglass-half"></i> Pending
+                        </span>
+                      {{ else if eq $task.Status "running" }}
+                        <span class="badge rounded-pill text-bg-primary">
+                          <i class="far fa-play-circle"></i> Running
+                        </span>
+                      {{ else if eq $task.Status "complete" }}
+                        <span class="badge rounded-pill text-bg-success">
+                          <i class="far fa-check-circle"></i> Complete
+                        </span>
+                      {{ else }}
+                        <span class="badge rounded-pill text-bg-warning">
+                          <i class="far fa-question"></i> {{ $task.Status }}
+                        </span>
+                      {{ end }}
+                    </div>
+                  </div>
+                  <div class="row">
+                    <div class="col-6 col-sm-3 col-lg-2">Result:</div>
+                    <div class="col-6 col-sm-3 col-lg-10">
+                      {{ if eq $task.Result "success" }}
+                        <span class="badge rounded-pill text-bg-success">
+                          <i class="fas fa-check"></i> Success
+                        </span>
+                      {{ else if eq $task.Result "failure" }}
+                        <span class="badge rounded-pill text-bg-danger">
+                          <i class="fas fa-times"></i> Failure
+                        </span>
+                      {{ else }}
+                        <span class="badge rounded-pill text-bg-secondary">
+                          <i class="fas fa-question"></i> None
+                        </span>
+                      {{ end }}
+                    </div>
+                  </div>
+                  {{ if $task.IsStarted }}
+                  <div class="row">
+                    <div class="col-6 col-sm-3 col-lg-2">Start Time:</div>
+                    <div class="col-6 col-sm-3 col-lg-10">{{ formatDateTime $task.StartTime.UTC }}</div>
+                  </div>
+                  {{ end }}
+                  {{ if $task.IsCompleted }}
+                  <div class="row">
+                    <div class="col-6 col-sm-3 col-lg-2">Finish Time:</div>
+                    <div class="col-6 col-sm-3 col-lg-10">{{ formatDateTime $task.StopTime.UTC }}</div>
+                  </div>
+                  {{ end }}
+                  {{ if not (eq $task.ResultError "") }}
+                  <div class="row">
+                    <div class="col-6 col-sm-3 col-lg-2">Error Result:</div>
+                    <div class="col-6 col-sm-3 col-lg-10">
+                      <pre>{{ .ResultError }}</pre>
+                    </div>
+                  </div>
+                  {{ end }}
+
+
+                  {{ if $task.IsStarted }}
+                  <ul class="nav nav-tabs" id="task{{ $task.Index }}-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                      <button class="nav-link active" id="task{{ $task.Index }}-logs-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-logs" type="button" role="tab" aria-controls="task{{ $task.Index }}-logs" aria-selected="true">Logs</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                      <button class="nav-link" id="task{{ $task.Index }}-config-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-config" type="button" role="tab" aria-controls="task{{ $task.Index }}-config" aria-selected="false">Config</button>
+                    </li>
+                  </ul>
+                  <div class="card">
+                    <div class="tab-content card-body" id="task{{ $task.Index }}-tabcontent">
+                      <div class="tab-pane fade show active" id="task{{ $task.Index }}-logs" role="tabpanel" aria-labelledby="task{{ $task.Index }}-logs-tab">
+                        <div style="max-height:400px; overflow-y:auto;">
+                          <div class="container-fluid">
+                          {{ range $i, $log := .Log }}
+                            <div class="row">
+                              <div class="col-5 col-lg-2">
+                                {{ formatDateTime $log.Time.UTC }}
+                              </div>
+                              <div class="col-3 col-lg-1">
+                                {{ if eq $log.Level 0 }}
+                                  <span class="loglevel-0 text-danger">PANIC</span>
+                                {{ else if eq $log.Level 1 }}
+                                  <span class="loglevel-1 text-danger">FATAL</span>
+                                {{ else if eq $log.Level 2 }}
+                                  <span class="loglevel-2 text-danger">ERROR</span>
+                                {{ else if eq $log.Level 3 }}
+                                  <span class="loglevel-3 text-warning">WARN</span>
+                                {{ else if eq $log.Level 4 }}
+                                  <span class="loglevel-4 text-info">INFO</span>
+                                {{ else if eq $log.Level 5 }}
+                                  <span class="loglevel-5 text-secondary">DEBUG</span>
+                                {{ else if eq $log.Level 6 }}
+                                  <span class="loglevel-6 text-secondary">TRACE</span>
+                                {{ end }}
+                              </div>
+                              <div class="col-3 col-lg-1">
+                                <span class="badge rounded-pill text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" title="{{ range $key, $val := .Data }}{{ $key }}: {{ $val }}<br>{{ end }}">{{ $log.DataLen }} Fields</span>
+                              </div>
+                              <div class="col-12 col-lg-8">
+                                {{ $log.Message }}
+                              </div>
+                            </div>
+                          {{ end }}
+                          </div>
+                        </div>
+                      </div>
+                      <div class="tab-pane fade card-body" id="task{{ $task.Index }}-config" role="tabpanel" aria-labelledby="task{{ $task.Index }}-config-tab">
+<pre>
+{{ $task.ConfigYaml }}</pre>
+
+                      </div>
+                    </div>
+                  </div>
+                  {{ end }}
+
+                </div>
+              </div>
+            </td>
+          </tr>
+
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{{ end }}
+
+{{ define "sidebar" }}
+{{ end }}
+{{ define "js" }}
+{{ end }}
+{{ define "css" }}
+<style>
+.task-panel .accordion-body {
+  padding: 8px;
+  background-color: #fbfbfb;
+}
+
+.task-panel .card {
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.task-panel .tab-content {
+  padding: 4px;
+}
+
+.task-panel .nav-tabs .nav-link {
+  padding: 2px 16px;
+}
+
+</style>
+{{ end }}

@@ -6,6 +6,8 @@ type Config struct {
 	ValidatorIndex       *uint64  `yaml:"validatorIndex" json:"validatorIndex"`
 	ValidatorStatus      []string `yaml:"validatorStatus" json:"validatorStatus"`
 	FailOnCheckMiss      bool     `yaml:"failOnCheckMiss" json:"failOnCheckMiss"`
+
+	ValidatorInfoResultVar string `yaml:"validatorInfoResultVar" json:"validatorInfoResultVar"`
 }
 
 func DefaultConfig() Config {

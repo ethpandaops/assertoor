@@ -3,6 +3,7 @@ package checkconsensusvalidatorstatus
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"time"
@@ -91,29 +92,20 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	wallclockEpochSubscription := consensusPool.GetBlockCache().SubscribeWallclockEpochEvent(10)
 	defer wallclockEpochSubscription.Unsubscribe()
 
 	// load current epoch duties
 	t.loadValidatorSet(ctx)
+	t.runCheck()
 
 	for {
 		select {
 		case <-wallclockEpochSubscription.Channel():
 			t.loadValidatorSet(ctx)
-
-			checkResult := t.runValidatorStatusCheck()
-
-			switch {
-			case checkResult:
-				t.ctx.SetResult(types.TaskResultSuccess)
-			case t.config.FailOnCheckMiss:
-				t.ctx.SetResult(types.TaskResultFailure)
-			default:
-				t.ctx.SetResult(types.TaskResultNone)
-			}
+			t.runCheck()
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -121,17 +113,33 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) loadValidatorSet(ctx context.Context) {
-	client := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 	validatorSet, err := client.GetRPCClient().GetStateValidators(ctx, "head")
 
 	if err != nil {
-		t.logger.Errorf("error while fetching epoch duties: %v", err.Error())
+		t.logger.Errorf("error while fetching validator set: %v", err.Error())
 		return
 	}
 
 	t.currentValidatorSet = make(map[uint64]*v1.Validator)
 	for _, val := range validatorSet {
 		t.currentValidatorSet[uint64(val.Index)] = val
+	}
+}
+
+func (t *Task) runCheck() {
+	checkResult := t.runValidatorStatusCheck()
+
+	_, epoch, _ := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().GetWallclock().Now()
+	t.logger.Infof("epoch %v check result: %v", epoch.Number(), checkResult)
+
+	switch {
+	case checkResult:
+		t.ctx.SetResult(types.TaskResultSuccess)
+	case t.config.FailOnCheckMiss:
+		t.ctx.SetResult(types.TaskResultFailure)
+	default:
+		t.ctx.SetResult(types.TaskResultNone)
 	}
 }
 
@@ -146,7 +154,6 @@ func (t *Task) runValidatorStatusCheck() bool {
 	for {
 		validator := t.currentValidatorSet[currentIndex]
 		if validator == nil {
-			t.logger.Errorf("check failed: no matching validator found")
 			return false
 		}
 
@@ -157,7 +164,7 @@ func (t *Task) runValidatorStatusCheck() bool {
 		}
 
 		if t.config.ValidatorNamePattern != "" {
-			validatorName := t.ctx.Scheduler.GetCoordinator().ValidatorNames().GetValidatorName(uint64(validator.Index))
+			validatorName := t.ctx.Scheduler.GetServices().ValidatorNames().GetValidatorName(uint64(validator.Index))
 			matched, err := regexp.MatchString(t.config.ValidatorNamePattern, validatorName)
 
 			if err != nil {
@@ -174,7 +181,27 @@ func (t *Task) runValidatorStatusCheck() bool {
 			pubkey := common.FromHex(t.config.ValidatorPubKey)
 
 			if !bytes.Equal(pubkey, validator.Validator.PublicKey[:]) {
+				t.logger.Infof("check failed: no matching validator found")
 				continue
+			}
+		}
+
+		// found a matching validator
+		t.logger.Infof("validator found: index %v, status: %v", validator.Index, validator.Status.String())
+
+		if t.config.ValidatorInfoResultVar != "" {
+			validatorJSON, err := json.Marshal(validator)
+			if err == nil {
+				validatorMap := map[string]interface{}{}
+				err = json.Unmarshal(validatorJSON, &validatorMap)
+
+				if err == nil {
+					t.ctx.Vars.SetVar(t.config.ValidatorInfoResultVar, validatorMap)
+				} else {
+					t.logger.Errorf("could not unmarshal validator info for result var: %v", err)
+				}
+			} else {
+				t.logger.Errorf("could not marshal validator info for result var: %v", err)
 			}
 		}
 

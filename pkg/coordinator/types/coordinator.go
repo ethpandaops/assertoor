@@ -1,6 +1,8 @@
 package types
 
 import (
+	"context"
+
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
@@ -14,6 +16,11 @@ type Coordinator interface {
 	ClientPool() *clients.ClientPool
 	WalletManager() *wallet.Manager
 	ValidatorNames() *names.ValidatorNames
-	NewVariables(parentScope Variables) Variables
-	GetTests() []Test
+
+	LoadTests(ctx context.Context)
+	GetTestDescriptors() []TestDescriptor
+	GetTestByRunID(runID uint64) Test
+	GetTestQueue() []Test
+	GetTestHistory() []Test
+	ScheduleTest(descriptor TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (Test, error)
 }

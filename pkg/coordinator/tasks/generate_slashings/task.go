@@ -116,7 +116,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var subscription *consensus.Subscription[*consensus.Block]
 	if t.config.LimitPerSlot > 0 {
-		subscription = t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
+		subscription = t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
 		defer subscription.Unsubscribe()
 	}
 
@@ -137,6 +137,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			t.logger.Errorf("error generating slashing: %v", err.Error())
 		} else {
 			t.ctx.SetResult(types.TaskResultSuccess)
+
 			perSlotCount++
 			totalCount++
 		}
@@ -166,7 +167,7 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v1.Validator, *phase0.Fork, error) {
-	client := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 
 	validators, err := client.GetRPCClient().GetStateValidators(ctx, "head")
 	if err != nil {
@@ -182,7 +183,7 @@ func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v
 }
 
 func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator, forkState *phase0.Fork) error {
-	clientPool := t.ctx.Scheduler.GetCoordinator().ClientPool()
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
 	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, validatorKeyPath)
@@ -238,6 +239,7 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, validato
 		if len(clients) == 0 {
 			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
+
 		client = clients[0].ConsensusClient
 	}
 
@@ -276,7 +278,7 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 	// different target, different source
 	// source1 < source 2
 	// target 1 > target 2
-	clPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	clPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	slot, epoch, _ := clPool.GetBlockCache().GetWallclock().Now()
 	if epoch.Number() < 4 {
@@ -372,7 +374,7 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 }
 
 func (t *Task) generateProposerSlashing(validatorIndex uint64, validatorKey *e2types.BLSPrivateKey, forkState *phase0.Fork) (*phase0.ProposerSlashing, error) {
-	clPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	clPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	genesis := clPool.GetBlockCache().GetGenesis()
 
 	slot, _, _ := clPool.GetBlockCache().GetWallclock().Now()

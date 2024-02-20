@@ -44,6 +44,22 @@ The `check_consensus_block_proposals` task checks consensus block proposals to m
 - **`minBlobCount`**:\
   The minimum number of blob sidecars (extra data packets) in a block.
 
+- **`expectDeposits`**:\
+  A list of validator public keys expected to have deposit operations included in the block.
+
+- **`expectExits`**:\
+  A list of validator public keys expected to have exit operations included in the block.
+
+- **`expectSlashings`**:\
+  A list of expected slashing operations in the block, each specified as an object with a `publicKey` and a `slashingType` ("attester" or "proposer"). If `slashingType` is omitted, any type of slashing is accepted.
+
+- **`expectBlsChanges`**:\
+  A list of expected BLS change operations in the block, each as an object with a `publicKey` and the target `address` (optional).
+
+- **`expectWithdrawals`**:\
+  A list of expected withdrawal operations in the block, each as an object with a `publicKey`, `address`, and a `minAmount` specifying the minimum amount expected for the withdrawal.
+
+
 ### Defaults
 
 These are the default settings for the `check_consensus_block_proposals` task:
@@ -64,4 +80,9 @@ These are the default settings for the `check_consensus_block_proposals` task:
     minWithdrawalCount: 0
     minTransactionCount: 0
     minBlobCount: 0
+    expectDeposits: []
+    expectExits: []
+    expectSlashings: []
+    expectBlsChanges: []
+    expectWithdrawals: []
 ```

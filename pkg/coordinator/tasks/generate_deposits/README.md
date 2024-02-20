@@ -11,6 +11,9 @@ The `generate_deposits` task focuses on creating deposit transactions and sendin
 - **`limitTotal`**:\
   The total limit on the number of deposit transactions that this task will generate.
 
+- **`limitPending`**:\
+  The limit based on the number of pending deposit transactions.
+
 - **`mnemonic`**:\
   A mnemonic phrase used to generate validator keys. These keys are essential for creating valid deposit transactions.
 
@@ -38,6 +41,21 @@ The `generate_deposits` task focuses on creating deposit transactions and sendin
 - **`excludeClientPattern`**:\
   A regex pattern to exclude certain clients from being used for deposit transactions. This parameter adds an extra layer of control over client selection.
 
+- **`awaitReceipt`**:\
+  If set to `true`, the task waits for a receipt for each deposit transaction, ensuring they are confirmed on the network.
+
+- **`failOnReject`**:\
+  Determines whether the task should fail if any deposit transaction is rejected by the network.
+
+- **`depositTransactionsResultVar`**:\
+  The variable where the hashes of the generated deposit transactions will be stored.
+
+- **`depositReceiptsResultVar`**:\
+  The variable for storing the receipts of the deposit transactions, applicable if `awaitReceipt` is `true`.
+
+- **`validatorPubkeysResultVar`**:\
+  The variable where the public keys of the validators associated with the generated deposits will be stored.
+
 
 ### Defaults
 
@@ -48,6 +66,7 @@ Default settings for the `generate_deposits` task:
   config:
     limitPerSlot: 0
     limitTotal: 0
+    limitPending: 0
     mnemonic: ""
     startIndex: 0
     indexCount: 0
@@ -57,4 +76,9 @@ Default settings for the `generate_deposits` task:
     depositTxTipCap: 1000000000
     clientPattern: ""
     excludeClientPattern: ""
+    awaitReceipt: false
+    failOnReject: false
+    depositTransactionsResultVar: ""
+    depositReceiptsResultVar: ""
+    validatorPubkeysResultVar: ""
 ```

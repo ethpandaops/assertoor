@@ -5,9 +5,9 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	web_types "github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -24,10 +24,10 @@ type Config struct {
 	GlobalVars map[string]interface{} `yaml:"globalVars" json:"globalVars"`
 
 	// List of Test configurations.
-	Tests []*test.Config `yaml:"tests" json:"tests"`
+	Tests []*types.TestConfig `yaml:"tests" json:"tests"`
 
 	// List of yaml files with test configurations
-	ExternalTests []*test.ExternalConfig `yaml:"externalTests" json:"externalTests"`
+	ExternalTests []*types.ExternalTestConfig `yaml:"externalTests" json:"externalTests"`
 }
 
 // DefaultConfig represents a sane-default configuration.
@@ -41,8 +41,8 @@ func DefaultConfig() *Config {
 			},
 		},
 		GlobalVars:    make(map[string]interface{}),
-		Tests:         []*test.Config{},
-		ExternalTests: []*test.ExternalConfig{},
+		Tests:         []*types.TestConfig{},
+		ExternalTests: []*types.ExternalTestConfig{},
 	}
 }
 

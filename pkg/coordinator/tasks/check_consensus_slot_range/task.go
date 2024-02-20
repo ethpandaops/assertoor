@@ -87,7 +87,7 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	wallclockSubscription := consensusPool.GetBlockCache().SubscribeWallclockSlotEvent(10)
 	defer wallclockSubscription.Unsubscribe()
@@ -114,7 +114,7 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) runRangeCheck() (checkResult, isLower bool) {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	currentSlot, currentEpoch, err := consensusPool.GetBlockCache().GetWallclock().Now()
 	if err != nil {

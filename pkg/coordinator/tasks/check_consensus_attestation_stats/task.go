@@ -101,7 +101,7 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	blockSubscription := consensusPool.GetBlockCache().SubscribeBlockEvent(10)
 	defer blockSubscription.Unsubscribe()
@@ -152,7 +152,7 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) processBlock(ctx context.Context, block *consensus.Block) {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	specs := consensusPool.GetBlockCache().GetSpecs()
 
 	blockBody := block.AwaitBlock(ctx, 500*time.Millisecond)
@@ -226,7 +226,7 @@ func (t *Task) processBlock(ctx context.Context, block *consensus.Block) {
 }
 
 func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64) {
-	consensusPool := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool()
+	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	canonicalFork := consensusPool.GetCanonicalFork(1)
 
 	epochVotes := t.aggregateEpochVotes(ctx, epoch)
@@ -351,7 +351,7 @@ func (t *Task) newEpochVotes(base *epochVotes) *epochVotes {
 func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVotes {
 	t1 := time.Now()
 
-	consensusBlockCache := t.ctx.Scheduler.GetCoordinator().ClientPool().GetConsensusPool().GetBlockCache()
+	consensusBlockCache := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache()
 	specs := consensusBlockCache.GetSpecs()
 
 	firstSlot := epoch * specs.SlotsPerEpoch
