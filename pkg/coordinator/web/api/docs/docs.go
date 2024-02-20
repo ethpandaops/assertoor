@@ -69,25 +69,18 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/test/{testId}/run": {
+        "/api/v1/test_run": {
             "post": {
                 "description": "Returns the test \u0026 run id of the scheduled test execution.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Test"
+                    "TestRun"
                 ],
                 "summary": "Schedule new test run by test ID",
                 "operationId": "postTestRun",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID of the test definition to schedule a test run for",
-                        "name": "testId",
-                        "in": "path",
-                        "required": true
-                    },
                     {
                         "description": "Rest run options",
                         "name": "runOptions",
@@ -643,6 +636,9 @@ const docTemplate = `{
                 "config": {
                     "type": "object",
                     "additionalProperties": {}
+                },
+                "test_id": {
+                    "type": "string"
                 }
             }
         },

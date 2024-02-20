@@ -6,10 +6,10 @@ import (
 	"net/http"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/gorilla/mux"
 )
 
 type PostTestRunRequest struct {
+	TestID string         `json:"test_id"`
 	Config map[string]any `json:"config"`
 }
 
@@ -23,24 +23,28 @@ type PostTestRunResponse struct {
 // PostTestRun godoc
 // @Id postTestRun
 // @Summary Schedule new test run by test ID
-// @Tags Test
+// @Tags TestRun
 // @Description Returns the test & run id of the scheduled test execution.
 // @Produce json
-// @Param testId path string true "ID of the test definition to schedule a test run for"
 // @Param runOptions body PostTestRunRequest true "Rest run options"
 // @Success 200 {object} Response{data=PostTestRunResponse} "Success"
 // @Failure 400 {object} Response "Failure"
 // @Failure 500 {object} Response "Server Error"
-// @Router /api/v1/test/{testId}/run [post]
+// @Router /api/v1/test_run [post]
 func (ah *APIHandler) PostTestRun(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	vars := mux.Vars(r)
-	if vars["testId"] == "" {
-		ah.sendErrorResponse(w, r.URL.String(), "testId missing", http.StatusBadRequest)
+	// parse request body
+	decoder := json.NewDecoder(r.Body)
+	req := &PostTestRunRequest{}
+
+	err := decoder.Decode(req)
+	if err != nil {
+		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body: %v", err), http.StatusBadRequest)
 		return
 	}
 
+	// get test descriptor by test id
 	var testDescriptor types.TestDescriptor
 
 	for _, testDescr := range ah.coordinator.GetTestDescriptors() {
@@ -48,7 +52,7 @@ func (ah *APIHandler) PostTestRun(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if testDescr.ID() == vars["testId"] {
+		if testDescr.ID() == req.TestID {
 			testDescriptor = testDescr
 			break
 		}
@@ -65,16 +69,6 @@ func (ah *APIHandler) PostTestRun(w http.ResponseWriter, r *http.Request) {
 			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("test already scheduled (run_id: %v)", testInstance.RunID()), http.StatusTooManyRequests)
 			return
 		}
-	}
-
-	// parse request body
-	decoder := json.NewDecoder(r.Body)
-	req := &PostTestRunRequest{}
-
-	err := decoder.Decode(req)
-	if err != nil {
-		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body: %v", err), http.StatusBadRequest)
-		return
 	}
 
 	// create test run
