@@ -69,6 +69,15 @@ The task is intended for mass transaction generation.
 - **`amount`**:\
   The amount of ETH (in wei) to be sent in each transaction.
 
+- **`awaitReceipt`**:\
+  If `false`, the task succeeds immediately after sending the transactions without waiting for the receipts. If `true`, it waits for all receipts.
+
+- **`failOnReject`**:\
+  If `true`, the task fails if any transaction is rejected.
+
+- **`failOnSuccess`**:\
+  If `true`, the task fails if any transaction is successful and not rejected.
+
 - **`clientPattern`**:\
   A regex pattern for selecting specific client endpoints for sending the transactions. This allows targeting particular clients or groups for transaction dispatch.
 
@@ -104,6 +113,9 @@ Default settings for the `generate_eoa_transactions` task:
     callData: ""
     randomAmount: false
     amount: "0"
+    awaitReceipt: false
+    failOnReject: false
+    failOnSuccess: false
     clientPattern: ""
     excludeClientPattern: ""
 ```
