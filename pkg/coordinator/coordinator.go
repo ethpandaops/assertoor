@@ -267,6 +267,9 @@ func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverr
 }
 
 func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
+	maxConcurrentTests := 2
+	semaphore := make(chan bool, maxConcurrentTests)
+
 	for {
 		var nextTest types.Test
 
@@ -279,8 +282,16 @@ func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
 		c.testRegistryMutex.Unlock()
 
 		if nextTest != nil {
+
 			// run next test
-			c.runTest(ctx, nextTest)
+			semaphore <- true
+			go func(nextTest types.Test) {
+				c.runTest(ctx, nextTest)
+				defer func() {
+					<-semaphore
+				}()
+			}(nextTest)
+
 		} else {
 			// sleep and wait for queue notification
 			select {
