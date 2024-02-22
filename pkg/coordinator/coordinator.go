@@ -43,9 +43,10 @@ type Coordinator struct {
 	testHistory          []types.Test
 	testRegistryMutex    sync.RWMutex
 	testNotificationChan chan bool
+	concurrency          int
 }
 
-func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Coordinator {
+func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int, concurrency int) *Coordinator {
 	return &Coordinator{
 		log: logger.NewLogger(&logger.ScopeOptions{
 			Parent:      log,
@@ -58,6 +59,7 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Co
 		testQueue:            []types.Test{},
 		testHistory:          []types.Test{},
 		testNotificationChan: make(chan bool, 1),
+		concurrency:          concurrency,
 	}
 }
 
@@ -267,8 +269,7 @@ func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverr
 }
 
 func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
-	maxConcurrentTests := 2
-	semaphore := make(chan bool, maxConcurrentTests)
+	semaphore := make(chan bool, c.concurrency)
 
 	for {
 		var nextTest types.Test

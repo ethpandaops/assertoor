@@ -31,7 +31,7 @@ var rootCmd = &cobra.Command{
 			logr.SetLevel(logrus.DebugLevel)
 		}
 
-		coord := coordinator.NewCoordinator(config, logr, metricsPort)
+		coord := coordinator.NewCoordinator(config, logr, metricsPort, concurrency)
 
 		if err := coord.Run(cmd.Context()); err != nil {
 			log.Fatal(err)
@@ -45,6 +45,7 @@ var (
 	logFormat   string
 	verbose     bool
 	metricsPort int
+	concurrency int
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -62,6 +63,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text", "log format (default is text). Valid values are 'text', 'json'")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
-
+	rootCmd.Flags().IntVar(&concurrency, "concurrency", 1, "Number of tests to run concurrently")
 	rootCmd.Flags().IntVarP(&metricsPort, "metrics-port", "", 9090, "Port to serve Prometheus metrics on")
 }
