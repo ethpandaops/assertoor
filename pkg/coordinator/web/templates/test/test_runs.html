@@ -7,8 +7,9 @@
       <thead>
         <tr>
           <th style="width: 50px"></th>
-          <th>Run ID</th>
-          <th>Test Name</th>
+          <th style="width: 100px;">Run ID</th>
+          <th style="min-width:200px;">Test Name</th>
+          <th style="width:20%; min-width:200px;">Start Time</th>
           <th style="width:20%; min-width:150px;">Run Time</th>
           <th style="width:10%; min-width:100px;">Status</th>
         </tr>
@@ -20,6 +21,7 @@
           <td class="p-0"><button class="btn btn-default btn-xs"><i class="fa fa-eye" aria-hidden="true"></i></button></td>
           <td>{{ $test.RunID }}</td>
           <td>{{ $test.Name }}</td>
+          <td>{{ if $test.IsStarted }}{{ formatDateTime $test.StartTime.UTC }}{{ end }}</td>
           <td>{{ if $test.HasRunTime }}{{ $test.RunTime }}{{ else }}?{{ end }}{{ if $test.HasTimeout }} / {{ $test.Timeout }}{{ end }}</td>
           <td>
             {{ if eq $test.Status "pending" }}
