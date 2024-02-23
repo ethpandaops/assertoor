@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"log"
 	"os"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator"
@@ -15,27 +14,18 @@ var rootCmd = &cobra.Command{
 	Use:   "assertoor",
 	Short: "Runs a configured test until completion or error",
 	Run: func(cmd *cobra.Command, _ []string) {
-		if version && buildinfo.BuildRelease != "" {
-			log.Printf("Release: %s\n", buildinfo.BuildRelease)
-			return
-		}
-
-		if version && buildinfo.BuildVersion != "" {
-			log.Printf("Version: %s\n", buildinfo.BuildVersion)
-			return
-		}
+		logr := logrus.New()
 
 		if version {
-			log.Print("Local build; Unknown version\n")
+			logr.Printf("Version: %s\n", buildinfo.GetVersion())
 			return
 		}
 
 		config, err := coordinator.NewConfig(cfgFile)
 		if err != nil {
-			log.Fatal(err)
+			logr.Fatal(err)
 		}
 
-		logr := logrus.New()
 		if logFormat == "json" {
 			logr.SetFormatter(&logrus.JSONFormatter{})
 			logr.Info("Log format set to json")
@@ -50,7 +40,7 @@ var rootCmd = &cobra.Command{
 		coord := coordinator.NewCoordinator(config, logr, metricsPort, maxConcurrentTests)
 
 		if err := coord.Run(cmd.Context()); err != nil {
-			log.Fatal(err)
+			logr.Fatal(err)
 		}
 
 	},

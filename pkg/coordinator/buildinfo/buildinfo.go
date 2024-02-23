@@ -6,6 +6,10 @@ var BuildVersion string
 var BuildRelease string
 
 func GetVersion() string {
+	if BuildVersion == "" {
+		return "local build"
+	}
+
 	if BuildRelease == "" {
 		return fmt.Sprintf("git-%v", BuildVersion)
 	}
