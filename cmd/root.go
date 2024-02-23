@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -17,17 +16,17 @@ var rootCmd = &cobra.Command{
 	Short: "Runs a configured test until completion or error",
 	Run: func(cmd *cobra.Command, _ []string) {
 		if version && buildinfo.BuildRelease != "" {
-			fmt.Printf("Release: %s\n", buildinfo.BuildRelease)
+			log.Printf("Release: %s\n", buildinfo.BuildRelease)
 			return
 		}
 
 		if version && buildinfo.BuildVersion != "" {
-			fmt.Printf("Version: %s\n", buildinfo.BuildVersion)
+			log.Printf("Version: %s\n", buildinfo.BuildVersion)
 			return
 		}
 
 		if version {
-			fmt.Printf("Local build; Unknown version\n")
+			log.Printf("Local build; Unknown version\n")
 			return
 		}
 
