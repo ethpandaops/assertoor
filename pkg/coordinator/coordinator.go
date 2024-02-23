@@ -43,9 +43,10 @@ type Coordinator struct {
 	testHistory          []types.Test
 	testRegistryMutex    sync.RWMutex
 	testNotificationChan chan bool
+	maxConcurrentTests   int
 }
 
-func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Coordinator {
+func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, maxConcurrentTests int) *Coordinator {
 	return &Coordinator{
 		log: logger.NewLogger(&logger.ScopeOptions{
 			Parent:      log,
@@ -58,6 +59,7 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Co
 		testQueue:            []types.Test{},
 		testHistory:          []types.Test{},
 		testNotificationChan: make(chan bool, 1),
+		maxConcurrentTests:   maxConcurrentTests,
 	}
 }
 
@@ -267,6 +269,8 @@ func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverr
 }
 
 func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
+	semaphore := make(chan bool, c.maxConcurrentTests)
+
 	for {
 		var nextTest types.Test
 
@@ -280,7 +284,13 @@ func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
 
 		if nextTest != nil {
 			// run next test
-			c.runTest(ctx, nextTest)
+			testFunc := func(nextTest types.Test) {
+				defer func() { <-semaphore }()
+				c.runTest(ctx, nextTest)
+			}
+			semaphore <- true
+
+			go testFunc(nextTest)
 		} else {
 			// sleep and wait for queue notification
 			select {
