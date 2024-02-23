@@ -46,7 +46,7 @@ type Coordinator struct {
 	maxConcurrentTests   int
 }
 
-func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int, maxConcurrentTests int) *Coordinator {
+func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, maxConcurrentTests int) *Coordinator {
 	return &Coordinator{
 		log: logger.NewLogger(&logger.ScopeOptions{
 			Parent:      log,
@@ -283,14 +283,14 @@ func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
 		c.testRegistryMutex.Unlock()
 
 		if nextTest != nil {
-
 			// run next test
-			semaphore <- true
-			go func(nextTest types.Test) {
+			testFunc := func(nextTest types.Test) {
 				defer func() { <-semaphore }()
 				c.runTest(ctx, nextTest)
-			}(nextTest)
+			}
+			semaphore <- true
 
+			go testFunc(nextTest)
 		} else {
 			// sleep and wait for queue notification
 			select {

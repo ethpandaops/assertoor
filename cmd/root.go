@@ -26,7 +26,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		if version {
-			log.Printf("Local build; Unknown version\n")
+			log.Print("Local build; Unknown version\n")
 			return
 		}
 
