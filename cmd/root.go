@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -14,6 +16,21 @@ var rootCmd = &cobra.Command{
 	Use:   "assertoor",
 	Short: "Runs a configured test until completion or error",
 	Run: func(cmd *cobra.Command, _ []string) {
+		if version && buildinfo.BuildRelease != "" {
+			fmt.Printf("Release: %s\n", buildinfo.BuildRelease)
+			return
+		}
+
+		if version && buildinfo.BuildVersion != "" {
+			fmt.Printf("Version: %s\n", buildinfo.BuildVersion)
+			return
+		}
+
+		if version {
+			fmt.Printf("Local build; Unknown version\n")
+			return
+		}
+
 		config, err := coordinator.NewConfig(cfgFile)
 		if err != nil {
 			log.Fatal(err)
@@ -31,7 +48,7 @@ var rootCmd = &cobra.Command{
 			logr.SetLevel(logrus.DebugLevel)
 		}
 
-		coord := coordinator.NewCoordinator(config, logr, metricsPort, concurrency)
+		coord := coordinator.NewCoordinator(config, logr, metricsPort, maxConcurrentTests)
 
 		if err := coord.Run(cmd.Context()); err != nil {
 			log.Fatal(err)
@@ -41,11 +58,12 @@ var rootCmd = &cobra.Command{
 }
 
 var (
-	cfgFile     string
-	logFormat   string
-	verbose     bool
-	metricsPort int
-	concurrency int
+	cfgFile            string
+	logFormat          string
+	verbose            bool
+	metricsPort        int
+	maxConcurrentTests int
+	version            bool
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -63,6 +81,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text", "log format (default is text). Valid values are 'text', 'json'")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
-	rootCmd.Flags().IntVar(&concurrency, "concurrency", 1, "Number of tests to run concurrently")
+	rootCmd.Flags().IntVar(&maxConcurrentTests, "maxConcurrentTests", 1, "Number of tests to run concurrently")
 	rootCmd.Flags().IntVarP(&metricsPort, "metrics-port", "", 9090, "Port to serve Prometheus metrics on")
+	rootCmd.Flags().BoolVarP(&version, "version", "", false, "Print version information")
 }
