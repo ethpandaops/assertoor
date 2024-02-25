@@ -20,6 +20,9 @@ The `generate_exits` task is designed to create and send voluntary exit transact
 - **`indexCount`**:\
   The number of validator keys to generate from the mnemonic, determining how many unique exit transactions will be created.
 
+- **`exitEpoch`**:\
+  The exit epoch number set within the exit message. (defaults to head epoch)
+
 - **`clientPattern`**:\
   A regex pattern for selecting specific client endpoints for sending the exit transactions. If left empty, any available endpoint will be used.
 
@@ -39,6 +42,7 @@ Default settings for the `generate_exits` task:
     mnemonic: ""
     startIndex: 0
     indexCount: 0
+    exitEpoch: -1
     clientPattern: ""
     excludeClientPattern: ""
 ```

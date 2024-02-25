@@ -10,6 +10,7 @@ type Config struct {
 	Mnemonic             string `yaml:"mnemonic" json:"mnemonic"`
 	StartIndex           int    `yaml:"startIndex" json:"startIndex"`
 	IndexCount           int    `yaml:"indexCount" json:"indexCount"`
+	ExitEpoch            int64  `yaml:"exitEpoch" json:"exitEpoch"`
 	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
 	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
 }

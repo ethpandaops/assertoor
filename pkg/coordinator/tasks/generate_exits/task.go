@@ -228,12 +228,16 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	}
 
 	// build voluntary exit message
-	currentSlot, _ := client.GetLastHead()
 	specs := clientPool.GetConsensusPool().GetBlockCache().GetSpecs()
-	currentEpoch := phase0.Epoch(currentSlot / phase0.Slot(specs.SlotsPerEpoch))
 	operation := &phase0.VoluntaryExit{
-		Epoch:          currentEpoch,
 		ValidatorIndex: validator.Index,
+	}
+
+	if t.config.ExitEpoch >= 0 {
+		operation.Epoch = phase0.Epoch(t.config.ExitEpoch)
+	} else {
+		currentSlot, _ := client.GetLastHead()
+		operation.Epoch = phase0.Epoch(currentSlot / phase0.Slot(specs.SlotsPerEpoch))
 	}
 
 	root, err := operation.HashTreeRoot()
