@@ -58,7 +58,7 @@ type ExternalTestConfig struct {
 }
 
 type TestSchedule struct {
-	Startup bool     `yaml:"file" json:"file"`
+	Startup bool     `yaml:"startup" json:"startup"`
 	Cron    []string `yaml:"cron" json:"cron"`
 }
 

@@ -61,62 +61,6 @@
                 }
             }
         },
-        "/api/v1/test_run": {
-            "post": {
-                "description": "Returns the test \u0026 run id of the scheduled test execution.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "TestRun"
-                ],
-                "summary": "Schedule new test run by test ID",
-                "operationId": "postTestRun",
-                "parameters": [
-                    {
-                        "description": "Rest run options",
-                        "name": "runOptions",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.PostTestRunRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Success",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/api.PostTestRunResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Failure",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/test_run/{runId}": {
             "get": {
                 "description": "Returns the run details with given ID. Includes a summary and a list of task with limited details",
@@ -398,6 +342,62 @@
                 }
             }
         },
+        "/api/v1/test_runs/schedule": {
+            "post": {
+                "description": "Returns the test \u0026 run id of the scheduled test execution.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Schedule new test run by test ID",
+                "operationId": "postTestRunsSchedule",
+                "parameters": [
+                    {
+                        "description": "Rest run options",
+                        "name": "runOptions",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.PostTestRunsScheduleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.PostTestRunsScheduleResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/tests": {
             "get": {
                 "description": "Returns the list of test definitions. These test definitions can be used to create new test runs and are supplied via the assertoor configuration.",
@@ -425,6 +425,125 @@
                                             "items": {
                                                 "$ref": "#/definitions/api.GetTestsResponse"
                                             }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tests/register": {
+            "post": {
+                "description": "Returns the test id and name of the added test.",
+                "consumes": [
+                    "application/json",
+                    "application/yaml"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Register new test via yaml configuration",
+                "operationId": "postTestsRegister",
+                "parameters": [
+                    {
+                        "description": "Test configuration (json or yaml)",
+                        "name": "testConfig",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.PostTestsRegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.PostTestsRegisterResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tests/register_external": {
+            "post": {
+                "description": "Returns the test id and name of the added test.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Register new test via external test configuration",
+                "operationId": "postTestsRegisterExternal",
+                "parameters": [
+                    {
+                        "description": "Test configuration (json or yaml)",
+                        "name": "externalTestConfig",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.PostTestsRegisterExternalRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.PostTestsRegisterExternalResponse"
                                         }
                                     }
                                 }
@@ -721,7 +840,7 @@
                 }
             }
         },
-        "api.PostTestRunRequest": {
+        "api.PostTestRunsScheduleRequest": {
             "type": "object",
             "properties": {
                 "allow_duplicate": {
@@ -736,7 +855,7 @@
                 }
             }
         },
-        "api.PostTestRunResponse": {
+        "api.PostTestRunsScheduleResponse": {
             "type": "object",
             "properties": {
                 "config": {
@@ -754,6 +873,102 @@
                 }
             }
         },
+        "api.PostTestsRegisterExternalRequest": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "configVars": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "file": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/types.TestSchedule"
+                },
+                "timeout": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.PostTestsRegisterExternalResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestsRegisterRequest": {
+            "type": "object",
+            "properties": {
+                "cleanupTasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helper.RawMessage"
+                    }
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "configVars": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/types.TestSchedule"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helper.RawMessage"
+                    }
+                },
+                "timeout": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestsRegisterResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response": {
             "type": "object",
             "properties": {
@@ -762,6 +977,9 @@
                     "type": "string"
                 }
             }
+        },
+        "helper.RawMessage": {
+            "type": "object"
         },
         "types.TestSchedule": {
             "type": "object",
@@ -772,7 +990,7 @@
                         "type": "string"
                     }
                 },
-                "file": {
+                "startup": {
                     "type": "boolean"
                 }
             }

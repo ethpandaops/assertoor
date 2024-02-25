@@ -8,36 +8,36 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 )
 
-type PostTestRunRequest struct {
+type PostTestRunsScheduleRequest struct {
 	TestID         string         `json:"test_id"`
 	Config         map[string]any `json:"config"`
 	AllowDuplicate bool           `json:"allow_duplicate"`
 }
 
-type PostTestRunResponse struct {
+type PostTestRunsScheduleResponse struct {
 	TestID string         `json:"test_id"`
 	RunID  uint64         `json:"run_id"`
 	Name   string         `json:"name"`
 	Config map[string]any `json:"config"`
 }
 
-// PostTestRun godoc
-// @Id postTestRun
+// PostTestRunsSchedule godoc
+// @Id postTestRunsSchedule
 // @Summary Schedule new test run by test ID
 // @Tags TestRun
 // @Description Returns the test & run id of the scheduled test execution.
 // @Produce json
-// @Param runOptions body PostTestRunRequest true "Rest run options"
-// @Success 200 {object} Response{data=PostTestRunResponse} "Success"
+// @Param runOptions body PostTestRunsScheduleRequest true "Rest run options"
+// @Success 200 {object} Response{data=PostTestRunsScheduleResponse} "Success"
 // @Failure 400 {object} Response "Failure"
 // @Failure 500 {object} Response "Server Error"
-// @Router /api/v1/test_run [post]
-func (ah *APIHandler) PostTestRun(w http.ResponseWriter, r *http.Request) {
+// @Router /api/v1/test_runs/schedule [post]
+func (ah *APIHandler) PostTestRunsSchedule(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// parse request body
 	decoder := json.NewDecoder(r.Body)
-	req := &PostTestRunRequest{}
+	req := &PostTestRunsScheduleRequest{}
 
 	err := decoder.Decode(req)
 	if err != nil {
@@ -71,7 +71,7 @@ func (ah *APIHandler) PostTestRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ah.sendOKResponse(w, r.URL.String(), &PostTestRunResponse{
+	ah.sendOKResponse(w, r.URL.String(), &PostTestRunsScheduleResponse{
 		TestID: testDescriptor.ID(),
 		RunID:  testInstance.RunID(),
 		Name:   testInstance.Name(),

@@ -18,6 +18,7 @@ type Coordinator interface {
 	ValidatorNames() *names.ValidatorNames
 
 	LoadTests(ctx context.Context)
+	AddTestDescriptor(testDescriptor TestDescriptor) error
 	GetTestDescriptors() []TestDescriptor
 	GetTestByRunID(runID uint64) Test
 	GetTestQueue() []Test

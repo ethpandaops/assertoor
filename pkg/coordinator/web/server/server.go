@@ -88,9 +88,12 @@ func (ws *WebServer) ConfigureRoutes(config *types.WebConfig, logger logrus.Fiel
 		// register api routes
 		apiHandler := api.NewAPIHandler(logger.WithField("module", "api"), coordinator)
 		ws.router.HandleFunc("/api/v1/tests", apiHandler.GetTests).Methods("GET")
+		ws.router.HandleFunc("/api/v1/tests/register", apiHandler.PostTestsRegister).Methods("POST")
+		ws.router.HandleFunc("/api/v1/tests/register_external", apiHandler.PostTestsRegisterExternal).Methods("POST")
 		ws.router.HandleFunc("/api/v1/test/{testId}", apiHandler.GetTest).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_runs", apiHandler.GetTestRuns).Methods("GET")
-		ws.router.HandleFunc("/api/v1/test_run", apiHandler.PostTestRun).Methods("POST")
+		ws.router.HandleFunc("/api/v1/test_run", apiHandler.PostTestRunsSchedule).Methods("POST") // legacy
+		ws.router.HandleFunc("/api/v1/test_runs/schedule", apiHandler.PostTestRunsSchedule).Methods("POST")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}", apiHandler.GetTestRun).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/status", apiHandler.GetTestRunStatus).Methods("GET")

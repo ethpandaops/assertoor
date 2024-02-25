@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime/debug"
+	"sort"
 	"sync"
 	"time"
 
@@ -37,13 +38,22 @@ type Coordinator struct {
 	lastExecutedRunID  uint64
 	testSchedulerMutex sync.Mutex
 
-	testDescriptors      []types.TestDescriptor
+	testDescriptors      map[string]testDescriptorEntry
+	testDescriptorsMutex sync.RWMutex
+	testDescriptorIndex  uint64
+
 	testRunMap           map[uint64]types.Test
 	testQueue            []types.Test
 	testHistory          []types.Test
 	testRegistryMutex    sync.RWMutex
 	testNotificationChan chan bool
 	maxConcurrentTests   int
+}
+
+type testDescriptorEntry struct {
+	descriptor types.TestDescriptor
+	dynamic    bool
+	index      uint64
 }
 
 func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, maxConcurrentTests int) *Coordinator {
@@ -55,6 +65,7 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, maxConc
 		Config:      config,
 		metricsPort: metricsPort,
 
+		testDescriptors:      map[string]testDescriptorEntry{},
 		testRunMap:           map[uint64]types.Test{},
 		testQueue:            []types.Test{},
 		testHistory:          []types.Test{},
@@ -156,22 +167,87 @@ func (c *Coordinator) LoadTests(ctx context.Context) {
 	descriptors := test.LoadTestDescriptors(ctx, c.Config.Tests, c.Config.ExternalTests)
 	errCount := 0
 
+	c.testDescriptorsMutex.Lock()
+	defer c.testDescriptorsMutex.Unlock()
+
+	indexMap := map[string]uint64{}
+
+	for id, descriptorEntry := range c.testDescriptors {
+		if !descriptorEntry.dynamic {
+			delete(c.testDescriptors, id)
+
+			indexMap[id] = descriptorEntry.index
+		}
+	}
+
 	for _, descriptor := range descriptors {
 		if descriptor.Err() != nil {
 			c.log.GetLogger().Errorf("error while loading test '%v': %v", descriptor.ID(), descriptor.Err())
 
 			errCount++
+		} else {
+			entryIndex := indexMap[descriptor.ID()]
+			if entryIndex == 0 {
+				c.testDescriptorIndex++
+				entryIndex = c.testDescriptorIndex
+			}
+
+			c.testDescriptors[descriptor.ID()] = testDescriptorEntry{
+				descriptor: descriptor,
+				dynamic:    false,
+				index:      entryIndex,
+			}
 		}
 	}
 
 	c.log.GetLogger().Infof("loaded %v test descriptors (%v errors)", len(descriptors), errCount)
-	c.testDescriptors = descriptors
+}
+
+func (c *Coordinator) AddTestDescriptor(testDescriptor types.TestDescriptor) error {
+	if testDescriptor.Err() != nil {
+		return fmt.Errorf("cannot add failed test descriptor: %v", testDescriptor.Err())
+	}
+
+	if testDescriptor.ID() == "" {
+		return fmt.Errorf("cannot add test descriptor without ID")
+	}
+
+	c.testDescriptorsMutex.Lock()
+	defer c.testDescriptorsMutex.Unlock()
+
+	entryIndex := c.testDescriptors[testDescriptor.ID()].index
+	if entryIndex == 0 {
+		c.testDescriptorIndex++
+		entryIndex = c.testDescriptorIndex
+	}
+
+	c.testDescriptors[testDescriptor.ID()] = testDescriptorEntry{
+		descriptor: testDescriptor,
+		dynamic:    true,
+		index:      entryIndex,
+	}
+
+	return nil
 }
 
 func (c *Coordinator) GetTestDescriptors() []types.TestDescriptor {
-	descriptors := make([]types.TestDescriptor, len(c.testDescriptors))
+	c.testDescriptorsMutex.RLock()
+	defer c.testDescriptorsMutex.RUnlock()
 
-	copy(descriptors, c.testDescriptors)
+	descriptors := make([]types.TestDescriptor, len(c.testDescriptors))
+	idx := 0
+
+	for _, descriptorEntry := range c.testDescriptors {
+		descriptors[idx] = descriptorEntry.descriptor
+		idx++
+	}
+
+	sort.Slice(descriptors, func(a, b int) bool {
+		entryA := c.testDescriptors[descriptors[a].ID()]
+		entryB := c.testDescriptors[descriptors[b].ID()]
+
+		return entryA.index < entryB.index
+	})
 
 	return descriptors
 }
@@ -318,17 +394,10 @@ func (c *Coordinator) runTest(ctx context.Context, testRef types.Test) {
 
 func (c *Coordinator) runTestScheduler(ctx context.Context) {
 	// startup scheduler
-	for _, testDescr := range c.testDescriptors {
-		if testDescr.Err() != nil {
-			continue
-		}
-
-		testConfig := testDescr.Config()
-		if testConfig.Schedule == nil || testConfig.Schedule.Startup {
-			_, err := c.ScheduleTest(testDescr, nil, false)
-			if err != nil {
-				c.Logger().Errorf("could not schedule startup test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
-			}
+	for _, testDescr := range c.getStartupTests() {
+		_, err := c.ScheduleTest(testDescr, nil, false)
+		if err != nil {
+			c.Logger().Errorf("could not schedule startup test execution for %v (%v): %v", testDescr.ID(), testDescr.Config().Name, err)
 		}
 	}
 
@@ -347,40 +416,77 @@ func (c *Coordinator) runTestScheduler(ctx context.Context) {
 			}
 		}
 
-		for _, testDescr := range c.testDescriptors {
-			if testDescr.Err() != nil {
-				continue
-			}
-
-			testConfig := testDescr.Config()
-			if testConfig.Schedule == nil || len(testConfig.Schedule.Cron) == 0 {
-				continue
-			}
-
-			triggerTest := false
-
-			for _, cronExprStr := range testConfig.Schedule.Cron {
-				cronExpr, err := cronexpr.Parse(cronExprStr)
-				if err != nil {
-					c.Logger().Errorf("invalid cron expression for test %v (%v): %v", testDescr.ID(), testConfig.Name, err)
-					break
-				}
-
-				next := cronExpr.Next(cronTime.Add(-1 * time.Second))
-				if next.Compare(cronTime) == 0 {
-					triggerTest = true
-					break
-				}
-			}
-
-			if !triggerTest {
-				continue
-			}
-
+		for _, testDescr := range c.getCronTests(cronTime) {
 			_, err := c.ScheduleTest(testDescr, nil, false)
 			if err != nil {
-				c.Logger().Errorf("could not schedule cron test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
+				c.Logger().Errorf("could not schedule cron test execution for %v (%v): %v", testDescr.ID(), testDescr.Config().Name, err)
 			}
 		}
 	}
+}
+
+func (c *Coordinator) getStartupTests() []types.TestDescriptor {
+	c.testDescriptorsMutex.RLock()
+	defer c.testDescriptorsMutex.RUnlock()
+
+	descriptors := []types.TestDescriptor{}
+
+	for _, testDescrEntry := range c.testDescriptors {
+		testDescr := testDescrEntry.descriptor
+
+		if testDescr.Err() != nil {
+			continue
+		}
+
+		testConfig := testDescr.Config()
+		if testConfig.Schedule == nil || testConfig.Schedule.Startup {
+			descriptors = append(descriptors, testDescr)
+		}
+	}
+
+	return descriptors
+}
+
+func (c *Coordinator) getCronTests(cronTime time.Time) []types.TestDescriptor {
+	c.testDescriptorsMutex.RLock()
+	defer c.testDescriptorsMutex.RUnlock()
+
+	descriptors := []types.TestDescriptor{}
+
+	for _, testDescrEntry := range c.testDescriptors {
+		testDescr := testDescrEntry.descriptor
+
+		if testDescr.Err() != nil {
+			continue
+		}
+
+		testConfig := testDescr.Config()
+		if testConfig.Schedule == nil || len(testConfig.Schedule.Cron) == 0 {
+			continue
+		}
+
+		triggerTest := false
+
+		for _, cronExprStr := range testConfig.Schedule.Cron {
+			cronExpr, err := cronexpr.Parse(cronExprStr)
+			if err != nil {
+				c.Logger().Errorf("invalid cron expression for test %v (%v): %v", testDescr.ID(), testConfig.Name, err)
+				break
+			}
+
+			next := cronExpr.Next(cronTime.Add(-1 * time.Second))
+			if next.Compare(cronTime) == 0 {
+				triggerTest = true
+				break
+			}
+		}
+
+		if !triggerTest {
+			continue
+		}
+
+		descriptors = append(descriptors, testDescr)
+	}
+
+	return descriptors
 }
