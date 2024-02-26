@@ -426,14 +426,9 @@ func (c *Coordinator) runTestScheduler(ctx context.Context) {
 }
 
 func (c *Coordinator) getStartupTests() []types.TestDescriptor {
-	c.testDescriptorsMutex.RLock()
-	defer c.testDescriptorsMutex.RUnlock()
-
 	descriptors := []types.TestDescriptor{}
 
-	for _, testDescrEntry := range c.testDescriptors {
-		testDescr := testDescrEntry.descriptor
-
+	for _, testDescr := range c.GetTestDescriptors() {
 		if testDescr.Err() != nil {
 			continue
 		}
@@ -448,14 +443,9 @@ func (c *Coordinator) getStartupTests() []types.TestDescriptor {
 }
 
 func (c *Coordinator) getCronTests(cronTime time.Time) []types.TestDescriptor {
-	c.testDescriptorsMutex.RLock()
-	defer c.testDescriptorsMutex.RUnlock()
-
 	descriptors := []types.TestDescriptor{}
 
-	for _, testDescrEntry := range c.testDescriptors {
-		testDescr := testDescrEntry.descriptor
-
+	for _, testDescr := range c.GetTestDescriptors() {
 		if testDescr.Err() != nil {
 			continue
 		}
