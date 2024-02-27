@@ -1,5 +1,5 @@
 {{ define "sidebar" }}
-  <div class="d-flex flex-column flex-shrink-0 p-3 bg-light" style="width: 280px;">
+  <div class="d-flex flex-column flex-shrink-0 p-3 sidebar" style="width: 280px;">
     <div class="container-fluid text-secondary">
       <div class="row">
         <div class="col-12">
@@ -26,7 +26,7 @@
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
       <li class="nav-item">
-        <a href="/" class="nav-link {{ if .AllTestsActive }}active{{ else }}link-dark{{ end }}" aria-current="page">
+        <a href="/" class="nav-link {{ if .AllTestsActive }}active{{ end }}" aria-current="page">
           All Test Runs
         </a>
       </li>
@@ -36,7 +36,7 @@
       </li>
       {{ range $i, $test := .TestDescriptors }}
       <li>
-        <a href="/test/{{ $test.ID }}" class="nav-link {{ if $test.Active }}active{{ else }}link-dark{{ end }}">
+        <a href="/test/{{ $test.ID }}" class="nav-link {{ if $test.Active }}active{{ end }}">
           {{ $test.Name }}
         </a>
       </li>
