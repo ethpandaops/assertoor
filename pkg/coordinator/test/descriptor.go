@@ -104,14 +104,19 @@ func LoadExternalTestConfig(ctx context.Context, extTestCfg *types.ExternalTestC
 	}
 
 	decoder := yaml.NewDecoder(reader)
-	testConfig := &types.TestConfig{
-		Config:     map[string]interface{}{},
-		ConfigVars: map[string]string{},
-	}
+	testConfig := &types.TestConfig{}
 
 	err := decoder.Decode(testConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding external test config %v: %v", extTestCfg.File, err)
+	}
+
+	if testConfig.Config == nil {
+		testConfig.Config = map[string]interface{}{}
+	}
+
+	if testConfig.ConfigVars == nil {
+		testConfig.ConfigVars = map[string]string{}
 	}
 
 	if extTestCfg.Name != "" {
