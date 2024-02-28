@@ -20,18 +20,67 @@
         </div>
       </div>
     </div>
-
-    <!--
-    <h5 class="mt-3 mb-0">Schedule Execution</h5>
-    -->
     
-    <h5 class="mt-3 mb-0">Test Runs</h5>
+    <div class="mt-2 d-flex flex-row" style="max-width: 500px;">
+      <div class="flex-grow-1">
+        <h5 class="mt-3 mb-0">Test Runs</h5>
+      </div>
+      <div class="mx-2">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#startTestModal">Start Test</button>
+      </div>
+    </div>
+
+    <div class="modal fade" id="startTestModal" tabindex="-1" aria-labelledby="startTestModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h1 class="modal-title fs-5" id="startTestModalLabel">Start Test</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body container-fluid">
+            <div class="row">
+              <div class="col-4">
+                Test ID:
+              </div>
+              <div class="col-8">
+                {{ .ID }}     
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-4">
+                Name:
+              </div>
+              <div class="col-8">
+                {{ .Name }}     
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-8">
+                Configuration overrides:
+              </div>
+              <div class="col-4 text-end">
+                (optional)
+              </div>
+              <div class="col-12">
+                <textarea class="form-control" id="testConfigOverrides" rows="3"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary">Start Test</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     {{ template "test_runs" .Tests }}
 
   </div>
 {{ end }}
 
 {{ define "js" }}
+
 {{ end }}
 {{ define "css" }}
 {{ end }}
