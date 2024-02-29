@@ -8,9 +8,8 @@ import (
 	"regexp"
 	"time"
 
-	v1 "github.com/attestantio/go-eth2-client/api/v1"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
@@ -26,11 +25,10 @@ var (
 )
 
 type Task struct {
-	ctx                 *types.TaskContext
-	options             *types.TaskOptions
-	config              Config
-	logger              logrus.FieldLogger
-	currentValidatorSet map[uint64]*v1.Validator
+	ctx     *types.TaskContext
+	options *types.TaskOptions
+	config  Config
+	logger  logrus.FieldLogger
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -98,32 +96,15 @@ func (t *Task) Execute(ctx context.Context) error {
 	defer wallclockEpochSubscription.Unsubscribe()
 
 	// load current epoch duties
-	t.loadValidatorSet(ctx)
 	t.runCheck()
 
 	for {
 		select {
 		case <-wallclockEpochSubscription.Channel():
-			t.loadValidatorSet(ctx)
 			t.runCheck()
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-	}
-}
-
-func (t *Task) loadValidatorSet(ctx context.Context) {
-	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
-	validatorSet, err := client.GetRPCClient().GetStateValidators(ctx, "head")
-
-	if err != nil {
-		t.logger.Errorf("error while fetching validator set: %v", err.Error())
-		return
-	}
-
-	t.currentValidatorSet = make(map[uint64]*v1.Validator)
-	for _, val := range validatorSet {
-		t.currentValidatorSet[uint64(val.Index)] = val
 	}
 }
 
@@ -144,7 +125,8 @@ func (t *Task) runCheck() {
 }
 
 func (t *Task) runValidatorStatusCheck() bool {
-	if t.currentValidatorSet == nil {
+	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
+	if validatorSet == nil {
 		t.logger.Errorf("check failed: no validator set")
 		return false
 	}
@@ -152,7 +134,7 @@ func (t *Task) runValidatorStatusCheck() bool {
 	currentIndex := uint64(0)
 
 	for {
-		validator := t.currentValidatorSet[currentIndex]
+		validator := validatorSet[phase0.ValidatorIndex(currentIndex)]
 		if validator == nil {
 			return false
 		}

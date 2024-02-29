@@ -182,9 +182,9 @@ func (t *Task) processBlock(ctx context.Context, block *consensus.Block) {
 
 	t.logger.Infof("loading epoch %v duties (dependent: %v)", currentBlockEpoch, parentBlock.Root.String())
 
-	validators, err := block.GetSeenBy()[0].GetRPCClient().GetStateValidators(ctx, parentStateRoot.String())
-	if err != nil {
-		t.logger.Warnf("could not load epoch %v dependent state %v validators", currentBlockEpoch, parentStateRoot.String())
+	validators := consensusPool.GetValidatorSet()
+	if validators == nil {
+		t.logger.Warnf("could not load validators", currentBlockEpoch, parentStateRoot.String())
 		return
 	}
 
