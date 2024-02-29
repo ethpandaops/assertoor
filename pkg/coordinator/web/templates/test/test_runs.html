@@ -62,10 +62,12 @@
                       <span class="badge rounded-pill text-bg-secondary">
                         <i class="far fa-hourglass-half"></i> Pending
                       </span>
+                      <button type="button" class="btn btn-danger test-cancel-button" data-testid="{{ $test.TestID }}" data-runid="{{ $test.RunID }}">Cancel Test</button>
                     {{ else if eq $test.Status "running" }}
                       <span class="badge rounded-pill text-bg-primary">
                         <i class="far fa-play-circle"></i> Running
                       </span>
+                      <button type="button" class="btn btn-danger test-cancel-button" data-testid="{{ $test.TestID }}" data-runid="{{ $test.RunID }}">Cancel Test</button>
                     {{ else if eq $test.Status "success" }}
                       <span class="badge rounded-pill text-bg-success">
                         <i class="fas fa-check-circle"></i> Success
@@ -114,4 +116,47 @@
       </tbody>
     </table>
   </div>
+  <script type="text/javascript">
+    $(function() {
+      $(".test-cancel-button").on("click", function() {
+        var testId = $(this).data("testid");
+        var runId = $(this).data("runid");
+
+        if(!confirm("Cancel test run " + runId + "?"))
+          return;
+
+        var reqPromise = new Promise(function(resolve, reject) {
+          $.ajax({
+            type: "POST",
+            url: "/api/v1/test_run/" + runId + "/cancel",
+            dataType: "json",
+            async: false,
+            data: JSON.stringify({
+              test_id: testId
+            }),
+            success: resolve,
+            error: reject
+          });
+        });
+
+        reqPromise.then(function(res) {
+          if(!res || res.status !== "OK") {
+            throw res.status;
+          }
+          location.reload();
+        }, function(rsp) {
+          throw rsp.responseJSON ? rsp.responseJSON.status : rsp.statusText;
+        }).catch(function(err) {
+          alert("Could not cancel test: " + err.toString());
+        });
+      });
+    });
+  </script>
+  <style>
+    .test-cancel-button {
+      padding: 0 8px;
+      font-size: 0.9rem;
+      margin-left: 20px;
+    }
+  </style>
 {{ end }}
