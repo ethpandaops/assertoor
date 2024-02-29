@@ -1,7 +1,7 @@
 
 body main {
     display: flex;
-    overflow: hidden;
+    /* overflow: hidden; */
     min-height: calc(100vh - 64px)!important;
 }
 
@@ -67,6 +67,10 @@ nav .theme-selector .theme-navlabel {
 
 main .sidebar {
     background-color: rgba(var(--bs-emphasis-color-rgb), 0.03);
+}
+
+main .sidebar .nav-pills {
+    --bs-nav-pills-link-active-bg: rgba(13, 110, 253, 0.7);
 }
 
 main .sidebar .nav-link {
