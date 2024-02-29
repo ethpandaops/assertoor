@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,22 +46,29 @@ func LoadTestDescriptors(ctx context.Context, localTests []*types.TestConfig, ex
 		testID := ""
 
 		testConfig, err := loadExternalTestConfig(ctx, extTestCfg)
-		if err == nil {
-			if extTestCfg.Name != "" {
-				testConfig.Name = extTestCfg.Name
-			}
+		if err != nil || testConfig == nil {
+			logrus.Errorf("error loading external test %v: %v", extTestCfg.File, err)
+			return nil
+		}
 
-			if extTestCfg.Timeout != nil {
-				testConfig.Timeout = *extTestCfg.Timeout
-			}
+		if extTestCfg.Name != "" {
+			testConfig.Name = extTestCfg.Name
+		}
 
-			for k, v := range extTestCfg.Config {
-				testConfig.Config[k] = v
-			}
+		if extTestCfg.Timeout != nil {
+			testConfig.Timeout = *extTestCfg.Timeout
+		}
 
-			for k, v := range extTestCfg.ConfigVars {
-				testConfig.ConfigVars[k] = v
-			}
+		for k, v := range extTestCfg.Config {
+			testConfig.Config[k] = v
+		}
+
+		for k, v := range extTestCfg.ConfigVars {
+			testConfig.ConfigVars[k] = v
+		}
+
+		if testConfig.ID != "" {
+			testID = testConfig.ID
 		}
 
 		if testID == "" {
