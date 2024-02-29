@@ -13,7 +13,6 @@ import (
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
-	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -140,11 +139,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		defer subscription.Unsubscribe()
 	}
 
-	validators, err := t.loadChainState(ctx)
-	if err != nil {
-		return err
-	}
-
 	var pendingChan chan bool
 
 	pendingWg := sync.WaitGroup{}
@@ -164,7 +158,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		pubkey, tx, err := t.generateDeposit(ctx, accountIdx, validators, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
+		pubkey, tx, err := t.generateDeposit(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
 			if pendingChan != nil {
 				<-pendingChan
 			}
@@ -284,18 +278,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v1.Validator, error) {
-	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
-
-	validators, err := client.GetRPCClient().GetStateValidators(ctx, "head")
-	if err != nil {
-		return nil, err
-	}
-
-	return validators, nil
-}
-
-func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*common.BLSPubkey, *ethtypes.Transaction, error) {
+func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*common.BLSPubkey, *ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
@@ -310,10 +293,12 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, validator
 		return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
 	}
 
+	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
+
 	var validator *v1.Validator
 
 	validatorPubkey := validatorPrivkey.PublicKey().Marshal()
-	for _, val := range validators {
+	for _, val := range validatorSet {
 		if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
 			validator = val
 			break

@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"time"
 
-	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/juliangruber/go-intersect"
@@ -26,20 +26,17 @@ var (
 )
 
 type Task struct {
-	ctx                 *types.TaskContext
-	options             *types.TaskOptions
-	config              Config
-	logger              logrus.FieldLogger
-	firstHeight         map[uint16]uint64
-	currentValidatorSet map[uint64]*v1.Validator
+	ctx     *types.TaskContext
+	options *types.TaskOptions
+	config  Config
+	logger  logrus.FieldLogger
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
 	return &Task{
-		ctx:         ctx,
-		options:     options,
-		logger:      ctx.Logger.GetLogger(),
-		firstHeight: map[uint16]uint64{},
+		ctx:     ctx,
+		options: options,
+		logger:  ctx.Logger.GetLogger(),
 	}, nil
 }
 
@@ -99,12 +96,6 @@ func (t *Task) Execute(ctx context.Context) error {
 	blockSubscription := consensusPool.GetBlockCache().SubscribeBlockEvent(10)
 	defer blockSubscription.Unsubscribe()
 
-	wallclockEpochSubscription := consensusPool.GetBlockCache().SubscribeWallclockEpochEvent(10)
-	defer wallclockEpochSubscription.Unsubscribe()
-
-	// load current epoch duties
-	t.loadValidatorSet(ctx)
-
 	totalMatches := 0
 
 	for {
@@ -129,26 +120,9 @@ func (t *Task) Execute(ctx context.Context) error {
 					t.ctx.SetResult(types.TaskResultNone)
 				}
 			}
-		case <-wallclockEpochSubscription.Channel():
-			t.loadValidatorSet(ctx)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-	}
-}
-
-func (t *Task) loadValidatorSet(ctx context.Context) {
-	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
-	validatorSet, err := client.GetRPCClient().GetStateValidators(ctx, "head")
-
-	if err != nil {
-		t.logger.Errorf("error while fetching validator set: %v", err.Error())
-		return
-	}
-
-	t.currentValidatorSet = make(map[uint64]*v1.Validator)
-	for _, val := range validatorSet {
-		t.currentValidatorSet[uint64(val.Index)] = val
 	}
 }
 
@@ -328,7 +302,8 @@ func (t *Task) checkBlockExits(block *consensus.Block, blockData *spec.Versioned
 	}
 
 	if len(t.config.ExpectExits) > 0 {
-		if t.currentValidatorSet == nil {
+		validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
+		if validatorSet == nil {
 			t.logger.Errorf("check failed: no validator set")
 			return false
 		}
@@ -337,7 +312,7 @@ func (t *Task) checkBlockExits(block *consensus.Block, blockData *spec.Versioned
 			found := false
 
 			for _, exit := range exits {
-				validator := t.currentValidatorSet[uint64(exit.Message.ValidatorIndex)]
+				validator := validatorSet[exit.Message.ValidatorIndex]
 				if validator == nil {
 					continue
 				}
@@ -378,7 +353,8 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 	}
 
 	if len(t.config.ExpectSlashings) > 0 {
-		if t.currentValidatorSet == nil {
+		validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
+		if validatorSet == nil {
 			t.logger.Errorf("check failed: no validator set")
 			return false
 		}
@@ -395,7 +371,7 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 							continue
 						}
 
-						validator := t.currentValidatorSet[valIdx]
+						validator := validatorSet[phase0.ValidatorIndex(valIdx)]
 						if validator == nil {
 							continue
 						}
@@ -414,9 +390,7 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 
 			if !found && (expectedSlashing.SlashingType == "" || expectedSlashing.SlashingType == "proposer") {
 				for _, slashing := range propSlashings {
-					valIdx := uint64(slashing.SignedHeader1.Message.ProposerIndex)
-
-					validator := t.currentValidatorSet[valIdx]
+					validator := validatorSet[slashing.SignedHeader1.Message.ProposerIndex]
 					if validator == nil {
 						continue
 					}
@@ -483,7 +457,8 @@ func (t *Task) checkBlockBlsChanges(block *consensus.Block, blockData *spec.Vers
 	}
 
 	if len(t.config.ExpectBlsChanges) > 0 {
-		if t.currentValidatorSet == nil {
+		validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
+		if validatorSet == nil {
 			t.logger.Errorf("check failed: no validator set")
 			return false
 		}
@@ -492,7 +467,7 @@ func (t *Task) checkBlockBlsChanges(block *consensus.Block, blockData *spec.Vers
 			found := false
 
 			for _, blsChange := range blsChanges {
-				validator := t.currentValidatorSet[uint64(blsChange.Message.ValidatorIndex)]
+				validator := validatorSet[blsChange.Message.ValidatorIndex]
 				if validator == nil {
 					continue
 				}
@@ -531,7 +506,8 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 	}
 
 	if len(t.config.ExpectWithdrawals) > 0 {
-		if t.currentValidatorSet == nil {
+		validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
+		if validatorSet == nil {
 			t.logger.Errorf("check failed: no validator set")
 			return false
 		}
@@ -540,7 +516,7 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 			found := false
 
 			for _, withdrawal := range withdrawals {
-				validator := t.currentValidatorSet[uint64(withdrawal.ValidatorIndex)]
+				validator := validatorSet[withdrawal.ValidatorIndex]
 				if validator == nil {
 					continue
 				}

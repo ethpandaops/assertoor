@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	v1 "github.com/attestantio/go-eth2-client/api/v1"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/sirupsen/logrus"
 )
 
@@ -64,6 +66,24 @@ func NewPool(ctx context.Context, config *PoolConfig, logger logrus.FieldLogger)
 
 func (pool *Pool) GetBlockCache() *BlockCache {
 	return pool.blockCache
+}
+
+func (pool *Pool) GetValidatorSet() map[phase0.ValidatorIndex]*v1.Validator {
+	return pool.blockCache.getCachedValidatorSet(func() map[phase0.ValidatorIndex]*v1.Validator {
+		client := pool.GetReadyEndpoint(UnspecifiedClient)
+		if client == nil {
+			pool.logger.Errorf("could not load validator set: no ready client")
+			return nil
+		}
+
+		valset, err := client.GetRPCClient().GetStateValidators(client.clientCtx, "head")
+		if err != nil {
+			pool.logger.Errorf("could not load validator set: %v", err)
+			return nil
+		}
+
+		return valset
+	})
 }
 
 func (pool *Pool) AddEndpoint(endpoint *ClientConfig) (*Client, error) {

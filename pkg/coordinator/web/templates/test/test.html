@@ -2,24 +2,24 @@
   <div class="d-flex flex-column flex-grow-1 mt-3 container-fluid">
     <h2 class="py-2">{{ .Name }}</h2>
 
-    <div class="test-header" style="max-width: 800px;">
-      <div class="row">
-        <div class="col-6 col-sm-4 col-lg-3">
+    <table class="test-header">
+      <tr>
+        <td style="width: 200px">
           Test ID:
-        </div>
-        <div class="col-6 col-sm-8 col-lg-9">
+        </td>
+        <td>
           {{ .ID }}     
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-6 col-sm-4 col-lg-3">
+        </td>
+      </tr>
+      <tr>
+        <td>
           Source:
-        </div>
-        <div class="col-6 col-sm-8 col-lg-9">
+        </td>
+        <td>
           {{ .Source }}     
-        </div>
-      </div>
-    </div>
+        </td>
+      </tr>
+    </table>
     
     <div class="mt-2 d-flex flex-row" style="max-width: 500px;">
       <div class="flex-grow-1">

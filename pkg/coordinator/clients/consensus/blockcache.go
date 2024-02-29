@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
 	"runtime/debug"
 	"sort"
 	"strings"
@@ -19,19 +20,28 @@ import (
 
 type BlockCache struct {
 	followDistance uint64
-	specMutex      sync.RWMutex
-	specs          *ChainSpec
-	genesisMutex   sync.Mutex
-	genesis        *v1.Genesis
+
+	specMutex sync.RWMutex
+	specs     *ChainSpec
+
+	genesisMutex sync.Mutex
+	genesis      *v1.Genesis
+
 	wallclockMutex sync.Mutex
 	wallclock      *ethwallclock.EthereumBeaconChain
+
 	finalizedMutex sync.RWMutex
 	finalizedEpoch phase0.Epoch
 	finalizedRoot  phase0.Root
-	cacheMutex     sync.RWMutex
-	slotMap        map[phase0.Slot][]*Block
-	rootMap        map[phase0.Root]*Block
-	maxSlotIdx     int64
+
+	valsetMutex sync.Mutex
+	valsetEpoch phase0.Epoch
+	valsetMap   map[phase0.ValidatorIndex]*v1.Validator
+
+	blockMutex   sync.RWMutex
+	blockSlotMap map[phase0.Slot][]*Block
+	blockRootMap map[phase0.Root]*Block
+	maxSlotIdx   int64
 
 	blockDispatcher          Dispatcher[*Block]
 	checkpointDispatcher     Dispatcher[*FinalizedCheckpoint]
@@ -46,8 +56,8 @@ func NewBlockCache(ctx context.Context, logger logrus.FieldLogger, followDistanc
 
 	cache := BlockCache{
 		followDistance: followDistance,
-		slotMap:        make(map[phase0.Slot][]*Block),
-		rootMap:        make(map[phase0.Root]*Block),
+		blockSlotMap:   make(map[phase0.Slot][]*Block),
+		blockRootMap:   make(map[phase0.Root]*Block),
 	}
 
 	go func() {
@@ -194,12 +204,38 @@ func (cache *BlockCache) GetFinalizedCheckpoint() (phase0.Epoch, phase0.Root) {
 	return cache.finalizedEpoch, cache.finalizedRoot
 }
 
-func (cache *BlockCache) AddBlock(root phase0.Root, slot phase0.Slot) (*Block, bool) {
-	cache.cacheMutex.Lock()
-	defer cache.cacheMutex.Unlock()
+func (cache *BlockCache) getCachedValidatorSet(loadFn func() map[phase0.ValidatorIndex]*v1.Validator) map[phase0.ValidatorIndex]*v1.Validator {
+	wallclock := cache.GetWallclock()
 
-	if cache.rootMap[root] != nil {
-		return cache.rootMap[root], false
+	cache.valsetMutex.Lock()
+	defer cache.valsetMutex.Unlock()
+
+	epoch := phase0.Epoch(0)
+
+	if wallclock != nil {
+		_, e, _ := wallclock.Now()
+		if e.Number() < math.MaxInt64 {
+			epoch = phase0.Epoch(e.Number())
+		}
+	}
+
+	if cache.valsetMap == nil || cache.valsetEpoch < epoch {
+		// refresh cached validator set
+		valsetMap := loadFn()
+		if valsetMap != nil {
+			cache.valsetMap = valsetMap
+		}
+	}
+
+	return cache.valsetMap
+}
+
+func (cache *BlockCache) AddBlock(root phase0.Root, slot phase0.Slot) (*Block, bool) {
+	cache.blockMutex.Lock()
+	defer cache.blockMutex.Unlock()
+
+	if cache.blockRootMap[root] != nil {
+		return cache.blockRootMap[root], false
 	}
 
 	if int64(slot) < cache.maxSlotIdx-int64(cache.followDistance) {
@@ -213,12 +249,12 @@ func (cache *BlockCache) AddBlock(root phase0.Root, slot phase0.Slot) (*Block, b
 		headerChan: make(chan bool),
 		blockChan:  make(chan bool),
 	}
-	cache.rootMap[root] = cacheBlock
+	cache.blockRootMap[root] = cacheBlock
 
-	if cache.slotMap[slot] == nil {
-		cache.slotMap[slot] = []*Block{cacheBlock}
+	if cache.blockSlotMap[slot] == nil {
+		cache.blockSlotMap[slot] = []*Block{cacheBlock}
 	} else {
-		cache.slotMap[slot] = append(cache.slotMap[slot], cacheBlock)
+		cache.blockSlotMap[slot] = append(cache.blockSlotMap[slot], cacheBlock)
 	}
 
 	if int64(slot) > cache.maxSlotIdx {
@@ -229,17 +265,17 @@ func (cache *BlockCache) AddBlock(root phase0.Root, slot phase0.Slot) (*Block, b
 }
 
 func (cache *BlockCache) GetCachedBlockByRoot(root phase0.Root) *Block {
-	cache.cacheMutex.RLock()
-	defer cache.cacheMutex.RUnlock()
+	cache.blockMutex.RLock()
+	defer cache.blockMutex.RUnlock()
 
-	return cache.rootMap[root]
+	return cache.blockRootMap[root]
 }
 
 func (cache *BlockCache) GetCachedBlocksBySlot(slot phase0.Slot) []*Block {
-	cache.cacheMutex.RLock()
-	defer cache.cacheMutex.RUnlock()
+	cache.blockMutex.RLock()
+	defer cache.blockMutex.RUnlock()
 
-	blocks := cache.slotMap[slot]
+	blocks := cache.blockSlotMap[slot]
 	if len(blocks) == 0 {
 		return blocks
 	}
@@ -251,13 +287,13 @@ func (cache *BlockCache) GetCachedBlocksBySlot(slot phase0.Slot) []*Block {
 }
 
 func (cache *BlockCache) GetCachedBlocks() []*Block {
-	cache.cacheMutex.RLock()
-	defer cache.cacheMutex.RUnlock()
+	cache.blockMutex.RLock()
+	defer cache.blockMutex.RUnlock()
 
 	blocks := []*Block{}
 	slots := []phase0.Slot{}
 
-	for slot := range cache.slotMap {
+	for slot := range cache.blockSlotMap {
 		slots = append(slots, slot)
 	}
 
@@ -266,7 +302,7 @@ func (cache *BlockCache) GetCachedBlocks() []*Block {
 	})
 
 	for _, slot := range slots {
-		blocks = append(blocks, cache.slotMap[slot]...)
+		blocks = append(blocks, cache.blockSlotMap[slot]...)
 	}
 
 	return blocks
@@ -280,29 +316,53 @@ func (cache *BlockCache) runCacheCleanup(ctx context.Context) {
 		case <-time.After(30 * time.Second):
 		}
 
-		cache.cleanupCache()
+		cache.cleanupBlockCache()
+		cache.cleanupValsetCache()
 	}
 }
 
-func (cache *BlockCache) cleanupCache() {
-	cache.cacheMutex.Lock()
-	defer cache.cacheMutex.Unlock()
+func (cache *BlockCache) cleanupBlockCache() {
+	cache.blockMutex.Lock()
+	defer cache.blockMutex.Unlock()
 
 	minSlot := cache.maxSlotIdx - int64(cache.followDistance)
 	if minSlot <= 0 {
 		return
 	}
 
-	for slot, blocks := range cache.slotMap {
+	for slot, blocks := range cache.blockSlotMap {
 		if slot >= phase0.Slot(minSlot) {
 			continue
 		}
 
 		for _, block := range blocks {
-			delete(cache.rootMap, block.Root)
+			delete(cache.blockRootMap, block.Root)
 		}
 
-		delete(cache.slotMap, slot)
+		delete(cache.blockSlotMap, slot)
+	}
+}
+
+func (cache *BlockCache) cleanupValsetCache() {
+	if cache.valsetMap == nil {
+		return
+	}
+
+	wallclock := cache.GetWallclock()
+	epoch := phase0.Epoch(0)
+
+	if wallclock != nil {
+		_, e, _ := wallclock.Now()
+		if e.Number() < math.MaxInt64 {
+			epoch = phase0.Epoch(e.Number())
+		}
+	}
+
+	cache.valsetMutex.Lock()
+	defer cache.valsetMutex.Unlock()
+
+	if epoch-cache.valsetEpoch >= 2 {
+		cache.valsetMap = nil
 	}
 }
 

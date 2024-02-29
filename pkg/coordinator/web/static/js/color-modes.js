@@ -64,7 +64,12 @@
     }
   })
 
-  window.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('DOMContentLoaded', initThemePicker)
+  if(document.readyState == "complete") {
+    initThemePicker();
+  }
+
+  function initThemePicker() {
     showActiveTheme(getPreferredTheme())
 
     document.querySelectorAll('[data-bs-theme-value]')
@@ -76,5 +81,6 @@
           showActiveTheme(theme, true)
         })
       })
-  })
+  }
+  
 })()

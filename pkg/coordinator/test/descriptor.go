@@ -54,6 +54,10 @@ func LoadTestDescriptors(ctx context.Context, localTests []*types.TestConfig, ex
 
 		testConfig, err := LoadExternalTestConfig(ctx, extTestCfg)
 
+		if testConfig.ID != "" {
+			testID = testConfig.ID
+		}
+
 		if testID == "" {
 			testID = fmt.Sprintf("external-%v", testIdx)
 		}
@@ -117,6 +121,10 @@ func LoadExternalTestConfig(ctx context.Context, extTestCfg *types.ExternalTestC
 
 	if testConfig.ConfigVars == nil {
 		testConfig.ConfigVars = map[string]string{}
+	}
+
+	if extTestCfg.ID != "" {
+		testConfig.ID = extTestCfg.ID
 	}
 
 	if extTestCfg.Name != "" {
