@@ -116,7 +116,11 @@ func (t *Task) runCheck() types.TaskResult {
 		t.logger.Warnf("check failed: too many forks. (have: %v, want <= %v)", len(headForks)-1, t.config.MaxForkCount)
 
 		for idx, fork := range headForks {
-			t.logger.Infof("Fork #%v: %v [0x%x] (%v clients)", idx, fork.Slot, fork.Root, len(fork.AllClients))
+			clients := make([]string, len(fork.AllClients))
+			for _, client := range fork.AllClients {
+				clients = append(clients, client.GetName())
+			}
+			t.logger.Infof("Fork #%v: %v [0x%x] (%v clients: [%v])", idx, fork.Slot, fork.Root, len(fork.AllClients), clients)
 		}
 
 		return types.TaskResultFailure
