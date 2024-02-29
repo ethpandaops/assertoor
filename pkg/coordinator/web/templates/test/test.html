@@ -8,7 +8,7 @@
           Test ID:
         </td>
         <td>
-          {{ .ID }}     
+          {{ .ID }}
         </td>
       </tr>
       <tr>
@@ -30,7 +30,7 @@
       </div>
     </div>
 
-    <div class="modal fade" id="startTestModal" tabindex="-1" aria-labelledby="startTestModalLabel" aria-hidden="true">
+    <div class="modal fade modal-xl" id="startTestModal" tabindex="-1" aria-labelledby="startTestModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
@@ -55,20 +55,17 @@
               </div>
             </div>
             <div class="row">
-              <div class="col-8">
-                Configuration overrides:
-              </div>
-              <div class="col-4 text-end">
-                (optional)
-              </div>
               <div class="col-12">
-                <textarea class="form-control" id="testConfigOverrides" rows="3"></textarea>
+                Configuration:
+              </div>
+              <div class="col-12 ">
+                <textarea class="form-control" id="testConfigOverrides" rows="3" style="width:100%;height:400px;"></textarea>
               </div>
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            <button type="button" class="btn btn-primary">Start Test</button>
+            <button type="button" class="btn btn-primary" id="startTestButton">Start Test</button>
           </div>
         </div>
       </div>
@@ -80,7 +77,70 @@
 {{ end }}
 
 {{ define "js" }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js" integrity="sha512-gqjFRgajJiZM9GmvHEE7vpzPSL/moP+zxpl4F6lRNJDOI3pb2Tvu8k5vUjAzJKsl0ragzWL0/WasKhR430PkCw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/yamljs/0.3.0/yaml.min.js" integrity="sha512-f/K0Q5lZ1SrdNdjc2BO2I5kTx8E5Uw1EU3PhSUB9fYPohap5rPWEmQRCjtpDxNmQB4/+MMI/Cf+nvh1VSiwrTA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script type="text/javascript">
+$(document).ready(function() {
+  var editor = ace.edit("testConfigOverrides");
+  editor.session.setMode("ace/mode/yaml");
+  var defaultConfigStr = {{ .Config }};
+  var defaultConfig = defaultConfigStr ? JSON.parse(defaultConfigStr) : {};
 
+  window.editor = editor;
+  resetConfigOverrides();
+  $("#startTestButton").on("click", startTest);
+
+  function resetConfigOverrides() {
+    var configYaml = YAML.dump(defaultConfig);
+    if(configYaml == "{}") configYaml = "";
+    editor.setValue(configYaml, -1);
+  }
+
+  function startTest() {
+    var configJson;
+    try {
+      var configYaml = editor.getValue();
+      configJson = YAML.parse(configYaml);
+    } catch(ex) {
+      alert("invalid config yaml: " + ex.toString());
+      return;
+    }
+
+    var reqPromise = new Promise(function(resolve, reject) {
+      $.ajax({
+        type: "POST",
+        url: "/api/v1/test_runs/schedule",
+        dataType: "json",
+        async: false,
+        data: JSON.stringify({
+          test_id: "{{ .ID }}",
+          config: configJson
+        }),
+        success: resolve,
+        error: reject
+      });
+    });
+
+    reqPromise.then(function(res) {
+      if(!res || res.status !== "OK") {
+        throw res.status;
+      }
+      location.reload();
+    }, function(rsp) {
+      throw rsp.responseJSON ? rsp.responseJSON.status : rsp.statusText;
+    }).catch(function(err) {
+      alert("Could not schedule test: " + err.toString());
+    });
+  }
+
+});
+</script>
 {{ end }}
 {{ define "css" }}
+<style>
+#startTestModal .ace_editor {
+  height: 200px;
+}
+
+</style>
 {{ end }}

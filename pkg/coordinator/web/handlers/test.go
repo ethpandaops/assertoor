@@ -9,7 +9,6 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 )
 
 type TestPage struct {
@@ -110,12 +109,12 @@ func (fh *FrontendHandler) getTestPageData(testID string) (*TestPage, error) {
 	}
 
 	if testConfig.Config != nil {
-		testCfgYaml, err := yaml.Marshal(testConfig.Config)
+		testCfgJSON, err := json.Marshal(testConfig.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed marshalling test config: %v", err)
 		}
 
-		pageData.Config = string(testCfgYaml)
+		pageData.Config = string(testCfgJSON)
 	}
 
 	// test runs
