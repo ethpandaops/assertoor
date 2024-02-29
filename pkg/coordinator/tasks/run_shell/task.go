@@ -112,10 +112,10 @@ func (t *Task) Execute(ctx context.Context) error {
 		return err
 	}
 
-	stdoutChan := t.readOutputStream(stdout)
+	stdoutChan := t.readOutputStream(stdout, cmdLogger.WithField("stream", "stdout"))
 	defer close(stdoutChan)
 
-	stderrChan := t.readOutputStream(stderr)
+	stderrChan := t.readOutputStream(stderr, cmdLogger.WithField("stream", "stderr"))
 	defer close(stderrChan)
 
 	// add env vars
@@ -163,6 +163,10 @@ func (t *Task) Execute(ctx context.Context) error {
 		defer close(waitChan)
 
 		execErr = command.Wait()
+
+		// give stdout/stderr handler some time to parse remaining outputs
+		// TODO: find a better solution to wait for IO streams before continuing here
+		time.Sleep(100 * time.Millisecond)
 	}()
 
 	// wait for output handler
@@ -170,8 +174,9 @@ cmdloop:
 	for {
 		select {
 		case line := <-stdoutChan:
-			t.parseOutputVars(line)
-			cmdLogger.Infof("OUT: %v", line)
+			if !t.parseOutputVars(line) {
+				cmdLogger.Infof("OUT: %v", line)
+			}
 		case line := <-stderrChan:
 			cmdLogger.Warnf("ERR: %v", line)
 		case <-waitChan:
@@ -190,17 +195,39 @@ cmdloop:
 	return nil
 }
 
-func (t *Task) readOutputStream(pipe io.ReadCloser) chan string {
+func (t *Task) readOutputStream(pipe io.ReadCloser, logger logrus.FieldLogger) chan string {
 	resChan := make(chan string)
 
 	go func() {
-		scanner := bufio.NewScanner(pipe)
-		for scanner.Scan() {
-			if scanner.Err() != nil {
-				return
+		var err error
+
+		reader := bufio.NewReader(pipe)
+
+		for err == nil {
+			isPrefix := true
+			ln := []byte{}
+
+			for isPrefix && err == nil {
+				var line []byte
+
+				line, isPrefix, err = reader.ReadLine()
+				if err != nil {
+					if err == io.EOF {
+						logger.Errorf("EOF")
+						break
+					}
+
+					logger.Errorf("error reading stream: %v", err)
+
+					break
+				}
+
+				ln = append(ln, line...)
 			}
 
-			resChan <- scanner.Text()
+			if len(ln) > 0 {
+				resChan <- string(ln)
+			}
 		}
 	}()
 
@@ -210,11 +237,19 @@ func (t *Task) readOutputStream(pipe io.ReadCloser) chan string {
 var outputVarPattern = regexp.MustCompile(`^::set-var +([^ ]+) +(.*)$`)
 var outputJSONPattern = regexp.MustCompile(`^::set-json +([^ ]+) +(.*)$`)
 
-func (t *Task) parseOutputVars(line string) {
+func (t *Task) parseOutputVars(line string) bool {
 	match := outputVarPattern.FindStringSubmatch(line)
 	if match != nil {
 		t.ctx.Vars.SetVar(match[1], match[2])
-		t.logger.Infof("set variable %v: (string) %v", match[1], match[2])
+
+		logValue := match[2]
+		if len(logValue) > 1024 {
+			logValue = fmt.Sprintf("(%v bytes)", len(logValue))
+		}
+
+		t.logger.Infof("set variable %v: (string) %v", match[1], logValue)
+
+		return true
 	}
 
 	match = outputJSONPattern.FindStringSubmatch(line)
@@ -227,6 +262,10 @@ func (t *Task) parseOutputVars(line string) {
 		} else {
 			t.ctx.Vars.SetVar(match[1], varValue)
 			t.logger.Infof("set variable %v: (json) %v", match[1], varValue)
+
+			return true
 		}
 	}
+
+	return false
 }

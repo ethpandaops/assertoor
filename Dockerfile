@@ -13,5 +13,5 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
   jq \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
-COPY --from=builder bin/assertoor /assertoor
+COPY --from=builder /src/bin/assertoor /assertoor
 ENTRYPOINT ["/assertoor"]

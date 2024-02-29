@@ -49,6 +49,7 @@ type TestConfig struct {
 }
 
 type ExternalTestConfig struct {
+	ID         string                 `yaml:"id" json:"id"`
 	File       string                 `yaml:"file" json:"file"`
 	Name       string                 `yaml:"name" json:"name"`
 	Timeout    *human.Duration        `yaml:"timeout" json:"timeout"`
@@ -58,7 +59,7 @@ type ExternalTestConfig struct {
 }
 
 type TestSchedule struct {
-	Startup bool     `yaml:"file" json:"file"`
+	Startup bool     `yaml:"startup" json:"startup"`
 	Cron    []string `yaml:"cron" json:"cron"`
 }
 

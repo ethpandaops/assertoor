@@ -30,6 +30,10 @@ type Config struct {
 	RandomAmount       bool     `yaml:"randomAmount" json:"randomAmount"`
 	Amount             *big.Int `yaml:"amount" json:"amount"`
 
+	AwaitReceipt  bool `yaml:"awaitReceipt" json:"awaitReceipt"`
+	FailOnReject  bool `yaml:"failOnReject" json:"failOnReject"`
+	FailOnSuccess bool `yaml:"failOnSuccess" json:"failOnSuccess"`
+
 	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
 	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
 }

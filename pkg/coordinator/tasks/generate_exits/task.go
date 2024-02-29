@@ -118,7 +118,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		defer subscription.Unsubscribe()
 	}
 
-	fork, validators, err := t.loadChainState(ctx)
+	fork, err := t.loadChainState(ctx)
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateVoluntaryExit(ctx, accountIdx, fork, validators)
+		err := t.generateVoluntaryExit(ctx, accountIdx, fork)
 		if err != nil {
 			t.logger.Errorf("error generating voluntary exit for index %v: %v", accountIdx, err.Error())
 		} else {
@@ -168,23 +168,18 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, map[phase0.ValidatorIndex]*v1.Validator, error) {
+func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, error) {
 	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
 
 	fork, err := client.GetRPCClient().GetForkState(ctx, "head")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	validators, err := client.GetRPCClient().GetStateValidators(ctx, "head")
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return fork, validators, nil
+	return fork, nil
 }
 
-func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, fork *phase0.Fork, validators map[phase0.ValidatorIndex]*v1.Validator) error {
+func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, fork *phase0.Fork) error {
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
 	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, validatorKeyPath)
@@ -196,7 +191,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	var validator *v1.Validator
 
 	validatorPubkey := validatorPrivkey.PublicKey().Marshal()
-	for _, val := range validators {
+	for _, val := range t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet() {
 		if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
 			validator = val
 			break
@@ -228,12 +223,16 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	}
 
 	// build voluntary exit message
-	currentSlot, _ := client.GetLastHead()
 	specs := clientPool.GetConsensusPool().GetBlockCache().GetSpecs()
-	currentEpoch := phase0.Epoch(currentSlot / phase0.Slot(specs.SlotsPerEpoch))
 	operation := &phase0.VoluntaryExit{
-		Epoch:          currentEpoch,
 		ValidatorIndex: validator.Index,
+	}
+
+	if t.config.ExitEpoch >= 0 {
+		operation.Epoch = phase0.Epoch(t.config.ExitEpoch)
+	} else {
+		currentSlot, _ := client.GetLastHead()
+		operation.Epoch = phase0.Epoch(currentSlot / phase0.Slot(specs.SlotsPerEpoch))
 	}
 
 	root, err := operation.HashTreeRoot()

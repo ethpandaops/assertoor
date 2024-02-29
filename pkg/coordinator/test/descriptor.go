@@ -20,6 +20,14 @@ type Descriptor struct {
 	err    error
 }
 
+func NewDescriptor(testID, testSrc string, config *types.TestConfig) *Descriptor {
+	return &Descriptor{
+		id:     testID,
+		source: testSrc,
+		config: config,
+	}
+}
+
 func LoadTestDescriptors(ctx context.Context, localTests []*types.TestConfig, externalTests []*types.ExternalTestConfig) []types.TestDescriptor {
 	descriptors := []types.TestDescriptor{}
 
@@ -41,30 +49,17 @@ func LoadTestDescriptors(ctx context.Context, localTests []*types.TestConfig, ex
 
 	// load external tests
 	for testIdx, extTestCfg := range externalTests {
-		testSrc := fmt.Sprintf("external-%v", testIdx+1)
+		testSrc := fmt.Sprintf("external:%v", extTestCfg.File)
 		testID := ""
 
-		testConfig, err := loadExternalTestConfig(ctx, extTestCfg)
-		if err == nil {
-			if extTestCfg.Name != "" {
-				testConfig.Name = extTestCfg.Name
-			}
+		testConfig, err := LoadExternalTestConfig(ctx, extTestCfg)
 
-			if extTestCfg.Timeout != nil {
-				testConfig.Timeout = *extTestCfg.Timeout
-			}
-
-			for k, v := range extTestCfg.Config {
-				testConfig.Config[k] = v
-			}
-
-			for k, v := range extTestCfg.ConfigVars {
-				testConfig.ConfigVars[k] = v
-			}
+		if testConfig.ID != "" {
+			testID = testConfig.ID
 		}
 
 		if testID == "" {
-			testID = testSrc
+			testID = fmt.Sprintf("external-%v", testIdx)
 		}
 
 		descriptors = append(descriptors, &Descriptor{
@@ -78,7 +73,7 @@ func LoadTestDescriptors(ctx context.Context, localTests []*types.TestConfig, ex
 	return descriptors
 }
 
-func loadExternalTestConfig(ctx context.Context, extTestCfg *types.ExternalTestConfig) (*types.TestConfig, error) {
+func LoadExternalTestConfig(ctx context.Context, extTestCfg *types.ExternalTestConfig) (*types.TestConfig, error) {
 	var reader io.Reader
 
 	if strings.HasPrefix(extTestCfg.File, "http://") || strings.HasPrefix(extTestCfg.File, "https://") {
@@ -118,6 +113,34 @@ func loadExternalTestConfig(ctx context.Context, extTestCfg *types.ExternalTestC
 	err := decoder.Decode(testConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding external test config %v: %v", extTestCfg.File, err)
+	}
+
+	if testConfig.Config == nil {
+		testConfig.Config = map[string]interface{}{}
+	}
+
+	if testConfig.ConfigVars == nil {
+		testConfig.ConfigVars = map[string]string{}
+	}
+
+	if extTestCfg.ID != "" {
+		testConfig.ID = extTestCfg.ID
+	}
+
+	if extTestCfg.Name != "" {
+		testConfig.Name = extTestCfg.Name
+	}
+
+	if extTestCfg.Timeout != nil {
+		testConfig.Timeout = *extTestCfg.Timeout
+	}
+
+	for k, v := range extTestCfg.Config {
+		testConfig.Config[k] = v
+	}
+
+	for k, v := range extTestCfg.ConfigVars {
+		testConfig.ConfigVars[k] = v
 	}
 
 	return testConfig, nil

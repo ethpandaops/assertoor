@@ -120,7 +120,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		defer subscription.Unsubscribe()
 	}
 
-	validators, forkState, err := t.loadChainState(ctx)
+	forkState, err := t.loadChainState(ctx)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateSlashing(ctx, accountIdx, validators, forkState)
+		err := t.generateSlashing(ctx, accountIdx, forkState)
 		if err != nil {
 			t.logger.Errorf("error generating slashing: %v", err.Error())
 		} else {
@@ -166,23 +166,18 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v1.Validator, *phase0.Fork, error) {
+func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, error) {
 	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
-
-	validators, err := client.GetRPCClient().GetStateValidators(ctx, "head")
-	if err != nil {
-		return nil, nil, err
-	}
 
 	forkState, err := client.GetRPCClient().GetForkState(ctx, "head")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return validators, forkState, nil
+	return forkState, nil
 }
 
-func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator, forkState *phase0.Fork) error {
+func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkState *phase0.Fork) error {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
@@ -194,7 +189,7 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, validato
 	var validator *v1.Validator
 
 	validatorPubkey := validatorPrivkey.PublicKey().Marshal()
-	for _, val := range validators {
+	for _, val := range t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet() {
 		if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
 			validator = val
 			break

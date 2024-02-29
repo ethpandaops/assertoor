@@ -49,7 +49,29 @@ header.header-bar .navbar-brand {
 header.header-bar .nav-item {
     padding: 0 16px;
 }
+  
+.colormode-icon {
+    width: 1em;
+    height: 1em;
+    fill: currentcolor;
+}
 
+nav .theme-selector .theme-navicon {
+    display: inline;
+    height: 40px;
+}
+  
+nav .theme-selector .theme-navlabel {
+    margin-left: 2px;
+}
+
+main .sidebar {
+    background-color: rgba(var(--bs-emphasis-color-rgb), 0.03);
+}
+
+main .sidebar .nav-link {
+    color: var(--bs-body-color);
+}
 
 main .main-content {
     display: flex;

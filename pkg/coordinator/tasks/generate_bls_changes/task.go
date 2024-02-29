@@ -11,7 +11,6 @@ import (
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/capella"
-	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
@@ -126,11 +125,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		defer subscription.Unsubscribe()
 	}
 
-	validators, err := t.loadChainState(ctx)
-	if err != nil {
-		return err
-	}
-
 	perSlotCount := 0
 	totalCount := 0
 
@@ -138,7 +132,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateBlsChange(ctx, accountIdx, validators)
+		err := t.generateBlsChange(ctx, accountIdx)
 		if err != nil {
 			t.logger.Errorf("error generating bls change: %v", err.Error())
 		} else {
@@ -172,18 +166,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) loadChainState(ctx context.Context) (map[phase0.ValidatorIndex]*v1.Validator, error) {
-	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
-
-	validators, err := client.GetRPCClient().GetStateValidators(ctx, "head")
-	if err != nil {
-		return nil, err
-	}
-
-	return validators, nil
-}
-
-func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64, validators map[phase0.ValidatorIndex]*v1.Validator) error {
+func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) error {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
@@ -192,10 +175,12 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64, validat
 		return fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 	}
 
+	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
+
 	var validator *v1.Validator
 
 	validatorPubkey := validatorPrivkey.PublicKey().Marshal()
-	for _, val := range validators {
+	for _, val := range validatorSet {
 		if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
 			validator = val
 			break

@@ -188,10 +188,9 @@ func (stream *Stream) receiveEvents(r io.ReadCloser) {
 			return
 		}
 
-		stream.closeMutex.Unlock()
-
 		pub, ok := ev.(StreamEvent)
 		if !ok {
+			stream.closeMutex.Unlock()
 			continue
 		}
 
@@ -204,6 +203,7 @@ func (stream *Stream) receiveEvents(r io.ReadCloser) {
 		}
 
 		stream.Events <- pub
+		stream.closeMutex.Unlock()
 	}
 }
 

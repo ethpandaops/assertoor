@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -171,8 +172,13 @@ func (t *Task) Execute(ctx context.Context) error {
 		pendingChan = make(chan bool, t.config.LimitPending)
 	}
 
+	pendingWaitGroup := sync.WaitGroup{}
 	perBlockCount := 0
 	totalCount := 0
+
+	sucessCount := 0
+	revertCount := 0
+	unknownCount := 0
 
 	for {
 		txIndex := t.txIndex
@@ -185,9 +191,19 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			if receipt != nil {
 				t.logger.Infof("transaction %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
+
+				if receipt.Status == 0 {
+					revertCount++
+				} else {
+					sucessCount++
+				}
 			} else {
 				t.logger.Infof("transaction %v replaced (nonce: %v)", tx.Hash().Hex(), tx.Nonce())
+
+				unknownCount++
 			}
+
+			pendingWaitGroup.Done()
 		})
 		if err != nil {
 			t.logger.Errorf("error generating transaction: %v", err.Error())
@@ -199,6 +215,8 @@ func (t *Task) Execute(ctx context.Context) error {
 				case pendingChan <- true:
 				}
 			}
+
+			pendingWaitGroup.Add(1)
 
 			perBlockCount++
 			totalCount++
@@ -219,6 +237,24 @@ func (t *Task) Execute(ctx context.Context) error {
 		} else if err := ctx.Err(); err != nil {
 			return err
 		}
+	}
+
+	if t.config.AwaitReceipt {
+		pendingWaitGroup.Wait()
+	}
+
+	t.logger.Infof("seding complete, total sent: %v, success: %v, reverted: %v, unknown: %v, pending: %v", totalCount, sucessCount, revertCount, unknownCount, totalCount-(sucessCount+revertCount+unknownCount))
+
+	switch {
+	case t.config.FailOnSuccess && sucessCount > 0:
+		t.logger.Infof("set task result to failed, %v transactions succeeded unexpectedly (FailOnSuccess)", sucessCount)
+		t.ctx.SetResult(types.TaskResultFailure)
+	case t.config.FailOnReject && revertCount > 0:
+		t.logger.Infof("set task result to failed, %v transactions reverted unexpectedly (FailOnReject)", revertCount)
+		t.ctx.SetResult(types.TaskResultFailure)
+	case totalCount == 0:
+		t.logger.Infof("set task result to failed, no tansactions sent")
+		t.ctx.SetResult(types.TaskResultFailure)
 	}
 
 	return nil
@@ -347,6 +383,10 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		if err == nil {
 			break
 		}
+
+		t.logger.WithFields(logrus.Fields{
+			"client": client.GetName(),
+		}).Warnf("RPC error when sending tx %v: %v", transactionIdx, err)
 	}
 
 	if err != nil {

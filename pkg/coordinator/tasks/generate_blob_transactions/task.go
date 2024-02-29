@@ -347,6 +347,10 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		if err == nil {
 			break
 		}
+
+		t.logger.WithFields(logrus.Fields{
+			"client": client.GetName(),
+		}).Warnf("RPC error when sending tx %v: %v", transactionIdx, err)
 	}
 
 	if err != nil {
