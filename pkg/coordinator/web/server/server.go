@@ -88,9 +88,12 @@ func (ws *WebServer) ConfigureRoutes(config *types.WebConfig, logger logrus.Fiel
 		// register api routes
 		apiHandler := api.NewAPIHandler(logger.WithField("module", "api"), coordinator)
 		ws.router.HandleFunc("/api/v1/tests", apiHandler.GetTests).Methods("GET")
+		ws.router.HandleFunc("/api/v1/tests/register", apiHandler.PostTestsRegister).Methods("POST")
+		ws.router.HandleFunc("/api/v1/tests/register_external", apiHandler.PostTestsRegisterExternal).Methods("POST")
 		ws.router.HandleFunc("/api/v1/test/{testId}", apiHandler.GetTest).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_runs", apiHandler.GetTestRuns).Methods("GET")
-		ws.router.HandleFunc("/api/v1/test_run", apiHandler.PostTestRun).Methods("POST")
+		ws.router.HandleFunc("/api/v1/test_run", apiHandler.PostTestRunsSchedule).Methods("POST") // legacy
+		ws.router.HandleFunc("/api/v1/test_runs/schedule", apiHandler.PostTestRunsSchedule).Methods("POST")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}", apiHandler.GetTestRun).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/status", apiHandler.GetTestRunStatus).Methods("GET")
@@ -140,9 +143,26 @@ func (ws *WebServer) getSwaggerHandler(logger logrus.FieldLogger) http.HandlerFu
 				headerScript.WriteString("var headerEl = document.createElement(\"div\"); headerEl.className = \"header\"; headerEl.innerHTML = headerHtml; document.body.insertBefore(headerEl, document.body.firstElementChild);")
 				headerScript.WriteString(`function addCss(fileName) { var el = document.createElement("link"); el.type = "text/css"; el.rel = "stylesheet"; el.href = fileName; document.head.appendChild(el); }`)
 				headerScript.WriteString(`function addStyle(cssCode) { var el = document.createElement("style"); el.type = "text/css"; el.appendChild(document.createTextNode(cssCode)); document.head.appendChild(el); }`)
+				headerScript.WriteString(`function addScript(fileName) { var el = document.createElement("script"); el.type = "text/javascript"; el.src = fileName; document.head.appendChild(el); }`)
 				headerScript.WriteString(`addCss("/css/bootstrap.min.css");`)
 				headerScript.WriteString(`addCss("/css/layout.css");`)
-				headerScript.WriteString(`addStyle("#swagger-ui .topbar { display: none; } ");`)
+				headerScript.WriteString(`addScript("/js/color-modes.js");`)
+				headerScript.WriteString(`addScript("/js/jquery.min.js");`)
+				headerScript.WriteString(`addScript("/js/bootstrap.bundle.min.js");`)
+				headerScript.WriteString(`addStyle("#swagger-ui .topbar { display: none; } .swagger-ui .opblock .opblock-section-header { background: rgba(var(--bs-body-bg-rgb), 0.8); } [data-bs-theme='dark'] .swagger-ui svg { filter: invert(100%); }");`)
+				headerScript.WriteString(`
+					// override swagger style (replace all color selectors)
+					swaggerStyle = Array.prototype.filter.call(document.styleSheets, function(style) { return style.href && style.href.match(/swagger-ui/) })[0];
+					swaggerRules = swaggerStyle.rules || swaggerStyle.cssRules;
+					swaggerColorSelectors = [];
+					Array.prototype.forEach.call(swaggerRules, function(rule) {
+						if(rule.cssText.match(/color: rgb\(59, 65, 81\);/)) {
+							swaggerColorSelectors.push(rule.selectorText);
+						}
+					});
+					addStyle(swaggerColorSelectors.join(", ") + " { color: inherit; }");
+
+				`)
 
 				//nolint:gosec // ignore
 				c.AfterScript = template.JS(headerScript.String())
