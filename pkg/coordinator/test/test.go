@@ -27,7 +27,7 @@ type Test struct {
 func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.FieldLogger, services types.TaskServices, variables types.Variables) (types.Test, error) {
 	test := &Test{
 		runID:      runID,
-		logger:     logger.WithField("RunID", runID),
+		logger:     logger.WithField("RunID", runID).WithField("TestID", descriptor.ID()),
 		descriptor: descriptor,
 		config:     descriptor.Config(),
 		status:     types.TestStatusPending,
