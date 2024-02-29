@@ -167,6 +167,7 @@ func (t *Test) Run(ctx context.Context) error {
 }
 
 func (t *Test) AbortTest(skipCleanup bool) {
+	t.logger.Info("aborting test")
 	t.status = types.TestStatusAborted
 
 	if t.taskScheduler != nil {
