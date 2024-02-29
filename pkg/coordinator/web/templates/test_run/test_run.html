@@ -81,8 +81,7 @@
       <table class="table table-condensed table-striped details-table">
         <thead>
           <tr>
-            <th style="width:150px; min-width:150px;"></th>
-            <th style="width:100px;">ID</th>
+            <th style="width:200px; min-width:200px;">ID</th>
             <th style="width:20%; min-width:150px;">Action Name</th>
             <th style="width:60%; min-width:250px;">Task Title</th>
             <th style="width:10%; min-width:200px;">Run Time</th>
@@ -94,8 +93,22 @@
           <tr class="details-row"></tr>
           {{ range $i, $task := .Tasks }}
           <tr data-bs-toggle="collapse" data-bs-target="#task-details-{{ $task.Index }}" class="accordion-toggle">
-            <td class="p-0"></td>
-            <td>{{ $task.Index }}</td>
+            <td class="task-graph">
+              <div class="graph-container">
+                {{ range $l, $graph := $task.GraphLevels }}
+                <div class="graph-level {{ if gt $graph 0 }}graph-line{{ end }} {{ if eq $graph 3 }}graph-last{{ end }}">
+                  {{ if gt $graph 1 }}
+                  <div class="graph-item"></div>
+                  {{ end }}
+                </div>
+                {{ end }}
+                <div class="graph-label">
+                  <span>
+                    {{ $task.Index }}
+                  </span>
+                </div>
+              </div>
+            </td>
             <td>{{ $task.Name }}</td>
             <td>{{ $task.Title }}</td>
             <td>{{ if $task.HasRunTime }}{{ $task.RunTime }}{{ else }}?{{ end }}{{ if $task.HasTimeout }} / {{ $task.Timeout }}{{ end }}</td>
@@ -285,6 +298,58 @@
 
 .task-panel .nav-tabs .nav-link {
   padding: 2px 16px;
+}
+
+.task-list td.task-graph {
+  padding: 0 8px;
+  height: 1px;
+}
+
+.task-list .task-graph .graph-container {
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+
+  --graph-border: 1px dotted;
+}
+
+.task-graph .graph-level {
+  position: relative;
+  width: 10px;
+  margin-left: 10px;
+}
+
+.task-graph .graph-label {
+  flex-grow: 1;
+  padding: 8px;
+}
+
+.task-graph .graph-item {
+  width: 100%;
+  height: 50%;
+  border-bottom: var(--graph-border);
+}
+
+.task-graph .graph-level.graph-last {
+  height: 50%;
+}
+
+.task-graph .graph-last .graph-item {
+  height: 100%;
+}
+
+.task-graph .graph-level:before, .task-graph .graph-item:before {
+  content:"";
+  display:block;
+  position:absolute;
+}
+
+.task-graph .graph-level.graph-line:before {
+  width:0;
+  top:0;
+  bottom:0;
+  left:0;
+  border-left: var(--graph-border);
 }
 
 </style>
