@@ -123,6 +123,10 @@ func LoadExternalTestConfig(ctx context.Context, extTestCfg *types.ExternalTestC
 		testConfig.ConfigVars = map[string]string{}
 	}
 
+	if extTestCfg.ID != "" {
+		testConfig.ID = extTestCfg.ID
+	}
+
 	if extTestCfg.Name != "" {
 		testConfig.Name = extTestCfg.Name
 	}
