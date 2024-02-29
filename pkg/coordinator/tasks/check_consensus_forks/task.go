@@ -120,6 +120,7 @@ func (t *Task) runCheck() types.TaskResult {
 			for _, client := range fork.AllClients {
 				clients = append(clients, client.GetName())
 			}
+
 			t.logger.Infof("Fork #%v: %v [0x%x] (%v clients: [%v])", idx, fork.Slot, fork.Root, len(fork.AllClients), clients)
 		}
 
