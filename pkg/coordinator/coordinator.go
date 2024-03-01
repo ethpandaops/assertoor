@@ -47,7 +47,6 @@ type Coordinator struct {
 	testHistory          []types.Test
 	testRegistryMutex    sync.RWMutex
 	testNotificationChan chan bool
-	maxConcurrentTests   int
 }
 
 type testDescriptorEntry struct {
@@ -56,7 +55,7 @@ type testDescriptorEntry struct {
 	index      uint64
 }
 
-func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, maxConcurrentTests int) *Coordinator {
+func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Coordinator {
 	return &Coordinator{
 		log: logger.NewLogger(&logger.ScopeOptions{
 			Parent:      log,
@@ -70,7 +69,6 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, maxConc
 		testQueue:            []types.Test{},
 		testHistory:          []types.Test{},
 		testNotificationChan: make(chan bool, 1),
-		maxConcurrentTests:   maxConcurrentTests,
 	}
 }
 
@@ -78,7 +76,7 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort, maxConc
 func (c *Coordinator) Run(ctx context.Context) error {
 	defer func() {
 		if err := recover(); err != nil {
-			logrus.WithError(err.(error)).Errorf("uncaught panic in coordinator.Run: %v, stack: %v", err, string(debug.Stack()))
+			c.log.GetLogger().WithError(err.(error)).Errorf("uncaught panic in coordinator.Run: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 
@@ -136,6 +134,9 @@ func (c *Coordinator) Run(ctx context.Context) error {
 
 	// start test scheduler
 	go c.runTestScheduler(ctx)
+
+	// start test cleanup routine
+	go c.runTestCleanup(ctx)
 
 	// run tests
 	c.runTestExecutionLoop(ctx)
@@ -345,7 +346,12 @@ func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverr
 }
 
 func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
-	semaphore := make(chan bool, c.maxConcurrentTests)
+	concurrencyLimit := c.Config.Coordinator.MaxConcurrentTests
+	if concurrencyLimit < 1 {
+		concurrencyLimit = 1
+	}
+
+	semaphore := make(chan bool, concurrencyLimit)
 
 	for {
 		var nextTest types.Test
@@ -393,6 +399,12 @@ func (c *Coordinator) runTest(ctx context.Context, testRef types.Test) {
 }
 
 func (c *Coordinator) runTestScheduler(ctx context.Context) {
+	defer func() {
+		if err := recover(); err != nil {
+			c.log.GetLogger().WithError(err.(error)).Panicf("uncaught panic in coordinator.runTestScheduler: %v, stack: %v", err, string(debug.Stack()))
+		}
+	}()
+
 	// startup scheduler
 	for _, testDescr := range c.getStartupTests() {
 		_, err := c.ScheduleTest(testDescr, nil, false)
@@ -479,4 +491,50 @@ func (c *Coordinator) getCronTests(cronTime time.Time) []types.TestDescriptor {
 	}
 
 	return descriptors
+}
+
+func (c *Coordinator) runTestCleanup(ctx context.Context) {
+	defer func() {
+		if err := recover(); err != nil {
+			c.log.GetLogger().WithError(err.(error)).Panicf("uncaught panic in coordinator.runTestCleanup: %v, stack: %v", err, string(debug.Stack()))
+		}
+	}()
+
+	retentionTime := c.Config.Coordinator.TestRetentionTime.Duration
+	if retentionTime <= 0 {
+		retentionTime = 14 * 24 * time.Hour
+	}
+
+	cleanupInterval := 1 * time.Hour
+	if retentionTime <= 4*time.Hour {
+		cleanupInterval = 10 * time.Minute
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(cleanupInterval):
+		}
+
+		c.cleanupTestHistory(retentionTime)
+	}
+}
+
+func (c *Coordinator) cleanupTestHistory(retentionTime time.Duration) {
+	c.testRegistryMutex.Lock()
+	defer c.testRegistryMutex.Unlock()
+
+	cleanedHistory := []types.Test{}
+
+	for _, test := range c.testHistory {
+		if test.Status() != types.TestStatusPending && test.StartTime().Add(retentionTime).Compare(time.Now()) == -1 {
+			test.Logger().Infof("cleanup test")
+			continue
+		}
+
+		cleanedHistory = append(cleanedHistory, test)
+	}
+
+	c.testHistory = cleanedHistory
 }

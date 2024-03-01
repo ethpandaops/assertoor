@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	web_types "github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
@@ -23,11 +24,23 @@ type Config struct {
 	// Global variables
 	GlobalVars map[string]interface{} `yaml:"globalVars" json:"globalVars"`
 
+	// Coordinator config
+	Coordinator *CoordinatorConfig `yaml:"coordinator" json:"coordinator"`
+
 	// List of Test configurations.
 	Tests []*types.TestConfig `yaml:"tests" json:"tests"`
 
 	// List of yaml files with test configurations
 	ExternalTests []*types.ExternalTestConfig `yaml:"externalTests" json:"externalTests"`
+}
+
+//nolint:revive // ignore
+type CoordinatorConfig struct {
+	// Maximum number of tests executed concurrently
+	MaxConcurrentTests uint64 `yaml:"maxConcurrentTests" json:"maxConcurrentTests"`
+
+	// Test history cleanup delay
+	TestRetentionTime human.Duration `yaml:"testRetentionTime" json:"testRetentionTime"`
 }
 
 // DefaultConfig represents a sane-default configuration.
@@ -41,6 +54,7 @@ func DefaultConfig() *Config {
 			},
 		},
 		GlobalVars:    make(map[string]interface{}),
+		Coordinator:   &CoordinatorConfig{},
 		Tests:         []*types.TestConfig{},
 		ExternalTests: []*types.ExternalTestConfig{},
 	}

@@ -26,6 +26,10 @@ var rootCmd = &cobra.Command{
 			logr.Fatal(err)
 		}
 
+		if maxConcurrentTests > 0 {
+			config.Coordinator.MaxConcurrentTests = maxConcurrentTests
+		}
+
 		if logFormat == "json" {
 			logr.SetFormatter(&logrus.JSONFormatter{})
 			logr.Info("Log format set to json")
@@ -37,7 +41,7 @@ var rootCmd = &cobra.Command{
 			logr.SetLevel(logrus.DebugLevel)
 		}
 
-		coord := coordinator.NewCoordinator(config, logr, metricsPort, maxConcurrentTests)
+		coord := coordinator.NewCoordinator(config, logr, metricsPort)
 
 		if err := coord.Run(cmd.Context()); err != nil {
 			logr.Fatal(err)
@@ -51,7 +55,7 @@ var (
 	logFormat          string
 	verbose            bool
 	metricsPort        int
-	maxConcurrentTests int
+	maxConcurrentTests uint64
 	version            bool
 )
 
@@ -70,7 +74,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text", "log format (default is text). Valid values are 'text', 'json'")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
-	rootCmd.Flags().IntVar(&maxConcurrentTests, "maxConcurrentTests", 1, "Number of tests to run concurrently")
+	rootCmd.Flags().Uint64Var(&maxConcurrentTests, "maxConcurrentTests", 0, "Number of tests to run concurrently")
 	rootCmd.Flags().IntVarP(&metricsPort, "metrics-port", "", 9090, "Port to serve Prometheus metrics on")
 	rootCmd.Flags().BoolVarP(&version, "version", "", false, "Print version information")
 }
