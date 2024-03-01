@@ -30,7 +30,7 @@ type TestRunPage struct {
 type TestRunTask struct {
 	Index       uint64            `json:"index"`
 	ParentIndex uint64            `json:"parent_index"`
-	IndentPx    uint64            `json:"indent_px"`
+	GraphLevels []uint64          `json:"graph_levels"`
 	Name        string            `json:"name"`
 	Title       string            `json:"title"`
 	IsStarted   bool              `json:"started"`
@@ -157,7 +157,7 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
 		indentationMap := map[uint64]int{}
 
-		for _, task := range taskScheduler.GetAllTasks() {
+		for idx, task := range taskScheduler.GetAllTasks() {
 			taskStatus := taskScheduler.GetTaskStatus(task)
 
 			taskData := &TestRunTask{
@@ -171,6 +171,7 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 				StopTime:    taskStatus.StopTime,
 				Timeout:     task.Timeout(),
 				HasTimeout:  task.Timeout() > 0,
+				GraphLevels: []uint64{},
 			}
 
 			indentation := 0
@@ -179,7 +180,27 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 			}
 
 			indentationMap[taskData.Index] = indentation
-			taskData.IndentPx = uint64(20 * indentation)
+
+			if indentation > 0 {
+				for i := 0; i < indentation; i++ {
+					taskData.GraphLevels = append(taskData.GraphLevels, 0)
+				}
+
+				taskData.GraphLevels[indentation-1] = 3
+
+				for i := idx - 1; i >= 0; i-- {
+					if pageData.Tasks[i].ParentIndex == taskData.ParentIndex {
+						pageData.Tasks[i].GraphLevels[indentation-1] = 2
+						break
+					}
+
+					if pageData.Tasks[i].Index == taskData.ParentIndex {
+						break
+					}
+
+					pageData.Tasks[i].GraphLevels[indentation-1] = 1
+				}
+			}
 
 			switch {
 			case !taskStatus.IsStarted:

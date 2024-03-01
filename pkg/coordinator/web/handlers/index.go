@@ -24,6 +24,7 @@ type IndexPageTestDescriptor struct {
 
 type TestRunData struct {
 	RunID       uint64        `json:"run_id"`
+	TestID      string        `json:"test_id"`
 	Index       uint64        `json:"index"`
 	Name        string        `json:"name"`
 	IsStarted   bool          `json:"started"`
@@ -113,6 +114,7 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 func (fh *FrontendHandler) getTestRunData(idx int, test types.Test) *TestRunData {
 	testData := &TestRunData{
 		RunID:      test.RunID(),
+		TestID:     test.TestID(),
 		Index:      uint64(idx),
 		Name:       test.Name(),
 		StartTime:  test.StartTime(),

@@ -3,19 +3,20 @@
     <h2 class="py-2">Test Run {{ .RunID }}: {{ .Name }}</h2>
     
     <!-- client pool status -->
-    <div class="row">
-      <div class="row">
-        <div class="col-6 col-sm-4 col-lg-3">
+    <table class="test-header">
+      <tr>
+        <td style="width: 200px">
           Test ID:
-        </div>
-        <div class="col-6 col-sm-8 col-lg-9">
+        </td>
+        <td>
           {{ .TestID }}     
-        </div>
-      </div>
-      <div class="col-6 col-sm-4 col-lg-3">
-        Test Status:
-      </div>
-      <div class="col-6 col-sm-8 col-lg-9">
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Test Status:
+        </td>
+        <td>
         {{ if eq .Status "pending" }}
           <span class="badge rounded-pill text-bg-secondary">
             <i class="far fa-hourglass-half"></i> Pending
@@ -41,36 +42,37 @@
             {{ .Status }}
           </span>
         {{ end }}
-      </div>
-    </div>
-    {{ if .IsStarted }}
-    <div class="row">
-      <div class="col-6 col-sm-4 col-lg-3">
-        Start Time:
-      </div>
-      <div class="col-6 col-sm-8 col-lg-9">
-        {{ formatDateTime .StartTime.UTC }}     
-      </div>
-    </div>
-    {{ end }}
-    {{ if .IsCompleted }}
-    <div class="row">
-      <div class="col-6 col-sm-4 col-lg-3">
-        Finish Time:
-      </div>
-      <div class="col-6 col-sm-8 col-lg-9">
-        {{ formatDateTime .StopTime.UTC }}     
-      </div>
-    </div>
-    {{ end }}
-    <div class="row">
-      <div class="col-6 col-sm-4 col-lg-3">
-        Timeout:
-      </div>
-      <div class="col-6 col-sm-8 col-lg-9">
-        {{ .Timeout }}     
-      </div>
-    </div>
+        </td>
+      </tr>
+      {{ if .IsStarted }}
+      <tr>
+        <td>
+          Start Time:
+        </td>
+        <td>
+          {{ formatDateTime .StartTime.UTC }}     
+        </td>
+      </tr>
+      {{ end }}
+      {{ if .IsCompleted }}
+      <tr>
+        <td>
+          Finish Time:
+        </td>
+        <td>
+          {{ formatDateTime .StopTime.UTC }}     
+        </td>
+      </tr>
+      {{ end }}
+      <tr>
+        <td>
+          Timeout:
+        </td>
+        <td>
+          {{ .Timeout }}     
+        </td>
+      </tr>
+    </table>
     
     <!-- task list -->
     <div class="task-list">
@@ -79,8 +81,7 @@
       <table class="table table-condensed table-striped details-table">
         <thead>
           <tr>
-            <th style="width:150px; min-width:150px;"></th>
-            <th style="width:100px;">ID</th>
+            <th style="width:200px; min-width:200px;">ID</th>
             <th style="width:20%; min-width:150px;">Action Name</th>
             <th style="width:60%; min-width:250px;">Task Title</th>
             <th style="width:10%; min-width:200px;">Run Time</th>
@@ -92,8 +93,22 @@
           <tr class="details-row"></tr>
           {{ range $i, $task := .Tasks }}
           <tr data-bs-toggle="collapse" data-bs-target="#task-details-{{ $task.Index }}" class="accordion-toggle">
-            <td class="p-0"></td>
-            <td>{{ $task.Index }}</td>
+            <td class="task-graph">
+              <div class="graph-container">
+                {{ range $l, $graph := $task.GraphLevels }}
+                <div class="graph-level {{ if gt $graph 0 }}graph-line{{ end }} {{ if eq $graph 3 }}graph-last{{ end }}">
+                  {{ if gt $graph 1 }}
+                  <div class="graph-item"></div>
+                  {{ end }}
+                </div>
+                {{ end }}
+                <div class="graph-label">
+                  <span>
+                    {{ $task.Index }}
+                  </span>
+                </div>
+              </div>
+            </td>
             <td>{{ $task.Name }}</td>
             <td>{{ $task.Title }}</td>
             <td>{{ if $task.HasRunTime }}{{ $task.RunTime }}{{ else }}?{{ end }}{{ if $task.HasTimeout }} / {{ $task.Timeout }}{{ end }}</td>
@@ -127,71 +142,73 @@
           <tr>
             <td colspan="12" class="details-row task-panel">
               <div class="accordian-body collapse" id="task-details-{{ $task.Index }}">
-                <div class="container-fluid details-content">
-                  <div class="row">
-                    <div class="col-6 col-sm-3 col-lg-2">Status:</div>
-                    <div class="col-6 col-sm-3 col-lg-10">
-                      {{ if eq $task.Status "pending" }}
-                        <span class="badge rounded-pill text-bg-secondary">
-                          <i class="far fa-hourglass-half"></i> Pending
-                        </span>
-                      {{ else if eq $task.Status "running" }}
-                        <span class="badge rounded-pill text-bg-primary">
-                          <i class="far fa-play-circle"></i> Running
-                        </span>
-                      {{ else if eq $task.Status "complete" }}
-                        <span class="badge rounded-pill text-bg-success">
-                          <i class="far fa-check-circle"></i> Complete
-                        </span>
-                      {{ else }}
-                        <span class="badge rounded-pill text-bg-warning">
-                          <i class="far fa-question"></i> {{ $task.Status }}
-                        </span>
-                      {{ end }}
-                    </div>
-                  </div>
-                  <div class="row">
-                    <div class="col-6 col-sm-3 col-lg-2">Result:</div>
-                    <div class="col-6 col-sm-3 col-lg-10">
-                      {{ if eq $task.Result "success" }}
-                        <span class="badge rounded-pill text-bg-success">
-                          <i class="fas fa-check"></i> Success
-                        </span>
-                      {{ else if eq $task.Result "failure" }}
-                        <span class="badge rounded-pill text-bg-danger">
-                          <i class="fas fa-times"></i> Failure
-                        </span>
-                      {{ else }}
-                        <span class="badge rounded-pill text-bg-secondary">
-                          <i class="fas fa-question"></i> None
-                        </span>
-                      {{ end }}
-                    </div>
-                  </div>
-                  {{ if $task.IsStarted }}
-                  <div class="row">
-                    <div class="col-6 col-sm-3 col-lg-2">Start Time:</div>
-                    <div class="col-6 col-sm-3 col-lg-10">{{ formatDateTime $task.StartTime.UTC }}</div>
-                  </div>
-                  {{ end }}
-                  {{ if $task.IsCompleted }}
-                  <div class="row">
-                    <div class="col-6 col-sm-3 col-lg-2">Finish Time:</div>
-                    <div class="col-6 col-sm-3 col-lg-10">{{ formatDateTime $task.StopTime.UTC }}</div>
-                  </div>
-                  {{ end }}
-                  {{ if not (eq $task.ResultError "") }}
-                  <div class="row">
-                    <div class="col-6 col-sm-3 col-lg-2">Error Result:</div>
-                    <div class="col-6 col-sm-3 col-lg-10">
-                      <pre>{{ .ResultError }}</pre>
-                    </div>
-                  </div>
-                  {{ end }}
+                <div class="details-content">
+                  <table>
+                    <tr>
+                      <td style="width: 200px;">Status:</td>
+                      <td>
+                        {{ if eq $task.Status "pending" }}
+                          <span class="badge rounded-pill text-bg-secondary">
+                            <i class="far fa-hourglass-half"></i> Pending
+                          </span>
+                        {{ else if eq $task.Status "running" }}
+                          <span class="badge rounded-pill text-bg-primary">
+                            <i class="far fa-play-circle"></i> Running
+                          </span>
+                        {{ else if eq $task.Status "complete" }}
+                          <span class="badge rounded-pill text-bg-success">
+                            <i class="far fa-check-circle"></i> Complete
+                          </span>
+                        {{ else }}
+                          <span class="badge rounded-pill text-bg-warning">
+                            <i class="far fa-question"></i> {{ $task.Status }}
+                          </span>
+                        {{ end }}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Result:</td>
+                      <td>
+                        {{ if eq $task.Result "success" }}
+                          <span class="badge rounded-pill text-bg-success">
+                            <i class="fas fa-check"></i> Success
+                          </span>
+                        {{ else if eq $task.Result "failure" }}
+                          <span class="badge rounded-pill text-bg-danger">
+                            <i class="fas fa-times"></i> Failure
+                          </span>
+                        {{ else }}
+                          <span class="badge rounded-pill text-bg-secondary">
+                            <i class="fas fa-question"></i> None
+                          </span>
+                        {{ end }}
+                      </td>
+                    </tr>
+                    {{ if $task.IsStarted }}
+                    <tr>
+                      <td>Start Time:</td>
+                      <td>{{ formatDateTime $task.StartTime.UTC }}</td>
+                    </tr>
+                    {{ end }}
+                    {{ if $task.IsCompleted }}
+                    <tr>
+                      <td>Finish Time:</td>
+                      <td>{{ formatDateTime $task.StopTime.UTC }}</td>
+                    </tr>
+                    {{ end }}
+                    {{ if not (eq $task.ResultError "") }}
+                    <tr>
+                      <td>Error Result:</td>
+                      <td>
+                        <pre>{{ .ResultError }}</pre>
+                      </td>
+                    </tr>
+                    {{ end }}
+                  </table>
 
 
                   {{ if $task.IsStarted }}
-                  <ul class="nav nav-tabs" id="task{{ $task.Index }}-tabs" role="tablist">
+                  <ul class="nav nav-tabs mt-2" id="task{{ $task.Index }}-tabs" role="tablist">
                     <li class="nav-item" role="presentation">
                       <button class="nav-link active" id="task{{ $task.Index }}-logs-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-logs" type="button" role="tab" aria-controls="task{{ $task.Index }}-logs" aria-selected="true">Logs</button>
                     </li>
@@ -203,13 +220,13 @@
                     <div class="tab-content card-body" id="task{{ $task.Index }}-tabcontent">
                       <div class="tab-pane fade show active" id="task{{ $task.Index }}-logs" role="tabpanel" aria-labelledby="task{{ $task.Index }}-logs-tab">
                         <div style="max-height:400px; overflow-y:auto;">
-                          <div class="container-fluid">
+                          <table>
                           {{ range $i, $log := .Log }}
-                            <div class="row">
-                              <div class="col-5 col-lg-2">
+                            <tr>
+                              <td style="width: 200px;">
                                 {{ formatDateTime $log.Time.UTC }}
-                              </div>
-                              <div class="col-3 col-lg-1">
+                              </td>
+                              <td style="width: 80px;">
                                 {{ if eq $log.Level 0 }}
                                   <span class="loglevel-0 text-danger">PANIC</span>
                                 {{ else if eq $log.Level 1 }}
@@ -225,16 +242,16 @@
                                 {{ else if eq $log.Level 6 }}
                                   <span class="loglevel-6 text-secondary">TRACE</span>
                                 {{ end }}
-                              </div>
-                              <div class="col-3 col-lg-1">
+                              </td>
+                              <td style="width: 70px;">
                                 <span class="badge rounded-pill text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" title="{{ range $key, $val := .Data }}{{ $key }}: {{ $val }}<br>{{ end }}">{{ $log.DataLen }} Fields</span>
-                              </div>
-                              <div class="col-12 col-lg-8">
+                              </td>
+                              <td>
                                 {{ $log.Message }}
-                              </div>
-                            </div>
+                              </td>
+                            </tr>
                           {{ end }}
-                          </div>
+                          </table>
                         </div>
                       </div>
                       <div class="tab-pane fade card-body" id="task{{ $task.Index }}-config" role="tabpanel" aria-labelledby="task{{ $task.Index }}-config-tab">
@@ -281,6 +298,58 @@
 
 .task-panel .nav-tabs .nav-link {
   padding: 2px 16px;
+}
+
+.task-list td.task-graph {
+  padding: 0 8px;
+  height: 1px;
+}
+
+.task-list .task-graph .graph-container {
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+
+  --graph-border: 1px dotted;
+}
+
+.task-graph .graph-level {
+  position: relative;
+  width: 10px;
+  margin-left: 10px;
+}
+
+.task-graph .graph-label {
+  flex-grow: 1;
+  padding: 8px;
+}
+
+.task-graph .graph-item {
+  width: 100%;
+  height: 50%;
+  border-bottom: var(--graph-border);
+}
+
+.task-graph .graph-level.graph-last {
+  height: 50%;
+}
+
+.task-graph .graph-last .graph-item {
+  height: 100%;
+}
+
+.task-graph .graph-level:before, .task-graph .graph-item:before {
+  content:"";
+  display:block;
+  position:absolute;
+}
+
+.task-graph .graph-level.graph-line:before {
+  width:0;
+  top:0;
+  bottom:0;
+  left:0;
+  border-left: var(--graph-border);
 }
 
 </style>
