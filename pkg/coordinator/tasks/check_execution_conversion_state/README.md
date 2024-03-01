@@ -28,7 +28,7 @@ Default settings for the `check_execution_conversion_state` task:
 - name: check_execution_conversion_state
   config:
     clientPattern: ""
-    pollInterval: 5s
+    pollInterval: 10s
     expectStarted: false
     expectFinished: false
     failOnUnexpected: false

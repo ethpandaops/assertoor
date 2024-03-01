@@ -16,7 +16,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		PollInterval: human.Duration{Duration: 5 * time.Second},
+		PollInterval: human.Duration{Duration: 10 * time.Second},
 	}
 }
 
