@@ -67,5 +67,6 @@ type TestDescriptor interface {
 	ID() string
 	Source() string
 	Config() *TestConfig
+	Vars() Variables
 	Err() error
 }

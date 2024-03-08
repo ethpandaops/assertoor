@@ -63,7 +63,7 @@ func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.R
 		extTestCfg.Timeout = &human.Duration{Duration: time.Duration(req.Timeout) * time.Second}
 	}
 
-	testConfig, err := test.LoadExternalTestConfig(r.Context(), extTestCfg)
+	testConfig, testVars, err := test.LoadExternalTestConfig(r.Context(), ah.coordinator.GlobalVariables(), extTestCfg)
 	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed loading test config from %v: %v", req.File, err), http.StatusBadRequest)
 		return
@@ -84,7 +84,7 @@ func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	testDescriptor := test.NewDescriptor(testConfig.ID, fmt.Sprintf("api-call,external:%v", extTestCfg.File), testConfig)
+	testDescriptor := test.NewDescriptor(testConfig.ID, fmt.Sprintf("api-call,external:%v", extTestCfg.File), testConfig, testVars)
 
 	// add test descriptor
 	err = ah.coordinator.AddTestDescriptor(testDescriptor)

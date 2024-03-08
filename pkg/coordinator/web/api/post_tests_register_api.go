@@ -9,6 +9,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"gopkg.in/yaml.v3"
 )
 
@@ -99,10 +100,22 @@ func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	testDescriptor := test.NewDescriptor(req.ID, "api-call", testConfig)
+	testVars := vars.NewVariables(ah.coordinator.GlobalVariables())
+
+	for k, v := range testConfig.Config {
+		testVars.SetVar(k, v)
+	}
+
+	err := testVars.CopyVars(ah.coordinator.GlobalVariables(), testConfig.ConfigVars)
+	if err != nil {
+		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed decoding configVars: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	testDescriptor := test.NewDescriptor(req.ID, "api-call", testConfig, testVars)
 
 	// add test descriptor
-	err := ah.coordinator.AddTestDescriptor(testDescriptor)
+	err = ah.coordinator.AddTestDescriptor(testDescriptor)
 	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed adding test: %v", err), http.StatusInternalServerError)
 		return

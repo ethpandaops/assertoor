@@ -164,8 +164,12 @@ func (c *Coordinator) ValidatorNames() *names.ValidatorNames {
 	return c.validatorNames
 }
 
+func (c *Coordinator) GlobalVariables() types.Variables {
+	return c.globalVars
+}
+
 func (c *Coordinator) LoadTests(ctx context.Context) {
-	descriptors := test.LoadTestDescriptors(ctx, c.Config.Tests, c.Config.ExternalTests)
+	descriptors := test.LoadTestDescriptors(ctx, c.globalVars, c.Config.Tests, c.Config.ExternalTests)
 	errCount := 0
 
 	c.testDescriptorsMutex.Lock()
@@ -325,7 +329,7 @@ func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverr
 	c.runIDCounter++
 	runID := c.runIDCounter
 
-	testRef, err := test.CreateTest(runID, descriptor, c.Logger().WithField("module", "test"), c, c.globalVars)
+	testRef, err := test.CreateTest(runID, descriptor, c.Logger().WithField("module", "test"), c)
 	if err != nil {
 		return nil, fmt.Errorf("failed initializing test run #%v '%v': %w", runID, descriptor.Config().Name, err)
 	}

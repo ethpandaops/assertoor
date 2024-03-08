@@ -10,7 +10,7 @@ The configuration file is structured as follows:
 ```yaml
 coordinator:
   maxConcurrentTests: 1 # max number of tests to run concurrently
-  testRetentionTime: 14d # delete test run (logs + status) after that duration
+  testRetentionTime: 336h # delete test run (logs + status) after that duration
 
 web:
   server:
