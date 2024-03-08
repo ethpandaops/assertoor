@@ -288,15 +288,17 @@ func (wallet *Wallet) AwaitTransaction(ctx context.Context, tx *types.Transactio
 	}
 
 	retryCount := 3
+
 	var headFork *execution.HeadFork
 
 	for retryCount > 0 {
 		headFork = wallet.manager.clientPool.GetCanonicalFork(0)
+
 		if headFork != nil && headFork.ReadyClients != nil && len(headFork.ReadyClients) > 0 {
 			break
 		}
 		time.Sleep(2 * time.Second)
-		retryCount -= 1
+		retryCount--
 	}
 
 	if headFork == nil || headFork.ReadyClients == nil || len(headFork.ReadyClients) == 0 {
