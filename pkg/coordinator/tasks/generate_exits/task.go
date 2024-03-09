@@ -169,7 +169,10 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, error) {
-	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().AwaitReadyEndpoint(ctx, consensus.AnyClient)
+	if client == nil {
+		return nil, ctx.Err()
+	}
 
 	fork, err := client.GetRPCClient().GetForkState(ctx, "head")
 	if err != nil {
@@ -212,7 +215,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.AnyClient)
 	} else {
 		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(clients) == 0 {

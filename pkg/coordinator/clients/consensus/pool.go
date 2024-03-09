@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
@@ -70,7 +71,7 @@ func (pool *Pool) GetBlockCache() *BlockCache {
 
 func (pool *Pool) GetValidatorSet() map[phase0.ValidatorIndex]*v1.Validator {
 	return pool.blockCache.getCachedValidatorSet(func() map[phase0.ValidatorIndex]*v1.Validator {
-		client := pool.GetReadyEndpoint(UnspecifiedClient)
+		client := pool.GetReadyEndpoint(AnyClient)
 		if client == nil {
 			pool.logger.Errorf("could not load validator set: no ready client")
 			return nil
@@ -120,6 +121,21 @@ func (pool *Pool) GetReadyEndpoint(clientType ClientType) *Client {
 	return selectedClient
 }
 
+func (pool *Pool) AwaitReadyEndpoint(ctx context.Context, clientType ClientType) *Client {
+	for {
+		client := pool.GetReadyEndpoint(clientType)
+		if client != nil {
+			return client
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(1 * time.Second):
+		}
+	}
+}
+
 func (pool *Pool) IsClientReady(client *Client) bool {
 	if client == nil {
 		return false
@@ -148,7 +164,7 @@ func (pool *Pool) runClientScheduler(readyClients []*Client, clientType ClientTy
 		var firstReadyClient *Client
 
 		for _, client := range readyClients {
-			if clientType != UnspecifiedClient && clientType != client.clientType {
+			if clientType != AnyClient && clientType != client.clientType {
 				continue
 			}
 

@@ -167,7 +167,10 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, error) {
-	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().AwaitReadyEndpoint(ctx, consensus.AnyClient)
+	if client == nil {
+		return nil, ctx.Err()
+	}
 
 	forkState, err := client.GetRPCClient().GetForkState(ctx, "head")
 	if err != nil {
@@ -228,7 +231,7 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkStat
 	var client *consensus.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.AnyClient)
 	} else {
 		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(clients) == 0 {

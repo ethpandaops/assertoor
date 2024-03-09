@@ -345,7 +345,10 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 	var client *execution.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		client = clientPool.GetExecutionPool().GetReadyEndpoint(execution.UnspecifiedClient)
+		client = clientPool.GetExecutionPool().AwaitReadyEndpoint(ctx, execution.AnyClient)
+		if client == nil {
+			return nil, nil, ctx.Err()
+		}
 	} else {
 		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(clients) == 0 {
