@@ -238,7 +238,10 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) error {
 	var client *consensus.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+		client = clientPool.GetConsensusPool().AwaitReadyEndpoint(ctx, consensus.AnyClient)
+		if client == nil {
+			return ctx.Err()
+		}
 	} else {
 		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(clients) == 0 {

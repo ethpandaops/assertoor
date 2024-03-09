@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -91,6 +92,21 @@ func (pool *Pool) GetReadyEndpoint(clientType ClientType) *Client {
 	return selectedClient
 }
 
+func (pool *Pool) AwaitReadyEndpoint(ctx context.Context, clientType ClientType) *Client {
+	for {
+		client := pool.GetReadyEndpoint(clientType)
+		if client != nil {
+			return client
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(1 * time.Second):
+		}
+	}
+}
+
 func (pool *Pool) GetReadyEndpoints() []*Client {
 	canonicalFork := pool.GetCanonicalFork(-1)
 	if canonicalFork == nil {
@@ -133,7 +149,7 @@ func (pool *Pool) runClientScheduler(readyClients []*Client, clientType ClientTy
 		var firstReadyClient *Client
 
 		for _, client := range readyClients {
-			if clientType != UnspecifiedClient && clientType != client.clientType {
+			if clientType != AnyClient && clientType != client.clientType {
 				continue
 			}
 

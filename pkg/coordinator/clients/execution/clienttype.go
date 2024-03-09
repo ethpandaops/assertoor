@@ -8,14 +8,14 @@ import (
 type ClientType int8
 
 var (
-	UnspecifiedClient ClientType
-	UnknownClient     ClientType = -1
-	BesuClient        ClientType = 1
-	ErigonClient      ClientType = 2
-	EthjsClient       ClientType = 3
-	GethClient        ClientType = 4
-	NethermindClient  ClientType = 5
-	RethClient        ClientType = 6
+	AnyClient        ClientType
+	UnknownClient    ClientType = -1
+	BesuClient       ClientType = 1
+	ErigonClient     ClientType = 2
+	EthjsClient      ClientType = 3
+	GethClient       ClientType = 4
+	NethermindClient ClientType = 5
+	RethClient       ClientType = 6
 )
 var clientTypePatterns = map[ClientType]*regexp.Regexp{
 	BesuClient:       regexp.MustCompile("(?i)^Besu/.*"),

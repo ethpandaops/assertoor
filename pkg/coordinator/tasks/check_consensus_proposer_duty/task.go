@@ -128,7 +128,11 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) loadEpochDuties(ctx context.Context, epoch uint64) {
-	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetReadyEndpoint(consensus.UnspecifiedClient)
+	client := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().AwaitReadyEndpoint(ctx, consensus.AnyClient)
+	if client == nil {
+		return
+	}
+
 	proposerDuties, err := client.GetRPCClient().GetProposerDuties(ctx, epoch)
 
 	if err != nil {

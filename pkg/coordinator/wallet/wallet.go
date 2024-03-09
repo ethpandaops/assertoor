@@ -74,7 +74,7 @@ func (wallet *Wallet) loadState() {
 
 	go func() {
 		for {
-			client := wallet.manager.clientPool.GetReadyEndpoint(execution.UnspecifiedClient)
+			client := wallet.manager.clientPool.GetReadyEndpoint(execution.AnyClient)
 			if client == nil {
 				time.Sleep(500 * time.Millisecond)
 				continue
@@ -287,25 +287,12 @@ func (wallet *Wallet) AwaitTransaction(ctx context.Context, tx *types.Transactio
 		}
 	}
 
-	retryCount := 3
-
-	var headFork *execution.HeadFork
-
-	for retryCount > 0 {
-		headFork = wallet.manager.clientPool.GetCanonicalFork(0)
-
-		if headFork != nil && headFork.ReadyClients != nil && len(headFork.ReadyClients) > 0 {
-			break
-		}
-		time.Sleep(2 * time.Second)
-		retryCount--
+	client := wallet.manager.clientPool.AwaitReadyEndpoint(ctx, execution.AnyClient)
+	if client == nil {
+		return nil, ctx.Err()
 	}
 
-	if headFork == nil || headFork.ReadyClients == nil || len(headFork.ReadyClients) == 0 {
-		return nil, fmt.Errorf("no ready clients currently are available")
-	}
-
-	return headFork.ReadyClients[0].GetRPCClient().GetTransactionReceipt(ctx, txHash)
+	return client.GetRPCClient().GetTransactionReceipt(ctx, txHash)
 }
 
 func (wallet *Wallet) getTxNonceChan(targetNonce uint64) *nonceStatus {
