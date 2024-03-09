@@ -122,7 +122,10 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 	}
 
 	decoder := yaml.NewDecoder(reader)
-	testConfig := &types.TestConfig{}
+	testConfig := &types.TestConfig{
+		Config:     map[string]interface{}{},
+		ConfigVars: map[string]string{},
+	}
 	testVars := vars.NewVariables(nil)
 
 	err := decoder.Decode(testConfig)
