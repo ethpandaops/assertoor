@@ -287,9 +287,25 @@ func (wallet *Wallet) AwaitTransaction(ctx context.Context, tx *types.Transactio
 		}
 	}
 
-	client := wallet.manager.clientPool.GetCanonicalFork(0).ReadyClients[0]
+	retryCount := 3
 
-	return client.GetRPCClient().GetTransactionReceipt(ctx, txHash)
+	var headFork *execution.HeadFork
+
+	for retryCount > 0 {
+		headFork = wallet.manager.clientPool.GetCanonicalFork(0)
+
+		if headFork != nil && headFork.ReadyClients != nil && len(headFork.ReadyClients) > 0 {
+			break
+		}
+		time.Sleep(2 * time.Second)
+		retryCount--
+	}
+
+	if headFork == nil || headFork.ReadyClients == nil || len(headFork.ReadyClients) == 0 {
+		return nil, fmt.Errorf("no ready clients currently are available")
+	}
+
+	return headFork.ReadyClients[0].GetRPCClient().GetTransactionReceipt(ctx, txHash)
 }
 
 func (wallet *Wallet) getTxNonceChan(targetNonce uint64) *nonceStatus {
