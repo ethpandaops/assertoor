@@ -101,10 +101,10 @@ func (ws *WebServer) ConfigureRoutes(config *types.WebConfig, logger logrus.Fiel
 	}
 
 	if config.Frontend != nil {
-		if config.Frontend.Pprof {
-			// add pprof handler
-			ws.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
-		}
+		// if config.Frontend.Pprof {
+		// add pprof handler
+		ws.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
+		// }
 
 		if config.Frontend.Enabled {
 			frontendHandler := handlers.NewFrontendHandler(coordinator)
