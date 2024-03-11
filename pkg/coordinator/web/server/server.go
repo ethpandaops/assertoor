@@ -19,6 +19,10 @@ import (
 
 	// import swagger docs
 	_ "github.com/ethpandaops/assertoor/pkg/coordinator/web/api/docs"
+
+	// import pprof
+	//nolint:gosec // ignore
+	_ "net/http/pprof"
 )
 
 type WebServer struct {
