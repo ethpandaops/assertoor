@@ -224,6 +224,7 @@ func (cache *BlockCache) getCachedValidatorSet(loadFn func() map[phase0.Validato
 		valsetMap := loadFn()
 		if valsetMap != nil {
 			cache.valsetMap = valsetMap
+			cache.valsetEpoch = epoch
 		}
 	}
 
