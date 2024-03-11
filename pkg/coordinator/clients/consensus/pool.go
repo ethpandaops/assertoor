@@ -3,6 +3,7 @@ package consensus
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 
@@ -37,6 +38,8 @@ type Pool struct {
 	schedulerMutex sync.Mutex
 	rrLastIndexes  map[ClientType]uint16
 }
+
+var debugValSetCounter uint64 = 1
 
 func NewPool(ctx context.Context, config *PoolConfig, logger logrus.FieldLogger) (*Pool, error) {
 	var err error
@@ -82,6 +85,15 @@ func (pool *Pool) GetValidatorSet() map[phase0.ValidatorIndex]*v1.Validator {
 			pool.logger.Errorf("could not load validator set: %v", err)
 			return nil
 		}
+
+		valsetID := debugValSetCounter
+		debugValSetCounter++
+
+		fmt.Printf("valset alloc: %v\n", valsetID)
+
+		runtime.SetFinalizer(&valset, func(_ any) {
+			fmt.Printf("valset free: %v\n", valsetID)
+		})
 
 		return valset
 	})
