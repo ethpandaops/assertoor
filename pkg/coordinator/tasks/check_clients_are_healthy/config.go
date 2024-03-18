@@ -14,6 +14,7 @@ type Config struct {
 	ExpectUnhealthy    bool           `yaml:"expectUnhealthy" json:"expectUnhealthy"`
 	MinClientCount     int            `yaml:"minClientCount" json:"minClientCount"`
 	MaxUnhealthyCount  int            `yaml:"maxUnhealthyCount" json:"maxUnhealthyCount"`
+	FailOnCheckMiss    bool           `yaml:"failOnCheckMiss" json:"failOnCheckMiss"`
 }
 
 func DefaultConfig() Config {

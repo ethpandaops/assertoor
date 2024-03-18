@@ -128,11 +128,19 @@ func (t *Task) processCheck() {
 
 	switch {
 	case t.config.MaxUnhealthyCount > -1 && len(failedClients) >= t.config.MaxUnhealthyCount:
-		t.ctx.SetResult(types.TaskResultFailure)
+		if t.config.FailOnCheckMiss {
+			t.ctx.SetResult(types.TaskResultFailure)
+		} else {
+			t.ctx.SetResult(types.TaskResultNone)
+		}
 	case resultPass:
 		t.ctx.SetResult(types.TaskResultSuccess)
 	default:
-		t.ctx.SetResult(types.TaskResultNone)
+		if t.config.FailOnCheckMiss {
+			t.ctx.SetResult(types.TaskResultFailure)
+		} else {
+			t.ctx.SetResult(types.TaskResultNone)
+		}
 	}
 }
 
