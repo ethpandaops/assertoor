@@ -13,11 +13,13 @@ type Config struct {
 	SkipExecutionCheck bool           `yaml:"skipExecutionCheck" json:"skipExecutionCheck"`
 	ExpectUnhealthy    bool           `yaml:"expectUnhealthy" json:"expectUnhealthy"`
 	MinClientCount     int            `yaml:"minClientCount" json:"minClientCount"`
+	MaxUnhealthyCount  int            `yaml:"maxUnhealthyCount" json:"maxUnhealthyCount"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		PollInterval: human.Duration{Duration: 5 * time.Second},
+		PollInterval:      human.Duration{Duration: 5 * time.Second},
+		MaxUnhealthyCount: -1,
 	}
 }
 
