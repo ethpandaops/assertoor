@@ -279,8 +279,8 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 	clPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	slot, epoch, _ := clPool.GetBlockCache().GetWallclock().Now()
-	if epoch.Number() < 2 {
-		return nil, fmt.Errorf("current epoch too low (require epoch >= 2)")
+	if epoch.Number() < 4 {
+		return nil, fmt.Errorf("current epoch too low (require epoch >= 4)")
 	}
 
 	specs := clPool.GetBlockCache().GetSpecs()
@@ -290,7 +290,7 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 	slot2 := slot1 - specs.SlotsPerEpoch - 2
 
 	targetEpoch1 := slot1 / specs.SlotsPerEpoch
-	sourceEpoch1 := targetEpoch1 - 2
+	sourceEpoch1 := targetEpoch1 - 3
 
 	targetEpoch2 := slot2 / specs.SlotsPerEpoch
 	sourceEpoch2 := targetEpoch2
