@@ -126,3 +126,10 @@ func (ec *ExecutionClient) GetTransactionReceipt(ctx context.Context, txHash com
 func (ec *ExecutionClient) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	return ec.ethClient.SendTransaction(ctx, tx)
 }
+
+func (ec *ExecutionClient) GetVerkleConversionState(ctx context.Context) (*VerkleConversionState, error) {
+	var result VerkleConversionState
+	err := ec.rpcClient.CallContext(ctx, &result, "debug_conversionStatus", "latest")
+
+	return &result, err
+}

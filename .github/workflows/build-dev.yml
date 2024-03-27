@@ -44,6 +44,10 @@ jobs:
         echo "repository: $commit_repo"
         echo "commit: $commit_ref"
         
+        if [[ "$has_docker_image_label" == "true" ]]; then
+          run_builds="true"
+        fi
+
         manual_tag="${{ inputs.docker_tag }}"
         if [[ ! -z "$manual_tag" ]]; then
           has_docker_image_label="true"

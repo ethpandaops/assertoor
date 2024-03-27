@@ -52,6 +52,8 @@ func (bc *BeaconClient) Initialize(ctx context.Context) error {
 		http.WithLogLevel(zerolog.Disabled),
 		// TODO (when upstream PR is merged)
 		// http.WithConnectionCheck(false),
+		// TODO: remove when go-eth2-client has proper verkle support
+		http.WithEnforceJSON(true),
 	}
 
 	// set extra endpoint headers
