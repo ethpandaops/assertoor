@@ -63,7 +63,7 @@ func EncodeBlob(data []byte) (*BlobCommitment, error) {
 
 	// build versioned hash
 	blobCommitment.VersionedHash = sha256.Sum256(blobCommitment.Commitment[:])
-	blobCommitment.VersionedHash[0] = params.BlobTxHashVersion
+	blobCommitment.VersionedHash[0] = 0x01
 
 	return &blobCommitment, nil
 }
