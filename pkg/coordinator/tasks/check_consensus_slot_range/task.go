@@ -115,6 +115,9 @@ func (t *Task) Execute(ctx context.Context) error {
 
 func (t *Task) runRangeCheck() (checkResult, isLower bool) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
+	if consensusPool.GetBlockCache().GetGenesis().GenesisTime.Compare(time.Now()) >= 0 {
+		return false, true
+	}
 
 	currentSlot, currentEpoch, err := consensusPool.GetBlockCache().GetWallclock().Now()
 	if err != nil {
