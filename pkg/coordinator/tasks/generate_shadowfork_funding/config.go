@@ -23,7 +23,7 @@ func DefaultConfig() Config {
 	return Config{
 		ShadowForkVaultContract: "0x9620e3933dAAa49EBe3250b731291ac817E24372",
 
-		MinBalance:    big.NewInt(0),                   // 0 ETH
+		MinBalance:    big.NewInt(1000000000000000000), // 1 ETH
 		TxFeeCap:      big.NewInt(100000000000),        // 100 Gwei
 		TxTipCap:      big.NewInt(1000000000),          // 1 Gwei
 		RequestAmount: big.NewInt(1000000000000000000), // 1 ETH

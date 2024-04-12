@@ -124,8 +124,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.Infof("root wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
 
-	if t.wallet.GetBalance().Cmp(t.config.MinBalance) <= 0 {
-		t.logger.Infof("balance exceeds minBalance (%v ETH), skipping shadow vault request", wallet.GetReadableBalance(t.config.MinBalance, 18, 0, 4, false, false))
+	if t.wallet.GetBalance().Cmp(t.config.MinBalance) >= 0 {
+		t.logger.Infof("balance (%v ETH) exceeds minBalance (%v ETH), skipping shadow vault request", t.wallet.GetReadableBalance(18, 0, 4, false, false), wallet.GetReadableBalance(t.config.MinBalance, 18, 0, 4, false, false))
 		return nil
 	}
 
