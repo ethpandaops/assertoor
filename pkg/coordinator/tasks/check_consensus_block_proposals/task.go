@@ -348,7 +348,7 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 
 	slashingCount := len(attSlashings) + len(propSlashings)
 	if slashingCount < t.config.MinSlashingCount {
-		t.logger.Infof("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinSlashingCount, slashingCount)
+		t.logger.Infof("check failed for block %v [0x%x]: not enough slashings (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinSlashingCount, slashingCount)
 		return false
 	}
 
@@ -421,7 +421,7 @@ func (t *Task) checkBlockAttesterSlashings(block *consensus.Block, blockData *sp
 
 	slashingCount := len(attSlashings)
 	if slashingCount < t.config.MinAttesterSlashingCount {
-		t.logger.Infof("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinAttesterSlashingCount, slashingCount)
+		t.logger.Infof("check failed for block %v [0x%x]: not enough attester slashings (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinAttesterSlashingCount, slashingCount)
 		return false
 	}
 
@@ -437,7 +437,7 @@ func (t *Task) checkBlockProposerSlashings(block *consensus.Block, blockData *sp
 
 	slashingCount := len(propSlashings)
 	if slashingCount < t.config.MinProposerSlashingCount {
-		t.logger.Infof("check failed for block %v [0x%x]: not enough exits (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinProposerSlashingCount, slashingCount)
+		t.logger.Infof("check failed for block %v [0x%x]: not enough proposer slashings (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinProposerSlashingCount, slashingCount)
 		return false
 	}
 

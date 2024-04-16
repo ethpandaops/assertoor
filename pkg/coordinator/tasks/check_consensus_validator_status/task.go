@@ -132,11 +132,29 @@ func (t *Task) runValidatorStatusCheck() bool {
 	}
 
 	currentIndex := uint64(0)
+	matchingValidators := uint64(0)
+	pubkey := []byte{}
+
+	var namePattern *regexp.Regexp
+
+	if t.config.ValidatorPubKey != "" {
+		pubkey = common.FromHex(t.config.ValidatorPubKey)
+	}
+
+	if t.config.ValidatorNamePattern != "" {
+		pattern, err := regexp.Compile(t.config.ValidatorNamePattern)
+		if err != nil {
+			t.logger.Errorf("check failed: validator name pattern invalid: %v", err)
+			return false
+		}
+
+		namePattern = pattern
+	}
 
 	for {
 		validator := validatorSet[phase0.ValidatorIndex(currentIndex)]
 		if validator == nil {
-			return false
+			break
 		}
 
 		currentIndex++
@@ -145,31 +163,18 @@ func (t *Task) runValidatorStatusCheck() bool {
 			continue
 		}
 
-		if t.config.ValidatorNamePattern != "" {
-			validatorName := t.ctx.Scheduler.GetServices().ValidatorNames().GetValidatorName(uint64(validator.Index))
-			matched, err := regexp.MatchString(t.config.ValidatorNamePattern, validatorName)
-
-			if err != nil {
-				t.logger.Errorf("check failed: validator name pattern invalid: %v", err)
-				return false
-			}
-
-			if !matched {
-				continue
-			}
+		if t.config.ValidatorNamePattern != "" && !namePattern.MatchString(t.ctx.Scheduler.GetServices().ValidatorNames().GetValidatorName(uint64(validator.Index))) {
+			continue
 		}
 
-		if t.config.ValidatorPubKey != "" {
-			pubkey := common.FromHex(t.config.ValidatorPubKey)
-
-			if !bytes.Equal(pubkey, validator.Validator.PublicKey[:]) {
-				t.logger.Infof("check failed: no matching validator found")
-				continue
-			}
+		if t.config.ValidatorPubKey != "" && !bytes.Equal(pubkey, validator.Validator.PublicKey[:]) {
+			continue
 		}
 
 		// found a matching validator
 		t.logger.Infof("validator found: index %v, status: %v", validator.Index, validator.Status.String())
+
+		matchingValidators++
 
 		if t.config.ValidatorInfoResultVar != "" {
 			validatorJSON, err := json.Marshal(validator)
@@ -204,4 +209,10 @@ func (t *Task) runValidatorStatusCheck() bool {
 
 		return true
 	}
+
+	if matchingValidators == 0 {
+		t.logger.Infof("check failed: no matching validator found")
+	}
+
+	return false
 }

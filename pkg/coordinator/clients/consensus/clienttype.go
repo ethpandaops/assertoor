@@ -8,14 +8,14 @@ import (
 type ClientType int8
 
 var (
-	UnspecifiedClient ClientType
-	UnknownClient     ClientType = -1
-	LighthouseClient  ClientType = 1
-	LodestarClient    ClientType = 2
-	NimbusClient      ClientType = 3
-	PrysmClient       ClientType = 4
-	TekuClient        ClientType = 5
-	GrandineClient    ClientType = 6
+	AnyClient        ClientType
+	UnknownClient    ClientType = -1
+	LighthouseClient ClientType = 1
+	LodestarClient   ClientType = 2
+	NimbusClient     ClientType = 3
+	PrysmClient      ClientType = 4
+	TekuClient       ClientType = 5
+	GrandineClient   ClientType = 6
 )
 var clientTypePatterns = map[ClientType]*regexp.Regexp{
 	LighthouseClient: regexp.MustCompile("(?i)^Lighthouse/.*"),

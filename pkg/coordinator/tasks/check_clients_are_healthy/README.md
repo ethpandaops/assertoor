@@ -23,6 +23,12 @@ The `check_clients_are_healthy` task is designed to ensure the health of specifi
 - **`minClientCount`**:\
   The minimum number of clients that must match the `clientNamePatterns` and pass the health checks for the task to succeed. A value of 0 indicates that all matching clients need to pass the health check. Use this to set a threshold for the number of healthy clients required by your test scenario.
 
+- **`maxUnhealthyCount`**:\
+  Specifies the maximum number of unhealthy clients allowed before the health check fails. A value of 0 means that any unhealthy client will cause the health check to fail, enforcing strict health criteria.
+
+- **`failOnCheckMiss`**: \
+  Determines the task's behavior when a health check fails. If true, the task reports a failure upon the first unsuccessful health check. If false, the task continues to poll the clients until a successful check occurs, allowing for temporary issues to be resolved without immediate failure.
+
 ### Defaults
 
 These are the default settings for the `check_clients_are_healthy` task:
@@ -36,4 +42,6 @@ These are the default settings for the `check_clients_are_healthy` task:
     skipExecutionCheck: false
     expectUnhealthy: false
     minClientCount: 0
+    maxUnhealthyCount: -1
+    failOnCheckMiss: false
 ```

@@ -74,7 +74,7 @@ func (wallet *Wallet) loadState() {
 
 	go func() {
 		for {
-			client := wallet.manager.clientPool.GetReadyEndpoint(execution.UnspecifiedClient)
+			client := wallet.manager.clientPool.GetReadyEndpoint(execution.AnyClient)
 			if client == nil {
 				time.Sleep(500 * time.Millisecond)
 				continue
@@ -287,7 +287,10 @@ func (wallet *Wallet) AwaitTransaction(ctx context.Context, tx *types.Transactio
 		}
 	}
 
-	client := wallet.manager.clientPool.GetCanonicalFork(0).ReadyClients[0]
+	client := wallet.manager.clientPool.AwaitReadyEndpoint(ctx, execution.AnyClient)
+	if client == nil {
+		return nil, ctx.Err()
+	}
 
 	return client.GetRPCClient().GetTransactionReceipt(ctx, txHash)
 }

@@ -158,17 +158,20 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	err = nil
+	if len(clients) == 0 {
+		err = fmt.Errorf("no ready clients available")
+	} else {
+		for i := 0; i < len(clients); i++ {
+			client := clients[i%len(clients)]
 
-	for i := 0; i < len(clients); i++ {
-		client := clients[i%len(clients)]
+			t.logger.WithFields(logrus.Fields{
+				"client": client.GetName(),
+			}).Infof("sending tx: %v", tx.Hash().Hex())
 
-		t.logger.WithFields(logrus.Fields{
-			"client": client.GetName(),
-		}).Infof("sending tx: %v", tx.Hash().Hex())
-
-		err = client.GetRPCClient().SendTransaction(ctx, tx)
-		if err == nil {
-			break
+			err = client.GetRPCClient().SendTransaction(ctx, tx)
+			if err == nil {
+				break
+			}
 		}
 	}
 

@@ -371,22 +371,25 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 	}
 
 	err = nil
+	if len(clients) == 0 {
+		err = fmt.Errorf("no ready clients available")
+	} else {
+		for i := 0; i < len(clients); i++ {
+			client := clients[(transactionIdx+uint64(i))%uint64(len(clients))]
 
-	for i := 0; i < len(clients); i++ {
-		client := clients[(transactionIdx+uint64(i))%uint64(len(clients))]
+			t.logger.WithFields(logrus.Fields{
+				"client": client.GetName(),
+			}).Infof("sending tx %v: %v", transactionIdx, tx.Hash().Hex())
 
-		t.logger.WithFields(logrus.Fields{
-			"client": client.GetName(),
-		}).Infof("sending tx %v: %v", transactionIdx, tx.Hash().Hex())
+			err = client.GetRPCClient().SendTransaction(ctx, tx)
+			if err == nil {
+				break
+			}
 
-		err = client.GetRPCClient().SendTransaction(ctx, tx)
-		if err == nil {
-			break
+			t.logger.WithFields(logrus.Fields{
+				"client": client.GetName(),
+			}).Warnf("RPC error when sending tx %v: %v", transactionIdx, err)
 		}
-
-		t.logger.WithFields(logrus.Fields{
-			"client": client.GetName(),
-		}).Warnf("RPC error when sending tx %v: %v", transactionIdx, err)
 	}
 
 	if err != nil {

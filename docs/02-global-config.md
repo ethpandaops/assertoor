@@ -8,17 +8,23 @@ It contains general settings, endpoints, validator names, global variables, and 
 The configuration file is structured as follows:
 
 ```yaml
-endpoints:
-  - name: "node-1"
-    executionUrl: "http://127.0.0.1:8545"
-    consensusUrl: "http://127.0.0.1:5052"
+coordinator:
+  maxConcurrentTests: 1 # max number of tests to run concurrently
+  testRetentionTime: 336h # delete test run (logs + status) after that duration
 
 web:
   server:
     host: "0.0.0.0"
     port: 8080
+  api:
+    enabled: true # enable rest api
   frontend:
-    enabled: true
+    enabled: true # enable web ui
+
+endpoints:
+  - name: "node-1"
+    executionUrl: "http://127.0.0.1:8545"
+    consensusUrl: "http://127.0.0.1:5052"
 
 validatorNames:
   inventoryYaml: "./validator-names.yaml"
@@ -48,12 +54,14 @@ externalTests:
 
 ```
 
+- **`coordinator`**:\
+  Manages the execution of tests, specifying the maximum number of tests that can run concurrently (`maxConcurrentTests`) and how long to retain test runs, including logs and status, after completion (`testRetentionTime`).
 
 - **`endpoints`**:\
   A list of Ethereum consensus and execution clients. Each endpoint includes URLs for both RPC endpoints and a name for reference in subsequent tests.
 
 - **`web`**:\
-  Configurations for the web frontend, detailing server host and port settings.
+  Configurations for the web api & frontend, detailing server host and port settings.
 
 - **`validatorNames`**:\
   Defines a mapping of validator index ranges to their respective names. \
@@ -75,3 +83,4 @@ externalTests:
 - **`externalTests`**:\
   This feature enables the integration of tests that are defined in separate files, fostering a modular and scalable test configuration approach. \
   It allows for better organization and management of complex testing scenarios.
+

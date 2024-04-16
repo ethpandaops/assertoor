@@ -108,14 +108,12 @@ func (fh *FrontendHandler) getTestPageData(testID string) (*TestPage, error) {
 		Source: testDescriptor.Source(),
 	}
 
-	if testConfig.Config != nil {
-		testCfgJSON, err := json.Marshal(testConfig.Config)
-		if err != nil {
-			return nil, fmt.Errorf("failed marshalling test config: %v", err)
-		}
-
-		pageData.Config = string(testCfgJSON)
+	testCfgJSON, err := json.Marshal(testDescriptor.Vars().GetVarsMap())
+	if err != nil {
+		return nil, fmt.Errorf("failed marshalling test vars: %v", err)
 	}
+
+	pageData.Config = string(testCfgJSON)
 
 	// test runs
 	pageData.Tests = []*TestRunData{}

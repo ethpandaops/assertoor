@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"runtime"
 	"runtime/debug"
 	"sort"
 	"sync"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
@@ -138,6 +140,9 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	// start test cleanup routine
 	go c.runTestCleanup(ctx)
 
+	// start per epoch GC routine
+	go c.runEpochGC(ctx)
+
 	// run tests
 	c.runTestExecutionLoop(ctx)
 
@@ -164,8 +169,12 @@ func (c *Coordinator) ValidatorNames() *names.ValidatorNames {
 	return c.validatorNames
 }
 
+func (c *Coordinator) GlobalVariables() types.Variables {
+	return c.globalVars
+}
+
 func (c *Coordinator) LoadTests(ctx context.Context) {
-	descriptors := test.LoadTestDescriptors(ctx, c.Config.Tests, c.Config.ExternalTests)
+	descriptors := test.LoadTestDescriptors(ctx, c.globalVars, c.Config.Tests, c.Config.ExternalTests)
 	errCount := 0
 
 	c.testDescriptorsMutex.Lock()
@@ -325,7 +334,7 @@ func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverr
 	c.runIDCounter++
 	runID := c.runIDCounter
 
-	testRef, err := test.CreateTest(runID, descriptor, c.Logger().WithField("module", "test"), c, c.globalVars)
+	testRef, err := test.CreateTest(runID, descriptor, c.Logger().WithField("module", "test"), c)
 	if err != nil {
 		return nil, fmt.Errorf("failed initializing test run #%v '%v': %w", runID, descriptor.Config().Name, err)
 	}
@@ -537,4 +546,71 @@ func (c *Coordinator) cleanupTestHistory(retentionTime time.Duration) {
 	}
 
 	c.testHistory = cleanedHistory
+}
+
+func (c *Coordinator) runEpochGC(ctx context.Context) {
+	defer func() {
+		if err := recover(); err != nil {
+			c.log.GetLogger().WithError(err.(error)).Panicf("uncaught panic in coordinator.runEpochGC: %v, stack: %v", err, string(debug.Stack()))
+		}
+	}()
+
+	// await client readiness, which implies cache initialization
+	if c.clientPool.GetConsensusPool().AwaitReadyEndpoint(ctx, consensus.AnyClient) == nil {
+		return
+	}
+
+	genesis := c.clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
+	specs := c.clientPool.GetConsensusPool().GetBlockCache().GetSpecs()
+
+	for {
+		var sleepTime time.Duration
+
+		networkTime := time.Since(genesis.GenesisTime)
+		if networkTime < 0 {
+			sleepTime = networkTime.Abs()
+		} else {
+			currentSlot := uint64(networkTime / specs.SecondsPerSlot)
+			currentEpoch := currentSlot / specs.SlotsPerEpoch
+			currentSlotIndex := currentSlot % specs.SlotsPerEpoch
+			nextGcSlot := uint64(0)
+
+			gcSlotDiff := uint64(2)
+			if gcSlotDiff > specs.SlotsPerEpoch/2 {
+				gcSlotDiff = 1
+			}
+
+			gcSlotIndex := specs.SlotsPerEpoch - gcSlotDiff - 1
+
+			if currentSlotIndex == gcSlotIndex {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(specs.SecondsPerSlot / 2):
+				}
+
+				nextEpochDuration := time.Until(genesis.GenesisTime.Add(time.Duration((currentEpoch+1)*specs.SlotsPerEpoch) * specs.SecondsPerSlot))
+
+				c.log.GetLogger().Infof("run GC (slot %v, %v sec before epoch %v)", currentSlot, nextEpochDuration.Seconds(), currentEpoch+1)
+				runtime.GC()
+
+				nextGcSlot = currentSlot + specs.SlotsPerEpoch
+			} else {
+				if currentSlotIndex < gcSlotIndex {
+					nextGcSlot = currentSlot + (gcSlotIndex - currentSlotIndex)
+				} else {
+					nextGcSlot = currentSlot + (specs.SlotsPerEpoch - currentSlotIndex) + gcSlotIndex
+				}
+			}
+
+			nextRunTime := genesis.GenesisTime.Add(time.Duration(nextGcSlot) * specs.SecondsPerSlot)
+			sleepTime = time.Until(nextRunTime)
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(sleepTime):
+		}
+	}
 }

@@ -24,7 +24,7 @@ type Test struct {
 	timeout   time.Duration
 }
 
-func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.FieldLogger, services types.TaskServices, variables types.Variables) (types.Test, error) {
+func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.FieldLogger, services types.TaskServices) (types.Test, error) {
 	test := &Test{
 		runID:      runID,
 		logger:     logger.WithField("RunID", runID).WithField("TestID", descriptor.ID()),
@@ -37,15 +37,7 @@ func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.Fie
 	}
 
 	// set test variables
-	test.variables = variables.NewScope()
-	for name, value := range test.config.Config {
-		test.variables.SetVar(name, value)
-	}
-
-	err := test.variables.CopyVars(variables, test.config.ConfigVars)
-	if err != nil {
-		return nil, err
-	}
+	test.variables = descriptor.Vars()
 
 	// parse tasks
 	test.taskScheduler = scheduler.NewTaskScheduler(test.logger, services, test.variables)

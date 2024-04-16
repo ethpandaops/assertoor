@@ -16,6 +16,7 @@ type Coordinator interface {
 	ClientPool() *clients.ClientPool
 	WalletManager() *wallet.Manager
 	ValidatorNames() *names.ValidatorNames
+	GlobalVariables() Variables
 
 	LoadTests(ctx context.Context)
 	AddTestDescriptor(testDescriptor TestDescriptor) error
