@@ -13,6 +13,7 @@ import (
 	checkconsensusslotrange "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_slot_range"
 	checkconsensussyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_sync_status"
 	checkconsensusvalidatorstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_validator_status"
+	checkexecutionconversionstate "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_execution_conversion_state"
 	checkexecutionsyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_execution_sync_status"
 	generateblobtransactions "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_blob_transactions"
 	generateblschanges "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_bls_changes"
@@ -44,6 +45,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkconsensusslotrange.TaskDescriptor,
 	checkconsensussyncstatus.TaskDescriptor,
 	checkconsensusvalidatorstatus.TaskDescriptor,
+	checkexecutionconversionstate.TaskDescriptor,
 	checkexecutionsyncstatus.TaskDescriptor,
 	generateblobtransactions.TaskDescriptor,
 	generateblschanges.TaskDescriptor,
