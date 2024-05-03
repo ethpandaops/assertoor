@@ -30,11 +30,15 @@ type PoolClient struct {
 }
 
 type ClientConfig struct {
-	Name             string            `yaml:"name"`
-	ConsensusURL     string            `yaml:"consensusUrl"`
-	ConsensusHeaders map[string]string `yaml:"consensusHeaders"`
-	ExecutionURL     string            `yaml:"executionUrl"`
-	ExecutionHeaders map[string]string `yaml:"executionHeaders"`
+	Name                    string            `yaml:"name"`
+	ConsensusURL            string            `yaml:"consensusUrl"`
+	ConsensusHeaders        map[string]string `yaml:"consensusHeaders"`
+	ConsensusSnooperURL     string            `yaml:"consensusSnooperUrl"`
+	ConsensusSnooperHeaders map[string]string `yaml:"consensusSnooperHeaders"`
+	ExecutionURL            string            `yaml:"executionUrl"`
+	ExecutionHeaders        map[string]string `yaml:"executionHeaders"`
+	ExecutionSnooperURL     string            `yaml:"executionSnooperUrl"`
+	ExecutionSnooperHeaders map[string]string `yaml:"executionSnooperHeaders"`
 }
 
 func NewClientPool(logger logrus.FieldLogger) (*ClientPool, error) {
