@@ -7,6 +7,7 @@ import (
 )
 
 func GetExecutionExtraData(v *spec.VersionedSignedBeaconBlock) ([]byte, error) {
+	//nolint:exhaustive // ignore
 	switch v.Version {
 	case spec.DataVersionBellatrix:
 		if v.Bellatrix == nil || v.Bellatrix.Message == nil || v.Bellatrix.Message.Body == nil || v.Bellatrix.Message.Body.ExecutionPayload == nil {
