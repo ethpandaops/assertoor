@@ -6,6 +6,7 @@ type Config struct {
 	BlockCount               int    `yaml:"blockCount" json:"blockCount"`
 	GraffitiPattern          string `yaml:"graffitiPattern" json:"graffitiPattern"`
 	ValidatorNamePattern     string `yaml:"validatorNamePattern" json:"validatorNamePattern"`
+	ExtraDataPattern         string `yaml:"extraDataPattern" json:"extraDataPattern"`
 	MinAttestationCount      int    `yaml:"minAttestationCount" json:"minAttestationCount"`
 	MinDepositCount          int    `yaml:"minDepositCount" json:"minDepositCount"`
 	MinExitCount             int    `yaml:"minExitCount" json:"minExitCount"`

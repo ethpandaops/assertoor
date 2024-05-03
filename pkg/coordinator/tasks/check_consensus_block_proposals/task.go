@@ -134,13 +134,18 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 		return false
 	}
 
+	// check validator name
+	if t.config.ValidatorNamePattern != "" && !t.checkBlockValidatorName(block, blockData) {
+		return false
+	}
+
 	// check graffiti
 	if t.config.GraffitiPattern != "" && !t.checkBlockGraffiti(block, blockData) {
 		return false
 	}
 
-	// check validator name
-	if t.config.ValidatorNamePattern != "" && !t.checkBlockValidatorName(block, blockData) {
+	// check extra data
+	if t.config.ExtraDataPattern != "" && !t.checkBlockExtraData(block, blockData) {
 		return false
 	}
 
@@ -234,7 +239,28 @@ func (t *Task) checkBlockValidatorName(block *consensus.Block, blockData *spec.V
 	}
 
 	if !matched {
-		t.logger.Infof("check failed for block %v [0x%x]: unmatched validator name (have: %v, want: %v)", block.Slot, block.Root, validatorName, t.config.ValidatorNamePattern)
+		t.logger.Debugf("check failed for block %v [0x%x]: unmatched validator name (have: %v, want: %v)", block.Slot, block.Root, validatorName, t.config.ValidatorNamePattern)
+		return false
+	}
+
+	return true
+}
+
+func (t *Task) checkBlockExtraData(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
+	extraData, err := consensus.GetExecutionExtraData(blockData)
+	if err != nil {
+		t.logger.Warnf("could not get extra data for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		return false
+	}
+
+	matched, err := regexp.MatchString(t.config.ExtraDataPattern, string(extraData))
+	if err != nil {
+		t.logger.Warnf("could not check extra data for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		return false
+	}
+
+	if !matched {
+		t.logger.Infof("check failed for block %v [0x%x]: unmatched extra data", block.Slot, block.Root)
 		return false
 	}
 

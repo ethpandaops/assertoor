@@ -14,6 +14,9 @@ The `check_consensus_block_proposals` task checks consensus block proposals to m
 - **`validatorNamePattern`**:\
   A pattern to identify blocks by the names of their validators.
 
+- **`extraDataPattern`**:\
+  A pattern to match the execution layer extra data on the blocks.
+
 - **`minAttestationCount`**:\
   The minimum number of attestations (votes or approvals) in a block.
 
@@ -70,6 +73,7 @@ These are the default settings for the `check_consensus_block_proposals` task:
     blockCount: 1
     graffitiPattern: ""
     validatorNamePattern: ""
+    extraDataPattern: ""
     minAttestationCount: 0
     minDepositCount: 0
     minExitCount: 0
