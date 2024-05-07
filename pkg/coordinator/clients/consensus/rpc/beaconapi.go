@@ -52,7 +52,7 @@ func (bc *BeaconClient) Initialize(ctx context.Context) error {
 		http.WithLogLevel(zerolog.Disabled),
 		// TODO (when upstream PR is merged)
 		// http.WithConnectionCheck(false),
-		http.WithDynamicSSZ(true),
+		http.WithCustomSpecSupport(true),
 	}
 
 	// set extra endpoint headers
