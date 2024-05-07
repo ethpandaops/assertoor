@@ -127,7 +127,7 @@ func (t *Task) processCheck() {
 	t.logger.Infof("Check result: %v, Failed Clients: %v", resultPass, failedClients)
 
 	switch {
-	case t.config.MaxUnhealthyCount > -1 && len(failedClients) >= t.config.MaxUnhealthyCount:
+	case t.config.MaxUnhealthyCount > -1 && len(failedClients) > t.config.MaxUnhealthyCount:
 		if t.config.FailOnCheckMiss {
 			t.ctx.SetResult(types.TaskResultFailure)
 		} else {
