@@ -360,7 +360,7 @@ func (t *Task) checkBlockExits(block *consensus.Block, blockData *spec.Versioned
 }
 
 func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	attSlashings, err := blockData.AttesterSlashings()
+	attSlashingsVersioned, err := blockData.AttesterSlashings()
 	if err != nil {
 		t.logger.Warnf("could not get attester slashings for block %v [0x%x]: %v", block.Slot, block.Root, err)
 		return false
@@ -372,7 +372,7 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 		return false
 	}
 
-	slashingCount := len(attSlashings) + len(propSlashings)
+	slashingCount := len(attSlashingsVersioned) + len(propSlashings)
 	if slashingCount < t.config.MinSlashingCount {
 		t.logger.Infof("check failed for block %v [0x%x]: not enough slashings (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinSlashingCount, slashingCount)
 		return false
@@ -389,8 +389,14 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 			found := false
 
 			if !found && (expectedSlashing.SlashingType == "" || expectedSlashing.SlashingType == "attester") {
-				for _, slashing := range attSlashings {
-					inter := intersect.Simple(slashing.Attestation1.AttestingIndices, slashing.Attestation2.AttestingIndices)
+				for _, slashing := range attSlashingsVersioned {
+					att1, err1 := slashing.Attestation1()
+					att2, err2 := slashing.Attestation2()
+					if err1 != nil || err2 != nil {
+						continue
+					}
+
+					inter := intersect.Simple(att1.AttestingIndices, att2.AttestingIndices)
 					for _, j := range inter {
 						valIdx, ok := j.(uint64)
 						if !ok {

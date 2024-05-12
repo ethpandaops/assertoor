@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/prysmaticlabs/go-bitfield"
 	"github.com/sirupsen/logrus"
 )
 
@@ -399,35 +401,56 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 
 			isNextEpoch := slot-firstSlot >= specs.SlotsPerEpoch
 
-			attestations, err := blockBody.Attestations()
+			attestationsVersioned, err := blockBody.Attestations()
 			if err != nil {
 				continue
 			}
 
-			for _, att := range attestations {
-				if uint64(att.Data.Slot)/specs.SlotsPerEpoch != epoch {
+			for attIdx, att := range attestationsVersioned {
+				attData, err1 := att.Data()
+				if err1 != nil {
 					continue
 				}
 
-				attKey := fmt.Sprintf("%v-%v", uint64(att.Data.Slot), uint64(att.Data.Index))
+				if uint64(attData.Slot)/specs.SlotsPerEpoch != epoch {
+					continue
+				}
+
+				attAggregationBits, err := att.AggregationBits()
+				if err != nil {
+					continue
+				}
+
 				voteAmount := uint64(0)
 				voteCount := uint64(0)
-				voteBitset := att.AggregationBits
+				if att.Version >= spec.DataVersionElectra {
+					// EIP-7549 changes the attestation aggregation
+					// there can now be attestations from all committees aggregated into a single attestation aggregate
+					committeeBits, err := att.CommitteeBits()
+					if err != nil {
+						t.logger.Debugf("aggregateEpochVotes slot %v failed, can't get committeeBits for attestation %v: %v", slot, attIdx, err)
+						continue
+					}
 
-				for bitIdx, duty := range votes.attesterDuties.duties[attKey] {
-					if t.bitAtVector(voteBitset, bitIdx) {
-						if votes.activityMap[duty.validator] {
+					aggregationBitsOffset := uint64(0)
+					for committee := uint64(0); committee < specs.MaxCommitteesPerSlot; committee++ {
+						if !committeeBits.BitAt(committee) {
 							continue
 						}
 
-						voteAmount += duty.balance
-						voteCount++
-
-						votes.activityMap[duty.validator] = true
+						voteAmt, voteCnt, committeeSize := t.aggregateAttestationVotes(votes, uint64(attData.Slot), committee, attAggregationBits, 0)
+						voteAmount += voteAmt
+						voteCount += voteCnt
+						aggregationBitsOffset += committeeSize
 					}
+				} else {
+					// pre electra attestation aggregation
+					voteAmt, voteCnt, _ := t.aggregateAttestationVotes(votes, uint64(attData.Slot), uint64(attData.Index), attAggregationBits, 0)
+					voteAmount += voteAmt
+					voteCount += voteCnt
 				}
 
-				if bytes.Equal(att.Data.Target.Root[:], votes.targetRoot[:]) {
+				if bytes.Equal(attData.Target.Root[:], votes.targetRoot[:]) {
 					if isNextEpoch {
 						votes.nextEpoch.targetVoteCount += voteCount
 						votes.nextEpoch.targetVoteAmount += voteAmount
@@ -438,7 +461,7 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 				} /*else {
 					logger.Infof("vote target missmatch %v != 0x%x", att.Data.Target.Root, targetRoot)
 				}*/
-				if bytes.Equal(att.Data.BeaconBlockRoot[:], parentRoot[:]) {
+				if bytes.Equal(attData.BeaconBlockRoot[:], parentRoot[:]) {
 					if isNextEpoch {
 						votes.nextEpoch.headVoteCount += voteCount
 						votes.nextEpoch.headVoteAmount += voteAmount
@@ -472,4 +495,23 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 func (t *Task) bitAtVector(b []byte, i int) bool {
 	bb := b[i/8]
 	return (bb & (1 << uint(i%8))) > 0
+}
+
+func (t *Task) aggregateAttestationVotes(votes *epochVotes, slot uint64, committee uint64, aggregationBits bitfield.Bitfield, aggregationBitsOffset uint64) (uint64, uint64, uint64) {
+	voteAmount := uint64(0)
+	voteCount := uint64(0)
+	attKey := fmt.Sprintf("%v-%v", slot, committee)
+	voteValidators := votes.attesterDuties.duties[attKey]
+	for bitIdx, attDuty := range voteValidators {
+		validatorIdx := attDuty.validator
+		if aggregationBits.BitAt(uint64(bitIdx) + aggregationBitsOffset) {
+			if votes.activityMap[validatorIdx] {
+				continue
+			}
+			voteAmount += attDuty.balance
+			voteCount += 1
+			votes.activityMap[validatorIdx] = true
+		}
+	}
+	return voteAmount, voteCount, uint64(len(voteValidators))
 }
