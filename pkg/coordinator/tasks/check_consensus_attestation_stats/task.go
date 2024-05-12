@@ -490,11 +490,6 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 	return votes
 }
 
-func (t *Task) bitAtVector(b []byte, i int) bool {
-	bb := b[i/8]
-	return (bb & (1 << uint(i%8))) > 0
-}
-
 func (t *Task) aggregateAttestationVotes(votes *epochVotes, slot uint64, committee uint64, aggregationBits bitfield.Bitfield, aggregationBitsOffset uint64) (uint64, uint64, uint64) {
 	voteAmount := uint64(0)
 	voteCount := uint64(0)
