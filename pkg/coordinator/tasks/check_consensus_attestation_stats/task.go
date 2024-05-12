@@ -458,9 +458,7 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 						votes.currentEpoch.targetVoteCount += voteCount
 						votes.currentEpoch.targetVoteAmount += voteAmount
 					}
-				} /*else {
-					logger.Infof("vote target missmatch %v != 0x%x", att.Data.Target.Root, targetRoot)
-				}*/
+				}
 				if bytes.Equal(attData.BeaconBlockRoot[:], parentRoot[:]) {
 					if isNextEpoch {
 						votes.nextEpoch.headVoteCount += voteCount
