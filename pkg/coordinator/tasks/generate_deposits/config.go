@@ -13,6 +13,7 @@ type Config struct {
 	IndexCount           int    `yaml:"indexCount" json:"indexCount"`
 	WalletPrivkey        string `yaml:"walletPrivkey" json:"walletPrivkey"`
 	DepositContract      string `yaml:"depositContract" json:"depositContract"`
+	DepositAmount        uint64 `yaml:"depositAmount" json:"depositAmount"`
 	DepositTxFeeCap      int64  `yaml:"depositTxFeeCap" json:"depositTxFeeCap"`
 	DepositTxTipCap      int64  `yaml:"depositTxTipCap" json:"depositTxTipCap"`
 	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
@@ -29,6 +30,7 @@ func DefaultConfig() Config {
 	return Config{
 		DepositTxFeeCap: 100000000000, // 100 gwei
 		DepositTxTipCap: 1000000000,   // 1 gwei
+		DepositAmount:   32,           // 32 ETH
 	}
 }
 
@@ -47,6 +49,10 @@ func (c *Config) Validate() error {
 
 	if c.DepositContract == "" {
 		return errors.New("depositContract must be set")
+	}
+
+	if c.DepositAmount == 0 {
+		return errors.New("depositAmount must be > 0")
 	}
 
 	return nil

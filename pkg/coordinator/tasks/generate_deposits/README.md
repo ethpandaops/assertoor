@@ -29,6 +29,9 @@ The `generate_deposits` task focuses on creating deposit transactions and sendin
 - **`depositContract`**:\
   The address of the deposit contract on the blockchain. This is the destination where the deposit transactions will be sent.
 
+- **`depositAmount`**:
+  The amount in ETH to be deposited for each transaction. This setting specifies the stake amount per validator being registered.
+
 - **`depositTxFeeCap`**:\
   The maximum fee cap for each deposit transaction. This limits the transaction fees for deposit operations.
 
@@ -72,6 +75,7 @@ Default settings for the `generate_deposits` task:
     indexCount: 0
     walletPrivkey: ""
     depositContract: ""
+    depositAmount: 32
     depositTxFeeCap: 100000000000
     depositTxTipCap: 1000000000
     clientPattern: ""
