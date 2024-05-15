@@ -44,10 +44,10 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		FeeCap:       &helper.BigInt{*big.NewInt(100000000000)}, // 100 Gwei
-		TipCap:       &helper.BigInt{*big.NewInt(1000000000)},   // 1 Gwei
+		FeeCap:       &helper.BigInt{Value: *big.NewInt(100000000000)}, // 100 Gwei
+		TipCap:       &helper.BigInt{Value: *big.NewInt(1000000000)},   // 1 Gwei
 		GasLimit:     50000,
-		Amount:       &helper.BigInt{*big.NewInt(0)},
+		Amount:       &helper.BigInt{Value: *big.NewInt(0)},
 		AwaitReceipt: true,
 	}
 }
