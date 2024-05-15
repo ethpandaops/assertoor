@@ -3,24 +3,26 @@ package generatetransaction
 import (
 	"errors"
 	"math/big"
+
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 )
 
 type Config struct {
 	PrivateKey string `yaml:"privateKey" json:"privateKey"`
 
-	LegacyTxType       bool     `yaml:"legacyTxType" json:"legacyTxType"`
-	BlobTxType         bool     `yaml:"blobTxType" json:"blobTxType"`
-	BlobFeeCap         *big.Int `yaml:"blobFeeCap" json:"blobFeeCap"`
-	FeeCap             *big.Int `yaml:"feeCap" json:"feeCap"`
-	TipCap             *big.Int `yaml:"tipCap" json:"tipCap"`
-	GasLimit           uint64   `yaml:"gasLimit" json:"gasLimit"`
-	TargetAddress      string   `yaml:"targetAddress" json:"targetAddress"`
-	RandomTarget       bool     `yaml:"randomTarget" json:"randomTarget"`
-	ContractDeployment bool     `yaml:"contractDeployment" json:"contractDeployment"`
-	CallData           string   `yaml:"callData" json:"callData"`
-	BlobData           string   `yaml:"blobData" json:"blobData"`
-	RandomAmount       bool     `yaml:"randomAmount" json:"randomAmount"`
-	Amount             *big.Int `yaml:"amount" json:"amount"`
+	LegacyTxType       bool           `yaml:"legacyTxType" json:"legacyTxType"`
+	BlobTxType         bool           `yaml:"blobTxType" json:"blobTxType"`
+	BlobFeeCap         *helper.BigInt `yaml:"blobFeeCap" json:"blobFeeCap"`
+	FeeCap             *helper.BigInt `yaml:"feeCap" json:"feeCap"`
+	TipCap             *helper.BigInt `yaml:"tipCap" json:"tipCap"`
+	GasLimit           uint64         `yaml:"gasLimit" json:"gasLimit"`
+	TargetAddress      string         `yaml:"targetAddress" json:"targetAddress"`
+	RandomTarget       bool           `yaml:"randomTarget" json:"randomTarget"`
+	ContractDeployment bool           `yaml:"contractDeployment" json:"contractDeployment"`
+	CallData           string         `yaml:"callData" json:"callData"`
+	BlobData           string         `yaml:"blobData" json:"blobData"`
+	RandomAmount       bool           `yaml:"randomAmount" json:"randomAmount"`
+	Amount             *helper.BigInt `yaml:"amount" json:"amount"`
 
 	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
 	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
@@ -42,10 +44,10 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		FeeCap:       big.NewInt(100000000000), // 100 Gwei
-		TipCap:       big.NewInt(1000000000),   // 1 Gwei
+		FeeCap:       &helper.BigInt{*big.NewInt(100000000000)}, // 100 Gwei
+		TipCap:       &helper.BigInt{*big.NewInt(1000000000)},   // 1 Gwei
 		GasLimit:     50000,
-		Amount:       big.NewInt(0),
+		Amount:       &helper.BigInt{*big.NewInt(0)},
 		AwaitReceipt: true,
 	}
 }
