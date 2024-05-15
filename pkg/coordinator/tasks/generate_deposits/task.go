@@ -287,11 +287,6 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		return nil, nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 	}
 
-	withdrPrivkey, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
-	}
-
 	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
 
 	var validator *v1.Validator
@@ -308,17 +303,29 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		return nil, nil, fmt.Errorf("validator already exists on chain")
 	}
 
-	var pub, withdrPub common.BLSPubkey
+	var pub common.BLSPubkey
+	var withdrCreds []byte
 
 	copy(pub[:], validatorPubkey)
-	copy(withdrPub[:], withdrPrivkey.PublicKey().Marshal())
 
-	withdrCreds := hashing.Hash(withdrPub[:])
-	withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
+	if t.config.WithdrawalCredentials == "" {
+		withdrPrivkey, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
+		}
+
+		var withdrPub common.BLSPubkey
+		copy(withdrPub[:], withdrPrivkey.PublicKey().Marshal())
+
+		withdrCreds = withdrPub[:]
+		withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
+	} else {
+		withdrCreds = ethcommon.FromHex(t.config.WithdrawalCredentials)
+	}
 
 	data := common.DepositData{
 		Pubkey:                pub,
-		WithdrawalCredentials: withdrCreds,
+		WithdrawalCredentials: hashing.Hash(withdrCreds[:]),
 		Amount:                common.Gwei(t.config.DepositAmount * 1000000000),
 		Signature:             common.BLSSignature{},
 	}
