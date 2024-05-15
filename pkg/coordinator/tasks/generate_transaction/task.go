@@ -279,7 +279,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 			toAddr = &addr
 		}
 
-		txAmount := new(big.Int).Set(t.config.Amount)
+		txAmount := new(big.Int).Set(&t.config.Amount.Int)
 		if t.config.RandomAmount {
 			n, err := rand.Int(rand.Reader, txAmount)
 			if err == nil {
@@ -298,7 +298,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 		case t.config.LegacyTxType:
 			txObj = &ethtypes.LegacyTx{
 				Nonce:    nonce,
-				GasPrice: t.config.FeeCap,
+				GasPrice: &t.config.FeeCap.Int,
 				Gas:      t.config.GasLimit,
 				To:       toAddr,
 				Value:    txAmount,
@@ -321,9 +321,9 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 
 			txObj = &ethtypes.BlobTx{
 				Nonce:      nonce,
-				BlobFeeCap: uint256.MustFromBig(t.config.BlobFeeCap),
-				GasTipCap:  uint256.MustFromBig(t.config.TipCap),
-				GasFeeCap:  uint256.MustFromBig(t.config.FeeCap),
+				BlobFeeCap: uint256.MustFromBig(&t.config.BlobFeeCap.Int),
+				GasTipCap:  uint256.MustFromBig(&t.config.TipCap.Int),
+				GasFeeCap:  uint256.MustFromBig(&t.config.FeeCap.Int),
 				Gas:        t.config.GasLimit,
 				To:         *toAddr,
 				Value:      uint256.MustFromBig(txAmount),
@@ -335,8 +335,8 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 			txObj = &ethtypes.DynamicFeeTx{
 				ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
 				Nonce:     nonce,
-				GasTipCap: t.config.TipCap,
-				GasFeeCap: t.config.FeeCap,
+				GasTipCap: &t.config.TipCap.Int,
+				GasFeeCap: &t.config.FeeCap.Int,
 				Gas:       t.config.GasLimit,
 				To:        toAddr,
 				Value:     txAmount,
