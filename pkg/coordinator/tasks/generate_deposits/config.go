@@ -5,21 +5,22 @@ import (
 )
 
 type Config struct {
-	LimitPerSlot         int    `yaml:"limitPerSlot" json:"limitPerSlot"`
-	LimitTotal           int    `yaml:"limitTotal" json:"limitTotal"`
-	LimitPending         int    `yaml:"limitPending" json:"limitPending"`
-	Mnemonic             string `yaml:"mnemonic" json:"mnemonic"`
-	StartIndex           int    `yaml:"startIndex" json:"startIndex"`
-	IndexCount           int    `yaml:"indexCount" json:"indexCount"`
-	WalletPrivkey        string `yaml:"walletPrivkey" json:"walletPrivkey"`
-	DepositContract      string `yaml:"depositContract" json:"depositContract"`
-	DepositAmount        uint64 `yaml:"depositAmount" json:"depositAmount"`
-	DepositTxFeeCap      int64  `yaml:"depositTxFeeCap" json:"depositTxFeeCap"`
-	DepositTxTipCap      int64  `yaml:"depositTxTipCap" json:"depositTxTipCap"`
-	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
-	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
-	AwaitReceipt         bool   `yaml:"awaitReceipt" json:"awaitReceipt"`
-	FailOnReject         bool   `yaml:"failOnReject" json:"failOnReject"`
+	LimitPerSlot          int    `yaml:"limitPerSlot" json:"limitPerSlot"`
+	LimitTotal            int    `yaml:"limitTotal" json:"limitTotal"`
+	LimitPending          int    `yaml:"limitPending" json:"limitPending"`
+	Mnemonic              string `yaml:"mnemonic" json:"mnemonic"`
+	StartIndex            int    `yaml:"startIndex" json:"startIndex"`
+	IndexCount            int    `yaml:"indexCount" json:"indexCount"`
+	WalletPrivkey         string `yaml:"walletPrivkey" json:"walletPrivkey"`
+	DepositContract       string `yaml:"depositContract" json:"depositContract"`
+	DepositAmount         uint64 `yaml:"depositAmount" json:"depositAmount"`
+	DepositTxFeeCap       int64  `yaml:"depositTxFeeCap" json:"depositTxFeeCap"`
+	DepositTxTipCap       int64  `yaml:"depositTxTipCap" json:"depositTxTipCap"`
+	WithdrawalCredentials string `yaml:"withdrawalCredentials" json:"withdrawalCredentials"`
+	ClientPattern         string `yaml:"clientPattern" json:"clientPattern"`
+	ExcludeClientPattern  string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
+	AwaitReceipt          bool   `yaml:"awaitReceipt" json:"awaitReceipt"`
+	FailOnReject          bool   `yaml:"failOnReject" json:"failOnReject"`
 
 	DepositTransactionsResultVar string `yaml:"depositTransactionsResultVar" json:"depositTransactionsResultVar"`
 	DepositReceiptsResultVar     string `yaml:"depositReceiptsResultVar" json:"depositReceiptsResultVar"`

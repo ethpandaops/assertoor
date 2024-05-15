@@ -38,6 +38,9 @@ The `generate_deposits` task focuses on creating deposit transactions and sendin
 - **`depositTxTipCap`**:\
   The maximum tip cap for each deposit transaction. This controls the tip or priority fee for each transaction.
 
+- **`withdrawalCredentials`**:\
+  Specifies the withdrawal credentials for the deposited ETH. If left empty, it defaults to a standard `0x00...` credentials based on the validator mnemonic.
+
 - **`clientPattern`**:\
   A regex pattern to select specific client endpoints for sending deposit transactions. If left blank, any available endpoint will be used.
 
@@ -78,6 +81,7 @@ Default settings for the `generate_deposits` task:
     depositAmount: 32
     depositTxFeeCap: 100000000000
     depositTxTipCap: 1000000000
+    withdrawalCredentials: ""
     clientPattern: ""
     excludeClientPattern: ""
     awaitReceipt: false
