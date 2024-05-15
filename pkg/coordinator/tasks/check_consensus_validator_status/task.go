@@ -192,6 +192,10 @@ func (t *Task) runValidatorStatusCheck() bool {
 			}
 		}
 
+		if t.config.ValidatorPubKeyResultVar != "" {
+			t.ctx.Vars.SetVar(t.config.ValidatorPubKeyResultVar, fmt.Sprintf("0x%x", validator.Validator.PublicKey[:]))
+		}
+
 		if len(t.config.ValidatorStatus) > 0 {
 			found := false
 
