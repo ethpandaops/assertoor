@@ -22,7 +22,6 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
-	"github.com/protolambda/zrnt/eth2/util/hashing"
 	"github.com/protolambda/ztyp/tree"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
@@ -325,7 +324,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 
 	data := common.DepositData{
 		Pubkey:                pub,
-		WithdrawalCredentials: hashing.Hash(withdrCreds[:]),
+		WithdrawalCredentials: tree.Root(withdrCreds),
 		Amount:                common.Gwei(t.config.DepositAmount * 1000000000),
 		Signature:             common.BLSSignature{},
 	}
