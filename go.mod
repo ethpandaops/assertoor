@@ -17,6 +17,7 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	github.com/protolambda/zrnt v0.32.3
 	github.com/protolambda/ztyp v0.2.2
+	github.com/prysmaticlabs/go-bitfield v0.0.0-20240328144219-a1caa50c3a1e
 	github.com/rs/zerolog v1.32.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
@@ -74,7 +75,6 @@ require (
 	github.com/prometheus/common v0.51.1 // indirect
 	github.com/prometheus/procfs v0.13.0 // indirect
 	github.com/protolambda/bls12-381-util v0.1.0 // indirect
-	github.com/prysmaticlabs/go-bitfield v0.0.0-20240328144219-a1caa50c3a1e // indirect
 	github.com/r3labs/sse/v2 v2.10.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/spf13/pflag v1.0.5 // indirect

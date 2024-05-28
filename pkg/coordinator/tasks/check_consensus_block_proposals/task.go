@@ -392,6 +392,7 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 				for _, slashing := range attSlashingsVersioned {
 					att1, err1 := slashing.Attestation1()
 					att2, err2 := slashing.Attestation2()
+
 					if err1 != nil || err2 != nil {
 						continue
 					}

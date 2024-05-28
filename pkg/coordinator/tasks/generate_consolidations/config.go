@@ -30,6 +30,7 @@ func (c *Config) Validate() error {
 	if c.SourceMnemonic == "" {
 		return errors.New("sourceMnemonic must be set")
 	}
+
 	if c.TargetMnemonic == "" {
 		return errors.New("sourceMnemonic must be set")
 	}

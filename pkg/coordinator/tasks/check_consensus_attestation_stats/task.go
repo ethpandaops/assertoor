@@ -423,6 +423,7 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 
 				voteAmount := uint64(0)
 				voteCount := uint64(0)
+
 				if att.Version >= spec.DataVersionElectra {
 					// EIP-7549 changes the attestation aggregation
 					// there can now be attestations from all committees aggregated into a single attestation aggregate
@@ -433,6 +434,7 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 					}
 
 					aggregationBitsOffset := uint64(0)
+
 					for committee := uint64(0); committee < specs.MaxCommitteesPerSlot; committee++ {
 						if !committeeBits.BitAt(committee) {
 							continue
@@ -459,6 +461,7 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 						votes.currentEpoch.targetVoteAmount += voteAmount
 					}
 				}
+
 				if bytes.Equal(attData.BeaconBlockRoot[:], parentRoot[:]) {
 					if isNextEpoch {
 						votes.nextEpoch.headVoteCount += voteCount
@@ -490,21 +493,24 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 	return votes
 }
 
-func (t *Task) aggregateAttestationVotes(votes *epochVotes, slot uint64, committee uint64, aggregationBits bitfield.Bitfield, aggregationBitsOffset uint64) (uint64, uint64, uint64) {
-	voteAmount := uint64(0)
-	voteCount := uint64(0)
+func (t *Task) aggregateAttestationVotes(votes *epochVotes, slot, committee uint64, aggregationBits bitfield.Bitfield, aggregationBitsOffset uint64) (voteAmount, voteCount, validatorCount uint64) {
 	attKey := fmt.Sprintf("%v-%v", slot, committee)
 	voteValidators := votes.attesterDuties.duties[attKey]
+
 	for bitIdx, attDuty := range voteValidators {
 		validatorIdx := attDuty.validator
 		if aggregationBits.BitAt(uint64(bitIdx) + aggregationBitsOffset) {
 			if votes.activityMap[validatorIdx] {
 				continue
 			}
+
 			voteAmount += attDuty.balance
-			voteCount += 1
+			voteCount++
 			votes.activityMap[validatorIdx] = true
 		}
 	}
-	return voteAmount, voteCount, uint64(len(voteValidators))
+
+	validatorCount = uint64(len(voteValidators))
+
+	return
 }

@@ -32,7 +32,7 @@ var (
 	}
 )
 
-var DOMAIN_CONSOLIDATION = common.BLSDomainType{0x0B, 0x00, 0x00, 0x00}
+var DomainConsolidation = common.BLSDomainType{0x0B, 0x00, 0x00, 0x00}
 
 type Task struct {
 	ctx           *types.TaskContext
@@ -110,6 +110,7 @@ func (t *Task) LoadConfig() error {
 	}
 
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", config.TargetKeyIndex)
+
 	t.targetPrivKey, err = util.PrivateKeyFromSeedAndPath(t.targetSeed, validatorKeyPath)
 	if err != nil {
 		return fmt.Errorf("failed generating target validator key %v: %w", validatorKeyPath, err)
@@ -188,15 +189,16 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64) err
 	validatorSet := clientPool.GetConsensusPool().GetValidatorSet()
 	specs := clientPool.GetConsensusPool().GetBlockCache().GetSpecs()
 
-	var sourceValidator *v1.Validator
-	var targetValidator *v1.Validator
+	var sourceValidator, targetValidator *v1.Validator
 
 	sourceValidatorPubkey := validatorPrivkey.PublicKey().Marshal()
 	targetValidatorPubkey := t.targetPrivKey.PublicKey().Marshal()
+
 	for _, val := range validatorSet {
 		if bytes.Equal(val.Validator.PublicKey[:], sourceValidatorPubkey) {
 			sourceValidator = val
 		}
+
 		if bytes.Equal(val.Validator.PublicKey[:], targetValidatorPubkey) {
 			targetValidator = val
 		}
@@ -205,6 +207,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64) err
 	if sourceValidator == nil {
 		return fmt.Errorf("source validator not found")
 	}
+
 	if targetValidator == nil {
 		return fmt.Errorf("source validator not found")
 	}
@@ -212,6 +215,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64) err
 	if sourceValidator.Validator.WithdrawalCredentials[0] != 0x01 {
 		return fmt.Errorf("validator %v does not have 0x01 withdrawal creds", sourceValidator.Index)
 	}
+
 	if targetValidator.Validator.WithdrawalCredentials[0] != 0x01 {
 		return fmt.Errorf("validator %v does not have 0x01 withdrawal creds", targetValidator.Index)
 	}
@@ -238,7 +242,8 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64) err
 		SourceIndex: sourceValidator.Index,
 		TargetIndex: targetValidator.Index,
 	}
-	if t.config.ConsolidationEpoch >= 0 {
+
+	if t.config.ConsolidationEpoch > 0 {
 		operation.Epoch = phase0.Epoch(t.config.ConsolidationEpoch)
 	} else {
 		currentSlot, _ := client.GetLastHead()
@@ -252,7 +257,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64) err
 	}
 
 	genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
-	dom := common.ComputeDomain(DOMAIN_CONSOLIDATION, common.Version(genesis.GenesisForkVersion), tree.Root(genesis.GenesisValidatorsRoot))
+	dom := common.ComputeDomain(DomainConsolidation, common.Version(genesis.GenesisForkVersion), tree.Root(genesis.GenesisValidatorsRoot))
 	signingRoot := common.ComputeSigningRoot(operationRoot, dom)
 
 	// source signature
@@ -262,6 +267,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64) err
 	if err != nil {
 		return fmt.Errorf("failed converting validator priv key: %w", err)
 	}
+
 	sig1 := sourceSecKey.SignHash(signingRoot[:])
 
 	// target signature
@@ -271,6 +277,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64) err
 	if err != nil {
 		return fmt.Errorf("failed converting validator priv key: %w", err)
 	}
+
 	sig2 := targetSecKey.SignHash(signingRoot[:])
 
 	// aggregate signature
