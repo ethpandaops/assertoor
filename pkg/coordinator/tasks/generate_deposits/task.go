@@ -303,17 +303,19 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 	}
 
 	var pub common.BLSPubkey
+
 	var withdrCreds []byte
 
 	copy(pub[:], validatorPubkey)
 
 	if t.config.WithdrawalCredentials == "" {
-		withdrPrivkey, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
+		withdrPrivkey, err2 := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
+		if err2 != nil {
+			return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err2)
 		}
 
 		var withdrPub common.BLSPubkey
+
 		copy(withdrPub[:], withdrPrivkey.PublicKey().Marshal())
 
 		withdrCreds = withdrPub[:]
