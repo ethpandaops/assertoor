@@ -6,8 +6,8 @@ github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migc
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWkuxnzWhEzLwhP9w653o=
-github.com/attestantio/go-eth2-client v0.0.0-20240611134001-2d6d5b48577c h1:qwXgAXKmjyzh7Oa8griHB+5X3R+TXQOkFcMpWYa14RM=
-github.com/attestantio/go-eth2-client v0.0.0-20240611134001-2d6d5b48577c/go.mod h1:d7ZPNrMX8jLfIgML5u7QZxFo2AukLM+5m08iMaLdqb8=
+github.com/attestantio/go-eth2-client v0.21.6 h1:eLhQ/OFHPhWrT7LYERL1Z6EPOoec6fJeDHsjjn73KBg=
+github.com/attestantio/go-eth2-client v0.21.6/go.mod h1:d7ZPNrMX8jLfIgML5u7QZxFo2AukLM+5m08iMaLdqb8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bits-and-blooms/bitset v1.13.0 h1:bAQ9OPNFYbGHV6Nez0tmNI0RiEu7/hxlYJRUA0wFAVE=

@@ -3,7 +3,7 @@ module github.com/ethpandaops/assertoor
 go 1.21.1
 
 require (
-	github.com/attestantio/go-eth2-client v0.0.0-20240611134001-2d6d5b48577c
+	github.com/attestantio/go-eth2-client v0.21.6
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
 	github.com/ethereum/go-ethereum v1.13.14
 	github.com/ethpandaops/ethwallclock v0.3.0
