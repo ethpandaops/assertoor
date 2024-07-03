@@ -12,7 +12,8 @@ linters-settings:
       - performance
       - style
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
   nolintlint:
     require-explanation: true
     require-specific: true
@@ -21,7 +22,6 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
     - dogsled
     - dupl
     - errcheck
@@ -42,14 +42,13 @@ linters:
     - prealloc
     - revive
     - staticcheck
-    - structcheck
     - stylecheck
     - thelper
     - tparallel
     - typecheck
     - unconvert
     - unparam
-    - varcheck
+    - unused
     - whitespace
     - wsl
 
