@@ -41,14 +41,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout base code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         path: code
-    - name: Checkout wiki code
-      uses: actions/checkout@v2
-      with:
-        repository: ${{github.repository}}.wiki
-        path: wiki
+    - name: Generate wiki from docs
+      env:
+        WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+      run: |
+        git clone https://$WIKI_TOKEN@github.com/${{ github.event.repository.owner.name }}/${{ github.event.repository.name }}.wiki.git ./wiki
+
     - name: Generate wiki from docs
       run: |
         touch ./wiki.md
@@ -66,6 +67,8 @@ jobs:
 
         cp ./wiki.md ./wiki/Home.md
     - name: Push to wiki
+      env:
+        WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
       run: |
         cd wiki
         git config --local user.email "action@github.com"
