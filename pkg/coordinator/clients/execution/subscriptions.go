@@ -3,16 +3,12 @@ package execution
 import "sync"
 
 type Subscription[T interface{}] struct {
-	//nolint:structcheck // linter bug with generic struct
-	channel chan T
-	//nolint:structcheck // linter bug with generic struct
+	channel    chan T
 	dispatcher *Dispatcher[T]
 }
 
 type Dispatcher[T interface{}] struct {
-	//nolint:structcheck // linter bug with generic struct
-	mutex sync.Mutex
-	//nolint:structcheck // linter bug with generic struct
+	mutex         sync.Mutex
 	subscriptions []*Subscription[T]
 }
 
