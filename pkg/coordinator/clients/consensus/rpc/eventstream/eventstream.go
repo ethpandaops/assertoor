@@ -230,11 +230,13 @@ func (stream *Stream) retryRestartStream() {
 			return
 		}
 
+		stream.closeMutex.Lock()
 		if stream.isClosed {
+			stream.closeMutex.Unlock()
 			return
 		}
-
 		stream.Errors <- err
+		stream.closeMutex.Unlock()
 
 		backoff = 10 * time.Second
 	}
