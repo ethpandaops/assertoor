@@ -16,7 +16,6 @@ import (
 	"github.com/attestantio/go-eth2-client/http"
 	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/capella"
-	"github.com/attestantio/go-eth2-client/spec/electra"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/rs/zerolog"
 	"github.com/sirupsen/logrus"
@@ -483,15 +482,6 @@ func (bc *BeaconClient) SubmitAttesterSlashing(ctx context.Context, slashing *ph
 
 func (bc *BeaconClient) SubmitProposerSlashing(ctx context.Context, slashing *phase0.ProposerSlashing) error {
 	err := bc.postJSON(ctx, fmt.Sprintf("%s/eth/v1/beacon/pool/proposer_slashings", bc.endpoint), slashing, nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (bc *BeaconClient) SubmitConsolidation(ctx context.Context, consolidation *electra.SignedConsolidation) error {
-	err := bc.postJSON(ctx, fmt.Sprintf("%s/eth/v1/beacon/pool/consolidations", bc.endpoint), consolidation, nil)
 	if err != nil {
 		return err
 	}

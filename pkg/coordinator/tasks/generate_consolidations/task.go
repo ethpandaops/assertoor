@@ -9,13 +9,9 @@ import (
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
-	"github.com/attestantio/go-eth2-client/spec/electra"
-	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
-	"github.com/protolambda/ztyp/tree"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
 	e2types "github.com/wealdtech/go-eth2-types/v2"
@@ -177,7 +173,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64) error {
+func (t *Task) generateConsolidation(_ context.Context, accountIdx uint64) error {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
@@ -187,7 +183,6 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64) err
 	}
 
 	validatorSet := clientPool.GetConsensusPool().GetValidatorSet()
-	specs := clientPool.GetConsensusPool().GetBlockCache().GetSpecs()
 
 	var sourceValidator, targetValidator *v1.Validator
 
@@ -218,82 +213,6 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64) err
 
 	if targetValidator.Validator.WithdrawalCredentials[0] != 0x01 {
 		return fmt.Errorf("validator %v does not have 0x01 withdrawal creds", targetValidator.Index)
-	}
-
-	// select client
-	var client *consensus.Client
-
-	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		client = clientPool.GetConsensusPool().AwaitReadyEndpoint(ctx, consensus.AnyClient)
-		if client == nil {
-			return ctx.Err()
-		}
-	} else {
-		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
-		if len(clients) == 0 {
-			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
-		}
-
-		client = clients[0].ConsensusClient
-	}
-
-	// generate operation
-	operation := electra.Consolidation{
-		SourceIndex: sourceValidator.Index,
-		TargetIndex: targetValidator.Index,
-	}
-
-	if t.config.ConsolidationEpoch > 0 {
-		operation.Epoch = phase0.Epoch(t.config.ConsolidationEpoch)
-	} else {
-		currentSlot, _ := client.GetLastHead()
-		operation.Epoch = phase0.Epoch(currentSlot / phase0.Slot(specs.SlotsPerEpoch))
-	}
-
-	// sign operation
-	operationRoot, err := operation.HashTreeRoot()
-	if err != nil {
-		return fmt.Errorf("could not generate hash tree root for consolidation operation: %v", err)
-	}
-
-	genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
-	dom := common.ComputeDomain(DomainConsolidation, common.Version(genesis.GenesisForkVersion), tree.Root(genesis.GenesisValidatorsRoot))
-	signingRoot := common.ComputeSigningRoot(operationRoot, dom)
-
-	// source signature
-	var sourceSecKey hbls.SecretKey
-
-	err = sourceSecKey.Deserialize(validatorPrivkey.Marshal())
-	if err != nil {
-		return fmt.Errorf("failed converting validator priv key: %w", err)
-	}
-
-	sig1 := sourceSecKey.SignHash(signingRoot[:])
-
-	// target signature
-	var targetSecKey hbls.SecretKey
-
-	err = targetSecKey.Deserialize(t.targetPrivKey.Marshal())
-	if err != nil {
-		return fmt.Errorf("failed converting validator priv key: %w", err)
-	}
-
-	sig2 := targetSecKey.SignHash(signingRoot[:])
-
-	// aggregate signature
-	sig1.Add(sig2)
-
-	// build signed operation
-	operationSigned := electra.SignedConsolidation{
-		Message:   &operation,
-		Signature: phase0.BLSSignature(sig1.Serialize()),
-	}
-
-	t.logger.WithField("client", client.GetName()).Infof("sending consolidation for validator %v (consolidating to %v)", sourceValidator.Index, targetValidator.Index)
-
-	err = client.GetRPCClient().SubmitConsolidation(ctx, &operationSigned)
-	if err != nil {
-		return err
 	}
 
 	return nil
