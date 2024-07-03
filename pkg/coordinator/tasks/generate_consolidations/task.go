@@ -122,6 +122,7 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
+//nolint:gocyclo // ignore
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.SourceStartIndex > 0 {
 		t.nextIndex = uint64(t.config.SourceStartIndex)
@@ -274,9 +275,10 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
 	var sourceValidator, targetValidator *v1.Validator
-	validatorSet := clientPool.GetConsensusPool().GetValidatorSet()
 
+	validatorSet := clientPool.GetConsensusPool().GetValidatorSet()
 	sourceSelector := ""
+
 	if t.sourceSeed != nil {
 		// select by key index
 		validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)

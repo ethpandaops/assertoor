@@ -651,7 +651,6 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 			}
 
 			for _, depositRequest := range depositRequests {
-
 				if expectedDepositRequest.PublicKey == "" || depositRequest.Pubkey.String() == expectedDepositRequest.PublicKey {
 					depositAmount := big.NewInt(int64(depositRequest.Amount))
 					depositAmount = depositAmount.Mul(depositAmount, big.NewInt(1000000000))
@@ -700,15 +699,15 @@ func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *s
 			if expectedWithdrawalRequest.SourceAddress != "" {
 				expectedAddress = common.FromHex(expectedWithdrawalRequest.SourceAddress)
 			}
+
 			if expectedWithdrawalRequest.ValidatorPubkey != "" {
 				expectedPubKey = common.FromHex(expectedWithdrawalRequest.ValidatorPubkey)
 			}
 
 			for _, withdrawalRequest := range withdrawalRequests {
-
 				if expectedWithdrawalRequest.ValidatorPubkey == "" || bytes.Equal(withdrawalRequest.ValidatorPubkey[:], expectedPubKey) {
 					withdrawalAmount := big.NewInt(int64(withdrawalRequest.Amount))
-					//withdrawalAmount = withdrawalAmount.Mul(withdrawalAmount, big.NewInt(1000000000))
+					withdrawalAmount = withdrawalAmount.Mul(withdrawalAmount, big.NewInt(1000000000))
 
 					switch {
 					case expectedWithdrawalRequest.SourceAddress != "" && !bytes.Equal(expectedAddress, withdrawalRequest.SourceAddress[:]):
@@ -754,15 +753,16 @@ func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData
 			if expectedConsolidationRequest.SourceAddress != "" {
 				expectedAddress = common.FromHex(expectedConsolidationRequest.SourceAddress)
 			}
+
 			if expectedConsolidationRequest.SourcePubkey != "" {
 				expectedSrcPubKey = common.FromHex(expectedConsolidationRequest.SourcePubkey)
 			}
+
 			if expectedConsolidationRequest.TargetPubkey != "" {
 				expectedTgtPubKey = common.FromHex(expectedConsolidationRequest.TargetPubkey)
 			}
 
 			for _, consolidationRequest := range consolidationRequests {
-
 				if expectedConsolidationRequest.SourcePubkey == "" || bytes.Equal(consolidationRequest.SourcePubkey[:], expectedSrcPubKey) {
 					switch {
 					case expectedConsolidationRequest.SourceAddress != "" && !bytes.Equal(expectedAddress, consolidationRequest.SourceAddress[:]):

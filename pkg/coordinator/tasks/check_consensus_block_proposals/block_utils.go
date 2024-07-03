@@ -8,6 +8,7 @@ import (
 )
 
 func getExecutionDepositRequests(v *spec.VersionedSignedBeaconBlock) ([]*electra.DepositRequest, error) {
+	//nolint:exhaustive // ignore
 	switch v.Version {
 	case spec.DataVersionPhase0:
 		return nil, errors.New("phase0 block does not have execution deposit requests")
@@ -35,6 +36,7 @@ func getExecutionDepositRequests(v *spec.VersionedSignedBeaconBlock) ([]*electra
 
 // ExecutionWithdrawalRequests returs the execution withdrawal requests for the block.
 func getExecutionWithdrawalRequests(v *spec.VersionedSignedBeaconBlock) ([]*electra.WithdrawalRequest, error) {
+	//nolint:exhaustive // ignore
 	switch v.Version {
 	case spec.DataVersionPhase0:
 		return nil, errors.New("phase0 block does not have execution withdrawal requests")
@@ -62,6 +64,7 @@ func getExecutionWithdrawalRequests(v *spec.VersionedSignedBeaconBlock) ([]*elec
 
 // ExecutionConsolidationRequests returs the execution consolidation requests for the block.
 func getExecutionConsolidationRequests(v *spec.VersionedSignedBeaconBlock) ([]*electra.ConsolidationRequest, error) {
+	//nolint:exhaustive // ignore
 	switch v.Version {
 	case spec.DataVersionPhase0:
 		return nil, errors.New("phase0 block does not have execution consolidation requests")
