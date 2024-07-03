@@ -3,18 +3,26 @@ package generateconsolidations
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
-	e2types "github.com/wealdtech/go-eth2-types/v2"
 	util "github.com/wealdtech/go-eth2-util"
 )
 
@@ -31,15 +39,15 @@ var (
 var DomainConsolidation = common.BLSDomainType{0x0B, 0x00, 0x00, 0x00}
 
 type Task struct {
-	ctx           *types.TaskContext
-	options       *types.TaskOptions
-	config        Config
-	logger        logrus.FieldLogger
-	sourceSeed    []byte
-	targetSeed    []byte
-	nextIndex     uint64
-	lastIndex     uint64
-	targetPrivKey *e2types.BLSPrivateKey
+	ctx                       *types.TaskContext
+	options                   *types.TaskOptions
+	config                    Config
+	logger                    logrus.FieldLogger
+	sourceSeed                []byte
+	nextIndex                 uint64
+	lastIndex                 uint64
+	walletPrivKey             *ecdsa.PrivateKey
+	consolidationContractAddr ethcommon.Address
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -95,22 +103,19 @@ func (t *Task) LoadConfig() error {
 		return valerr
 	}
 
-	t.sourceSeed, err = t.mnemonicToSeed(config.SourceMnemonic)
+	if config.SourceMnemonic != "" {
+		t.sourceSeed, err = t.mnemonicToSeed(config.SourceMnemonic)
+		if err != nil {
+			return err
+		}
+	}
+
+	t.walletPrivKey, err = crypto.HexToECDSA(config.WalletPrivkey)
 	if err != nil {
 		return err
 	}
 
-	t.targetSeed, err = t.mnemonicToSeed(config.TargetMnemonic)
-	if err != nil {
-		return err
-	}
-
-	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", config.TargetKeyIndex)
-
-	t.targetPrivKey, err = util.PrivateKeyFromSeedAndPath(t.targetSeed, validatorKeyPath)
-	if err != nil {
-		return fmt.Errorf("failed generating target validator key %v: %w", validatorKeyPath, err)
-	}
+	t.consolidationContractAddr = ethcommon.HexToAddress(config.ConsolidationContract)
 
 	t.config = config
 
@@ -132,21 +137,56 @@ func (t *Task) Execute(ctx context.Context) error {
 		defer subscription.Unsubscribe()
 	}
 
+	var pendingChan chan bool
+
+	pendingWg := sync.WaitGroup{}
+
+	if t.config.LimitPending > 0 {
+		pendingChan = make(chan bool, t.config.LimitPending)
+	}
+
 	perSlotCount := 0
 	totalCount := 0
+
+	consolidationTransactions := []string{}
+	consolidationReceipts := map[string]*ethtypes.Receipt{}
 
 	for {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateConsolidation(ctx, accountIdx)
+		tx, err := t.generateConsolidation(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
+			if pendingChan != nil {
+				<-pendingChan
+			}
+
+			pendingWg.Done()
+
+			consolidationReceipts[tx.Hash().Hex()] = receipt
+
+			if receipt != nil {
+				t.logger.Infof("deposit %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
+			}
+		})
 		if err != nil {
-			t.logger.Errorf("error generating consolidationn: %v", err.Error())
+			t.logger.Errorf("error generating deposit: %v", err.Error())
 		} else {
+			if pendingChan != nil {
+				select {
+				case <-ctx.Done():
+					return nil
+				case pendingChan <- true:
+				}
+			}
+
+			pendingWg.Add(1)
+
 			t.ctx.SetResult(types.TaskResultSuccess)
 
 			perSlotCount++
 			totalCount++
+
+			consolidationTransactions = append(consolidationTransactions, tx.Hash().Hex())
 		}
 
 		if t.lastIndex > 0 && t.nextIndex >= t.lastIndex {
@@ -165,57 +205,193 @@ func (t *Task) Execute(ctx context.Context) error {
 				return nil
 			case <-subscription.Channel():
 			}
-		} else if err := ctx.Err(); err != nil {
-			return err
+		} else if ctx.Err() != nil {
+			return nil
+		}
+	}
+
+	if t.config.AwaitReceipt {
+		pendingWg.Wait()
+	}
+
+	if t.config.ConsolidationTransactionsResultVar != "" {
+		t.ctx.Vars.SetVar(t.config.ConsolidationTransactionsResultVar, consolidationTransactions)
+	}
+
+	if t.config.ConsolidationReceiptsResultVar != "" {
+		receiptList := []interface{}{}
+
+		for _, txhash := range consolidationTransactions {
+			var receiptMap map[string]interface{}
+
+			receipt := consolidationReceipts[txhash]
+			if receipt == nil {
+				receiptMap = nil
+			} else {
+				receiptJSON, err := json.Marshal(receipt)
+				if err == nil {
+					receiptMap = map[string]interface{}{}
+					err = json.Unmarshal(receiptJSON, &receiptMap)
+
+					if err != nil {
+						t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
+
+						receiptMap = nil
+					}
+				} else {
+					t.logger.Errorf("could not marshal transaction receipt for result var: %v", err)
+				}
+			}
+
+			receiptList = append(receiptList, receiptMap)
+		}
+
+		t.ctx.Vars.SetVar(t.config.ConsolidationReceiptsResultVar, receiptList)
+	}
+
+	if t.config.FailOnReject {
+		for _, txhash := range consolidationTransactions {
+			if consolidationReceipts[txhash] == nil {
+				t.logger.Errorf("no receipt for consolidation transaction: %v", txhash)
+				t.ctx.SetResult(types.TaskResultFailure)
+
+				break
+			}
+
+			if consolidationReceipts[txhash].Status == 0 {
+				t.logger.Errorf("consolidation transaction failed: %v", txhash)
+				t.ctx.SetResult(types.TaskResultFailure)
+
+				break
+			}
 		}
 	}
 
 	return nil
 }
 
-func (t *Task) generateConsolidation(_ context.Context, accountIdx uint64) error {
+func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
-	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
-
-	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.sourceSeed, validatorKeyPath)
-	if err != nil {
-		return fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
-	}
-
-	validatorSet := clientPool.GetConsensusPool().GetValidatorSet()
 
 	var sourceValidator, targetValidator *v1.Validator
+	validatorSet := clientPool.GetConsensusPool().GetValidatorSet()
 
-	sourceValidatorPubkey := validatorPrivkey.PublicKey().Marshal()
-	targetValidatorPubkey := t.targetPrivKey.PublicKey().Marshal()
+	sourceSelector := ""
+	if t.sourceSeed != nil {
+		// select by key index
+		validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
-	for _, val := range validatorSet {
-		if bytes.Equal(val.Validator.PublicKey[:], sourceValidatorPubkey) {
-			sourceValidator = val
+		validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.sourceSeed, validatorKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 		}
 
-		if bytes.Equal(val.Validator.PublicKey[:], targetValidatorPubkey) {
-			targetValidator = val
+		sourceValidatorPubkey := validatorPrivkey.PublicKey().Marshal()
+		sourceSelector = fmt.Sprintf("(pubkey: 0x%x)", sourceValidatorPubkey)
+
+		for _, val := range validatorSet {
+			if bytes.Equal(val.Validator.PublicKey[:], sourceValidatorPubkey) {
+				sourceValidator = val
+				break
+			}
 		}
+	} else if t.config.SourceStartValidatorIndex != nil {
+		// select by validator index
+		validatorIndex := *t.config.SourceStartValidatorIndex + accountIdx
+		sourceSelector = fmt.Sprintf("(index: %v)", validatorIndex)
+		sourceValidator = validatorSet[phase0.ValidatorIndex(validatorIndex)]
 	}
 
 	if sourceValidator == nil {
-		return fmt.Errorf("source validator not found")
+		return nil, fmt.Errorf("source validator %s not found in validator set", sourceSelector)
 	}
 
+	targetValidator = validatorSet[phase0.ValidatorIndex(*t.config.TargetValidatorIndex)]
 	if targetValidator == nil {
-		return fmt.Errorf("source validator not found")
+		return nil, fmt.Errorf("target validator (index: %v) not found", *t.config.TargetValidatorIndex)
 	}
 
-	if sourceValidator.Validator.WithdrawalCredentials[0] != 0x01 {
-		return fmt.Errorf("validator %v does not have 0x01 withdrawal creds", sourceValidator.Index)
+	// generate consolidation transaction
+
+	var client *execution.Client
+
+	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
+		client = clientPool.GetExecutionPool().AwaitReadyEndpoint(ctx, execution.AnyClient)
+		if client == nil {
+			return nil, ctx.Err()
+		}
+	} else {
+		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
+		if len(clients) == 0 {
+			return nil, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+		}
+
+		client = clients[0].ExecutionClient
 	}
 
-	if targetValidator.Validator.WithdrawalCredentials[0] != 0x01 {
-		return fmt.Errorf("validator %v does not have 0x01 withdrawal creds", targetValidator.Index)
+	wallet, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
-	return nil
+	err = wallet.AwaitReady(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cannot load wallet state: %w", err)
+	}
+
+	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
+
+	tx, err := wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
+		txData := make([]byte, 96)
+		copy(txData[0:48], sourceValidator.Validator.PublicKey[:])
+		copy(txData[48:], targetValidator.Validator.PublicKey[:])
+
+		txObj := &ethtypes.DynamicFeeTx{
+			ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
+			Nonce:     nonce,
+			GasTipCap: t.config.TxTipCap,
+			GasFeeCap: t.config.TxFeeCap,
+			Gas:       t.config.TxGasLimit,
+			To:        &t.consolidationContractAddr,
+			Value:     t.config.TxAmount,
+			Data:      txData,
+		}
+
+		return ethtypes.NewTx(txObj), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot build consolidation transaction: %w", err)
+	}
+
+	t.logger.Infof("sending consolidation transaction (source index: %v, target index: %v, nonce: %v)", sourceValidator.Index, targetValidator.Index, tx.Nonce())
+
+	err = client.GetRPCClient().SendTransaction(ctx, tx)
+	if err != nil {
+		return nil, fmt.Errorf("failed sending consolidation transaction: %w", err)
+	}
+
+	go func() {
+		var receipt *ethtypes.Receipt
+
+		if onConfirm != nil {
+			defer func() {
+				onConfirm(tx, receipt)
+			}()
+		}
+
+		receipt, err := wallet.AwaitTransaction(ctx, tx)
+
+		if ctx.Err() != nil {
+			return
+		}
+
+		if err != nil {
+			t.logger.Errorf("failed awaiting transaction receipt: %w", err)
+			return
+		}
+	}()
+
+	return tx, nil
 }
 
 func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {
