@@ -166,7 +166,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			depositReceipts[tx.Hash().Hex()] = receipt
 
 			if receipt != nil {
-				t.logger.Infof("deposit %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
+				t.logger.Infof("deposit %v confirmed in block %v (nonce: %v, status: %v)", tx.Hash().Hex(), receipt.BlockNumber, tx.Nonce(), receipt.Status)
 			}
 		})
 		if err != nil {

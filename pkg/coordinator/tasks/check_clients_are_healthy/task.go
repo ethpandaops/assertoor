@@ -112,6 +112,14 @@ func (t *Task) processCheck() {
 		checkResult := t.processClientCheck(client)
 		if checkResult == expectedResult {
 			passResultCount++
+
+			if t.config.ExecutionRPCResultVar != "" && passResultCount == 1 && client.ExecutionClient != nil {
+				t.ctx.Vars.SetVar(t.config.ExecutionRPCResultVar, client.ExecutionClient.GetEndpointConfig().URL)
+			}
+
+			if t.config.ConsensusRPCResultVar != "" && passResultCount == 1 && client.ConsensusClient != nil {
+				t.ctx.Vars.SetVar(t.config.ConsensusRPCResultVar, client.ConsensusClient.GetEndpointConfig().URL)
+			}
 		} else {
 			failedClients = append(failedClients, client.Config.Name)
 		}
