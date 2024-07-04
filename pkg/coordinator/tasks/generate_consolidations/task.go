@@ -161,9 +161,9 @@ func (t *Task) Execute(ctx context.Context) error {
 				<-pendingChan
 			}
 
-			pendingWg.Done()
-
 			consolidationReceipts[tx.Hash().Hex()] = receipt
+
+			pendingWg.Done()
 
 			if receipt != nil {
 				t.logger.Infof("deposit %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
