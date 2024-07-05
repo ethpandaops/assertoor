@@ -24,7 +24,7 @@ type Task struct {
 	options *types.TaskOptions
 	config  Config
 	logger  logrus.FieldLogger
-	tasks   []types.Task
+	tasks   []types.TaskIndex
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -81,7 +81,7 @@ func (t *Task) LoadConfig() error {
 	}
 
 	// init child tasks
-	childTasks := []types.Task{}
+	childTasks := []types.TaskIndex{}
 
 	for i := range config.Tasks {
 		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
@@ -105,7 +105,7 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	for i, task := range t.tasks {
-		err := t.ctx.Scheduler.ExecuteTask(ctx, task, func(ctx context.Context, cancelFn context.CancelFunc, task types.Task) {
+		err := t.ctx.Scheduler.ExecuteTask(ctx, task, func(ctx context.Context, cancelFn context.CancelFunc, task types.TaskIndex) {
 			if t.config.StopChildOnResult {
 				t.ctx.Scheduler.WatchTaskPass(ctx, cancelFn, task)
 			}

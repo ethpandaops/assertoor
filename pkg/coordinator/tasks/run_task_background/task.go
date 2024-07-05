@@ -25,8 +25,8 @@ type Task struct {
 	options        *types.TaskOptions
 	config         Config
 	logger         logrus.FieldLogger
-	foregroundTask types.Task
-	backgroundTask types.Task
+	foregroundTask types.TaskIndex
+	backgroundTask types.TaskIndex
 	resultChanMtx  sync.Mutex
 	resultChan     chan taskResult
 	foregroundChan chan bool
@@ -130,7 +130,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	childCtx, cancel := context.WithCancel(ctx)
 
-	if t.backgroundTask != nil {
+	if t.backgroundTask != 0 {
 		go t.execBackgroundTask(childCtx)
 	}
 
@@ -170,7 +170,8 @@ func (t *Task) execBackgroundTask(ctx context.Context) {
 		return
 	}
 
-	taskResult := t.ctx.Scheduler.GetTaskStatus(t.backgroundTask)
+	taskState := t.ctx.Scheduler.GetTaskState(t.backgroundTask)
+	taskResult := taskState.GetTaskStatus()
 
 	//nolint:goconst // ignore
 	taskStatus := "success"
@@ -197,11 +198,12 @@ func (t *Task) execForegroundTask(ctx context.Context) {
 		close(t.foregroundChan)
 	}()
 
-	err := t.ctx.Scheduler.ExecuteTask(ctx, t.foregroundTask, func(ctx context.Context, cancelFn context.CancelFunc, _ types.Task) {
-		t.watchTaskResult(ctx, cancelFn)
-	})
+	taskState := t.ctx.Scheduler.GetTaskState(t.foregroundTask)
+	taskResult := taskState.GetTaskStatus()
 
-	taskResult := t.ctx.Scheduler.GetTaskStatus(t.foregroundTask)
+	err := t.ctx.Scheduler.ExecuteTask(ctx, t.foregroundTask, func(ctx context.Context, _ context.CancelFunc, _ types.TaskIndex) {
+		t.watchTaskResult(ctx, taskState)
+	})
 
 	taskStatus := "success"
 	if taskResult.Result == types.TaskResultFailure {
@@ -213,11 +215,11 @@ func (t *Task) execForegroundTask(ctx context.Context) {
 	t.completeWithResult(taskResult.Result, taskResult.Error)
 }
 
-func (t *Task) watchTaskResult(ctx context.Context, _ context.CancelFunc) {
+func (t *Task) watchTaskResult(ctx context.Context, taskState types.TaskState) {
 	currentResult := types.TaskResultNone
 
 	for {
-		updateChan := t.ctx.Scheduler.GetTaskResultUpdateChan(t.foregroundTask, currentResult)
+		updateChan := taskState.GetTaskResultUpdateChan(currentResult)
 		if updateChan != nil {
 			select {
 			case <-ctx.Done():
@@ -226,7 +228,7 @@ func (t *Task) watchTaskResult(ctx context.Context, _ context.CancelFunc) {
 			}
 		}
 
-		taskStatus := t.ctx.Scheduler.GetTaskStatus(t.foregroundTask)
+		taskStatus := taskState.GetTaskStatus()
 		if taskStatus.Result == currentResult {
 			continue
 		}

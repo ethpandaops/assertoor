@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
-	"github.com/sirupsen/logrus"
 )
 
 type TaskDescriptor struct {
@@ -29,6 +28,7 @@ type TaskOptions struct {
 	Timeout helper.Duration `yaml:"timeout" json:"timeout"`
 }
 
+type TaskIndex uint64
 type TaskResult uint8
 
 const (
@@ -38,21 +38,28 @@ const (
 )
 
 type Task interface {
-	Name() string
-	Title() string
-	Description() string
-
 	Config() interface{}
-	Logger() logrus.FieldLogger
 	Timeout() time.Duration
 
 	LoadConfig() error
 	Execute(ctx context.Context) error
 }
 
+type TaskState interface {
+	Index() TaskIndex
+	ParentIndex() TaskIndex
+	Name() string
+	Title() string
+	Description() string
+	Config() interface{}
+	Timeout() time.Duration
+	GetTaskStatus() *TaskStatus
+	GetTaskResultUpdateChan(oldResult TaskResult) <-chan bool
+}
+
 type TaskStatus struct {
-	Index       uint64
-	ParentIndex uint64
+	Index       TaskIndex
+	ParentIndex TaskIndex
 	IsStarted   bool
 	IsRunning   bool
 	StartTime   time.Time
@@ -64,9 +71,9 @@ type TaskStatus struct {
 
 type TaskContext struct {
 	Scheduler TaskScheduler
-	Index     uint64
+	Index     TaskIndex
 	Vars      Variables
 	Logger    *logger.LogScope
-	NewTask   func(options *TaskOptions, variables Variables) (Task, error)
+	NewTask   func(options *TaskOptions, variables Variables) (TaskIndex, error)
 	SetResult func(result TaskResult)
 }

@@ -158,19 +158,20 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 		indentationMap := map[uint64]int{}
 
 		for idx, task := range taskScheduler.GetAllTasks() {
-			taskStatus := taskScheduler.GetTaskStatus(task)
+			taskState := taskScheduler.GetTaskState(task)
+			taskStatus := taskState.GetTaskStatus()
 
 			taskData := &TestRunTask{
-				Index:       taskStatus.Index,
-				ParentIndex: taskStatus.ParentIndex,
-				Name:        task.Name(),
-				Title:       task.Title(),
+				Index:       uint64(taskState.Index()),
+				ParentIndex: uint64(taskState.ParentIndex()),
+				Name:        taskState.Name(),
+				Title:       taskState.Title(),
 				IsStarted:   taskStatus.IsStarted,
 				IsCompleted: taskStatus.IsStarted && !taskStatus.IsRunning,
 				StartTime:   taskStatus.StartTime,
 				StopTime:    taskStatus.StopTime,
-				Timeout:     task.Timeout(),
-				HasTimeout:  task.Timeout() > 0,
+				Timeout:     taskState.Timeout(),
+				HasTimeout:  taskState.Timeout() > 0,
 				GraphLevels: []uint64{},
 			}
 
@@ -247,7 +248,7 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 				taskData.Log[i] = logData
 			}
 
-			taskConfig, err := yaml.Marshal(task.Config())
+			taskConfig, err := yaml.Marshal(taskState.Config())
 			if err != nil {
 				taskData.ConfigYaml = fmt.Sprintf("failed marshalling config: %v", err)
 			} else {

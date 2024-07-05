@@ -94,16 +94,17 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 	taskScheduler := testInstance.GetTaskScheduler()
 	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
 		for _, task := range taskScheduler.GetAllTasks() {
-			taskStatus := taskScheduler.GetTaskStatus(task)
+			taskState := taskScheduler.GetTaskState(task)
+			taskStatus := taskState.GetTaskStatus()
 
 			taskData := &GetTestRunDetailedTask{
-				Index:       taskStatus.Index,
-				ParentIndex: taskStatus.ParentIndex,
-				Name:        task.Name(),
-				Title:       task.Title(),
+				Index:       uint64(taskState.Index()),
+				ParentIndex: uint64(taskState.ParentIndex()),
+				Name:        taskState.Name(),
+				Title:       taskState.Title(),
 				Started:     taskStatus.IsStarted,
 				Completed:   taskStatus.IsStarted && !taskStatus.IsRunning,
-				Timeout:     uint64(task.Timeout().Seconds()),
+				Timeout:     uint64(taskState.Timeout().Seconds()),
 			}
 
 			switch {
@@ -152,7 +153,7 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 				taskData.Log[i] = logData
 			}
 
-			taskConfig, err := yaml.Marshal(task.Config())
+			taskConfig, err := yaml.Marshal(taskState.Config())
 			if err != nil {
 				taskData.ConfigYaml = fmt.Sprintf("failed marshalling config: %v", err)
 			} else {
