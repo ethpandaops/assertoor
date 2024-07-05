@@ -9,8 +9,7 @@ type Variables interface {
 	GetSubScope(name string) Variables
 	SetSubScope(name string, subScope Variables)
 	NewScope() Variables
-	GetVarsMap(varsMap map[string]any) map[string]any
-	GetChildVarsMap() map[string]any
+	GetVarsMap(varsMap map[string]any, skipParent bool) map[string]any
 	ResolvePlaceholders(str string) string
 	ConsumeVars(config interface{}, consumeMap map[string]string) error
 	CopyVars(source Variables, copyMap map[string]string) error

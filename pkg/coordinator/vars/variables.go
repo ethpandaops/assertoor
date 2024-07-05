@@ -44,7 +44,7 @@ func (v *Variables) GetVar(name string) interface{} {
 
 	switch {
 	case subScope != nil:
-		return subScope.GetVarsMap(nil)
+		return subScope.GetVarsMap(nil, false)
 	case varValue.isDefined:
 		return varValue.value
 	case v.parentScope != nil:
@@ -62,7 +62,7 @@ func (v *Variables) LookupVar(name string) (interface{}, bool) {
 
 	switch {
 	case subScope != nil:
-		return subScope.GetVarsMap(nil), true
+		return subScope.GetVarsMap(nil, false), true
 	case varValue.isDefined:
 		return varValue.value, true
 	case v.parentScope != nil:
@@ -153,7 +153,7 @@ func (v *Variables) ResolvePlaceholders(str string) string {
 	return str
 }
 
-func (v *Variables) GetVarsMap(varsMap map[string]any) map[string]any {
+func (v *Variables) GetVarsMap(varsMap map[string]any, skipParent bool) map[string]any {
 	if varsMap == nil {
 		varsMap = map[string]any{}
 	}
@@ -165,7 +165,7 @@ func (v *Variables) GetVarsMap(varsMap map[string]any) map[string]any {
 			continue
 		}
 
-		varsMap[scopeName] = subScope.GetVarsMap(nil)
+		varsMap[scopeName] = subScope.GetVarsMap(nil, skipParent)
 	}
 
 	for varName, varData := range v.varsMap {
@@ -178,44 +178,15 @@ func (v *Variables) GetVarsMap(varsMap map[string]any) map[string]any {
 	}
 	v.varsMutex.RUnlock()
 
-	if v.parentScope != nil {
-		varsMap = v.parentScope.GetVarsMap(varsMap)
+	if v.parentScope != nil && !skipParent {
+		varsMap = v.parentScope.GetVarsMap(varsMap, false)
 	}
-
-	return varsMap
-}
-
-func (v *Variables) GetChildVarsMap() map[string]any {
-	varsMap := map[string]any{}
-
-	v.varsMutex.Lock()
-	for scopeName, subScope := range v.subScopes {
-		_, exists := varsMap[scopeName]
-		if exists {
-			continue
-		}
-
-		childVarsMap := subScope.GetChildVarsMap()
-		if len(childVarsMap) > 0 {
-			varsMap[scopeName] = subScope.GetChildVarsMap()
-		}
-	}
-
-	for varName, varData := range v.varsMap {
-		_, exists := varsMap[varName]
-		if exists {
-			continue
-		}
-
-		varsMap[varName] = varData.value
-	}
-	v.varsMutex.Unlock()
 
 	return varsMap
 }
 
 func (v *Variables) getGeneralizedVarsMap() (map[string]any, error) {
-	varsMap := v.GetVarsMap(nil)
+	varsMap := v.GetVarsMap(nil, false)
 
 	// this is a bit hacky, but we're marshalling & unmarshalling varsMap here to generalize the types.
 	// ie. []string should be a []interface{} of strings

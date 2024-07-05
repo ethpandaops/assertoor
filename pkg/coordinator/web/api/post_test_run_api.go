@@ -75,6 +75,6 @@ func (ah *APIHandler) PostTestRunsSchedule(w http.ResponseWriter, r *http.Reques
 		TestID: testDescriptor.ID(),
 		RunID:  testInstance.RunID(),
 		Name:   testInstance.Name(),
-		Config: testInstance.GetTestVariables().GetVarsMap(nil),
+		Config: testInstance.GetTestVariables().GetVarsMap(nil, false),
 	})
 }

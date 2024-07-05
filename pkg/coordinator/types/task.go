@@ -77,6 +77,7 @@ type TaskContext struct {
 	Scheduler TaskScheduler
 	Index     TaskIndex
 	Vars      Variables
+	Outputs   Variables
 	Logger    *logger.LogScope
 	NewTask   func(options *TaskOptions, variables Variables) (TaskIndex, error)
 	SetResult func(result TaskResult)

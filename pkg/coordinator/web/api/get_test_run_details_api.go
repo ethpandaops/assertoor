@@ -37,6 +37,7 @@ type GetTestRunDetailedTask struct {
 	ResultError string                       `json:"result_error"`
 	Log         []*GetTestRunDetailedTaskLog `json:"log"`
 	ConfigYaml  string                       `json:"config_yaml"`
+	ResultYaml  string                       `json:"result_yaml"`
 }
 
 type GetTestRunDetailedTaskLog struct {
@@ -158,6 +159,13 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 				taskData.ConfigYaml = fmt.Sprintf("failed marshalling config: %v", err)
 			} else {
 				taskData.ConfigYaml = string(taskConfig)
+			}
+
+			taskResult, err := yaml.Marshal(taskState.GetTaskStatusVars().GetVarsMap(nil, false))
+			if err != nil {
+				taskData.ResultYaml = fmt.Sprintf("failed marshalling result: %v", err)
+			} else {
+				taskData.ResultYaml = string(taskResult)
 			}
 
 			response.Tasks = append(response.Tasks, taskData)

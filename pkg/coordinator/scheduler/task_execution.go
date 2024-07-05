@@ -41,6 +41,7 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 		Scheduler: ts,
 		Index:     taskState.index,
 		Vars:      taskState.taskVars,
+		Outputs:   taskState.taskOutputs,
 		Logger:    taskState.logger,
 		NewTask: func(options *types.TaskOptions, variables types.Variables) (types.TaskIndex, error) {
 			task, err := ts.newTaskState(options, taskState, variables, taskState.isCleanup)

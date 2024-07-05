@@ -46,6 +46,7 @@ type TestRunTask struct {
 	ResultError string            `json:"result_error"`
 	Log         []*TestRunTaskLog `json:"log"`
 	ConfigYaml  string            `json:"config_yaml"`
+	ResultYaml  string            `json:"result_yaml"`
 }
 
 type TestRunTaskLog struct {
@@ -252,7 +253,14 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 			if err != nil {
 				taskData.ConfigYaml = fmt.Sprintf("failed marshalling config: %v", err)
 			} else {
-				taskData.ConfigYaml = string(taskConfig)
+				taskData.ConfigYaml = fmt.Sprintf("\n%v\n", string(taskConfig))
+			}
+
+			taskResult, err := yaml.Marshal(taskState.GetTaskStatusVars().GetVarsMap(nil, false))
+			if err != nil {
+				taskData.ResultYaml = fmt.Sprintf("failed marshalling result: %v", err)
+			} else {
+				taskData.ResultYaml = fmt.Sprintf("\n%v\n", string(taskResult))
 			}
 
 			pageData.Tasks = append(pageData.Tasks, taskData)
