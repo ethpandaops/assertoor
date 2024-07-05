@@ -42,7 +42,7 @@ func (ts *TaskScheduler) GetServices() types.TaskServices {
 }
 
 func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.TaskIndex, error) {
-	task, err := ts.newTask(options, nil, nil, false)
+	task, err := ts.newTaskState(options, nil, nil, false)
 	if err != nil {
 		return 0, err
 	}
@@ -53,7 +53,7 @@ func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.TaskInde
 }
 
 func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.TaskIndex, error) {
-	task, err := ts.newTask(options, nil, nil, true)
+	task, err := ts.newTaskState(options, nil, nil, true)
 	if err != nil {
 		return 0, err
 	}

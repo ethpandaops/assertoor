@@ -33,14 +33,14 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 		taskState.stopTime = time.Now()
 	}()
 
-	// initialize task instance
+	// create task control context
 	taskCtx := &types.TaskContext{
 		Scheduler: ts,
 		Index:     taskState.index,
 		Vars:      taskState.taskVars,
 		Logger:    taskState.logger,
 		NewTask: func(options *types.TaskOptions, variables types.Variables) (types.TaskIndex, error) {
-			task, err := ts.newTask(options, taskState, variables, taskState.isCleanup)
+			task, err := ts.newTaskState(options, taskState, variables, taskState.isCleanup)
 			if err != nil {
 				return 0, err
 			}
@@ -67,7 +67,12 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 		return fmt.Errorf("task %v config validation failed: %w", taskState.Name(), err)
 	}
 
+	taskState.task = task
 	taskState.taskConfig = task.Config()
+
+	defer func() {
+		taskState.task = nil
+	}()
 
 	// create cancelable task context
 	taskContext, taskCancelFn := context.WithCancel(ctx)

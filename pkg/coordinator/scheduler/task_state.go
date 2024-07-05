@@ -36,7 +36,7 @@ type taskState struct {
 	resultMutex      sync.RWMutex
 }
 
-func (ts *TaskScheduler) newTask(options *types.TaskOptions, parentState *taskState, variables types.Variables, isCleanupTask bool) (*taskState, error) {
+func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *taskState, variables types.Variables, isCleanupTask bool) (*taskState, error) {
 	if variables == nil {
 		if parentState != nil {
 			variables = parentState.taskVars
