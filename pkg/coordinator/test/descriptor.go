@@ -147,7 +147,7 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 		return nil, nil, fmt.Errorf("error decoding external test configVars %v: %v", extTestCfg.File, err)
 	}
 
-	for k, v := range globalVars.GetVarsMap() {
+	for k, v := range globalVars.GetVarsMap(nil) {
 		testVars.SetVar(k, v)
 	}
 

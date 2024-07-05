@@ -108,7 +108,7 @@ func (fh *FrontendHandler) getTestPageData(testID string) (*TestPage, error) {
 		Source: testDescriptor.Source(),
 	}
 
-	testCfgJSON, err := json.Marshal(testDescriptor.Vars().GetVarsMap())
+	testCfgJSON, err := json.Marshal(testDescriptor.Vars().GetVarsMap(nil))
 	if err != nil {
 		return nil, fmt.Errorf("failed marshalling test vars: %v", err)
 	}
