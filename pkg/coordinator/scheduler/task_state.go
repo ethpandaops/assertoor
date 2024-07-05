@@ -8,6 +8,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/tasks"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 )
 
 type taskState struct {
@@ -27,7 +28,9 @@ type taskState struct {
 	startTime time.Time
 	stopTime  time.Time
 
-	taskConfig interface{}
+	taskConfig     interface{}
+	taskOutputs    types.Variables
+	taskStatusVars types.Variables
 
 	updatedResult    bool
 	taskResult       types.TaskResult
@@ -71,11 +74,20 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 			Parent:      ts.logger.WithField("task", options.Name).WithField("taskidx", taskIdx),
 			HistorySize: 1000,
 		}),
+		taskOutputs:    vars.NewVariables(nil),
+		taskStatusVars: vars.NewVariables(nil),
 	}
 
 	if parentState != nil {
 		taskState.parentState = parentState
 		taskState.taskDepth = parentState.taskDepth + 1
+	}
+
+	taskState.taskStatusVars.NewSubScope("outputs")
+
+	if options.ID != "" {
+		tasksScope := variables.GetSubScope("tasks")
+		tasksScope.SetSubScope(options.ID, taskState.taskStatusVars)
 	}
 
 	ts.taskCount++
@@ -107,6 +119,8 @@ func (ts *taskState) setTaskResult(result types.TaskResult, setUpdated bool) {
 	}
 
 	ts.taskResult = result
+	ts.taskStatusVars.SetVar("result", uint8(result))
+
 	if ts.resultNotifyChan != nil {
 		close(ts.resultNotifyChan)
 		ts.resultNotifyChan = nil
@@ -130,6 +144,10 @@ func (ts *taskState) GetTaskStatus() *types.TaskStatus {
 	}
 
 	return taskStatus
+}
+
+func (ts *taskState) GetTaskStatusVars() types.Variables {
+	return ts.taskStatusVars
 }
 
 func (ts *taskState) GetTaskResultUpdateChan(oldResult types.TaskResult) <-chan bool {
@@ -157,6 +175,10 @@ func (ts *taskState) ParentIndex() types.TaskIndex {
 	}
 
 	return 0
+}
+
+func (ts *taskState) ID() string {
+	return ts.options.ID
 }
 
 func (ts *taskState) Name() string {

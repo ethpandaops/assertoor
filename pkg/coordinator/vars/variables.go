@@ -16,7 +16,7 @@ type Variables struct {
 	parentScope types.Variables
 	varsMutex   sync.RWMutex
 	varsMap     map[string]variableValue
-	subScopes   map[string]*Variables
+	subScopes   map[string]types.Variables
 }
 
 type variableValue struct {
@@ -28,7 +28,7 @@ func newVariables(parentScope types.Variables) *Variables {
 	return &Variables{
 		parentScope: parentScope,
 		varsMap:     map[string]variableValue{},
-		subScopes:   map[string]*Variables{},
+		subScopes:   map[string]types.Variables{},
 	}
 }
 
@@ -81,6 +81,16 @@ func (v *Variables) SetVar(name string, value interface{}) {
 	v.varsMutex.Unlock()
 }
 
+func (v *Variables) NewSubScope(name string) types.Variables {
+	v.varsMutex.Lock()
+	defer v.varsMutex.Unlock()
+
+	subScope := newVariables(nil)
+	v.subScopes[name] = subScope
+
+	return subScope
+}
+
 func (v *Variables) GetSubScope(name string) types.Variables {
 	var parentSubScope types.Variables
 
@@ -98,6 +108,13 @@ func (v *Variables) GetSubScope(name string) types.Variables {
 	}
 
 	return subScope
+}
+
+func (v *Variables) SetSubScope(name string, subScope types.Variables) {
+	v.varsMutex.Lock()
+	defer v.varsMutex.Unlock()
+
+	v.subScopes[name] = subScope
 }
 
 func (v *Variables) NewScope() types.Variables {
@@ -171,7 +188,7 @@ func (v *Variables) GetVarsMap(varsMap map[string]any) map[string]any {
 func (v *Variables) GetChildVarsMap() map[string]any {
 	varsMap := map[string]any{}
 
-	v.varsMutex.RLock()
+	v.varsMutex.Lock()
 	for scopeName, subScope := range v.subScopes {
 		_, exists := varsMap[scopeName]
 		if exists {
@@ -192,7 +209,7 @@ func (v *Variables) GetChildVarsMap() map[string]any {
 
 		varsMap[varName] = varData.value
 	}
-	v.varsMutex.RUnlock()
+	v.varsMutex.Unlock()
 
 	return varsMap
 }

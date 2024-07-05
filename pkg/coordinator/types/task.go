@@ -26,6 +26,8 @@ type TaskOptions struct {
 	Title string `yaml:"title" json:"title"`
 	// Timeout defines the max time waiting for the condition to be met.
 	Timeout helper.Duration `yaml:"timeout" json:"timeout"`
+	// The optional id of the task (for result access via steps.<step-id>).
+	ID string `yaml:"id" json:"id"`
 }
 
 type TaskIndex uint64
@@ -48,12 +50,14 @@ type Task interface {
 type TaskState interface {
 	Index() TaskIndex
 	ParentIndex() TaskIndex
+	ID() string
 	Name() string
 	Title() string
 	Description() string
 	Config() interface{}
 	Timeout() time.Duration
 	GetTaskStatus() *TaskStatus
+	GetTaskStatusVars() Variables
 	GetTaskResultUpdateChan(oldResult TaskResult) <-chan bool
 }
 

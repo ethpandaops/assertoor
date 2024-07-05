@@ -27,10 +27,13 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 	taskState.isStarted = true
 	taskState.startTime = time.Now()
 	taskState.isRunning = true
+	taskState.taskStatusVars.SetVar("started", true)
+	taskState.taskStatusVars.SetVar("running", true)
 
 	defer func() {
 		taskState.isRunning = false
 		taskState.stopTime = time.Now()
+		taskState.taskStatusVars.SetVar("running", false)
 	}()
 
 	// create task control context
@@ -83,6 +86,7 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 			select {
 			case <-time.After(taskTimeout):
 				taskState.isTimeout = true
+				taskState.taskStatusVars.SetVar("timeout", true)
 
 				taskLogger.Warnf("task timed out")
 				taskCancelFn()
