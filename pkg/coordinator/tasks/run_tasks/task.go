@@ -71,6 +71,7 @@ func (t *Task) LoadConfig() error {
 
 	if t.config.NewVariableScope {
 		taskVars = t.ctx.Vars.NewScope()
+		taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
 		t.ctx.Outputs.SetSubScope("childScope", taskVars)
 	}
 

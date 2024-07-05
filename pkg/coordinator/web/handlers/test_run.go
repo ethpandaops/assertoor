@@ -260,7 +260,20 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 			if err != nil {
 				taskData.ResultYaml = fmt.Sprintf("failed marshalling result: %v", err)
 			} else {
-				taskData.ResultYaml = fmt.Sprintf("\n%v\n", string(taskResult))
+				refComment := ""
+
+				if taskState.ID() != "" {
+					scopeOwner := taskState.GetTaskVars().GetVar("scopeOwner")
+					if scopeOwner != nil {
+						scopeOwner = fmt.Sprintf("task %v", scopeOwner)
+					} else {
+						scopeOwner = "root"
+					}
+
+					refComment = fmt.Sprintf("# available from %v scope via `tasks.%v`:\n", scopeOwner, taskState.ID())
+				}
+
+				taskData.ResultYaml = fmt.Sprintf("\n%v%v\n", refComment, string(taskResult))
 			}
 
 			pageData.Tasks = append(pageData.Tasks, taskData)

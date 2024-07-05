@@ -87,6 +87,7 @@ func (t *Task) LoadConfig() error {
 		}
 
 		taskVars := t.ctx.Vars.NewScope()
+		taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
 
 		task, err := t.ctx.NewTask(taskOpts, taskVars)
 		if err != nil {

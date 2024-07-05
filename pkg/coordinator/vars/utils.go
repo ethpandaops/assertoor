@@ -11,7 +11,7 @@ func GeneralizeData(source interface{}) (interface{}, error) {
 		return nil, fmt.Errorf("could not marshal: %v", err)
 	}
 
-	target := map[string]any{}
+	var target interface{}
 
 	err = json.Unmarshal(jsonData, &target)
 	if err != nil {

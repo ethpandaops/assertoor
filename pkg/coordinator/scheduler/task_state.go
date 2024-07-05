@@ -150,6 +150,10 @@ func (ts *taskState) GetTaskStatusVars() types.Variables {
 	return ts.taskStatusVars
 }
 
+func (ts *taskState) GetTaskVars() types.Variables {
+	return ts.taskVars
+}
+
 func (ts *taskState) GetTaskResultUpdateChan(oldResult types.TaskResult) <-chan bool {
 	ts.resultMutex.RLock()
 	defer ts.resultMutex.RUnlock()

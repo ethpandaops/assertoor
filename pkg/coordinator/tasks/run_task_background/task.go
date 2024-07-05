@@ -83,6 +83,7 @@ func (t *Task) LoadConfig() error {
 		}
 
 		backgroundScope := t.ctx.Vars.NewScope()
+		backgroundScope.SetVar("scopeOwner", uint64(t.ctx.Index))
 		t.ctx.Outputs.SetSubScope("backgroundScope", vars.NewScopeFilter(backgroundScope))
 
 		t.backgroundTask, err = t.ctx.NewTask(bgTaskOpts, backgroundScope)
@@ -100,6 +101,7 @@ func (t *Task) LoadConfig() error {
 	taskVars := t.ctx.Vars
 	if config.NewVariableScope {
 		taskVars = taskVars.NewScope()
+		taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
 		t.ctx.Outputs.SetSubScope("foregroundScope", vars.NewScopeFilter(taskVars))
 	}
 

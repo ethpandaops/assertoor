@@ -87,6 +87,8 @@ func (t *Task) LoadConfig() error {
 		}
 
 		taskVars := t.ctx.Vars.NewScope()
+		taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
+
 		if config.MatrixVar != "" {
 			taskVars.SetVar(config.MatrixVar, config.MatrixValues[i])
 		}

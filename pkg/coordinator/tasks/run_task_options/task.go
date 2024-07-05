@@ -85,7 +85,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		taskVars := t.ctx.Vars
 		if t.config.NewVariableScope {
 			taskVars = taskVars.NewScope()
-
+			taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
 			t.ctx.Outputs.SetSubScope("childScope", vars.NewScopeFilter(taskVars))
 		}
 
