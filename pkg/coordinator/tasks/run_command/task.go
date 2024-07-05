@@ -86,8 +86,11 @@ func (t *Task) Execute(ctx context.Context) error {
 	command := exec.CommandContext(ctx, com, args...)
 
 	stdOut, err := command.CombinedOutput()
+	t.ctx.Outputs.SetVar("stdout", string(stdOut))
+
 	if err != nil {
 		t.logger.WithField("stdout", string(stdOut)).WithError(err).Error("failed to run command")
+		t.ctx.Outputs.SetVar("error", err.Error())
 
 		if t.config.AllowedToFail {
 			return nil

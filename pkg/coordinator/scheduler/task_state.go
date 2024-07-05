@@ -83,7 +83,7 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 		taskState.taskDepth = parentState.taskDepth + 1
 	}
 
-	taskState.taskStatusVars.NewSubScope("outputs")
+	taskState.taskStatusVars.SetSubScope("outputs", taskState.taskOutputs)
 
 	if options.ID != "" {
 		tasksScope := variables.GetSubScope("tasks")

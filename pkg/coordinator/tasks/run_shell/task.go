@@ -220,6 +220,7 @@ func (t *Task) readOutputStream(pipe io.ReadCloser, logger logrus.FieldLogger) c
 
 var outputVarPattern = regexp.MustCompile(`^::set-var +([^ ]+) +(.*)$`)
 var outputJSONPattern = regexp.MustCompile(`^::set-json +([^ ]+) +(.*)$`)
+var outputOutPattern = regexp.MustCompile(`^::set-out(put)?(-json)? +([^ ]+) +(.*)$`)
 
 func (t *Task) parseOutputVars(line string) bool {
 	match := outputVarPattern.FindStringSubmatch(line)
@@ -248,6 +249,32 @@ func (t *Task) parseOutputVars(line string) bool {
 			t.logger.Infof("set variable %v: (json) %v", match[1], varValue)
 
 			return true
+		}
+	}
+
+	match = outputOutPattern.FindStringSubmatch(line)
+	if match != nil {
+		var varValue interface{}
+
+		if match[2] == "-json" {
+			err := json.Unmarshal([]byte(match[4]), &varValue)
+			if err != nil {
+				t.logger.Warnf("error parsing ::set-output-json expression: %v", err.Error())
+			} else {
+				t.ctx.Outputs.SetVar(match[2], varValue)
+				t.logger.Infof("set output %v: (json) %v", match[3], varValue)
+
+				return true
+			}
+		} else {
+			t.ctx.Outputs.SetVar(match[3], match[4])
+
+			logValue := match[4]
+			if len(logValue) > 1024 {
+				logValue = fmt.Sprintf("(%v bytes)", len(logValue))
+			}
+
+			t.logger.Infof("set output %v: (string) %v", match[3], logValue)
 		}
 	}
 

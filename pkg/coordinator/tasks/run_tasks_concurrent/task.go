@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -77,6 +78,7 @@ func (t *Task) LoadConfig() error {
 
 	// init child tasks
 	childTasks := []types.TaskIndex{}
+	childScopes := vars.NewVariables(nil)
 
 	for i := range config.Tasks {
 		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
@@ -84,13 +86,19 @@ func (t *Task) LoadConfig() error {
 			return fmt.Errorf("failed parsing child task config #%v : %w", i, err)
 		}
 
-		task, err := t.ctx.NewTask(taskOpts, nil)
+		taskVars := t.ctx.Vars.NewScope()
+
+		task, err := t.ctx.NewTask(taskOpts, taskVars)
 		if err != nil {
 			return fmt.Errorf("failed initializing child task #%v : %w", i, err)
 		}
 
 		childTasks = append(childTasks, task)
+
+		childScopes.SetSubScope(fmt.Sprintf("%v", i), vars.NewScopeFilter(taskVars))
 	}
+
+	t.ctx.Outputs.SetSubScope("childScopes", childScopes)
 
 	t.config = config
 	t.tasks = childTasks

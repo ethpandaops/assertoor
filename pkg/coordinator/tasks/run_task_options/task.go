@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -84,6 +85,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		taskVars := t.ctx.Vars
 		if t.config.NewVariableScope {
 			taskVars = taskVars.NewScope()
+
+			t.ctx.Outputs.SetSubScope("childScope", vars.NewScopeFilter(taskVars))
 		}
 
 		t.task, err = t.ctx.NewTask(taskOpts, taskVars)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -81,7 +82,10 @@ func (t *Task) LoadConfig() error {
 			return fmt.Errorf("failed parsing background task config: %w", err2)
 		}
 
-		t.backgroundTask, err = t.ctx.NewTask(bgTaskOpts, t.ctx.Vars.NewScope())
+		backgroundScope := t.ctx.Vars.NewScope()
+		t.ctx.Outputs.SetSubScope("backgroundScope", vars.NewScopeFilter(backgroundScope))
+
+		t.backgroundTask, err = t.ctx.NewTask(bgTaskOpts, backgroundScope)
 		if err != nil {
 			return fmt.Errorf("failed initializing background task: %w", err)
 		}
@@ -96,6 +100,7 @@ func (t *Task) LoadConfig() error {
 	taskVars := t.ctx.Vars
 	if config.NewVariableScope {
 		taskVars = taskVars.NewScope()
+		t.ctx.Outputs.SetSubScope("foregroundScope", vars.NewScopeFilter(taskVars))
 	}
 
 	t.foregroundTask, err = t.ctx.NewTask(fgTaskOpts, taskVars)

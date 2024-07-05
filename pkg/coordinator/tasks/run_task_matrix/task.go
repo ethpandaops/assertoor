@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -77,6 +78,7 @@ func (t *Task) LoadConfig() error {
 
 	// init child tasks
 	childTasks := []types.TaskIndex{}
+	childScopes := vars.NewVariables(nil)
 
 	for i := range config.MatrixValues {
 		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(config.Task)
@@ -95,7 +97,11 @@ func (t *Task) LoadConfig() error {
 		}
 
 		childTasks = append(childTasks, task)
+
+		childScopes.SetSubScope(fmt.Sprintf("%v", i), vars.NewScopeFilter(taskVars))
 	}
+
+	t.ctx.Outputs.SetSubScope("childScopes", childScopes)
 
 	t.config = config
 	t.tasks = childTasks

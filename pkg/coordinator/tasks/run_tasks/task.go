@@ -67,13 +67,20 @@ func (t *Task) LoadConfig() error {
 	// init child tasks
 	childTasks := []types.TaskIndex{}
 
+	var taskVars types.Variables
+
+	if t.config.NewVariableScope {
+		taskVars = t.ctx.Vars.NewScope()
+		t.ctx.Outputs.SetSubScope("childScope", taskVars)
+	}
+
 	for i := range config.Tasks {
 		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
 		if err != nil {
 			return fmt.Errorf("failed parsing child task config #%v : %w", i+1, err)
 		}
 
-		task, err := t.ctx.NewTask(taskOpts, nil)
+		task, err := t.ctx.NewTask(taskOpts, taskVars)
 		if err != nil {
 			return fmt.Errorf("failed initializing child task #%v : %w", i+1, err)
 		}

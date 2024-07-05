@@ -26,10 +26,6 @@ func (v *ScopeFilter) SetVar(name string, value interface{}) {
 	v.vars.SetVar(name, value)
 }
 
-func (v *ScopeFilter) NewSubScope(name string) types.Variables {
-	return v.vars.NewSubScope(name)
-}
-
 func (v *ScopeFilter) GetSubScope(name string) types.Variables {
 	return v.vars.GetSubScope(name)
 }
