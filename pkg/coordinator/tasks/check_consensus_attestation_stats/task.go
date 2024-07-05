@@ -255,6 +255,16 @@ func (t *Task) checkEpochVotes(epoch uint64, epochVote *epochVotes) bool {
 	t.logger.Infof("epoch %v head votes: %v (%.2f%%)", epoch, epochVote.currentEpoch.headVoteCount+epochVote.nextEpoch.headVoteCount, headPercent)
 	t.logger.Infof("epoch %v total votes: %v (%.2f%%)", epoch, epochVote.currentEpoch.totalVoteCount+epochVote.nextEpoch.totalVoteCount, totalPercent)
 
+	t.ctx.Outputs.SetVar("lastCheckedEpoch", epoch)
+	t.ctx.Outputs.SetVar("validatorCount", epochVote.attesterDuties.validatorCount)
+	t.ctx.Outputs.SetVar("validatorBalance", epochVote.attesterDuties.validatorBalance)
+	t.ctx.Outputs.SetVar("targetVotes", epochVote.currentEpoch.targetVoteCount+epochVote.nextEpoch.targetVoteCount)
+	t.ctx.Outputs.SetVar("targetVotesPercent", targetPercent)
+	t.ctx.Outputs.SetVar("headVotes", epochVote.currentEpoch.headVoteCount+epochVote.nextEpoch.headVoteCount)
+	t.ctx.Outputs.SetVar("headVotesPercent", headPercent)
+	t.ctx.Outputs.SetVar("totalVotes", epochVote.currentEpoch.totalVoteCount+epochVote.nextEpoch.totalVoteCount)
+	t.ctx.Outputs.SetVar("totalVotesPercent", totalPercent)
+
 	if t.config.MinTargetPercent > 0 && targetPercent < float64(t.config.MinTargetPercent) {
 		t.logger.Debugf("check failed for epoch %v: target vote percent (want: >= %v, have: %.2f%)", epoch, t.config.MinTargetPercent, targetPercent)
 		return false
