@@ -3,6 +3,7 @@ package checkexecutionblock
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -91,13 +92,19 @@ func (t *Task) Execute(ctx context.Context) error {
 	executionPool := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool()
 	blocks := executionPool.GetBlockCache().GetCachedBlocks()
 
+	if len(blocks) == 0 || blocks[0] == nil || blocks[0].GetBlock() == nil {
+		t.logger.Error("No blocks found or the first block is nil")
+		return errors.New("no blocks found or the first block is nil")
+	}
+
 	block := blocks[0].GetBlock()
 
 	t.logger.Infof("Fetched block number %v", block.Number())
 	t.logger.Infof("Fetched block hash %v", block.Hash().Hex())
-	jsonBytes, err := json.Marshal(block)
+	jsonBytes, err := json.Marshal(block.Header())
 	if err != nil {
 		t.logger.Errorf("Error marshaling block to JSON: %v", err)
+		return err
 	}
 	t.config.headBlock = string(jsonBytes)
 
