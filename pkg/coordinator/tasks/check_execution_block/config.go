@@ -1,7 +1,7 @@
 package checkexecutionblock
 
 type Config struct {
-	headBlock string `yaml:"headBlock" json:"headBlock"`
+	BlockHeaderResultVar string `yaml:"BlockHeaderResultVar" json:"BlockHeaderResultVar"`
 }
 
 func DefaultConfig() Config {

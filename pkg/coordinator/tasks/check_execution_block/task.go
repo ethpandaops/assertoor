@@ -106,8 +106,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Errorf("Error marshaling block to JSON: %v", err)
 		return err
 	}
-	t.config.headBlock = string(jsonBytes)
+	t.ctx.Vars.SetVar(t.config.BlockHeaderResultVar, string(jsonBytes))
 
-	t.logger.Infof("Block post json marshall %v", t.config.headBlock)
 	return nil
 }
