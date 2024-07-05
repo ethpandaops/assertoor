@@ -26,7 +26,7 @@ type TaskOptions struct {
 	Title string `yaml:"title" json:"title"`
 	// Timeout defines the max time waiting for the condition to be met.
 	Timeout helper.Duration `yaml:"timeout" json:"timeout"`
-	// The optional id of the task (for result access via steps.<step-id>).
+	// The optional id of the task (for result access via tasks.<task-id>).
 	ID string `yaml:"id" json:"id"`
 }
 
