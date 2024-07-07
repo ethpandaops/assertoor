@@ -3,11 +3,11 @@ package sleep
 import (
 	"errors"
 
-	human "github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 )
 
 type Config struct {
-	Duration human.Duration `yaml:"duration" json:"duration"`
+	Duration helper.Duration `yaml:"duration" json:"duration"`
 }
 
 func DefaultConfig() Config {

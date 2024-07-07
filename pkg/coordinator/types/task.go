@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/sirupsen/logrus"
 )
@@ -27,7 +26,7 @@ type TaskOptions struct {
 	// The title of the task - this is used to describe the task to the user.
 	Title string `yaml:"title" json:"title"`
 	// Timeout defines the max time waiting for the condition to be met.
-	Timeout human.Duration `yaml:"timeout" json:"timeout"`
+	Timeout helper.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type TaskResult uint8

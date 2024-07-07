@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	web_types "github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
@@ -40,7 +40,7 @@ type CoordinatorConfig struct {
 	MaxConcurrentTests uint64 `yaml:"maxConcurrentTests" json:"maxConcurrentTests"`
 
 	// Test history cleanup delay
-	TestRetentionTime human.Duration `yaml:"testRetentionTime" json:"testRetentionTime"`
+	TestRetentionTime helper.Duration `yaml:"testRetentionTime" json:"testRetentionTime"`
 }
 
 // DefaultConfig represents a sane-default configuration.

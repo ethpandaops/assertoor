@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,7 +39,7 @@ type Test interface {
 type TestConfig struct {
 	ID           string                 `yaml:"id" json:"id"`
 	Name         string                 `yaml:"name" json:"name"`
-	Timeout      human.Duration         `yaml:"timeout" json:"timeout"`
+	Timeout      helper.Duration        `yaml:"timeout" json:"timeout"`
 	Config       map[string]interface{} `yaml:"config" json:"config"`
 	ConfigVars   map[string]string      `yaml:"configVars" json:"configVars"`
 	Tasks        []helper.RawMessage    `yaml:"tasks" json:"tasks"`
@@ -52,7 +51,7 @@ type ExternalTestConfig struct {
 	ID         string                 `yaml:"id" json:"id"`
 	File       string                 `yaml:"file" json:"file"`
 	Name       string                 `yaml:"name" json:"name"`
-	Timeout    *human.Duration        `yaml:"timeout" json:"timeout"`
+	Timeout    *helper.Duration       `yaml:"timeout" json:"timeout"`
 	Config     map[string]interface{} `yaml:"config" json:"config"`
 	ConfigVars map[string]string      `yaml:"configVars" json:"configVars"`
 	Schedule   *TestSchedule          `yaml:"schedule" json:"schedule"`

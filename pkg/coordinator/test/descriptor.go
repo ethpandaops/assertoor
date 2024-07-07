@@ -67,7 +67,7 @@ func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localT
 
 		testConfig, testVars, err := LoadExternalTestConfig(ctx, globalVars, extTestCfg)
 
-		if testConfig.ID != "" {
+		if testConfig != nil && testConfig.ID != "" {
 			testID = testConfig.ID
 		}
 

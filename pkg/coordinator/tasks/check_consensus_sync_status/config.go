@@ -4,23 +4,23 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 )
 
 type Config struct {
-	ClientPattern           string         `yaml:"clientPattern" json:"clientPattern"`
-	PollInterval            human.Duration `yaml:"pollInterval" json:"pollInterval"`
-	ExpectSyncing           bool           `yaml:"expectSyncing" json:"expectSyncing"`
-	ExpectOptimistic        bool           `yaml:"expectOptimistic" json:"expectOptimistic"`
-	ExpectMinPercent        float64        `yaml:"expectMinPercent" json:"expectMinPercent"`
-	ExpectMaxPercent        float64        `yaml:"expectMaxPercent" json:"expectMaxPercent"`
-	MinSlotHeight           int            `yaml:"minSlotHeight" json:"minSlotHeight"`
-	WaitForChainProgression bool           `yaml:"waitForChainProgression" json:"waitForChainProgression"`
+	ClientPattern           string          `yaml:"clientPattern" json:"clientPattern"`
+	PollInterval            helper.Duration `yaml:"pollInterval" json:"pollInterval"`
+	ExpectSyncing           bool            `yaml:"expectSyncing" json:"expectSyncing"`
+	ExpectOptimistic        bool            `yaml:"expectOptimistic" json:"expectOptimistic"`
+	ExpectMinPercent        float64         `yaml:"expectMinPercent" json:"expectMinPercent"`
+	ExpectMaxPercent        float64         `yaml:"expectMaxPercent" json:"expectMaxPercent"`
+	MinSlotHeight           int             `yaml:"minSlotHeight" json:"minSlotHeight"`
+	WaitForChainProgression bool            `yaml:"waitForChainProgression" json:"waitForChainProgression"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		PollInterval:     human.Duration{Duration: 5 * time.Second},
+		PollInterval:     helper.Duration{Duration: 5 * time.Second},
 		ExpectMinPercent: 100,
 		ExpectMaxPercent: 100,
 		MinSlotHeight:    10,
