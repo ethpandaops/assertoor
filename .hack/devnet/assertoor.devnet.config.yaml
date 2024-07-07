@@ -1,0 +1,22 @@
+# this overrides settings in the generated config file
+# leave out setting you want to take over (endpoints, globalVars)
+
+web:
+  server:
+    host: "0.0.0.0"
+    port: 8080
+  frontend:
+    enabled: true
+    debug: true
+    pprof: true
+  api:
+    enabled: true
+
+validatorNames:
+  inventoryYaml: "${DEVNET_DIR}/generated-validator-ranges.yaml"
+
+#globalVars:
+#  additionalGlobalVar: xx
+
+externalTests:
+  #- file: ./test-playbook1.yaml
