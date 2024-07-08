@@ -82,16 +82,17 @@ func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
 	taskScheduler := testInstance.GetTaskScheduler()
 	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
 		for _, task := range taskScheduler.GetAllTasks() {
-			taskStatus := taskScheduler.GetTaskStatus(task)
+			taskState := taskScheduler.GetTaskState(task)
+			taskStatus := taskState.GetTaskStatus()
 
 			taskData := &GetTestRunTask{
-				Index:       taskStatus.Index,
-				ParentIndex: taskStatus.ParentIndex,
-				Name:        task.Name(),
-				Title:       task.Title(),
+				Index:       uint64(taskState.Index()),
+				ParentIndex: uint64(taskState.ParentIndex()),
+				Name:        taskState.Name(),
+				Title:       taskState.Title(),
 				Started:     taskStatus.IsStarted,
 				Completed:   taskStatus.IsStarted && !taskStatus.IsRunning,
-				Timeout:     uint64(task.Timeout().Seconds()),
+				Timeout:     uint64(taskState.Timeout().Seconds()),
 			}
 
 			switch {

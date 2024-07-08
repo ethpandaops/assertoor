@@ -36,24 +36,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -127,8 +111,12 @@ func (t *Task) runFinalityCheck() bool {
 		return false
 	}
 
-	finalizedEpoch, _ := consensusPool.GetBlockCache().GetFinalizedCheckpoint()
+	finalizedEpoch, finalizedRoot := consensusPool.GetBlockCache().GetFinalizedCheckpoint()
 	unfinalizedEpochs := currentEpoch.Number() - uint64(finalizedEpoch)
+
+	t.ctx.Outputs.SetVar("finalizedEpoch", finalizedEpoch)
+	t.ctx.Outputs.SetVar("finalizedRoot", finalizedRoot.String())
+	t.ctx.Outputs.SetVar("unfinalizedEpochs", unfinalizedEpochs)
 
 	if t.config.MinUnfinalizedEpochs > 0 && unfinalizedEpochs < t.config.MinUnfinalizedEpochs {
 		t.logger.Infof("check failed: minUnfinalizedEpochs (have: %v, want >= %v)", unfinalizedEpochs, t.config.MinUnfinalizedEpochs)

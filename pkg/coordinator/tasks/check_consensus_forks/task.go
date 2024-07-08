@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,6 +28,12 @@ type Task struct {
 	startEpoch uint64
 }
 
+type ForkInfo struct {
+	HeadSlot uint64   `json:"headSlot"`
+	HeadRoot string   `json:"headRoot"`
+	Clients  []string `json:"clients"`
+}
+
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
 	return &Task{
 		ctx:     ctx,
@@ -35,24 +42,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -110,8 +101,28 @@ func (t *Task) Execute(ctx context.Context) error {
 
 func (t *Task) runCheck() types.TaskResult {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
-
 	headForks := consensusPool.GetHeadForks(int64(t.config.MaxForkDistance))
+	headForkInfo := make([]*ForkInfo, len(headForks))
+
+	for i, headFork := range headForks {
+		clients := make([]string, len(headFork.AllClients))
+		for j, client := range headFork.AllClients {
+			clients[j] = client.GetName()
+		}
+
+		headForkInfo[i] = &ForkInfo{
+			HeadSlot: uint64(headFork.Slot),
+			HeadRoot: headFork.Root.String(),
+			Clients:  clients,
+		}
+	}
+
+	if data, err := vars.GeneralizeData(headForkInfo); err == nil {
+		t.ctx.Outputs.SetVar("forks", data)
+	} else {
+		t.logger.Warnf("failed setting `forks` output: %v", err)
+	}
+
 	if len(headForks)-1 > int(t.config.MaxForkCount) {
 		t.logger.Warnf("check failed: too many forks. (have: %v, want <= %v)", len(headForks)-1, t.config.MaxForkCount)
 

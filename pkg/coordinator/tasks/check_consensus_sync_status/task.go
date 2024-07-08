@@ -8,6 +8,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus/rpc"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,6 +30,14 @@ type Task struct {
 	firstHeight map[uint16]uint64
 }
 
+type ClientInfo struct {
+	Name          string `json:"name"`
+	Optimistic    bool   `json:"optimistic"`
+	Synchronizing bool   `json:"synchronizing"`
+	SyncHead      uint64 `json:"syncHead"`
+	SyncDistance  uint64 `json:"syncDistance"`
+}
+
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
 	return &Task{
 		ctx:         ctx,
@@ -38,24 +47,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -103,7 +96,9 @@ func (t *Task) Execute(ctx context.Context) error {
 
 func (t *Task) processCheck(ctx context.Context) {
 	allResultsPass := true
-	failedClients := []string{}
+	goodClients := []*ClientInfo{}
+	failedClients := []*ClientInfo{}
+	failedClientNames := []string{}
 
 	for _, client := range t.ctx.Scheduler.GetServices().ClientPool().GetClientsByNamePatterns(t.config.ClientPattern, "") {
 		var checkResult bool
@@ -126,11 +121,26 @@ func (t *Task) processCheck(ctx context.Context) {
 		if !checkResult {
 			allResultsPass = false
 
-			failedClients = append(failedClients, client.Config.Name)
+			failedClients = append(failedClients, t.getClientInfo(client, syncStatus))
+			failedClientNames = append(failedClientNames, client.Config.Name)
+		} else {
+			goodClients = append(goodClients, t.getClientInfo(client, syncStatus))
 		}
 	}
 
-	t.logger.Infof("Check result: %v, Failed Clients: %v", allResultsPass, failedClients)
+	t.logger.Infof("Check result: %v, Failed Clients: %v", allResultsPass, failedClientNames)
+
+	if goodClientsData, err := vars.GeneralizeData(goodClients); err == nil {
+		t.ctx.Outputs.SetVar("goodClients", goodClientsData)
+	} else {
+		t.logger.Warnf("Failed setting `goodClients` output: %v", err)
+	}
+
+	if failedClientsData, err := vars.GeneralizeData(failedClients); err == nil {
+		t.ctx.Outputs.SetVar("failedClients", failedClientsData)
+	} else {
+		t.logger.Warnf("Failed setting `failedClients` output: %v", err)
+	}
 
 	if allResultsPass {
 		t.ctx.SetResult(types.TaskResultSuccess)
@@ -177,4 +187,16 @@ func (t *Task) processClientCheck(client *clients.PoolClient, syncStatus *rpc.Sy
 	}
 
 	return true
+}
+
+func (t *Task) getClientInfo(client *clients.PoolClient, syncStatus *rpc.SyncStatus) *ClientInfo {
+	clientInfo := &ClientInfo{
+		Name:          client.Config.Name,
+		Synchronizing: syncStatus.IsSyncing,
+		Optimistic:    syncStatus.IsOptimistic,
+		SyncHead:      syncStatus.HeadSlot,
+		SyncDistance:  syncStatus.SyncDistance,
+	}
+
+	return clientInfo
 }

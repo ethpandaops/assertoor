@@ -635,6 +635,9 @@ const docTemplate = `{
                 "result_error": {
                     "type": "string"
                 },
+                "result_yaml": {
+                    "type": "string"
+                },
                 "runtime": {
                     "type": "integer"
                 },

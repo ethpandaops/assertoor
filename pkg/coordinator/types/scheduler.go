@@ -12,15 +12,14 @@ import (
 type TaskScheduler interface {
 	GetServices() TaskServices
 	ParseTaskOptions(rawtask *helper.RawMessage) (*TaskOptions, error)
-	ExecuteTask(ctx context.Context, task Task, taskWatchFn func(ctx context.Context, cancelFn context.CancelFunc, task Task)) error
-	WatchTaskPass(ctx context.Context, cancelFn context.CancelFunc, task Task)
+	ExecuteTask(ctx context.Context, taskIndex TaskIndex, taskWatchFn func(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)) error
+	WatchTaskPass(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)
+	GetTaskState(taskIndex TaskIndex) TaskState
 	GetTaskCount() int
-	GetAllTasks() []Task
-	GetRootTasks() []Task
-	GetAllCleanupTasks() []Task
-	GetRootCleanupTasks() []Task
-	GetTaskStatus(task Task) *TaskStatus
-	GetTaskResultUpdateChan(task Task, oldResult TaskResult) <-chan bool
+	GetAllTasks() []TaskIndex
+	GetRootTasks() []TaskIndex
+	GetAllCleanupTasks() []TaskIndex
+	GetRootCleanupTasks() []TaskIndex
 }
 
 type TaskServices interface {

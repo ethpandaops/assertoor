@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
 	"github.com/sirupsen/logrus"
 )
@@ -38,24 +39,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskDescriptor.Name
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -124,6 +109,13 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	childWallet := walletPool.GetNextChildWallet()
 	t.logger.Infof("child wallet: %v [nonce: %v]  %v ETH", childWallet.GetAddress().Hex(), childWallet.GetNonce(), childWallet.GetReadableBalance(18, 0, 4, false, false))
+
+	walletSummary := childWallet.GetSummary()
+	if walletSummaryData, err := vars.GeneralizeData(walletSummary); err == nil {
+		t.ctx.Outputs.SetVar("childWallet", walletSummaryData)
+	} else {
+		t.logger.Warnf("Failed setting `childWallet` output: %v", err)
+	}
 
 	if t.config.WalletAddressResultVar != "" {
 		t.ctx.Vars.SetVar(t.config.WalletAddressResultVar, childWallet.GetAddress().Hex())
