@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/juliangruber/go-intersect"
 	"github.com/sirupsen/logrus"
 )
@@ -42,24 +43,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -99,12 +84,14 @@ func (t *Task) Execute(ctx context.Context) error {
 	defer blockSubscription.Unsubscribe()
 
 	totalMatches := 0
+	matchingBlocks := []*consensus.Block{}
 
 	for {
 		select {
 		case block := <-blockSubscription.Channel():
 			matches := t.checkBlock(ctx, block)
 			if matches {
+				matchingBlocks = append(matchingBlocks, block)
 				t.logger.Infof("matching block %v [0x%x]", block.Slot, block.Root)
 
 				totalMatches++
@@ -112,7 +99,9 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			if t.config.BlockCount > 0 {
 				if totalMatches >= t.config.BlockCount {
+					t.setMatchingBlocksOutput(matchingBlocks)
 					t.ctx.SetResult(types.TaskResultSuccess)
+
 					return nil
 				}
 			} else {
@@ -126,6 +115,37 @@ func (t *Task) Execute(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
+}
+
+func (t *Task) setMatchingBlocksOutput(blocks []*consensus.Block) {
+	blockRoots := []string{}
+	blockHeaders := []any{}
+	blockBodies := []any{}
+
+	for _, block := range blocks {
+		blockRoots = append(blockRoots, block.Root.String())
+
+		var blockHeader, blockBody any
+
+		if header, err := vars.GeneralizeData(block.GetHeader()); err == nil {
+			blockHeader = header
+		} else {
+			t.logger.Warnf("Failed encoding block #%v header for matchingBlockHeaders output: %v", block.Slot, err)
+		}
+
+		if body, err := vars.GeneralizeData(consensus.GetBlockBody(block.GetBlock())); err == nil {
+			blockBody = body
+		} else {
+			t.logger.Warnf("Failed encoding block #%v header for matchingBlockHeaders output: %v", block.Slot, err)
+		}
+
+		blockHeaders = append(blockHeaders, blockHeader)
+		blockBodies = append(blockBodies, blockBody)
+	}
+
+	t.ctx.Outputs.SetVar("matchingBlockRoots", blockRoots)
+	t.ctx.Outputs.SetVar("matchingBlockHeaders", blockHeaders)
+	t.ctx.Outputs.SetVar("matchingBlockBodies", blockBodies)
 }
 
 //nolint:gocyclo // ignore

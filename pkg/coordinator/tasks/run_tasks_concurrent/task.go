@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,13 +27,13 @@ type Task struct {
 	config           Config
 	logger           logrus.FieldLogger
 	taskCtx          context.Context
-	tasks            []types.Task
-	taskIdxMap       map[types.Task]int
+	tasks            []types.TaskIndex
+	taskIdxMap       map[types.TaskIndex]int
 	resultNotifyChan chan taskResultUpdate
 }
 
 type taskResultUpdate struct {
-	task   types.Task
+	task   types.TaskIndex
 	result types.TaskResult
 }
 
@@ -41,29 +42,13 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 		ctx:              ctx,
 		options:          options,
 		logger:           ctx.Logger.GetLogger(),
-		taskIdxMap:       map[types.Task]int{},
+		taskIdxMap:       map[types.TaskIndex]int{},
 		resultNotifyChan: make(chan taskResultUpdate, 100),
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -92,7 +77,8 @@ func (t *Task) LoadConfig() error {
 	}
 
 	// init child tasks
-	childTasks := []types.Task{}
+	childTasks := []types.TaskIndex{}
+	childScopes := vars.NewVariables(nil)
 
 	for i := range config.Tasks {
 		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
@@ -100,13 +86,20 @@ func (t *Task) LoadConfig() error {
 			return fmt.Errorf("failed parsing child task config #%v : %w", i, err)
 		}
 
-		task, err := t.ctx.NewTask(taskOpts, nil)
+		taskVars := t.ctx.Vars.NewScope()
+		taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
+
+		task, err := t.ctx.NewTask(taskOpts, taskVars)
 		if err != nil {
 			return fmt.Errorf("failed initializing child task #%v : %w", i, err)
 		}
 
 		childTasks = append(childTasks, task)
+
+		childScopes.SetSubScope(fmt.Sprintf("%v", i), vars.NewScopeFilter(taskVars))
 	}
+
+	t.ctx.Outputs.SetSubScope("childScopes", childScopes)
 
 	t.config = config
 	t.tasks = childTasks
@@ -153,7 +146,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var successCount, failureCount, pendingCount uint64
 
-	resultMap := map[types.Task]types.TaskResult{}
+	resultMap := map[types.TaskIndex]types.TaskResult{}
 
 	taskComplete := false
 	for !taskComplete {
@@ -213,12 +206,13 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) watchChildTask(_ context.Context, _ context.CancelFunc, task types.Task) {
+func (t *Task) watchChildTask(_ context.Context, _ context.CancelFunc, task types.TaskIndex) {
+	taskState := t.ctx.Scheduler.GetTaskState(task)
 	oldStatus := types.TaskResultNone
 	taskActive := true
 
 	for taskActive {
-		updateChan := t.ctx.Scheduler.GetTaskResultUpdateChan(task, oldStatus)
+		updateChan := taskState.GetTaskResultUpdateChan(oldStatus)
 		if updateChan != nil {
 			select {
 			case <-t.taskCtx.Done():
@@ -228,7 +222,7 @@ func (t *Task) watchChildTask(_ context.Context, _ context.CancelFunc, task type
 			}
 		}
 
-		taskStatus := t.ctx.Scheduler.GetTaskStatus(task)
+		taskStatus := taskState.GetTaskStatus()
 		if !taskStatus.IsRunning {
 			taskActive = false
 		}
