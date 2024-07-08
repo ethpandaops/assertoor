@@ -67,12 +67,6 @@ The source validators can be specified in two ways:
 - **`failOnReject`**:
   Determines if the task should fail upon transaction rejection, enhancing error handling.
 
-- **`consolidationTransactionsResultVar`**:
-  A variable where the hashes of the executed consolidation transactions are stored.
-
-- **`consolidationReceiptsResultVar`**:
-  A variable for storing receipts of the consolidation transactions, applicable when receipts are awaited.
-
 ### Defaults
 
 Default settings for the `generate_consolidations` task:
