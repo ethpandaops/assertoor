@@ -109,6 +109,10 @@ func (t *Task) runRangeCheck() (checkResult, isLower bool) {
 		return false, true
 	}
 
+	t.ctx.Outputs.SetVar("genesisTime", consensusPool.GetBlockCache().GetGenesis().GenesisTime.Unix())
+	t.ctx.Outputs.SetVar("currentSlot", currentSlot.Number())
+	t.ctx.Outputs.SetVar("currentEpoch", currentEpoch.Number())
+
 	if currentSlot.Number() < t.config.MinSlotNumber {
 		return false, true
 	}

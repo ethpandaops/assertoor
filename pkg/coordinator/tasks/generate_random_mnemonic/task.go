@@ -86,5 +86,7 @@ func (t *Task) Execute(_ context.Context) error {
 		t.ctx.Vars.SetVar(t.config.MnemonicResultVar, mnemonic)
 	}
 
+	t.ctx.Outputs.SetVar("mnemonic", mnemonic)
+
 	return nil
 }
