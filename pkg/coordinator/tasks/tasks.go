@@ -21,6 +21,7 @@ import (
 	generateeoatransactions "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_eoa_transactions"
 	generateexits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_exits"
 	generaterandommnemonic "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_random_mnemonic"
+	generateshadowforkfunding "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_shadowfork_funding"
 	generateslashings "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_slashings"
 	generatetransaction "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_transaction"
 	runcommand "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_command"
@@ -52,6 +53,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generatedeposits.TaskDescriptor,
 	generateexits.TaskDescriptor,
 	generaterandommnemonic.TaskDescriptor,
+	generateshadowforkfunding.TaskDescriptor,
 	generateslashings.TaskDescriptor,
 	generatetransaction.TaskDescriptor,
 	runcommand.TaskDescriptor,
