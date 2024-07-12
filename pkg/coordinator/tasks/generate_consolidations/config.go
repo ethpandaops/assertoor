@@ -25,9 +25,6 @@ type Config struct {
 	ExcludeClientPattern      string   `yaml:"excludeClientPattern" json:"excludeClientPattern"`
 	AwaitReceipt              bool     `yaml:"awaitReceipt" json:"awaitReceipt"`
 	FailOnReject              bool     `yaml:"failOnReject" json:"failOnReject"`
-
-	ConsolidationTransactionsResultVar string `yaml:"consolidationTransactionsResultVar" json:"consolidationTransactionsResultVar"`
-	ConsolidationReceiptsResultVar     string `yaml:"consolidationReceiptsResultVar" json:"consolidationReceiptsResultVar"`
 }
 
 func DefaultConfig() Config {

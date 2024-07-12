@@ -19,3 +19,12 @@ docs:
 
 clean:
 	rm -f bin/*
+
+devnet:
+	.hack/devnet/run.sh
+
+devnet-run: devnet
+	go run main.go --config .hack/devnet/generated-assertoor-config.yaml
+
+devnet-clean:
+	.hack/devnet/cleanup.sh

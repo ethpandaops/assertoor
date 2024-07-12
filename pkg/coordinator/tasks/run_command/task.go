@@ -35,24 +35,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -102,8 +86,11 @@ func (t *Task) Execute(ctx context.Context) error {
 	command := exec.CommandContext(ctx, com, args...)
 
 	stdOut, err := command.CombinedOutput()
+	t.ctx.Outputs.SetVar("stdout", string(stdOut))
+
 	if err != nil {
 		t.logger.WithField("stdout", string(stdOut)).WithError(err).Error("failed to run command")
+		t.ctx.Outputs.SetVar("error", err.Error())
 
 		if t.config.AllowedToFail {
 			return nil

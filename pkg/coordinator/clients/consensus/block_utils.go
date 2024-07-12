@@ -31,3 +31,21 @@ func GetExecutionExtraData(v *spec.VersionedSignedBeaconBlock) ([]byte, error) {
 		return nil, errors.New("unknown version")
 	}
 }
+
+func GetBlockBody(v *spec.VersionedSignedBeaconBlock) any {
+	//nolint:exhaustive // ignore
+	switch v.Version {
+	case spec.DataVersionPhase0:
+		return v.Phase0
+	case spec.DataVersionAltair:
+		return v.Altair
+	case spec.DataVersionBellatrix:
+		return v.Bellatrix
+	case spec.DataVersionCapella:
+		return v.Capella
+	case spec.DataVersionDeneb:
+		return v.Deneb
+	default:
+		return nil
+	}
+}

@@ -67,7 +67,7 @@ func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localT
 
 		testConfig, testVars, err := LoadExternalTestConfig(ctx, globalVars, extTestCfg)
 
-		if testConfig.ID != "" {
+		if testConfig != nil && testConfig.ID != "" {
 			testID = testConfig.ID
 		}
 
@@ -147,7 +147,7 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 		return nil, nil, fmt.Errorf("error decoding external test configVars %v: %v", extTestCfg.File, err)
 	}
 
-	for k, v := range globalVars.GetVarsMap() {
+	for k, v := range globalVars.GetVarsMap(nil, false) {
 		testVars.SetVar(k, v)
 	}
 

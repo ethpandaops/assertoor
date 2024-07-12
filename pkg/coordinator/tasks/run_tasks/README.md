@@ -24,6 +24,9 @@ An important aspect of this task is that it cancels tasks once they return a res
 - **`continueOnFailure`**:\
   When `true`, the sequence of tasks continues even if individual tasks fail, allowing the entire sequence to be executed regardless of individual task outcomes.
 
+- **`newVariableScope`**:\
+  Determines whether to create a new variable scope for the child tasks. If `false`, the current scope is passed through, allowing the child tasks to share the same variable context as the `run_tasks` task.
+
 ### Defaults
 
 Default settings for the `run_tasks` task:
@@ -35,4 +38,5 @@ Default settings for the `run_tasks` task:
     stopChildOnResult: true
     expectFailure: false
     continueOnFailure: false
+    newVariableScope: false
 ```

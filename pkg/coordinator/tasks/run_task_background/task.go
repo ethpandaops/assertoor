@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,8 +26,8 @@ type Task struct {
 	options        *types.TaskOptions
 	config         Config
 	logger         logrus.FieldLogger
-	foregroundTask types.Task
-	backgroundTask types.Task
+	foregroundTask types.TaskIndex
+	backgroundTask types.TaskIndex
 	resultChanMtx  sync.Mutex
 	resultChan     chan taskResult
 	foregroundChan chan bool
@@ -45,24 +46,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -97,7 +82,11 @@ func (t *Task) LoadConfig() error {
 			return fmt.Errorf("failed parsing background task config: %w", err2)
 		}
 
-		t.backgroundTask, err = t.ctx.NewTask(bgTaskOpts, t.ctx.Vars.NewScope())
+		backgroundScope := t.ctx.Vars.NewScope()
+		backgroundScope.SetVar("scopeOwner", uint64(t.ctx.Index))
+		t.ctx.Outputs.SetSubScope("backgroundScope", vars.NewScopeFilter(backgroundScope))
+
+		t.backgroundTask, err = t.ctx.NewTask(bgTaskOpts, backgroundScope)
 		if err != nil {
 			return fmt.Errorf("failed initializing background task: %w", err)
 		}
@@ -112,6 +101,8 @@ func (t *Task) LoadConfig() error {
 	taskVars := t.ctx.Vars
 	if config.NewVariableScope {
 		taskVars = taskVars.NewScope()
+		taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
+		t.ctx.Outputs.SetSubScope("foregroundScope", vars.NewScopeFilter(taskVars))
 	}
 
 	t.foregroundTask, err = t.ctx.NewTask(fgTaskOpts, taskVars)
@@ -130,7 +121,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	childCtx, cancel := context.WithCancel(ctx)
 
-	if t.backgroundTask != nil {
+	if t.backgroundTask != 0 {
 		go t.execBackgroundTask(childCtx)
 	}
 
@@ -170,7 +161,8 @@ func (t *Task) execBackgroundTask(ctx context.Context) {
 		return
 	}
 
-	taskResult := t.ctx.Scheduler.GetTaskStatus(t.backgroundTask)
+	taskState := t.ctx.Scheduler.GetTaskState(t.backgroundTask)
+	taskResult := taskState.GetTaskStatus()
 
 	//nolint:goconst // ignore
 	taskStatus := "success"
@@ -197,11 +189,12 @@ func (t *Task) execForegroundTask(ctx context.Context) {
 		close(t.foregroundChan)
 	}()
 
-	err := t.ctx.Scheduler.ExecuteTask(ctx, t.foregroundTask, func(ctx context.Context, cancelFn context.CancelFunc, _ types.Task) {
-		t.watchTaskResult(ctx, cancelFn)
-	})
+	taskState := t.ctx.Scheduler.GetTaskState(t.foregroundTask)
+	taskResult := taskState.GetTaskStatus()
 
-	taskResult := t.ctx.Scheduler.GetTaskStatus(t.foregroundTask)
+	err := t.ctx.Scheduler.ExecuteTask(ctx, t.foregroundTask, func(ctx context.Context, _ context.CancelFunc, _ types.TaskIndex) {
+		t.watchTaskResult(ctx, taskState)
+	})
 
 	taskStatus := "success"
 	if taskResult.Result == types.TaskResultFailure {
@@ -213,11 +206,11 @@ func (t *Task) execForegroundTask(ctx context.Context) {
 	t.completeWithResult(taskResult.Result, taskResult.Error)
 }
 
-func (t *Task) watchTaskResult(ctx context.Context, _ context.CancelFunc) {
+func (t *Task) watchTaskResult(ctx context.Context, taskState types.TaskState) {
 	currentResult := types.TaskResultNone
 
 	for {
-		updateChan := t.ctx.Scheduler.GetTaskResultUpdateChan(t.foregroundTask, currentResult)
+		updateChan := taskState.GetTaskResultUpdateChan(currentResult)
 		if updateChan != nil {
 			select {
 			case <-ctx.Done():
@@ -226,7 +219,7 @@ func (t *Task) watchTaskResult(ctx context.Context, _ context.CancelFunc) {
 			}
 		}
 
-		taskStatus := t.ctx.Scheduler.GetTaskStatus(t.foregroundTask)
+		taskStatus := taskState.GetTaskStatus()
 		if taskStatus.Result == currentResult {
 			continue
 		}

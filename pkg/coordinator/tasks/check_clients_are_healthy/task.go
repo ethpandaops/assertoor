@@ -9,6 +9,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,6 +30,12 @@ type Task struct {
 	logger  logrus.FieldLogger
 }
 
+type ClientInfo struct {
+	Name     string `json:"name"`
+	ClRPCURL string `json:"clRpcUrl"`
+	ElRPCURL string `json:"elRpcUrl"`
+}
+
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
 	return &Task{
 		ctx:     ctx,
@@ -37,24 +44,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -104,7 +95,9 @@ func (t *Task) processCheck() {
 	expectedResult := !t.config.ExpectUnhealthy
 	passResultCount := 0
 	totalClientCount := 0
-	failedClients := []string{}
+	goodClients := []*ClientInfo{}
+	failedClients := []*ClientInfo{}
+	failedClientNames := []string{}
 
 	for _, client := range t.ctx.Scheduler.GetServices().ClientPool().GetClientsByNamePatterns(t.config.ClientPattern, "") {
 		totalClientCount++
@@ -112,6 +105,8 @@ func (t *Task) processCheck() {
 		checkResult := t.processClientCheck(client)
 		if checkResult == expectedResult {
 			passResultCount++
+
+			goodClients = append(goodClients, t.getClientInfo(client))
 
 			if t.config.ExecutionRPCResultVar != "" && passResultCount == 1 && client.ExecutionClient != nil {
 				t.ctx.Vars.SetVar(t.config.ExecutionRPCResultVar, client.ExecutionClient.GetEndpointConfig().URL)
@@ -121,7 +116,8 @@ func (t *Task) processCheck() {
 				t.ctx.Vars.SetVar(t.config.ConsensusRPCResultVar, client.ConsensusClient.GetEndpointConfig().URL)
 			}
 		} else {
-			failedClients = append(failedClients, client.Config.Name)
+			failedClients = append(failedClients, t.getClientInfo(client))
+			failedClientNames = append(failedClientNames, client.Config.Name)
 		}
 	}
 
@@ -132,7 +128,23 @@ func (t *Task) processCheck() {
 
 	resultPass := passResultCount >= requiredPassCount
 
-	t.logger.Infof("Check result: %v, Failed Clients: %v", resultPass, failedClients)
+	if goodClientsData, err := vars.GeneralizeData(goodClients); err == nil {
+		t.ctx.Outputs.SetVar("goodClients", goodClientsData)
+	} else {
+		t.logger.Warnf("Failed setting `goodClients` output: %v", err)
+	}
+
+	if failedClientsData, err := vars.GeneralizeData(failedClients); err == nil {
+		t.ctx.Outputs.SetVar("failedClients", failedClientsData)
+	} else {
+		t.logger.Warnf("Failed setting `failedClients` output: %v", err)
+	}
+
+	t.ctx.Outputs.SetVar("totalCount", totalClientCount)
+	t.ctx.Outputs.SetVar("failedCount", totalClientCount-passResultCount)
+	t.ctx.Outputs.SetVar("goodCount", passResultCount)
+
+	t.logger.Infof("Check result: %v, Failed Clients: %v", resultPass, failedClientNames)
 
 	switch {
 	case t.config.MaxUnhealthyCount > -1 && len(failedClients) > t.config.MaxUnhealthyCount:
@@ -150,6 +162,22 @@ func (t *Task) processCheck() {
 			t.ctx.SetResult(types.TaskResultNone)
 		}
 	}
+}
+
+func (t *Task) getClientInfo(client *clients.PoolClient) *ClientInfo {
+	clientInfo := &ClientInfo{
+		Name: client.Config.Name,
+	}
+
+	if client.ExecutionClient != nil {
+		clientInfo.ElRPCURL = client.ExecutionClient.GetEndpointConfig().URL
+	}
+
+	if client.ConsensusClient != nil {
+		clientInfo.ClRPCURL = client.ConsensusClient.GetEndpointConfig().URL
+	}
+
+	return clientInfo
 }
 
 func (t *Task) processClientCheck(client *clients.PoolClient) bool {

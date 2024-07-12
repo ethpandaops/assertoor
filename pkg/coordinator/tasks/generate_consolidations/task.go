@@ -58,24 +58,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -122,7 +106,6 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
-//nolint:gocyclo // ignore
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.SourceStartIndex > 0 {
 		t.nextIndex = uint64(t.config.SourceStartIndex)
@@ -215,40 +198,36 @@ func (t *Task) Execute(ctx context.Context) error {
 		pendingWg.Wait()
 	}
 
-	if t.config.ConsolidationTransactionsResultVar != "" {
-		t.ctx.Vars.SetVar(t.config.ConsolidationTransactionsResultVar, consolidationTransactions)
-	}
+	t.ctx.Outputs.SetVar("transactionHashes", consolidationTransactions)
 
-	if t.config.ConsolidationReceiptsResultVar != "" {
-		receiptList := []interface{}{}
+	receiptList := []interface{}{}
 
-		for _, txhash := range consolidationTransactions {
-			var receiptMap map[string]interface{}
+	for _, txhash := range consolidationTransactions {
+		var receiptMap map[string]interface{}
 
-			receipt := consolidationReceipts[txhash]
-			if receipt == nil {
-				receiptMap = nil
-			} else {
-				receiptJSON, err := json.Marshal(receipt)
-				if err == nil {
-					receiptMap = map[string]interface{}{}
-					err = json.Unmarshal(receiptJSON, &receiptMap)
+		receipt := consolidationReceipts[txhash]
+		if receipt == nil {
+			receiptMap = nil
+		} else {
+			receiptJSON, err := json.Marshal(receipt)
+			if err == nil {
+				receiptMap = map[string]interface{}{}
+				err = json.Unmarshal(receiptJSON, &receiptMap)
 
-					if err != nil {
-						t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
+				if err != nil {
+					t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
 
-						receiptMap = nil
-					}
-				} else {
-					t.logger.Errorf("could not marshal transaction receipt for result var: %v", err)
+					receiptMap = nil
 				}
+			} else {
+				t.logger.Errorf("could not marshal transaction receipt for result var: %v", err)
 			}
-
-			receiptList = append(receiptList, receiptMap)
 		}
 
-		t.ctx.Vars.SetVar(t.config.ConsolidationReceiptsResultVar, receiptList)
+		receiptList = append(receiptList, receiptMap)
 	}
+
+	t.ctx.Outputs.SetVar("transactionReceipts", receiptList)
 
 	if t.config.FailOnReject {
 		for _, txhash := range consolidationTransactions {

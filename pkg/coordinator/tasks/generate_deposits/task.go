@@ -60,24 +60,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -220,40 +204,46 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.Vars.SetVar(t.config.ValidatorPubkeysResultVar, validatorPubkeys)
 	}
 
+	t.ctx.Outputs.SetVar("validatorPubkeys", validatorPubkeys)
+
 	if t.config.DepositTransactionsResultVar != "" {
 		t.ctx.Vars.SetVar(t.config.DepositTransactionsResultVar, depositTransactions)
 	}
 
-	if t.config.DepositReceiptsResultVar != "" {
-		receiptList := []interface{}{}
+	t.ctx.Outputs.SetVar("depositTransactions", depositTransactions)
 
-		for _, txhash := range depositTransactions {
-			var receiptMap map[string]interface{}
+	receiptList := []interface{}{}
 
-			receipt := depositReceipts[txhash]
-			if receipt == nil {
-				receiptMap = nil
-			} else {
-				receiptJSON, err := json.Marshal(receipt)
-				if err == nil {
-					receiptMap = map[string]interface{}{}
-					err = json.Unmarshal(receiptJSON, &receiptMap)
+	for _, txhash := range depositTransactions {
+		var receiptMap map[string]interface{}
 
-					if err != nil {
-						t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
+		receipt := depositReceipts[txhash]
+		if receipt == nil {
+			receiptMap = nil
+		} else {
+			receiptJSON, err := json.Marshal(receipt)
+			if err == nil {
+				receiptMap = map[string]interface{}{}
+				err = json.Unmarshal(receiptJSON, &receiptMap)
 
-						receiptMap = nil
-					}
-				} else {
-					t.logger.Errorf("could not marshal transaction receipt for result var: %v", err)
+				if err != nil {
+					t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
+
+					receiptMap = nil
 				}
+			} else {
+				t.logger.Errorf("could not marshal transaction receipt for result var: %v", err)
 			}
-
-			receiptList = append(receiptList, receiptMap)
 		}
 
+		receiptList = append(receiptList, receiptMap)
+	}
+
+	if t.config.DepositReceiptsResultVar != "" {
 		t.ctx.Vars.SetVar(t.config.DepositReceiptsResultVar, receiptList)
 	}
+
+	t.ctx.Outputs.SetVar("depositReceipts", receiptList)
 
 	if t.config.FailOnReject {
 		for _, txhash := range depositTransactions {

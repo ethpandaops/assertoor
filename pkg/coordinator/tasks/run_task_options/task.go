@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,7 +25,7 @@ type Task struct {
 	options *types.TaskOptions
 	config  Config
 	logger  logrus.FieldLogger
-	task    types.Task
+	task    types.TaskIndex
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -35,24 +36,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -100,6 +85,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		taskVars := t.ctx.Vars
 		if t.config.NewVariableScope {
 			taskVars = taskVars.NewScope()
+			taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
+			t.ctx.Outputs.SetSubScope("childScope", vars.NewScopeFilter(taskVars))
 		}
 
 		t.task, err = t.ctx.NewTask(taskOpts, taskVars)
@@ -108,7 +95,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 
 		// execute task
-		taskErr = t.ctx.Scheduler.ExecuteTask(ctx, t.task, func(ctx context.Context, cancelFn context.CancelFunc, _ types.Task) {
+		taskErr = t.ctx.Scheduler.ExecuteTask(ctx, t.task, func(ctx context.Context, cancelFn context.CancelFunc, _ types.TaskIndex) {
 			t.watchTaskResult(ctx, cancelFn)
 		})
 
@@ -142,10 +129,11 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) watchTaskResult(ctx context.Context, cancelFn context.CancelFunc) {
+	taskState := t.ctx.Scheduler.GetTaskState(t.task)
 	currentResult := types.TaskResultNone
 
 	for {
-		updateChan := t.ctx.Scheduler.GetTaskResultUpdateChan(t.task, currentResult)
+		updateChan := taskState.GetTaskResultUpdateChan(currentResult)
 		if updateChan != nil {
 			select {
 			case <-ctx.Done():
@@ -154,7 +142,7 @@ func (t *Task) watchTaskResult(ctx context.Context, cancelFn context.CancelFunc)
 			}
 		}
 
-		taskStatus := t.ctx.Scheduler.GetTaskStatus(t.task)
+		taskStatus := taskState.GetTaskStatus()
 		if taskStatus.Result == currentResult {
 			continue
 		}

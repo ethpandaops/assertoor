@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
@@ -84,7 +83,7 @@ func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) 
 	testConfig := &types.TestConfig{
 		ID:           req.ID,
 		Name:         req.Name,
-		Timeout:      human.Duration{},
+		Timeout:      helper.Duration{},
 		Config:       req.Config,
 		ConfigVars:   req.ConfigVars,
 		Tasks:        req.Tasks,

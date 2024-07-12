@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/human-duration"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 )
@@ -54,13 +54,13 @@ func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.R
 	extTestCfg := &types.ExternalTestConfig{
 		File:       req.File,
 		Name:       req.Name,
-		Timeout:    &human.Duration{},
+		Timeout:    &helper.Duration{},
 		Config:     req.Config,
 		ConfigVars: req.ConfigVars,
 		Schedule:   req.Schedule,
 	}
 	if req.Timeout > 0 {
-		extTestCfg.Timeout = &human.Duration{Duration: time.Duration(req.Timeout) * time.Second}
+		extTestCfg.Timeout = &helper.Duration{Duration: time.Duration(req.Timeout) * time.Second}
 	}
 
 	testConfig, testVars, err := test.LoadExternalTestConfig(r.Context(), ah.coordinator.GlobalVariables(), extTestCfg)
