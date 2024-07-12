@@ -86,8 +86,8 @@ func (t *Task) Timeout() time.Duration {
 
 func (t *Task) Execute(ctx context.Context) error {
 	t.logger.Info("Checking eth_call...")
-	t.logger.Infof("EthCallData: %v", t.ctx.Vars.GetVar("EthCallData"))
-	t.logger.Infof("ExpectResult: %v", t.ctx.Vars.GetVar("ExpectResult"))
+	t.logger.Infof("EthCallData: %v", t.config.EthCallData)
+	t.logger.Infof("ExpectResult: %v", t.config.ExpectResult)
 
 	return nil
 }
