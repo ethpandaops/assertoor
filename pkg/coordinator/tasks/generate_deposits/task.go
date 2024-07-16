@@ -339,23 +339,27 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 
 	// generate deposit transaction
 
-	var client *execution.Client
+	var clients []*execution.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		client = clientPool.GetExecutionPool().AwaitReadyEndpoint(ctx, execution.AnyClient)
-		if client == nil {
-			return nil, nil, ctx.Err()
-		}
+		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
 	} else {
-		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
-		if len(clients) == 0 {
+		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
+		if len(poolClients) == 0 {
 			return nil, nil, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
 
-		client = clients[0].ExecutionClient
+		clients = make([]*execution.Client, len(poolClients))
+		for i, c := range poolClients {
+			clients[i] = c.ExecutionClient
+		}
 	}
 
-	depositContract, err := depositcontract.NewDepositContract(t.depositContractAddr, client.GetRPCClient().GetEthClient())
+	if len(clients) == 0 {
+		return nil, nil, fmt.Errorf("no ready clients available")
+	}
+
+	depositContract, err := depositcontract.NewDepositContract(t.depositContractAddr, clients[0].GetRPCClient().GetEthClient())
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot create bound instance of DepositContract: %w", err)
 	}
@@ -392,9 +396,19 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		return nil, nil, fmt.Errorf("cannot build deposit transaction: %w", err)
 	}
 
-	t.logger.Infof("sending deposit transaction (account idx: %v, nonce: %v)", accountIdx, tx.Nonce())
+	for i := 0; i < len(clients); i++ {
+		client := clients[i%len(clients)]
 
-	err = client.GetRPCClient().SendTransaction(ctx, tx)
+		t.logger.WithFields(logrus.Fields{
+			"client": client.GetName(),
+		}).Infof("sending deposit transaction (account idx: %v, nonce: %v)", accountIdx, tx.Nonce())
+
+		err = client.GetRPCClient().SendTransaction(ctx, tx)
+		if err == nil {
+			break
+		}
+	}
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed sending deposit transaction: %w", err)
 	}
