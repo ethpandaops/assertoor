@@ -36,20 +36,12 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
+}
+
+func (t *Task) Timeout() time.Duration {
+	return t.options.Timeout.Duration
 }
 
 func (t *Task) LoadConfig() error {
@@ -78,15 +70,7 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
-}
-
-func (t *Task) Timeout() time.Duration {
-	return t.options.Timeout.Duration
-}
-
-func (t *Task) Execute(ctx context.Context) error {
+func (t *Task) Execute(_ context.Context) error {
 	t.logger.Info("Checking the latest execution block...")
 
 	executionPool := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool()
@@ -101,11 +85,13 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.Infof("Fetched block number %v", block.Number())
 	t.logger.Infof("Fetched block hash %v", block.Hash().Hex())
+
 	jsonBytes, err := json.Marshal(block.Header())
 	if err != nil {
 		t.logger.Errorf("Error marshaling block to JSON: %v", err)
 		return err
 	}
+
 	t.ctx.Vars.SetVar(t.config.BlockHeaderResultVar, string(jsonBytes))
 
 	return nil
