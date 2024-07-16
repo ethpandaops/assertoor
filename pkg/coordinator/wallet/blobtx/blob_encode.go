@@ -10,13 +10,13 @@ import (
 )
 
 type BlobCommitment struct {
-	Blob          kzg4844.Blob
+	Blob          *kzg4844.Blob
 	Commitment    kzg4844.Commitment
 	Proof         kzg4844.Proof
 	VersionedHash common.Hash
 }
 
-func encodeBlobData(data []byte) kzg4844.Blob {
+func encodeBlobData(data []byte) *kzg4844.Blob {
 	blob := kzg4844.Blob{}
 	fieldIndex := -1
 
@@ -34,7 +34,7 @@ func encodeBlobData(data []byte) kzg4844.Blob {
 		copy(blob[fieldIndex*32+1:], data[i:maxpos])
 	}
 
-	return blob
+	return &blob
 }
 
 func EncodeBlob(data []byte) (*BlobCommitment, error) {
