@@ -10,7 +10,7 @@ require (
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/gorilla/mux v1.8.1
 	github.com/herumi/bls-eth-go-binary v1.33.0
-	github.com/holiman/uint256 v1.2.4
+	github.com/holiman/uint256 v1.3.0
 	github.com/itchyny/gojq v0.12.15
 	github.com/juliangruber/go-intersect v1.1.0
 	github.com/mashingan/smapping v0.1.19
@@ -105,4 +105,4 @@ require (
 
 replace github.com/attestantio/go-eth2-client => github.com/attestantio/go-eth2-client v0.0.0-20240701211822-0a60485fce68
 
-replace github.com/ethereum/go-ethereum => github.com/lightclient/go-ethereum v0.0.0-20240715202946-c4e4427a7e55
+replace github.com/ethereum/go-ethereum => github.com/lightclient/go-ethereum v0.0.0-20240716143145-1640531c26d3

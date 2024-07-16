@@ -251,7 +251,7 @@ func (wallet *Wallet) BuildTransaction(ctx context.Context, buildFn func(ctx con
 	wallet.txBuildMutex.Lock()
 	defer wallet.txBuildMutex.Unlock()
 
-	signer := types.LatestSignerForChainID(wallet.manager.clientPool.GetBlockCache().GetChainID())
+	signer := types.NewPragueSigner(wallet.manager.clientPool.GetBlockCache().GetChainID())
 	nonce := wallet.pendingNonce
 	tx, err := buildFn(ctx, nonce, func(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
 		if !bytes.Equal(addr[:], wallet.address[:]) {

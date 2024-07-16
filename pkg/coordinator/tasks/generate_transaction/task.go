@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
@@ -121,6 +122,19 @@ func (t *Task) Execute(ctx context.Context) error {
 	tx, err := t.generateTransaction(ctx)
 	if err != nil {
 		return err
+	}
+
+	if txData, err2 := vars.GeneralizeData(tx); err2 == nil {
+		t.ctx.Outputs.SetVar("transaction", txData)
+	} else {
+		t.logger.Warnf("Failed setting `transaction` output: %v", err2)
+	}
+
+	txBytes, err := tx.MarshalBinary()
+	if err != nil {
+		t.logger.Warnf("Failed setting `transactionHex` output: %v", err)
+	} else {
+		t.ctx.Outputs.SetVar("transactionHex", hexutil.Encode(txBytes))
 	}
 
 	var clients []*execution.Client
