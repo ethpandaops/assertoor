@@ -313,6 +313,46 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				BlobHashes: blobHashes,
 				Sidecar:    blobSidecar,
 			}
+		case t.config.SetCodeTxType:
+			authList := ethtypes.AuthorizationList{}
+
+			for _, authorization := range t.config.Authorizations {
+				authEntry := &ethtypes.Authorization{
+					ChainID: big.NewInt(0).SetUint64(authorization.ChainID),
+					Address: common.HexToAddress(authorization.CodeAddress),
+				}
+
+				if authorization.Nonce != nil {
+					authEntry.Nonce = []uint64{*authorization.Nonce}
+				} else {
+					authEntry.Nonce = []uint64{}
+				}
+
+				privKey, err := crypto.HexToECDSA(authorization.SignerPrivkey)
+				if err != nil {
+					return nil, err
+				}
+
+				authEntry, err = ethtypes.SignAuth(authEntry, privKey)
+				if err != nil {
+					return nil, err
+				}
+
+				authList = append(authList, authEntry)
+			}
+
+			txObj = &ethtypes.SetCodeTx{
+				ChainID:   uint256.MustFromBig(t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID()),
+				Nonce:     nonce,
+				GasTipCap: uint256.MustFromBig(&t.config.TipCap.Value),
+				GasFeeCap: uint256.MustFromBig(&t.config.FeeCap.Value),
+				Gas:       t.config.GasLimit,
+				To:        toAddr,
+				Value:     uint256.MustFromBig(txAmount),
+				Data:      txData,
+				AuthList:  authList,
+			}
+
 		default:
 			txObj = &ethtypes.DynamicFeeTx{
 				ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
