@@ -19,11 +19,4 @@ validatorNames:
 #  additionalGlobalVar: xx
 
 externalTests:
-  - file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/bls-changes.yaml"
-    config:
-      validatorCount: 100
-  - file: https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/wait-for-slot.yaml
-    id: wait1
-    config:
-      slot: 34
-  - file: ./test-consolidations.yaml
+  #- file: ./test-playbook1.yaml

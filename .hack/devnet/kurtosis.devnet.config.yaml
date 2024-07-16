@@ -1,33 +1,13 @@
 participants:
   - el_type: geth
-    el_image: ethpandaops/geth:prague-devnet-1
-    cl_type: teku
-    cl_image: ethpandaops/teku:master
-    count: 1
-  - el_type: geth
-    el_image: ethpandaops/geth:prague-devnet-1
-    cl_type: lodestar
-    cl_image: ethpandaops/lodestar:electra-fork
-    count: 1
-    validator_count: 10
-  - el_type: nethermind
-    el_image: nethermindeth/nethermind:pectra
-    cl_type: teku
-    cl_image: ethpandaops/teku:master
-    count: 1
-  - el_type: nethermind
-    el_image: nethermindeth/nethermind:pectra
-    cl_type: nimbus
-    cl_image: ethpandaops/nimbus-eth2:unstable
-    count: 1
+    el_image: ethereum/client-go:stable
+    cl_type: lighthouse
+    cl_image: sigp/lighthouse:latest
+    count: 3
 network_params:
   seconds_per_slot: 12
-  electra_fork_epoch: 1
-  min_validator_withdrawability_delay: 1
-  shard_committee_period: 1
 additional_services:
   - assertoor
-  - dora
 snooper_enabled: true
 assertoor_params:
   run_stability_check: false
