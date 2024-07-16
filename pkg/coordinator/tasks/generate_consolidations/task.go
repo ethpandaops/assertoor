@@ -149,11 +149,11 @@ func (t *Task) Execute(ctx context.Context) error {
 			pendingWg.Done()
 
 			if receipt != nil {
-				t.logger.Infof("deposit %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
+				t.logger.Infof("consolidation %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
 			}
 		})
 		if err != nil {
-			t.logger.Errorf("error generating deposit: %v", err.Error())
+			t.logger.Errorf("error generating consolidation: %v", err.Error())
 		} else {
 			if pendingChan != nil {
 				select {
@@ -294,20 +294,24 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 
 	// generate consolidation transaction
 
-	var client *execution.Client
+	var clients []*execution.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		client = clientPool.GetExecutionPool().AwaitReadyEndpoint(ctx, execution.AnyClient)
-		if client == nil {
-			return nil, ctx.Err()
-		}
+		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
 	} else {
-		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
-		if len(clients) == 0 {
+		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
+		if len(poolClients) == 0 {
 			return nil, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
 
-		client = clients[0].ExecutionClient
+		clients = make([]*execution.Client, len(poolClients))
+		for i, c := range poolClients {
+			clients[i] = c.ExecutionClient
+		}
+	}
+
+	if len(clients) == 0 {
+		return nil, fmt.Errorf("no ready clients available")
 	}
 
 	wallet, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
@@ -344,9 +348,19 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 		return nil, fmt.Errorf("cannot build consolidation transaction: %w", err)
 	}
 
-	t.logger.Infof("sending consolidation transaction (source index: %v, target index: %v, nonce: %v)", sourceValidator.Index, targetValidator.Index, tx.Nonce())
+	for i := 0; i < len(clients); i++ {
+		client := clients[i%len(clients)]
 
-	err = client.GetRPCClient().SendTransaction(ctx, tx)
+		t.logger.WithFields(logrus.Fields{
+			"client": client.GetName(),
+		}).Infof("sending consolidation transaction (source index: %v, target index: %v, nonce: %v)", sourceValidator.Index, targetValidator.Index, tx.Nonce())
+
+		err = client.GetRPCClient().SendTransaction(ctx, tx)
+		if err == nil {
+			break
+		}
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed sending consolidation transaction: %w", err)
 	}
