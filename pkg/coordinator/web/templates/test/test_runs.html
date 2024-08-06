@@ -16,7 +16,8 @@
       </thead>
       <tbody>
         <tr class="details-row"></tr>
-        {{ range $i, $test := . }}
+        {{ $canCancel := .CanCancel }}
+        {{ range $i, $test := .Tests }}
         <tr data-bs-toggle="collapse" data-bs-target="#run-details-{{ $test.RunID }}" class="accordion-toggle">
           <td class="p-0"><button class="btn btn-default btn-xs"><i class="fa fa-eye" aria-hidden="true"></i></button></td>
           <td>{{ $test.RunID }}</td>
@@ -62,12 +63,16 @@
                       <span class="badge rounded-pill text-bg-secondary">
                         <i class="far fa-hourglass-half"></i> Pending
                       </span>
-                      <button type="button" class="btn btn-danger test-cancel-button" data-testid="{{ $test.TestID }}" data-runid="{{ $test.RunID }}">Cancel Test</button>
+                      {{ if $canCancel }}
+                        <button type="button" class="btn btn-danger test-cancel-button" data-testid="{{ $test.TestID }}" data-runid="{{ $test.RunID }}">Cancel Test</button>
+                      {{ end }}
                     {{ else if eq $test.Status "running" }}
                       <span class="badge rounded-pill text-bg-primary">
                         <i class="far fa-play-circle"></i> Running
                       </span>
-                      <button type="button" class="btn btn-danger test-cancel-button" data-testid="{{ $test.TestID }}" data-runid="{{ $test.RunID }}">Cancel Test</button>
+                      {{ if $canCancel }}
+                        <button type="button" class="btn btn-danger test-cancel-button" data-testid="{{ $test.TestID }}" data-runid="{{ $test.RunID }}">Cancel Test</button>
+                      {{ end }}
                     {{ else if eq $test.Status "success" }}
                       <span class="badge rounded-pill text-bg-success">
                         <i class="fas fa-check-circle"></i> Success

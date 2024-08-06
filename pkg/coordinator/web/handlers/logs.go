@@ -25,6 +25,11 @@ type LogsEntry struct {
 }
 
 func (fh *FrontendHandler) LogsData(w http.ResponseWriter, r *http.Request) {
+	if fh.securityTrimmed {
+		http.Error(w, "Not allowed", http.StatusForbidden)
+		return
+	}
+
 	vars := mux.Vars(r)
 
 	sinceTime, err := strconv.ParseInt(vars["since"], 10, 64)
