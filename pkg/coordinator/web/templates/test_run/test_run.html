@@ -91,6 +91,7 @@
         </thead>
         <tbody>
           <tr class="details-row"></tr>
+          {{ $isSecTrimmed := .IsSecTrimmed }}
           {{ range $i, $task := .Tasks }}
           <tr data-bs-toggle="collapse" data-bs-target="#task-details-{{ $task.Index }}" class="accordion-toggle">
             <td class="task-graph">
@@ -206,7 +207,7 @@
                     {{ end }}
                   </table>
 
-
+                  {{ if not $isSecTrimmed }}
                   {{ if $task.IsStarted }}
                   <ul class="nav nav-tabs mt-2" id="task{{ $task.Index }}-tabs" role="tablist">
                     <li class="nav-item" role="presentation">
@@ -265,6 +266,7 @@
                       </div>
                     </div>
                   </div>
+                  {{ end }}
                   {{ end }}
 
                 </div>

@@ -19,7 +19,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web/server"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/gorhill/cronexpr"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -27,14 +27,15 @@ import (
 
 type Coordinator struct {
 	// Config is the coordinator configuration.
-	Config         *Config
-	log            *logger.LogScope
-	clientPool     *clients.ClientPool
-	walletManager  *wallet.Manager
-	webserver      *server.WebServer
-	validatorNames *names.ValidatorNames
-	globalVars     types.Variables
-	metricsPort    int
+	Config          *Config
+	log             *logger.LogScope
+	clientPool      *clients.ClientPool
+	walletManager   *wallet.Manager
+	webserver       *web.Server
+	publicWebserver *web.Server
+	validatorNames  *names.ValidatorNames
+	globalVars      types.Variables
+	metricsPort     int
 
 	runIDCounter       uint64
 	lastExecutedRunID  uint64
@@ -110,14 +111,26 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	}
 
 	// init webserver
-	if c.Config.Web != nil && c.Config.Web.Server != nil {
-		c.webserver, err = server.NewWebServer(c.Config.Web.Server, c.log.GetLogger())
-		if err != nil {
-			return err
+	if c.Config.Web != nil {
+		if c.Config.Web.Server != nil {
+			c.webserver, err = web.NewWebServer(c.Config.Web.Server, c.log.GetLogger())
+			if err != nil {
+				return err
+			}
+
+			err = c.webserver.ConfigureRoutes(c.Config.Web.Frontend, c.Config.Web.API, c, false)
+			if err != nil {
+				return err
+			}
 		}
 
-		if c.Config.Web.API != nil {
-			err = c.webserver.ConfigureRoutes(c.Config.Web, c.log.GetLogger(), c)
+		if c.Config.Web.PublicServer != nil {
+			c.publicWebserver, err = web.NewWebServer(c.Config.Web.PublicServer, c.log.GetLogger().WithField("module", "public_web"))
+			if err != nil {
+				return err
+			}
+
+			err = c.publicWebserver.ConfigureRoutes(c.Config.Web.Frontend, nil, c, true)
 			if err != nil {
 				return err
 			}
