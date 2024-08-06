@@ -1,7 +1,8 @@
-package web
+package templates
 
 import (
 	"bufio"
+	"embed"
 	"fmt"
 	"html/template"
 	"io"
@@ -12,46 +13,62 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sirupsen/logrus"
 	"github.com/tdewolff/minify"
-
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web/utils"
 )
 
-var templateFiles fs.FS
-var templateCache = make(map[string]*template.Template)
-var templateCacheMux = &sync.RWMutex{}
-var templateFuncs = utils.GetTemplateFuncs()
+var (
+	//go:embed *
+	templateFiles embed.FS
+)
 
-func GetTemplate(files ...string) *template.Template {
-	name := strings.Join(files, "-")
-
-	templateCacheMux.RLock()
-	if templateCache[name] != nil {
-		defer templateCacheMux.RUnlock()
-		return templateCache[name]
-	}
-	templateCacheMux.RUnlock()
-
-	tmpl := template.New(name).Funcs(templateFuncs)
-	tmpl = template.Must(parseTemplateFiles(tmpl, readFileFS(templateFiles), files...))
-
-	templateCacheMux.Lock()
-	defer templateCacheMux.Unlock()
-
-	templateCache[name] = tmpl
-
-	return templateCache[name]
+type Templates struct {
+	logger   logrus.FieldLogger
+	cache    map[string]*template.Template
+	cacheMux sync.RWMutex
+	funcs    template.FuncMap
+	minify   bool
 }
 
-func readFileFS(fsys fs.FS) func(string) (string, []byte, error) {
+func New(logger logrus.FieldLogger, funcs template.FuncMap, minifyHTML bool) *Templates {
+	return &Templates{
+		logger: logger,
+		cache:  make(map[string]*template.Template),
+		funcs:  funcs,
+		minify: minifyHTML,
+	}
+}
+
+func (t *Templates) GetTemplate(files ...string) *template.Template {
+	name := strings.Join(files, "-")
+
+	t.cacheMux.RLock()
+	if t.cache[name] != nil {
+		defer t.cacheMux.RUnlock()
+		return t.cache[name]
+	}
+	t.cacheMux.RUnlock()
+
+	tmpl := template.New(name).Funcs(t.funcs)
+	tmpl = template.Must(parseTemplateFiles(tmpl, t.readFileFS(templateFiles), files...))
+
+	t.cacheMux.Lock()
+	defer t.cacheMux.Unlock()
+
+	t.cache[name] = tmpl
+
+	return t.cache[name]
+}
+
+func (t *Templates) readFileFS(fsys fs.FS) func(string) (string, []byte, error) {
 	return func(file string) (name string, b []byte, err error) {
 		name = path.Base(file)
 		b, err = fs.ReadFile(fsys, file)
 
-		if frontendConfig.Minify {
+		if t.minify {
 			// minfiy template
 			m := minify.New()
-			m.AddFunc("text/html", minifyTemplate)
+			m.AddFunc("text/html", t.minifyTemplate)
 
 			b, err = m.Bytes("text/html", b)
 			if err != nil {
@@ -63,7 +80,7 @@ func readFileFS(fsys fs.FS) func(string) (string, []byte, error) {
 	}
 }
 
-func minifyTemplate(_ *minify.M, w io.Writer, r io.Reader, _ map[string]string) error {
+func (t *Templates) minifyTemplate(_ *minify.M, w io.Writer, r io.Reader, _ map[string]string) error {
 	// remove newlines and spaces
 	m1 := regexp.MustCompile(`([ \t]+)?[\r\n]+`)
 	m2 := regexp.MustCompile(`([ \t])[ \t]+`)
@@ -120,18 +137,6 @@ func parseTemplateFiles(t *template.Template, readFile func(string) (string, []b
 func GetTemplateNames() []string {
 	files, _ := getFileSysNames(templateFiles, ".")
 	return files
-}
-
-func CompileTimeCheck(fsys fs.FS) error {
-	files, err := getFileSysNames(fsys, ".")
-	if err != nil {
-		return err
-	}
-
-	template.Must(template.New("layout").Funcs(templateFuncs).ParseFS(templateFiles, files...))
-	logger.Infof("compile time check completed")
-
-	return nil
 }
 
 func getFileSysNames(fsys fs.FS, dirname string) ([]string, error) {

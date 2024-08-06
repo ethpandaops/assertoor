@@ -8,23 +8,23 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
 type TestRunPage struct {
-	RunID       uint64         `json:"runId"`
-	TestID      string         `json:"testId"`
-	Name        string         `json:"name"`
-	IsStarted   bool           `json:"started"`
-	IsCompleted bool           `json:"completed"`
-	StartTime   time.Time      `json:"start_time"`
-	StopTime    time.Time      `json:"stop_time"`
-	Timeout     time.Duration  `json:"timeout"`
-	Status      string         `json:"status"`
-	Tasks       []*TestRunTask `json:"tasks"`
+	RunID        uint64         `json:"runId"`
+	TestID       string         `json:"testId"`
+	Name         string         `json:"name"`
+	IsStarted    bool           `json:"started"`
+	IsCompleted  bool           `json:"completed"`
+	StartTime    time.Time      `json:"start_time"`
+	StopTime     time.Time      `json:"stop_time"`
+	Timeout      time.Duration  `json:"timeout"`
+	Status       string         `json:"status"`
+	IsSecTrimmed bool           `json:"is_sec_trimmed"`
+	Tasks        []*TestRunTask `json:"tasks"`
 }
 
 type TestRunTask struct {
@@ -65,13 +65,13 @@ func (fh *FrontendHandler) TestRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	templateFiles := web.LayoutTemplateFiles
+	templateFiles := LayoutTemplateFiles
 	templateFiles = append(templateFiles,
 		"test_run/test_run.html",
 		"sidebar/sidebar.html",
 	)
-	pageTemplate := web.GetTemplate(templateFiles...)
-	data := web.InitPageData(r, "test", "/", "Test ", templateFiles)
+	pageTemplate := fh.templates.GetTemplate(templateFiles...)
+	data := fh.initPageData(r, "test", "/", "Test ", templateFiles)
 
 	vars := mux.Vars(r)
 
@@ -84,7 +84,7 @@ func (fh *FrontendHandler) TestRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if pageError != nil {
-		web.HandlePageError(w, r, pageError)
+		fh.HandlePageError(w, r, pageError)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (fh *FrontendHandler) TestRun(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 
-	if web.HandleTemplateError(w, r, "test_run.go", "Test Run", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
+	if fh.handleTemplateError(w, r, "test_run.go", "Test Run", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
 		return // an error has occurred and was processed
 	}
 }
@@ -109,7 +109,7 @@ func (fh *FrontendHandler) TestRunData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if pageError != nil {
-		web.HandlePageError(w, r, pageError)
+		fh.HandlePageError(w, r, pageError)
 		return
 	}
 
@@ -124,6 +124,7 @@ func (fh *FrontendHandler) TestRunData(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//nolint:gocyclo // ignore
 func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error) {
 	test := fh.coordinator.GetTestByRunID(uint64(runID))
 	if test == nil {
@@ -131,13 +132,14 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 	}
 
 	pageData := &TestRunPage{
-		RunID:     uint64(runID),
-		TestID:    test.TestID(),
-		Name:      test.Name(),
-		StartTime: test.StartTime(),
-		StopTime:  test.StopTime(),
-		Timeout:   test.Timeout(),
-		Status:    string(test.Status()),
+		RunID:        uint64(runID),
+		TestID:       test.TestID(),
+		Name:         test.Name(),
+		StartTime:    test.StartTime(),
+		StopTime:     test.StopTime(),
+		Timeout:      test.Timeout(),
+		Status:       string(test.Status()),
+		IsSecTrimmed: fh.securityTrimmed,
 	}
 
 	switch test.Status() {
@@ -230,50 +232,52 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 				taskData.ResultError = taskStatus.Error.Error()
 			}
 
-			taskLog := taskStatus.Logger.GetLogEntries()
-			taskData.Log = make([]*TestRunTaskLog, len(taskLog))
+			if !fh.securityTrimmed {
+				taskLog := taskStatus.Logger.GetLogEntries()
+				taskData.Log = make([]*TestRunTaskLog, len(taskLog))
 
-			for i, log := range taskLog {
-				logData := &TestRunTaskLog{
-					Time:    log.Time,
-					Level:   uint64(log.Level),
-					Message: log.Message,
-					Data:    map[string]string{},
-					DataLen: uint64(len(log.Data)),
-				}
-
-				for dataKey, dataVal := range log.Data {
-					logData.Data[dataKey] = fmt.Sprintf("%v", dataVal)
-				}
-
-				taskData.Log[i] = logData
-			}
-
-			taskConfig, err := yaml.Marshal(taskState.Config())
-			if err != nil {
-				taskData.ConfigYaml = fmt.Sprintf("failed marshalling config: %v", err)
-			} else {
-				taskData.ConfigYaml = fmt.Sprintf("\n%v\n", string(taskConfig))
-			}
-
-			taskResult, err := yaml.Marshal(taskState.GetTaskStatusVars().GetVarsMap(nil, false))
-			if err != nil {
-				taskData.ResultYaml = fmt.Sprintf("failed marshalling result: %v", err)
-			} else {
-				refComment := ""
-
-				if taskState.ID() != "" {
-					scopeOwner := taskState.GetTaskVars().GetVar("scopeOwner")
-					if scopeOwner != nil {
-						scopeOwner = fmt.Sprintf("task %v", scopeOwner)
-					} else {
-						scopeOwner = "root"
+				for i, log := range taskLog {
+					logData := &TestRunTaskLog{
+						Time:    log.Time,
+						Level:   uint64(log.Level),
+						Message: log.Message,
+						Data:    map[string]string{},
+						DataLen: uint64(len(log.Data)),
 					}
 
-					refComment = fmt.Sprintf("# available from %v scope via `tasks.%v`:\n", scopeOwner, taskState.ID())
+					for dataKey, dataVal := range log.Data {
+						logData.Data[dataKey] = fmt.Sprintf("%v", dataVal)
+					}
+
+					taskData.Log[i] = logData
 				}
 
-				taskData.ResultYaml = fmt.Sprintf("\n%v%v\n", refComment, string(taskResult))
+				taskConfig, err := yaml.Marshal(taskState.Config())
+				if err != nil {
+					taskData.ConfigYaml = fmt.Sprintf("failed marshalling config: %v", err)
+				} else {
+					taskData.ConfigYaml = fmt.Sprintf("\n%v\n", string(taskConfig))
+				}
+
+				taskResult, err := yaml.Marshal(taskState.GetTaskStatusVars().GetVarsMap(nil, false))
+				if err != nil {
+					taskData.ResultYaml = fmt.Sprintf("failed marshalling result: %v", err)
+				} else {
+					refComment := ""
+
+					if taskState.ID() != "" {
+						scopeOwner := taskState.GetTaskVars().GetVar("scopeOwner")
+						if scopeOwner != nil {
+							scopeOwner = fmt.Sprintf("task %v", scopeOwner)
+						} else {
+							scopeOwner = "root"
+						}
+
+						refComment = fmt.Sprintf("# available from %v scope via `tasks.%v`:\n", scopeOwner, taskState.ID())
+					}
+
+					taskData.ResultYaml = fmt.Sprintf("\n%v%v\n", refComment, string(taskResult))
+				}
 			}
 
 			pageData.Tasks = append(pageData.Tasks, taskData)

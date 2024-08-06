@@ -1,4 +1,4 @@
-package server
+package web
 
 import (
 	"encoding/json"
@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	coordinator_types "github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/api"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/handlers"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
@@ -25,15 +24,15 @@ import (
 	_ "net/http/pprof"
 )
 
-type WebServer struct {
+type Server struct {
 	serverConfig *types.ServerConfig
 	logger       logrus.FieldLogger
 	router       *mux.Router
 	server       *http.Server
 }
 
-func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*WebServer, error) {
-	ws := &WebServer{
+func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*Server, error) {
+	ws := &Server{
 		serverConfig: config,
 		logger:       logger.WithField("module", "web"),
 		router:       mux.NewRouter(),
@@ -74,44 +73,46 @@ func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*WebSe
 	return ws, nil
 }
 
-func (ws *WebServer) ConfigureRoutes(config *types.WebConfig, logger logrus.FieldLogger, coordinator coordinator_types.Coordinator) error {
-	var frontend *web.Frontend
+func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfig *types.APIConfig, coordinator coordinator_types.Coordinator, securityTrimmed bool) error {
+	isAPIEnabled := apiConfig != nil && apiConfig.Enabled
+	if isAPIEnabled {
+		// register api routes
+		apiHandler := api.NewAPIHandler(ws.logger.WithField("module", "api"), coordinator)
 
-	if config.Frontend != nil && config.Frontend.Enabled {
-		var err error
+		// public apis
+		ws.router.HandleFunc("/api/v1/tests", apiHandler.GetTests).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test/{testId}", apiHandler.GetTest).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test_runs", apiHandler.GetTestRuns).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test_run/{runId}", apiHandler.GetTestRun).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test_run/{runId}/status", apiHandler.GetTestRunStatus).Methods("GET")
 
-		frontend, err = web.NewFrontend(config.Frontend)
-		if err != nil {
-			return err
+		// private apis
+		if !securityTrimmed {
+			ws.router.HandleFunc("/api/v1/tests/register", apiHandler.PostTestsRegister).Methods("POST")
+			ws.router.HandleFunc("/api/v1/tests/register_external", apiHandler.PostTestsRegisterExternal).Methods("POST")
+			ws.router.HandleFunc("/api/v1/test_run", apiHandler.PostTestRunsSchedule).Methods("POST") // legacy
+			ws.router.HandleFunc("/api/v1/test_runs/schedule", apiHandler.PostTestRunsSchedule).Methods("POST")
+			ws.router.HandleFunc("/api/v1/test_run/{runId}/cancel", apiHandler.PostTestRunCancel).Methods("POST")
+			ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
 		}
 	}
 
-	if config.API != nil && config.API.Enabled {
-		ws.router.PathPrefix("/api/docs/").Handler(ws.getSwaggerHandler(logger))
+	if frontendConfig != nil {
+		if /*frontendConfig.Pprof &&*/ !securityTrimmed {
+			// add pprof handler
+			ws.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
+		}
 
-		// register api routes
-		apiHandler := api.NewAPIHandler(logger.WithField("module", "api"), coordinator)
-		ws.router.HandleFunc("/api/v1/tests", apiHandler.GetTests).Methods("GET")
-		ws.router.HandleFunc("/api/v1/tests/register", apiHandler.PostTestsRegister).Methods("POST")
-		ws.router.HandleFunc("/api/v1/tests/register_external", apiHandler.PostTestsRegisterExternal).Methods("POST")
-		ws.router.HandleFunc("/api/v1/test/{testId}", apiHandler.GetTest).Methods("GET")
-		ws.router.HandleFunc("/api/v1/test_runs", apiHandler.GetTestRuns).Methods("GET")
-		ws.router.HandleFunc("/api/v1/test_run", apiHandler.PostTestRunsSchedule).Methods("POST") // legacy
-		ws.router.HandleFunc("/api/v1/test_runs/schedule", apiHandler.PostTestRunsSchedule).Methods("POST")
-		ws.router.HandleFunc("/api/v1/test_run/{runId}", apiHandler.GetTestRun).Methods("GET")
-		ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
-		ws.router.HandleFunc("/api/v1/test_run/{runId}/status", apiHandler.GetTestRunStatus).Methods("GET")
-		ws.router.HandleFunc("/api/v1/test_run/{runId}/cancel", apiHandler.PostTestRunCancel).Methods("POST")
-	}
-
-	if config.Frontend != nil {
-		// if config.Frontend.Pprof {
-		// add pprof handler
-		ws.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
-		// }
-
-		if config.Frontend.Enabled {
-			frontendHandler := handlers.NewFrontendHandler(coordinator)
+		if frontendConfig.Enabled {
+			frontendHandler := handlers.NewFrontendHandler(
+				coordinator,
+				ws.logger.WithField("module", "web-frontend"),
+				frontendConfig.SiteName,
+				frontendConfig.Minify,
+				frontendConfig.Debug,
+				securityTrimmed,
+				isAPIEnabled,
+			)
 
 			ws.router.HandleFunc("/", frontendHandler.Index).Methods("GET")
 			ws.router.HandleFunc("/test/{testId}", frontendHandler.TestPage).Methods("GET")
@@ -119,19 +120,24 @@ func (ws *WebServer) ConfigureRoutes(config *types.WebConfig, logger logrus.Fiel
 			ws.router.HandleFunc("/clients", frontendHandler.Clients).Methods("GET")
 			ws.router.HandleFunc("/logs/{since}", frontendHandler.LogsData).Methods("GET")
 
-			ws.router.PathPrefix("/").Handler(frontend)
+			if isAPIEnabled {
+				// add swagger handler
+				ws.router.PathPrefix("/api/docs/").Handler(ws.getSwaggerHandler(ws.logger, frontendHandler))
+			}
+
+			ws.router.PathPrefix("/").Handler(frontendHandler)
 		}
 	}
 
 	return nil
 }
 
-func (ws *WebServer) getSwaggerHandler(logger logrus.FieldLogger) http.HandlerFunc {
+func (ws *Server) getSwaggerHandler(logger logrus.FieldLogger, fh *handlers.FrontendHandler) http.HandlerFunc {
 	return httpSwagger.Handler(func(c *httpSwagger.Config) {
 		c.Layout = httpSwagger.StandaloneLayout
 
 		// override swagger header bar
-		headerHTML, err := web.BuildPageHeader()
+		headerHTML, err := fh.BuildPageHeader()
 		if err != nil {
 			logger.Errorf("failed generating page header for api: %v", err)
 		} else {
