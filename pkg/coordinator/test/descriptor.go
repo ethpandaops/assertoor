@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"gopkg.in/yaml.v3"
 )
 
@@ -43,7 +42,7 @@ func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localT
 			testID = testSrc
 		}
 
-		testVars := vars.NewVariables(globalVars)
+		testVars := globalVars.NewScope()
 
 		for k, v := range testCfg.Config {
 			testVars.SetVar(k, v)
@@ -123,7 +122,7 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 
 	decoder := yaml.NewDecoder(reader)
 	testConfig := &types.TestConfig{}
-	testVars := vars.NewVariables(nil)
+	testVars := globalVars.NewScope()
 
 	err := decoder.Decode(testConfig)
 	if err != nil {
@@ -139,16 +138,7 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 	}
 
 	for k, v := range testConfig.Config {
-		testVars.SetVar(k, v)
-	}
-
-	err = testVars.CopyVars(globalVars, testConfig.ConfigVars)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error decoding external test configVars %v: %v", extTestCfg.File, err)
-	}
-
-	for k, v := range globalVars.GetVarsMap(nil, false) {
-		testVars.SetVar(k, v)
+		testVars.SetDefaultVar(k, v)
 	}
 
 	if extTestCfg.ID != "" {
@@ -168,13 +158,13 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 		testVars.SetVar(k, v)
 	}
 
-	err = testVars.CopyVars(globalVars, extTestCfg.ConfigVars)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error decoding external test configVars %v: %v", extTestCfg.File, err)
-	}
-
 	for k, v := range extTestCfg.ConfigVars {
 		testConfig.ConfigVars[k] = v
+	}
+
+	err = testVars.CopyVars(testVars, testConfig.ConfigVars)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error decoding external test configVars %v: %v", extTestCfg.File, err)
 	}
 
 	return testConfig, testVars, nil

@@ -7,7 +7,6 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 )
 
 type ClientsPage struct {
@@ -38,25 +37,25 @@ type ClientsPageClient struct {
 
 // Clients will return the "clients" page using a go template
 func (fh *FrontendHandler) Clients(w http.ResponseWriter, r *http.Request) {
-	templateFiles := web.LayoutTemplateFiles
+	templateFiles := LayoutTemplateFiles
 	templateFiles = append(templateFiles,
 		"clients/clients.html",
 	)
 
-	pageTemplate := web.GetTemplate(templateFiles...)
-	data := web.InitPageData(r, "clients", "/clients", "Clients", templateFiles)
+	pageTemplate := fh.templates.GetTemplate(templateFiles...)
+	data := fh.initPageData(r, "clients", "/clients", "Clients", templateFiles)
 
 	var pageError error
 	data.Data, pageError = fh.getClientsPageData()
 
 	if pageError != nil {
-		web.HandlePageError(w, r, pageError)
+		fh.HandlePageError(w, r, pageError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html")
 
-	if web.HandleTemplateError(w, r, "clients.go", "Clients", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
+	if fh.handleTemplateError(w, r, "clients.go", "Clients", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
 		return // an error has occurred and was processed
 	}
 }

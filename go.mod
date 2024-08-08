@@ -3,24 +3,24 @@ module github.com/ethpandaops/assertoor
 go 1.21.1
 
 require (
-	github.com/attestantio/go-eth2-client v0.21.6
+	github.com/attestantio/go-eth2-client v0.21.10
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
-	github.com/ethereum/go-ethereum v1.13.14
+	github.com/ethereum/go-ethereum v1.14.7
 	github.com/ethpandaops/ethwallclock v0.3.0
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/gorilla/mux v1.8.1
-	github.com/herumi/bls-eth-go-binary v1.33.0
+	github.com/herumi/bls-eth-go-binary v1.35.0
 	github.com/holiman/uint256 v1.3.0
-	github.com/itchyny/gojq v0.12.15
+	github.com/itchyny/gojq v0.12.16
 	github.com/juliangruber/go-intersect v1.1.0
 	github.com/mashingan/smapping v0.1.19
-	github.com/prometheus/client_golang v1.19.0
+	github.com/prometheus/client_golang v1.19.1
 	github.com/protolambda/zrnt v0.32.3
 	github.com/protolambda/ztyp v0.2.2
 	github.com/prysmaticlabs/go-bitfield v0.0.0-20240328144219-a1caa50c3a1e
-	github.com/rs/zerolog v1.32.0
+	github.com/rs/zerolog v1.33.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/swaggo/swag v1.16.3
 	github.com/tdewolff/minify v2.3.6+incompatible
@@ -28,6 +28,7 @@ require (
 	github.com/urfave/negroni v1.0.0
 	github.com/wealdtech/go-eth2-types/v2 v2.8.2
 	github.com/wealdtech/go-eth2-util v1.8.2
+	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -59,7 +60,7 @@ require (
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/huandu/go-clone v1.7.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/itchyny/timefmt-go v0.1.5 // indirect
+	github.com/itchyny/timefmt-go v0.1.6 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/kilic/bls12-381 v0.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
@@ -99,7 +100,6 @@ require (
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/Knetic/govaluate.v3 v3.0.0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 

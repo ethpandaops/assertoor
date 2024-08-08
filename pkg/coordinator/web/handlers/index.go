@@ -6,20 +6,12 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/sirupsen/logrus"
 )
 
 type IndexPage struct {
-	TestDescriptors []*IndexPageTestDescriptor `json:"test_descriptors"`
-	Tests           []*TestRunData             `json:"tests"`
-}
-
-type IndexPageTestDescriptor struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Source string `json:"source"`
-	Config string `json:"config"`
+	CanCancel bool           `json:"can_cancel"`
+	Tests     []*TestRunData `json:"tests"`
 }
 
 type TestRunData struct {
@@ -47,20 +39,20 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	templateFiles := web.LayoutTemplateFiles
+	templateFiles := LayoutTemplateFiles
 	templateFiles = append(templateFiles,
 		"index/index.html",
 		"sidebar/sidebar.html",
 		"test/test_runs.html",
 	)
-	pageTemplate := web.GetTemplate(templateFiles...)
-	data := web.InitPageData(r, "index", "/", "Index", templateFiles)
+	pageTemplate := fh.templates.GetTemplate(templateFiles...)
+	data := fh.initPageData(r, "index", "/", "Index", templateFiles)
 
 	var pageError error
 	data.Data, pageError = fh.getIndexPageData()
 
 	if pageError != nil {
-		web.HandlePageError(w, r, pageError)
+		fh.HandlePageError(w, r, pageError)
 		return
 	}
 
@@ -69,7 +61,7 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 
-	if web.HandleTemplateError(w, r, "index.go", "Index", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
+	if fh.handleTemplateError(w, r, "index.go", "Index", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
 		return // an error has occurred and was processed
 	}
 }
@@ -81,7 +73,7 @@ func (fh *FrontendHandler) IndexData(w http.ResponseWriter, r *http.Request) {
 	pageData, pageError = fh.getIndexPageData()
 
 	if pageError != nil {
-		web.HandlePageError(w, r, pageError)
+		fh.HandlePageError(w, r, pageError)
 		return
 	}
 
@@ -98,7 +90,9 @@ func (fh *FrontendHandler) IndexData(w http.ResponseWriter, r *http.Request) {
 
 //nolint:unparam // ignore
 func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
-	pageData := &IndexPage{}
+	pageData := &IndexPage{
+		CanCancel: fh.isAPIEnabled && !fh.securityTrimmed,
+	}
 
 	// tasks list
 	pageData.Tests = []*TestRunData{}

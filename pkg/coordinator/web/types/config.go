@@ -3,9 +3,10 @@ package types
 import "time"
 
 type WebConfig struct {
-	Server   *ServerConfig   `yaml:"server"`
-	Frontend *FrontendConfig `yaml:"frontend"`
-	API      *APIConfig      `yaml:"api"`
+	Server       *ServerConfig   `yaml:"server"`
+	PublicServer *ServerConfig   `yaml:"publicServer"`
+	Frontend     *FrontendConfig `yaml:"frontend"`
+	API          *APIConfig      `yaml:"api"`
 }
 
 type ServerConfig struct {
