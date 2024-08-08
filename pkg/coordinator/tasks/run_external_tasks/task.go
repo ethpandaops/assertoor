@@ -142,6 +142,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	// execute child tasks
 	var resError error
 
+taskLoop:
 	for i, task := range tasks {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -157,7 +158,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		default:
 			if err != nil {
 				resError = fmt.Errorf("child task #%v failed: %w", i+1, err)
-				break
+				break taskLoop
 			}
 		}
 	}
