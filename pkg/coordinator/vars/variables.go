@@ -16,6 +16,7 @@ type Variables struct {
 	parentScope types.Variables
 	varsMutex   sync.RWMutex
 	varsMap     map[string]variableValue
+	defaultsMap map[string]variableValue
 	subScopes   map[string]types.Variables
 }
 
@@ -28,6 +29,7 @@ func newVariables(parentScope types.Variables) *Variables {
 	return &Variables{
 		parentScope: parentScope,
 		varsMap:     map[string]variableValue{},
+		defaultsMap: map[string]variableValue{},
 		subScopes:   map[string]types.Variables{},
 	}
 }
@@ -40,6 +42,7 @@ func (v *Variables) GetVar(name string) interface{} {
 	v.varsMutex.RLock()
 	subScope := v.subScopes[name]
 	varValue := v.varsMap[name]
+	defValue := v.defaultsMap[name]
 	v.varsMutex.RUnlock()
 
 	switch {
@@ -49,6 +52,8 @@ func (v *Variables) GetVar(name string) interface{} {
 		return varValue.value
 	case v.parentScope != nil:
 		return v.parentScope.GetVar(name)
+	case defValue.isDefined:
+		return defValue.value
 	default:
 		return nil
 	}
@@ -58,6 +63,7 @@ func (v *Variables) LookupVar(name string) (interface{}, bool) {
 	v.varsMutex.RLock()
 	subScope := v.subScopes[name]
 	varValue := v.varsMap[name]
+	defValue := v.defaultsMap[name]
 	v.varsMutex.RUnlock()
 
 	switch {
@@ -67,6 +73,8 @@ func (v *Variables) LookupVar(name string) (interface{}, bool) {
 		return varValue.value, true
 	case v.parentScope != nil:
 		return v.parentScope.LookupVar(name)
+	case defValue.isDefined:
+		return defValue.value, true
 	default:
 		return nil, false
 	}
@@ -75,6 +83,15 @@ func (v *Variables) LookupVar(name string) (interface{}, bool) {
 func (v *Variables) SetVar(name string, value interface{}) {
 	v.varsMutex.Lock()
 	v.varsMap[name] = variableValue{
+		isDefined: true,
+		value:     value,
+	}
+	v.varsMutex.Unlock()
+}
+
+func (v *Variables) SetDefaultVar(name string, value interface{}) {
+	v.varsMutex.Lock()
+	v.defaultsMap[name] = variableValue{
 		isDefined: true,
 		value:     value,
 	}
@@ -181,6 +198,17 @@ func (v *Variables) GetVarsMap(varsMap map[string]any, skipParent bool) map[stri
 	if v.parentScope != nil && !skipParent {
 		varsMap = v.parentScope.GetVarsMap(varsMap, false)
 	}
+
+	v.varsMutex.RLock()
+	for varName, varData := range v.defaultsMap {
+		_, exists := varsMap[varName]
+		if exists {
+			continue
+		}
+
+		varsMap[varName] = varData.value
+	}
+	v.varsMutex.RUnlock()
 
 	return varsMap
 }
