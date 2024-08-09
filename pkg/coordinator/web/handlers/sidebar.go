@@ -3,16 +3,17 @@ package handlers
 import "github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
 
 type SidebarData struct {
-	ClientCount     uint64         `json:"client_count"`
-	CLReadyCount    uint64         `json:"cl_ready_count"`
-	CLHeadSlot      uint64         `json:"cl_head_slot"`
-	CLHeadRoot      []byte         `json:"cl_head_root"`
-	ELReadyCount    uint64         `json:"el_ready_count"`
-	ELHeadNumber    uint64         `json:"el_head_number"`
-	ELHeadHash      []byte         `json:"el_head_hash"`
-	TestDescriptors []*SidebarTest `json:"tests"`
-	AllTestsActive  bool           `json:"all_tests_active"`
-	Version         string         `json:"version"`
+	ClientCount      uint64         `json:"client_count"`
+	CLReadyCount     uint64         `json:"cl_ready_count"`
+	CLHeadSlot       uint64         `json:"cl_head_slot"`
+	CLHeadRoot       []byte         `json:"cl_head_root"`
+	ELReadyCount     uint64         `json:"el_ready_count"`
+	ELHeadNumber     uint64         `json:"el_head_number"`
+	ELHeadHash       []byte         `json:"el_head_hash"`
+	TestDescriptors  []*SidebarTest `json:"tests"`
+	AllTestsActive   bool           `json:"all_tests_active"`
+	CanRegisterTests bool           `json:"can_register_tests"`
+	Version          string         `json:"version"`
 }
 
 type SidebarTest struct {
@@ -23,9 +24,10 @@ type SidebarTest struct {
 
 func (fh *FrontendHandler) getSidebarData(activeTestID string) *SidebarData {
 	sidebarData := &SidebarData{
-		TestDescriptors: []*SidebarTest{},
-		AllTestsActive:  activeTestID == "*",
-		Version:         buildinfo.GetVersion(),
+		TestDescriptors:  []*SidebarTest{},
+		AllTestsActive:   activeTestID == "*",
+		CanRegisterTests: !fh.securityTrimmed && fh.isAPIEnabled,
+		Version:          buildinfo.GetVersion(),
 	}
 
 	// client pool status
