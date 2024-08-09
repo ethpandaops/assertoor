@@ -79,8 +79,6 @@
 {{ end }}
 
 {{ define "js" }}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js" integrity="sha512-gqjFRgajJiZM9GmvHEE7vpzPSL/moP+zxpl4F6lRNJDOI3pb2Tvu8k5vUjAzJKsl0ragzWL0/WasKhR430PkCw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/yamljs/0.3.0/yaml.min.js" integrity="sha512-f/K0Q5lZ1SrdNdjc2BO2I5kTx8E5Uw1EU3PhSUB9fYPohap5rPWEmQRCjtpDxNmQB4/+MMI/Cf+nvh1VSiwrTA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script type="text/javascript">
 $(document).ready(function() {
   var editor = ace.edit("testConfigOverrides");
@@ -141,7 +139,7 @@ $(document).ready(function() {
 {{ define "css" }}
 <style>
 #startTestModal .ace_editor {
-  height: 200px;
+  min-height: 300px;
 }
 
 </style>
