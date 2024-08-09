@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
@@ -121,6 +122,19 @@ func (t *Task) Execute(ctx context.Context) error {
 	tx, err := t.generateTransaction(ctx)
 	if err != nil {
 		return err
+	}
+
+	if txData, err2 := vars.GeneralizeData(tx); err2 == nil {
+		t.ctx.Outputs.SetVar("transaction", txData)
+	} else {
+		t.logger.Warnf("Failed setting `transaction` output: %v", err2)
+	}
+
+	txBytes, err := tx.MarshalBinary()
+	if err != nil {
+		t.logger.Warnf("Failed setting `transactionHex` output: %v", err)
+	} else {
+		t.ctx.Outputs.SetVar("transactionHex", hexutil.Encode(txBytes))
 	}
 
 	var clients []*execution.Client
@@ -313,6 +327,46 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				BlobHashes: blobHashes,
 				Sidecar:    blobSidecar,
 			}
+		case t.config.SetCodeTxType:
+			authList := ethtypes.AuthorizationList{}
+
+			for _, authorization := range t.config.Authorizations {
+				authEntry := &ethtypes.Authorization{
+					ChainID: big.NewInt(0).SetUint64(authorization.ChainID),
+					Address: common.HexToAddress(authorization.CodeAddress),
+				}
+
+				if authorization.Nonce != nil {
+					authEntry.Nonce = []uint64{*authorization.Nonce}
+				} else {
+					authEntry.Nonce = []uint64{}
+				}
+
+				privKey, err := crypto.HexToECDSA(authorization.SignerPrivkey)
+				if err != nil {
+					return nil, err
+				}
+
+				authEntry, err = ethtypes.SignAuth(authEntry, privKey)
+				if err != nil {
+					return nil, err
+				}
+
+				authList = append(authList, authEntry)
+			}
+
+			txObj = &ethtypes.SetCodeTx{
+				ChainID:   uint256.MustFromBig(t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID()),
+				Nonce:     nonce,
+				GasTipCap: uint256.MustFromBig(&t.config.TipCap.Value),
+				GasFeeCap: uint256.MustFromBig(&t.config.FeeCap.Value),
+				Gas:       t.config.GasLimit,
+				To:        toAddr,
+				Value:     uint256.MustFromBig(txAmount),
+				Data:      txData,
+				AuthList:  authList,
+			}
+
 		default:
 			txObj = &ethtypes.DynamicFeeTx{
 				ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
