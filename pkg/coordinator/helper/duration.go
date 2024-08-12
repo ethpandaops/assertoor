@@ -1,4 +1,4 @@
-package human
+package helper
 
 import (
 	"encoding/json"

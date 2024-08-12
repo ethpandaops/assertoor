@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"github.com/sirupsen/logrus"
 )
@@ -37,6 +38,15 @@ type Wallet struct {
 
 	txNonceChans map[uint64]*nonceStatus
 	txNonceMutex sync.Mutex
+}
+
+type Summary struct {
+	Address          string   `json:"address"`
+	PrivKey          string   `json:"privkey"`
+	PendingBalance   *big.Int `json:"pendingBalance"`
+	PendingNonce     uint64   `json:"pendingNonce"`
+	ConfirmedBalance *big.Int `json:"confirmedBalance"`
+	ConfirmedNonce   uint64   `json:"confirmedNonce"`
 }
 
 type nonceStatus struct {
@@ -134,6 +144,17 @@ func (wallet *Wallet) GetPendingBalance() *big.Int {
 
 func (wallet *Wallet) GetNonce() uint64 {
 	return wallet.confirmedNonce
+}
+
+func (wallet *Wallet) GetSummary() *Summary {
+	return &Summary{
+		Address:          wallet.address.String(),
+		PrivKey:          fmt.Sprintf("%x", crypto.FromECDSA(wallet.privkey)),
+		PendingBalance:   wallet.pendingBalance,
+		PendingNonce:     wallet.pendingNonce,
+		ConfirmedBalance: wallet.confirmedBalance,
+		ConfirmedNonce:   wallet.confirmedNonce,
+	}
 }
 
 func (wallet *Wallet) GetReadableBalance(unitDigits, maxPreCommaDigitsBeforeTrim, digits int, addPositiveSign, trimAmount bool) string {

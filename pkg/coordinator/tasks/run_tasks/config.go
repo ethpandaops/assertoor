@@ -11,6 +11,7 @@ type Config struct {
 	StopChildOnResult bool                `yaml:"stopChildOnResult" json:"stopChildOnResult"`
 	ExpectFailure     bool                `yaml:"expectFailure" json:"expectFailure"`
 	ContinueOnFailure bool                `yaml:"continueOnFailure" json:"continueOnFailure"`
+	NewVariableScope  bool                `yaml:"newVariableScope" json:"newVariableScope"`
 }
 
 func DefaultConfig() Config {

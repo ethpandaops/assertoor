@@ -16,6 +16,8 @@ type Variables struct {
 	parentScope types.Variables
 	varsMutex   sync.RWMutex
 	varsMap     map[string]variableValue
+	defaultsMap map[string]variableValue
+	subScopes   map[string]types.Variables
 }
 
 type variableValue struct {
@@ -23,39 +25,59 @@ type variableValue struct {
 	value     interface{}
 }
 
-func NewVariables(parentScope types.Variables) types.Variables {
+func newVariables(parentScope types.Variables) *Variables {
 	return &Variables{
 		parentScope: parentScope,
 		varsMap:     map[string]variableValue{},
+		defaultsMap: map[string]variableValue{},
+		subScopes:   map[string]types.Variables{},
 	}
+}
+
+func NewVariables(parentScope types.Variables) types.Variables {
+	return newVariables(parentScope)
 }
 
 func (v *Variables) GetVar(name string) interface{} {
 	v.varsMutex.RLock()
+	subScope := v.subScopes[name]
 	varValue := v.varsMap[name]
+	defValue := v.defaultsMap[name]
 	v.varsMutex.RUnlock()
 
-	if varValue.isDefined {
+	switch {
+	case subScope != nil:
+		return subScope.GetVarsMap(nil, false)
+	case varValue.isDefined:
 		return varValue.value
-	} else if v.parentScope != nil {
+	case v.parentScope != nil:
 		return v.parentScope.GetVar(name)
+	case defValue.isDefined:
+		return defValue.value
+	default:
+		return nil
 	}
-
-	return nil
 }
 
 func (v *Variables) LookupVar(name string) (interface{}, bool) {
 	v.varsMutex.RLock()
+	subScope := v.subScopes[name]
 	varValue := v.varsMap[name]
+	defValue := v.defaultsMap[name]
 	v.varsMutex.RUnlock()
 
-	if varValue.isDefined {
+	switch {
+	case subScope != nil:
+		return subScope.GetVarsMap(nil, false), true
+	case varValue.isDefined:
 		return varValue.value, true
-	} else if v.parentScope != nil {
+	case v.parentScope != nil:
 		return v.parentScope.LookupVar(name)
+	case defValue.isDefined:
+		return defValue.value, true
+	default:
+		return nil, false
 	}
-
-	return nil, false
 }
 
 func (v *Variables) SetVar(name string, value interface{}) {
@@ -65,6 +87,51 @@ func (v *Variables) SetVar(name string, value interface{}) {
 		value:     value,
 	}
 	v.varsMutex.Unlock()
+}
+
+func (v *Variables) SetDefaultVar(name string, value interface{}) {
+	v.varsMutex.Lock()
+	v.defaultsMap[name] = variableValue{
+		isDefined: true,
+		value:     value,
+	}
+	v.varsMutex.Unlock()
+}
+
+func (v *Variables) NewSubScope(name string) types.Variables {
+	v.varsMutex.Lock()
+	defer v.varsMutex.Unlock()
+
+	subScope := newVariables(nil)
+	v.subScopes[name] = subScope
+
+	return subScope
+}
+
+func (v *Variables) GetSubScope(name string) types.Variables {
+	var parentSubScope types.Variables
+
+	if v.parentScope != nil {
+		parentSubScope = v.parentScope.GetSubScope(name)
+	}
+
+	v.varsMutex.Lock()
+	defer v.varsMutex.Unlock()
+
+	subScope := v.subScopes[name]
+	if subScope == nil {
+		subScope = newVariables(parentSubScope)
+		v.subScopes[name] = subScope
+	}
+
+	return subScope
+}
+
+func (v *Variables) SetSubScope(name string, subScope types.Variables) {
+	v.varsMutex.Lock()
+	defer v.varsMutex.Unlock()
+
+	v.subScopes[name] = subScope
 }
 
 func (v *Variables) NewScope() types.Variables {
@@ -103,24 +170,51 @@ func (v *Variables) ResolvePlaceholders(str string) string {
 	return str
 }
 
-func (v *Variables) GetVarsMap() map[string]any {
-	var varsMap map[string]any
-
-	if v.parentScope != nil {
-		varsMap = v.parentScope.GetVarsMap()
-	} else {
+func (v *Variables) GetVarsMap(varsMap map[string]any, skipParent bool) map[string]any {
+	if varsMap == nil {
 		varsMap = map[string]any{}
 	}
 
+	v.varsMutex.RLock()
+	for scopeName, subScope := range v.subScopes {
+		_, exists := varsMap[scopeName]
+		if exists {
+			continue
+		}
+
+		varsMap[scopeName] = subScope.GetVarsMap(nil, skipParent)
+	}
+
 	for varName, varData := range v.varsMap {
+		_, exists := varsMap[varName]
+		if exists {
+			continue
+		}
+
 		varsMap[varName] = varData.value
 	}
+	v.varsMutex.RUnlock()
+
+	if v.parentScope != nil && !skipParent {
+		varsMap = v.parentScope.GetVarsMap(varsMap, false)
+	}
+
+	v.varsMutex.RLock()
+	for varName, varData := range v.defaultsMap {
+		_, exists := varsMap[varName]
+		if exists {
+			continue
+		}
+
+		varsMap[varName] = varData.value
+	}
+	v.varsMutex.RUnlock()
 
 	return varsMap
 }
 
 func (v *Variables) getGeneralizedVarsMap() (map[string]any, error) {
-	varsMap := v.GetVarsMap()
+	varsMap := v.GetVarsMap(nil, false)
 
 	// this is a bit hacky, but we're marshalling & unmarshalling varsMap here to generalize the types.
 	// ie. []string should be a []interface{} of strings

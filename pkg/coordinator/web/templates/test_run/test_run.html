@@ -91,6 +91,7 @@
         </thead>
         <tbody>
           <tr class="details-row"></tr>
+          {{ $isSecTrimmed := .IsSecTrimmed }}
           {{ range $i, $task := .Tasks }}
           <tr data-bs-toggle="collapse" data-bs-target="#task-details-{{ $task.Index }}" class="accordion-toggle">
             <td class="task-graph">
@@ -206,7 +207,7 @@
                     {{ end }}
                   </table>
 
-
+                  {{ if not $isSecTrimmed }}
                   {{ if $task.IsStarted }}
                   <ul class="nav nav-tabs mt-2" id="task{{ $task.Index }}-tabs" role="tablist">
                     <li class="nav-item" role="presentation">
@@ -214,6 +215,9 @@
                     </li>
                     <li class="nav-item" role="presentation">
                       <button class="nav-link" id="task{{ $task.Index }}-config-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-config" type="button" role="tab" aria-controls="task{{ $task.Index }}-config" aria-selected="false">Config</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                      <button class="nav-link" id="task{{ $task.Index }}-result-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-result" type="button" role="tab" aria-controls="task{{ $task.Index }}-result" aria-selected="false">Result</button>
                     </li>
                   </ul>
                   <div class="card">
@@ -255,12 +259,14 @@
                         </div>
                       </div>
                       <div class="tab-pane fade card-body" id="task{{ $task.Index }}-config" role="tabpanel" aria-labelledby="task{{ $task.Index }}-config-tab">
-<pre>
-{{ $task.ConfigYaml }}</pre>
-
+                        <pre>{{ $task.ConfigYaml }}</pre>
+                      </div>
+                      <div class="tab-pane fade card-body" id="task{{ $task.Index }}-result" role="tabpanel" aria-labelledby="task{{ $task.Index }}-result-tab">
+                        <pre>{{ $task.ResultYaml }}</pre>
                       </div>
                     </div>
                   </div>
+                  {{ end }}
                   {{ end }}
 
                 </div>

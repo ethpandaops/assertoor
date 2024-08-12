@@ -11,6 +11,9 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
   libssl-dev \
   ca-certificates \
   jq \
+  git \
+  curl \
+  make \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /src/bin/assertoor /assertoor

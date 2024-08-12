@@ -24,6 +24,7 @@ import (
 	generateslashings "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_slashings"
 	generatetransaction "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_transaction"
 	runcommand "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_command"
+	runexternaltasks "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_external_tasks"
 	runshell "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_shell"
 	runtaskbackground "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_task_background"
 	runtaskmatrix "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_task_matrix"
@@ -55,6 +56,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generateslashings.TaskDescriptor,
 	generatetransaction.TaskDescriptor,
 	runcommand.TaskDescriptor,
+	runexternaltasks.TaskDescriptor,
 	runshell.TaskDescriptor,
 	runtaskbackground.TaskDescriptor,
 	runtaskmatrix.TaskDescriptor,

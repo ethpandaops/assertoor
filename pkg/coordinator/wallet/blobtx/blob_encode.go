@@ -26,12 +26,12 @@ func encodeBlobData(data []byte) kzg4844.Blob {
 			break
 		}
 
-		max := i + 31
-		if max > len(data) {
-			max = len(data)
+		maxpos := i + 31
+		if maxpos > len(data) {
+			maxpos = len(data)
 		}
 
-		copy(blob[fieldIndex*32+1:], data[i:max])
+		copy(blob[fieldIndex*32+1:], data[i:maxpos])
 	}
 
 	return blob
@@ -50,13 +50,13 @@ func EncodeBlob(data []byte) (*BlobCommitment, error) {
 	var err error
 
 	// generate blob commitment
-	blobCommitment.Commitment, err = kzg4844.BlobToCommitment(blobCommitment.Blob)
+	blobCommitment.Commitment, err = kzg4844.BlobToCommitment(&blobCommitment.Blob)
 	if err != nil {
 		return nil, fmt.Errorf("failed generating blob commitment: %w", err)
 	}
 
 	// generate blob proof
-	blobCommitment.Proof, err = kzg4844.ComputeBlobProof(blobCommitment.Blob, blobCommitment.Commitment)
+	blobCommitment.Proof, err = kzg4844.ComputeBlobProof(&blobCommitment.Blob, blobCommitment.Commitment)
 	if err != nil {
 		return nil, fmt.Errorf("failed generating blob proof: %w", err)
 	}

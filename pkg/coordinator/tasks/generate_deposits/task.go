@@ -22,8 +22,6 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
-	"github.com/protolambda/zrnt/eth2/configs"
-	"github.com/protolambda/zrnt/eth2/util/hashing"
 	"github.com/protolambda/ztyp/tree"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
@@ -62,24 +60,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -168,7 +150,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			depositReceipts[tx.Hash().Hex()] = receipt
 
 			if receipt != nil {
-				t.logger.Infof("deposit %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
+				t.logger.Infof("deposit %v confirmed in block %v (nonce: %v, status: %v)", tx.Hash().Hex(), receipt.BlockNumber, tx.Nonce(), receipt.Status)
 			}
 		})
 		if err != nil {
@@ -222,40 +204,46 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.Vars.SetVar(t.config.ValidatorPubkeysResultVar, validatorPubkeys)
 	}
 
+	t.ctx.Outputs.SetVar("validatorPubkeys", validatorPubkeys)
+
 	if t.config.DepositTransactionsResultVar != "" {
 		t.ctx.Vars.SetVar(t.config.DepositTransactionsResultVar, depositTransactions)
 	}
 
-	if t.config.DepositReceiptsResultVar != "" {
-		receiptList := []interface{}{}
+	t.ctx.Outputs.SetVar("depositTransactions", depositTransactions)
 
-		for _, txhash := range depositTransactions {
-			var receiptMap map[string]interface{}
+	receiptList := []interface{}{}
 
-			receipt := depositReceipts[txhash]
-			if receipt == nil {
-				receiptMap = nil
-			} else {
-				receiptJSON, err := json.Marshal(receipt)
-				if err == nil {
-					receiptMap = map[string]interface{}{}
-					err = json.Unmarshal(receiptJSON, &receiptMap)
+	for _, txhash := range depositTransactions {
+		var receiptMap map[string]interface{}
 
-					if err != nil {
-						t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
+		receipt := depositReceipts[txhash]
+		if receipt == nil {
+			receiptMap = nil
+		} else {
+			receiptJSON, err := json.Marshal(receipt)
+			if err == nil {
+				receiptMap = map[string]interface{}{}
+				err = json.Unmarshal(receiptJSON, &receiptMap)
 
-						receiptMap = nil
-					}
-				} else {
-					t.logger.Errorf("could not marshal transaction receipt for result var: %v", err)
+				if err != nil {
+					t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
+
+					receiptMap = nil
 				}
+			} else {
+				t.logger.Errorf("could not marshal transaction receipt for result var: %v", err)
 			}
-
-			receiptList = append(receiptList, receiptMap)
 		}
 
+		receiptList = append(receiptList, receiptMap)
+	}
+
+	if t.config.DepositReceiptsResultVar != "" {
 		t.ctx.Vars.SetVar(t.config.DepositReceiptsResultVar, receiptList)
 	}
+
+	t.ctx.Outputs.SetVar("depositReceipts", receiptList)
 
 	if t.config.FailOnReject {
 		for _, txhash := range depositTransactions {
@@ -288,11 +276,6 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		return nil, nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 	}
 
-	withdrPrivkey, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
-	}
-
 	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
 
 	var validator *v1.Validator
@@ -309,18 +292,32 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		return nil, nil, fmt.Errorf("validator already exists on chain")
 	}
 
-	var pub, withdrPub common.BLSPubkey
+	var pub common.BLSPubkey
+
+	var withdrCreds []byte
 
 	copy(pub[:], validatorPubkey)
-	copy(withdrPub[:], withdrPrivkey.PublicKey().Marshal())
 
-	withdrCreds := hashing.Hash(withdrPub[:])
-	withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
+	if t.config.WithdrawalCredentials == "" {
+		withdrPrivkey, err2 := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
+		if err2 != nil {
+			return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err2)
+		}
+
+		var withdrPub common.BLSPubkey
+
+		copy(withdrPub[:], withdrPrivkey.PublicKey().Marshal())
+
+		withdrCreds = withdrPub[:]
+		withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
+	} else {
+		withdrCreds = ethcommon.FromHex(t.config.WithdrawalCredentials)
+	}
 
 	data := common.DepositData{
 		Pubkey:                pub,
-		WithdrawalCredentials: withdrCreds,
-		Amount:                configs.Mainnet.MAX_EFFECTIVE_BALANCE,
+		WithdrawalCredentials: tree.Root(withdrCreds),
+		Amount:                common.Gwei(t.config.DepositAmount * 1000000000),
 		Signature:             common.BLSSignature{},
 	}
 	msgRoot := data.ToMessage().HashTreeRoot(tree.GetHashFn())

@@ -6,16 +6,17 @@ import (
 	"net/http"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
 type TestPage struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Source string `json:"source"`
-	Config string `json:"config"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Source    string `json:"source"`
+	Config    string `json:"config"`
+	CanStart  bool   `json:"can_start"`
+	CanCancel bool   `json:"can_cancel"`
 
 	Tests []*TestRunData `json:"tests"`
 }
@@ -28,15 +29,15 @@ func (fh *FrontendHandler) TestPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	templateFiles := web.LayoutTemplateFiles
+	templateFiles := LayoutTemplateFiles
 	templateFiles = append(templateFiles,
 		"test/test.html",
 		"sidebar/sidebar.html",
 		"test/test_runs.html",
 	)
-	pageTemplate := web.GetTemplate(templateFiles...)
+	pageTemplate := fh.templates.GetTemplate(templateFiles...)
 	vars := mux.Vars(r)
-	data := web.InitPageData(r, "test", "/", "Test", templateFiles)
+	data := fh.initPageData(r, "test", "/", "Test", templateFiles)
 
 	var pageError error
 
@@ -44,7 +45,7 @@ func (fh *FrontendHandler) TestPage(w http.ResponseWriter, r *http.Request) {
 
 	pageData, pageError = fh.getTestPageData(vars["testId"])
 	if pageError != nil {
-		web.HandlePageError(w, r, pageError)
+		fh.HandlePageError(w, r, pageError)
 		return
 	}
 
@@ -54,7 +55,7 @@ func (fh *FrontendHandler) TestPage(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 
-	if web.HandleTemplateError(w, r, "index.go", "Index", "", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
+	if fh.handleTemplateError(w, r, "index.go", "Index", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
 		return // an error has occurred and was processed
 	}
 }
@@ -68,7 +69,7 @@ func (fh *FrontendHandler) TestPageData(w http.ResponseWriter, r *http.Request) 
 	pageData, pageError = fh.getTestPageData(vars["testId"])
 
 	if pageError != nil {
-		web.HandlePageError(w, r, pageError)
+		fh.HandlePageError(w, r, pageError)
 		return
 	}
 
@@ -108,12 +109,18 @@ func (fh *FrontendHandler) getTestPageData(testID string) (*TestPage, error) {
 		Source: testDescriptor.Source(),
 	}
 
-	testCfgJSON, err := json.Marshal(testDescriptor.Vars().GetVarsMap())
-	if err != nil {
-		return nil, fmt.Errorf("failed marshalling test vars: %v", err)
-	}
+	if fh.isAPIEnabled && !fh.securityTrimmed {
+		testCfgJSON, err := json.Marshal(testDescriptor.Vars().GetVarsMap(nil, false))
+		if err != nil {
+			return nil, fmt.Errorf("failed marshalling test vars: %v", err)
+		}
 
-	pageData.Config = string(testCfgJSON)
+		pageData.Config = string(testCfgJSON)
+		pageData.CanStart = true
+		pageData.CanCancel = true
+	} else {
+		pageData.Config = "null"
+	}
 
 	// test runs
 	pageData.Tests = []*TestRunData{}

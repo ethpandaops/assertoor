@@ -4,3 +4,6 @@ tmp
 example/config/test.yaml
 test.yaml
 test-*.yaml
+
+.hack/devnet/generated-**.yaml
+.hack/devnet/custom-**.yaml

@@ -32,12 +32,14 @@
               <span class="nav-text">Clients</span>
             </a>
           </li>
+          {{ if .IsAPIEnabled }}
           <li class="nav-item">
             <a class="nav-link" href="/api/docs/">
               <span class="nav-text">API</span>
             </a>
           </li>
-
+          {{ end }}
+          
           <li class="nav-item dropdown theme-selector">
             <a class="nav-link dropdown-toggle" href="#" id="bd-theme-text" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
               <div class="theme-navicon">

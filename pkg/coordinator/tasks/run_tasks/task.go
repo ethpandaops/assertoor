@@ -24,7 +24,7 @@ type Task struct {
 	options *types.TaskOptions
 	config  Config
 	logger  logrus.FieldLogger
-	tasks   []types.Task
+	tasks   []types.TaskIndex
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -35,24 +35,8 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Name() string {
-	return TaskName
-}
-
-func (t *Task) Description() string {
-	return TaskDescriptor.Description
-}
-
-func (t *Task) Title() string {
-	return t.ctx.Vars.ResolvePlaceholders(t.options.Title)
-}
-
 func (t *Task) Config() interface{} {
 	return t.config
-}
-
-func (t *Task) Logger() logrus.FieldLogger {
-	return t.logger
 }
 
 func (t *Task) Timeout() time.Duration {
@@ -81,7 +65,15 @@ func (t *Task) LoadConfig() error {
 	}
 
 	// init child tasks
-	childTasks := []types.Task{}
+	childTasks := []types.TaskIndex{}
+
+	var taskVars types.Variables
+
+	if t.config.NewVariableScope {
+		taskVars = t.ctx.Vars.NewScope()
+		taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
+		t.ctx.Outputs.SetSubScope("childScope", taskVars)
+	}
 
 	for i := range config.Tasks {
 		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(&config.Tasks[i])
@@ -89,7 +81,7 @@ func (t *Task) LoadConfig() error {
 			return fmt.Errorf("failed parsing child task config #%v : %w", i+1, err)
 		}
 
-		task, err := t.ctx.NewTask(taskOpts, nil)
+		task, err := t.ctx.NewTask(taskOpts, taskVars)
 		if err != nil {
 			return fmt.Errorf("failed initializing child task #%v : %w", i+1, err)
 		}
@@ -105,7 +97,7 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	for i, task := range t.tasks {
-		err := t.ctx.Scheduler.ExecuteTask(ctx, task, func(ctx context.Context, cancelFn context.CancelFunc, task types.Task) {
+		err := t.ctx.Scheduler.ExecuteTask(ctx, task, func(ctx context.Context, cancelFn context.CancelFunc, task types.TaskIndex) {
 			if t.config.StopChildOnResult {
 				t.ctx.Scheduler.WatchTaskPass(ctx, cancelFn, task)
 			}
