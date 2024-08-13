@@ -36,6 +36,31 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 		taskState.taskStatusVars.SetVar("running", false)
 	}()
 
+	// check task condition if defined
+	if taskState.options.If != "" {
+		conditionResult, _, err := taskState.taskVars.ResolveQuery(taskState.options.If)
+		if err != nil {
+			taskLogger.Errorf("task condition evaluation failed: %v", err)
+			taskState.setTaskResult(types.TaskResultFailure, false)
+
+			return fmt.Errorf("task condition evaluation failed: %w", err)
+		}
+
+		isValid, isOk := conditionResult.(bool)
+		if !isOk {
+			taskLogger.Warnf("task condition is not a boolean: %v", conditionResult)
+		}
+
+		if !isValid {
+			taskLogger.Infof("task condition not met, skipping task")
+
+			taskState.isSkipped = true
+			taskState.setTaskResult(types.TaskResultNone, false)
+
+			return nil
+		}
+	}
+
 	// create task control context
 	taskCtx := &types.TaskContext{
 		Scheduler: ts,

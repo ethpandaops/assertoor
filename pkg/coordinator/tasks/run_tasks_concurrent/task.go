@@ -133,6 +133,13 @@ func (t *Task) Execute(ctx context.Context) error {
 		}(i)
 	}
 
+	completeChan := make(chan bool)
+	go func() {
+		taskWaitGroup.Wait()
+		time.Sleep(100 * time.Millisecond)
+		close(completeChan)
+	}()
+
 	// watch result updates
 	successLimit := t.config.SucceedTaskCount
 	if successLimit == 0 {
@@ -186,15 +193,15 @@ func (t *Task) Execute(ctx context.Context) error {
 				taskComplete = true
 			}
 
-			if !taskComplete && pendingCount == 0 {
-				t.logger.Infof("all child tasks completed (%v success, %v failure)", successCount, failureCount)
-				t.ctx.SetResult(types.TaskResultFailure)
-
-				taskComplete = true
-			}
-
 			if !taskComplete {
 				t.logger.Debugf("result update (%v success, %v failure)", successCount, failureCount)
+			}
+		case <-completeChan:
+			if !taskComplete {
+				taskComplete = true
+
+				t.ctx.SetResult(types.TaskResultSuccess)
+				t.logger.Infof("all child tasks completed (%v success, %v failure)", successCount, failureCount)
 			}
 		}
 	}

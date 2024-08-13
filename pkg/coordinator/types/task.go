@@ -29,6 +29,8 @@ type TaskOptions struct {
 	Timeout helper.Duration `yaml:"timeout" json:"timeout"`
 	// The optional id of the task (for result access via tasks.<task-id>).
 	ID string `yaml:"id" json:"id"`
+	// The optional condition to run the task.
+	If string `yaml:"if" json:"if"`
 }
 
 type TaskIndex uint64
@@ -68,6 +70,7 @@ type TaskStatus struct {
 	ParentIndex TaskIndex
 	IsStarted   bool
 	IsRunning   bool
+	IsSkipped   bool
 	StartTime   time.Time
 	StopTime    time.Time
 	Result      TaskResult
