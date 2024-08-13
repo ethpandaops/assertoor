@@ -1,0 +1,63 @@
+id: pectra-33eth-deposit
+name: "33eth-deposit"
+timeout: 278h
+config:
+  #walletPrivkey: ""
+  depositContract: "0x4242424242424242424242424242424242424242"
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: generate_random_mnemonic
+  title: "Generate random mnemonic"
+  config:
+    mnemonicResultVar: "validatorMnemonic"
+- name: generate_child_wallet
+  title: "Generate wallet for lifecycle test"
+  config:
+    prefundMinBalance: 3401000000000000000000 # ensure 3401 ETH
+    walletAddressResultVar: "depositorAddress"
+    walletPrivateKeyResultVar: "depositorPrivateKey"
+  configVars:
+    privateKey: "walletPrivkey"
+
+# generate deposits & wait for activation
+- name: run_tasks
+  title: "Generate deposits & track inclusion"
+  config:
+    stopChildOnResult: false
+    tasks:
+    - name: generate_deposits
+      title: "Generate 10 deposits with 33 ETH each"
+      config:
+        limitTotal: 10
+        limitPerSlot: 10
+        limitPending: 10
+        depositAmount: 33
+        awaitReceipt: true
+        failOnReject: true
+        validatorPubkeysResultVar: "validatorPubkeys"
+      configVars:
+        walletPrivkey: "depositorPrivateKey"
+        mnemonic: "validatorMnemonic"
+        depositContract: "depositContract"
+
+    - name: run_task_matrix
+      title: "Wait for detection of all deposited keys"
+      configVars:
+        matrixValues: "validatorPubkeys"
+      config:
+        runConcurrent: true
+        matrixVar: "validatorPubkey"
+        task:
+          name: check_consensus_validator_status
+          title: "Wait for validator to become activated (${validatorPubkey})"
+          config:
+            validatorStatus:
+            - pending_initialized
+          configVars:
+            validatorPubKey: "validatorPubkey"

@@ -1,0 +1,90 @@
+id: pectra-all
+name: "All pectra tests"
+timeout: 2h
+config:
+  #walletPrivkey: ""
+tasks:
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= 34"
+    timeout: 2h
+    config:
+      minSlotNumber: 34
+  - name: run_external_tasks
+    title: "Generate BLS changes for validator 0-300"
+    timeout: 30m
+    config:
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/bls-changes.yaml
+      testConfig:
+        validatorCount: 300
+  
+  # EIP-6110
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= 38"
+    timeout: 2h
+    config:
+      minSlotNumber: 38
+  - name: run_external_tasks
+    title: "Generate massive deposit with 0x02 creds"
+    timeout: 30m
+    config:
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/massive-deposit-0x02.yaml
+
+  # EIP-2935
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= 42"
+    timeout: 2h
+    config:
+      minSlotNumber: 42
+  - name: run_external_tasks
+    title: "Generate massive deposit with 0x02 creds"
+    timeout: 30m
+    config:
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/blockhash-test.yaml
+  
+  # EIP-7002
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= 46"
+    timeout: 2h
+    config:
+      minSlotNumber: 46
+  - name: run_external_tasks
+    title: "Generate voluntary exits for validator 0-10"
+    timeout: 30m
+    config:
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/voluntary-exits.yaml
+      testConfig:
+        validatorCount: 10
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= 50"
+    timeout: 2h
+    config:
+      minSlotNumber: 50
+  - name: run_external_tasks
+    title: "EL-triggered exit test for validator 20"
+    timeout: 30m
+    config:
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/el-triggered-exit.yaml
+      testConfig:
+        validatorIndex: 20
+
+  # EIP-7251
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= 54"
+    timeout: 2h
+    config:
+      minSlotNumber: 54
+  - name: run_external_tasks
+    title: "Generate EL-triggered consolidation for validator 21"
+    timeout: 30m
+    config:
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/el-triggered-consolidation.yaml
+      testConfig:
+        sourceValidatorIndex: 21
+        targetValidatorIndex: 25
+
+  # Final check
+  - name: run_external_tasks
+    title: "Final check"
+    timeout: 60m
+    config:
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/block-proposal-check.yaml
