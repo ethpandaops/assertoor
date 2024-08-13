@@ -24,6 +24,7 @@ type taskState struct {
 	isCleanup bool
 	isStarted bool
 	isRunning bool
+	isSkipped bool
 	isTimeout bool
 	startTime time.Time
 	stopTime  time.Time
@@ -149,6 +150,7 @@ func (ts *taskState) GetTaskStatus() *types.TaskStatus {
 		ParentIndex: 0,
 		IsStarted:   ts.isStarted,
 		IsRunning:   ts.isRunning,
+		IsSkipped:   ts.isSkipped,
 		StartTime:   ts.startTime,
 		StopTime:    ts.stopTime,
 		Result:      ts.taskResult,
