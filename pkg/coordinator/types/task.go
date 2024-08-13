@@ -10,6 +10,7 @@ import (
 
 type TaskDescriptor struct {
 	Name        string
+	Aliases     []string
 	Description string
 	Config      interface{}
 	NewTask     func(ctx *TaskContext, options *TaskOptions) (Task, error)

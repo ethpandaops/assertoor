@@ -41,12 +41,12 @@ type Wallet struct {
 }
 
 type Summary struct {
-	Address          string   `json:"address"`
-	PrivKey          string   `json:"privkey"`
-	PendingBalance   *big.Int `json:"pendingBalance"`
-	PendingNonce     uint64   `json:"pendingNonce"`
-	ConfirmedBalance *big.Int `json:"confirmedBalance"`
-	ConfirmedNonce   uint64   `json:"confirmedNonce"`
+	Address          string   `json:"address" yaml:"address"`
+	PrivKey          string   `json:"privkey" yaml:"privkey"`
+	PendingBalance   *big.Int `json:"pendingBalance" yaml:"pendingBalance"`
+	PendingNonce     uint64   `json:"pendingNonce" yaml:"pendingNonce"`
+	ConfirmedBalance *big.Int `json:"confirmedBalance" yaml:"confirmedBalance"`
+	ConfirmedNonce   uint64   `json:"confirmedNonce" yaml:"confirmedNonce"`
 }
 
 type nonceStatus struct {
