@@ -1,9 +1,10 @@
+id: validator-lifecycle-test
 name: "Validator Lifecycle Test"
 timeout: 72h
 config:
-  #walletPrivkey: ""
+  walletPrivkey: ""
   validatorMnemonic: "trial jeans seat abstract runway cupboard please elevator club file arrow lounge crash sun thumb clock duty priority key fence funny trick diary album"
-  #validatorPairNames: []
+  validatorPairNames: []
 tasks:
 - name: check_clients_are_healthy
   title: "Check if at least one client is ready"
@@ -19,6 +20,8 @@ tasks:
       title: "Generate 300 deposits"
       config:
         limitTotal: 300
+        limitPerSlot: 20
+        limitPending: 50
         depositContract: "0x4242424242424242424242424242424242424242"
       configVars:
         walletPrivkey: "walletPrivkey"
@@ -62,11 +65,12 @@ tasks:
     minUnfinalizedEpochs: 5
 
 # check if all client pairs propose blocks with bls changes during un-finality
-- name: run_tasks_concurrent
+- name: run_task_background
   title: "Check if all clients propose blocks with BLS changes during un-finality"
   config:
-    tasks:
-    - name: generate_bls_changes
+    onBackgroundComplete: failOrIgnore
+    backgroundTask:
+      name: generate_bls_changes
       title: "Generate 50 BLS changes (1 bls change per slot)"
       config:
         limitTotal: 50
@@ -76,7 +80,8 @@ tasks:
       configVars:
         mnemonic: "validatorMnemonic"
 
-    - name: run_task_matrix
+    foregroundTask:
+      name: run_task_matrix
       title: "Check bls change inclusion with all client pairs"
       timeout: 1h
       configVars:
@@ -93,11 +98,12 @@ tasks:
             minBlsChangeCount: 1
 
 # check if all client pairs propose blocks with exits during un-finality
-- name: run_tasks_concurrent
+- name: run_task_background
   title: "Check if all clients propose blocks with exits during un-finality"
   config:
-    tasks:
-    - name: generate_exits
+    onBackgroundComplete: failOrIgnore
+    backgroundTask:
+      name: generate_exits
       title: "Generate 50 Voluntary Exits (1 exit per slot)"
       config:
         limitTotal: 50
@@ -106,7 +112,8 @@ tasks:
       configVars:
         mnemonic: "validatorMnemonic"
 
-    - name: run_task_matrix
+    foregroundTask:
+      name: run_task_matrix
       title: "Check exit inclusion with all client pairs"
       timeout: 1h
       configVars:
@@ -123,11 +130,12 @@ tasks:
             minExitCount: 1
 
 # check if all client pairs propose blocks with attester slashings
-- name: run_tasks_concurrent
+- name: run_task_background
   title: "Check if all clients propose blocks with attester slashings during un-finality"
   config:
-    tasks:
-    - name: generate_slashings
+    onBackgroundComplete: failOrIgnore
+    backgroundTask:
+      name: generate_slashings
       title: "Generate 1 attester slashing per slot"
       config:
         slashingType: "attester"
@@ -138,7 +146,8 @@ tasks:
       configVars:
         mnemonic: "validatorMnemonic"
 
-    - name: run_task_matrix
+    foregroundTask:
+      name: run_task_matrix
       title: "Check slashing inclusion with all client pairs"
       timeout: 1h
       configVars:
@@ -155,11 +164,12 @@ tasks:
             minAttesterSlashingCount: 1
 
 # check if all client pairs propose blocks with proposer slashings
-- name: run_tasks_concurrent
+- name: run_task_background
   title: "Check if all clients propose blocks with proposer slashings during un-finality"
   config:
-    tasks:
-    - name: generate_slashings
+    onBackgroundComplete: failOrIgnore
+    backgroundTask:
+      name: generate_slashings
       title: "Generate 1 proposer slashing per slot"
       config:
         slashingType: "proposer"
@@ -170,7 +180,8 @@ tasks:
       configVars:
         mnemonic: "validatorMnemonic"
 
-    - name: run_task_matrix
+    foregroundTask:
+      name: run_task_matrix
       title: "Check slashing inclusion with all client pairs"
       timeout: 1h
       configVars:
@@ -200,11 +211,12 @@ tasks:
     maxUnfinalizedEpochs: 4
 
 # check if all client pairs propose blocks with bls changes during finality
-- name: run_tasks_concurrent
+- name: run_task_background
   title: "Check if all clients propose blocks with BLS changes during finality"
   config:
-    tasks:
-    - name: generate_bls_changes
+    onBackgroundComplete: failOrIgnore
+    backgroundTask:
+      name: generate_bls_changes
       title: "Generate 1 bls change per slot"
       config:
         startIndex: 150
@@ -215,7 +227,8 @@ tasks:
       configVars:
         mnemonic: "validatorMnemonic"
 
-    - name: run_task_matrix
+    foregroundTask:
+      name: run_task_matrix
       title: "Check bls change inclusion with all client pairs"
       timeout: 1h
       configVars:
@@ -232,11 +245,12 @@ tasks:
             minBlsChangeCount: 1
 
 # check if all client pairs propose blocks with exits during finality
-- name: run_tasks_concurrent
+- name: run_task_background
   title: "Check if all clients propose blocks with exits during finality"
   config:
-    tasks:
-    - name: generate_exits
+    onBackgroundComplete: failOrIgnore
+    backgroundTask:
+      name: generate_exits
       title: "Generate 1 exit per slot"
       config:
         startIndex: 150
@@ -246,7 +260,8 @@ tasks:
       configVars:
         mnemonic: "validatorMnemonic"
 
-    - name: run_task_matrix
+    foregroundTask:
+      name: run_task_matrix
       title: "Check exit inclusion with all client pairs"
       timeout: 1h
       configVars:
@@ -263,11 +278,12 @@ tasks:
             minExitCount: 1
 
 # check if all client pairs propose blocks with attester slashings
-- name: run_tasks_concurrent
+- name: run_task_background
   title: "Check if all clients propose blocks with attester slashings during finality"
   config:
-    tasks:
-    - name: generate_slashings
+    onBackgroundComplete: failOrIgnore
+    backgroundTask:
+      name: generate_slashings
       title: "Generate 1 attester slashing per slot"
       config:
         slashingType: "attester"
@@ -278,7 +294,8 @@ tasks:
       configVars:
         mnemonic: "validatorMnemonic"
 
-    - name: run_task_matrix
+    foregroundTask:
+      name: run_task_matrix
       title: "Check slashing inclusion with all client pairs"
       timeout: 1h
       configVars:
@@ -295,11 +312,12 @@ tasks:
             minAttesterSlashingCount: 1
 
 # check if all client pairs propose blocks with proposer slashings
-- name: run_tasks_concurrent
+- name: run_task_background
   title: "Check if all clients propose blocks with proposer slashings during finality"
   config:
-    tasks:
-    - name: generate_slashings
+    onBackgroundComplete: failOrIgnore
+    backgroundTask:
+      name: generate_slashings
       title: "Generate 1 proposer slashing per slot"
       config:
         slashingType: "proposer"
@@ -310,7 +328,8 @@ tasks:
       configVars:
         mnemonic: "validatorMnemonic"
 
-    - name: run_task_matrix
+    foregroundTask:
+      name: run_task_matrix
       title: "Check slashing inclusion with all client pairs"
       timeout: 1h
       configVars:

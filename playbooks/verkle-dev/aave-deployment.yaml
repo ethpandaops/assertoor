@@ -1,0 +1,85 @@
+
+id: deploy-aave
+name: "Deploy AAVE"
+timeout: 1h
+config:
+  #walletPrivkey: ""
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+      executionRpcResultVar: "executionClientRpc"
+  - name: generate_child_wallet
+    title: "Generate wallet for deployment"
+    config:
+      prefundMinBalance: 1000000000000000000 # 1 ETH
+      walletAddressResultVar: "deployerAddress"
+      walletPrivateKeyResultVar: "deployerPrivateKey"
+      walletSeed: "aave-deployer"
+    configVars:
+      privateKey: "walletPrivkey"
+  
+  # build & deploy aave via shell script
+  - name: run_shell
+    title: "Download & deploy AAVE v3.1"
+    config:
+      shell: "bash"
+      envVars:
+        DEPLOYER_PRIVKEY: "deployerPrivateKey"
+        DEPLOYER_ADDRESS: "deployerAddress"
+        NETWORK_RPC: "executionClientRpc"
+      command: |
+        tmp_dir=$(mktemp -d -t aave-XXXXXXXXXX)
+        cd $tmp_dir
+        export HOME=$tmp_dir
+        function finish {
+          rm -rf "$tmp_dir"
+          echo "aave tmpdir removed"
+        }
+        trap finish EXIT # always remove tempdir on exit
+
+        # install foundry
+        curl -L https://foundry.paradigm.xyz | bash
+        source $tmp_dir/.bashrc
+        foundryup
+
+        if [ -z "$(which forge)" ]; then
+          echo "Foundry setup failed! forge not found."
+          exit 1
+        fi
+
+        # setup solc 0.8.19
+        curl https://github.com/ethereum/solidity/releases/download/v0.8.19/solc-static-linux -Lo ./solc
+        chmod +x solc
+        export PATH="$tmp_dir:$PATH"
+
+        if [ -z "$(which solc)" ]; then
+          echo "Solc setup failed! solc not found."
+          exit 1
+        fi
+
+        # clone aave
+        git clone -b feat/verkle https://github.com/bgd-labs/aave-v3-origin.git
+        cd aave-v3-origin
+
+        # prepare .env
+        cp .env.example .env
+        sed -i "s/^PRIVATE_KEY=.*/PRIVATE_KEY=${DEPLOYER_PRIVKEY}/" .env
+        sed -i "s/^SENDER=.*/SENDER=${DEPLOYER_ADDRESS}/" .env
+        sed -i "s#^net=.*#net=${NETWORK_RPC}#" .env
+
+        # setup
+        forge install
+
+        # deploy
+        make deploy-v3-batched
+
+        echo "[]" > ./deployments.json
+        find ./broadcast | grep "run-latest.json" | while read file ; do
+          cat $file | jq ".transactions[] | select(.contractAddress) | { contractName: .contractName, contractAddress: .contractAddress } | [.]" >> deployments.json
+        done
+
+        cat ./deployments.json | jq ".[]"
+        
