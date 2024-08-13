@@ -1,4 +1,4 @@
-package generaterandommnemonic
+package getrandommnemonic
 
 type Config struct {
 	MnemonicResultVar string `yaml:"mnemonicResultVar" json:"mnemonicResultVar"`

@@ -1,4 +1,4 @@
-package generaterandommnemonic
+package getrandommnemonic
 
 import (
 	"context"
@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	TaskName       = "generate_random_mnemonic"
+	TaskName       = "get_random_mnemonic"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Generate random mnemonic.",
+		Aliases:     []string{"generate_random_mnemonic"},
+		Description: "Get random mnemonic.",
 		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}

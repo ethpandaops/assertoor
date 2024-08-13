@@ -56,6 +56,22 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 			taskDescriptor = taskDesc
 			break
 		}
+
+		if len(taskDesc.Aliases) > 0 {
+			isAlias := false
+
+			for _, alias := range taskDesc.Aliases {
+				if alias == options.Name {
+					isAlias = true
+					break
+				}
+			}
+
+			if isAlias {
+				taskDescriptor = taskDesc
+				break
+			}
+		}
 	}
 
 	if taskDescriptor == nil {
