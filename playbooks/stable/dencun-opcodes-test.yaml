@@ -1,9 +1,8 @@
+id: dencun-opcodes-test
 name: "Dencun Test"
 timeout: 1h
 config:
-  #walletPrivkey: ""
-  #validatorPairNames: []
-  #clientPairNames: []
+  walletPrivkey: ""
 tasks:
 - name: check_clients_are_healthy
   title: "Check if at least one client is ready"

@@ -1,0 +1,26 @@
+id: synchronized-check
+name: "Check client sync status"
+timeout: 12h
+config:
+  clientPairNames: []
+tasks:
+- name: run_task_matrix
+  title: "Check if client pairs are synchronized"
+  configVars:
+    matrixValues: "clientPairNames"
+  config:
+    runConcurrent: true
+    matrixVar: "checkClient"
+    task:
+      name: run_tasks_concurrent
+      title: "Check if ${checkClient} is synchronized"
+      config:
+        tasks:
+        - name: check_consensus_sync_status
+          title: "Check if CL client is synced"
+          configVars:
+            clientPattern: "checkClient"
+        - name: check_execution_sync_status
+          title: "Check if EL client is synced"
+          configVars:
+            clientPattern: "checkClient"
