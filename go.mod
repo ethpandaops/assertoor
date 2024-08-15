@@ -10,7 +10,7 @@ require (
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/gorilla/mux v1.8.1
 	github.com/herumi/bls-eth-go-binary v1.35.0
-	github.com/holiman/uint256 v1.3.0
+	github.com/holiman/uint256 v1.3.1
 	github.com/itchyny/gojq v0.12.16
 	github.com/juliangruber/go-intersect v1.1.0
 	github.com/mashingan/smapping v0.1.19
@@ -27,6 +27,7 @@ require (
 	github.com/urfave/negroni v1.0.0
 	github.com/wealdtech/go-eth2-types/v2 v2.8.2
 	github.com/wealdtech/go-eth2-util v1.8.2
+	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -99,6 +100,5 @@ require (
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/Knetic/govaluate.v3 v3.0.0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
