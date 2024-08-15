@@ -135,6 +135,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	depositTransactions := []string{}
 	validatorPubkeys := []string{}
 	depositReceipts := map[string]*ethtypes.Receipt{}
+	depositReceiptsMtx := sync.Mutex{}
 
 	for {
 		accountIdx := t.nextIndex
@@ -147,7 +148,9 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			pendingWg.Done()
 
+			depositReceiptsMtx.Lock()
 			depositReceipts[tx.Hash().Hex()] = receipt
+			depositReceiptsMtx.Unlock()
 
 			if receipt != nil {
 				t.logger.Infof("deposit %v confirmed in block %v (nonce: %v, status: %v)", tx.Hash().Hex(), receipt.BlockNumber, tx.Nonce(), receipt.Status)
