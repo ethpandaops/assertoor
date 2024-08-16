@@ -1,0 +1,45 @@
+
+id: el-triggered-consolidation
+name: "EL-triggered consolidation test"
+timeout: 1h
+config:
+  #walletPrivkey: ""
+  initialSourceValidatorIndex: 10
+  initialTargetValidatorIndex: 11
+  finalTargetValidatorIndex: 12
+  waitForSlot: 120
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= ${waitForSlot}"
+    timeout: 2h
+    configVars:
+      minSlotNumber: "waitForSlot"
+  - name: run_task_options
+    title: "Generate consolidations"
+    config:
+      task:
+        name: generate_consolidations
+        title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
+        config:
+          sourceIndexCount: 1
+          failOnReject: true
+          awaitReceipt: true
+        configVars:
+          walletPrivkey: "walletPrivkey"
+          sourceStartValidatorIndex: "initialSourceValidatorIndex"
+          targetValidatorIndex: "initialTargetValidatorIndex"
+
+  - name: check_consensus_validator_status
+    title: "Wait for validator to exit (${initialSourceValidatorIndex})"
+    config:
+      validatorStatus:
+        - exited_unslashed
+        - withdrawal_possible
+        - withdrawal_done
+    configVars:
+      validatorIndex: "initialSourceValidatorIndex"
