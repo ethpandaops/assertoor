@@ -10,7 +10,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		Shell: "sh",
+		Shell: "bash",
 	}
 }
 
