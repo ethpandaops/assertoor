@@ -41,4 +41,4 @@ tasks:
     configVars:
       EthCallData: "eip2935input"
       ExpectResult: "headBlockHash"
-      CallAddress: 0x0aae40965e6800cd9b1f4b05ff21581047e3f91e
+      CallAddress: "0x0aae40965e6800cd9b1f4b05ff21581047e3f91e"
