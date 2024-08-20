@@ -77,11 +77,11 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.logger.Infof("EthCallData: %v", t.config.EthCallData)
 	t.logger.Infof("ExpectResult: %v", t.config.ExpectResult)
 	t.logger.Infof("CallAddress: %v", t.config.CallAddress)
-	t.logger.Infof("CallAddressPointer: %v", &t.config.CallAddress)
 
 	var clients []*execution.Client
 	var callMsg ethereum.CallMsg
-	callMsg.Data = []byte(t.config.EthCallData)
+
+	callMsg.Data = common.FromHex(t.config.EthCallData)
 	address := common.HexToAddress(t.config.CallAddress)
 	callMsg.To = &address
 
