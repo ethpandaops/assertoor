@@ -81,7 +81,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	var clients []*execution.Client
 	var callMsg ethereum.CallMsg
 
-	callMsg.Data = common.FromHex(t.config.EthCallData)
+	callMsg.Data, _ = common.ParseHexOrString(t.config.EthCallData)
 	address := common.HexToAddress(t.config.CallAddress)
 	callMsg.To = &address
 
@@ -117,20 +117,26 @@ func (t *Task) Execute(ctx context.Context) error {
 		// Send the eth_call to all the clients
 		for i := 0; i < len(clients); i++ {
 			client := clients[i]
-			fetchedResult := common.Hash{}
+
 			t.logger.WithFields(logrus.Fields{
 				"client": client.GetName(),
 			}).Infof("sending ethCall ")
 
 			fetchedResult, err := client.GetRPCClient().GetEthCall(ctx, callMsg, block.Number())
 			if err == nil {
-				break
+				return fmt.Errorf("ethCall failed with error: %v", err)
+			} else if len(fetchedResult) == 0 {
+				return fmt.Errorf("ethCall failed with empty result")
 			}
-
 			fmt.Println(fetchedResult)
 			t.logger.WithFields(logrus.Fields{
 				"client": client.GetName(),
 			}).Warnf("RPC error when sending ethCall %v: %v", callMsg, err)
+
+			fmt.Println(common.Hash(fetchedResult))
+			if common.Hash(fetchedResult).Hex() != t.config.ExpectResult {
+				return fmt.Errorf("expected result not found, expected: %v, got: %v", t.config.ExpectResult, common.Hash(fetchedResult).Hex())
+			}
 		}
 	}
 

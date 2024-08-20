@@ -32,7 +32,7 @@ tasks:
         # Remove 0x from the block number
         BLOCK_NUMBER="${BLOCK_NUMBER#0x}"
         # Format the block number to 32 hexadecimal digits
-        hexval=$(printf "%032x" $((16#$BLOCK_NUMBER)))
+        hexval=$(printf "0x%064x" $((16#$BLOCK_NUMBER)))
         echo $hexval
         # Set the eip2935input variable
         echo "::set-var eip2935input $hexval"

@@ -129,10 +129,12 @@ func (ec *ExecutionClient) SendTransaction(ctx context.Context, tx *types.Transa
 	return ec.ethClient.SendTransaction(ctx, tx)
 }
 
-func (ec *ExecutionClient) GetEthCall(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) (common.Hash, error) {
+func (ec *ExecutionClient) GetEthCall(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	fmt.Println("GetEthCall")
 	fmt.Println(msg)
 	fmt.Println(blockNumber)
 	response, err := ec.ethClient.CallContract(ctx, msg, blockNumber)
-	return common.Hash(response), err
+	fmt.Println(response)
+
+	return response, err
 }
