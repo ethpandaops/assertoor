@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
+	"math/big"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
@@ -91,20 +92,14 @@ func (t *Task) Execute(ctx context.Context) error {
 	address := common.HexToAddress(t.config.CallAddress)
 	callMsg.To = &address
 
-	// Get the client pool from the scheduler
-	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
-
-	// Get the latest block from the execution pool
-	blocks := clientPool.GetExecutionPool().GetBlockCache().GetCachedBlocks()
-
-	if len(blocks) == 0 || blocks[0] == nil || blocks[0].GetBlock() == nil {
-		t.logger.Error("No blocks found or the first block is nil")
-		return fmt.Errorf("no blocks found or the first block is nil")
+	// Get the latest block
+	blockNumber, err := t.getLatestBlockNumber(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting latest block: %v", err)
 	}
 
-	// Get the head block
-	block := blocks[0].GetBlock()
-	t.logger.Infof("Fetched head block number %v for the ethCall parameter", block.Number())
+	// Get the client pool from the scheduler
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
 	// Get all the clients from the pool
 	poolClients := clientPool.GetAllClients()
@@ -124,35 +119,46 @@ func (t *Task) Execute(ctx context.Context) error {
 		for i := 0; i < len(clients); i++ {
 			client := clients[i]
 
-			t.logger.WithFields(logrus.Fields{
-				"client": client.GetName(),
-			}).Infof("sending ethCall ")
+			// Log the client name
+			t.logger.Infof("sending ethCall to client %v", client.GetName())
 
-			fetchedResult, err := client.GetRPCClient().GetEthCall(ctx, callMsg, block.Number())
+			// Send the eth_call
+			fetchedResult, err := client.GetRPCClient().GetEthCall(ctx, callMsg, blockNumber)
+
+			// Check if the eth_call was successful
 			if err != nil {
-				t.logger.WithFields(logrus.Fields{
-					"client": client.GetName(),
-				}).Warnf("RPC error when sending ethCall %v: %v", callMsg, err)
-				return fmt.Errorf("ethCall failed with error: %v", err)
+				return fmt.Errorf("RPC error when sending ethCall %v: %v to client %v", callMsg, err, client.GetName())
 			} else if len(fetchedResult) == 0 {
-				t.logger.WithFields(logrus.Fields{
-					"client": client.GetName(),
-				}).Warnf("RPC error when sending ethCall %v: %v", callMsg, err)
-
-				return fmt.Errorf("ethCall failed with empty result")
+				return fmt.Errorf("RPC error when sending ethCall %v: %v to client %v", callMsg, err, client.GetName())
 			}
-
+			// Check if the fetched result is the expected result
 			if common.Hash(fetchedResult).Hex() != t.config.ExpectResult {
 				return fmt.Errorf("expected result not found, expected: %v, got: %v", t.config.ExpectResult, common.Hash(fetchedResult).Hex())
 			}
 
-			t.logger.WithFields(logrus.Fields{
-				"client":         client.GetName(),
-				"ethCallResult":  common.Hash(fetchedResult),
-				"expectedResult": t.config.ExpectResult,
-			}).Infof("ethCall successful")
+			t.logger.Infof("ethCall to client %v was successful, ethCallResult: %v and expectedResult: %v", client.GetName(), common.Hash(fetchedResult), t.config.ExpectResult)
 		}
 	}
 
 	return nil
+}
+
+func (t *Task) getLatestBlockNumber(ctx context.Context) (*big.Int, error) {
+
+	// Get the client pool from the scheduler
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
+	// Get the latest block from the execution pool
+	blocks := clientPool.GetExecutionPool().GetBlockCache().GetCachedBlocks()
+
+	if len(blocks) == 0 || blocks[0] == nil || blocks[0].GetBlock() == nil {
+		t.logger.Error("No blocks found or the first block is nil")
+		return nil, fmt.Errorf("no blocks found or the first block is nil")
+	}
+
+	// Get the head block
+	block := blocks[0].GetBlock()
+
+	t.logger.Infof("Fetched head block number %v for the ethCall parameter", block.Number())
+
+	return block.Number(), nil
 }
