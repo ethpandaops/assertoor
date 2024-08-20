@@ -25,9 +25,6 @@ tasks:
         BLOCK_JSON=$(echo "$BLOCK" | jq '. | fromjson')
         BLOCK_NUMBER=$(echo "$BLOCK_JSON" | jq -r '.number')
         BLOCK_HASH=$(echo "$BLOCK_JSON" | jq -r '.hash')
-        echo $BLOCK_JSON
-        echo $BLOCK_NUMBER
-        echo $BLOCK_HASH
         echo "::set-var headBlockHash $BLOCK_HASH"
         # Remove 0x from the block number
         BLOCK_NUMBER="${BLOCK_NUMBER#0x}"

@@ -74,17 +74,24 @@ func (t *Task) LoadConfig() error {
 func (t *Task) Execute(ctx context.Context) error {
 	t.logger.Info("Checking eth_call...")
 	// Log all the parameters sent to it
+	t.logger.Infof("CallAddress: %v", t.config.CallAddress)
 	t.logger.Infof("EthCallData: %v", t.config.EthCallData)
 	t.logger.Infof("ExpectResult: %v", t.config.ExpectResult)
-	t.logger.Infof("CallAddress: %v", t.config.CallAddress)
+
+	// Sleep so that we move ahead one slot
+	t.logger.Info("Sleeping for 20 seconds to move ahead atleast one slot")
+	time.Sleep(20 * time.Second)
+	t.logger.Info("Woke up after 20 seconds")
 
 	var clients []*execution.Client
 	var callMsg ethereum.CallMsg
 
-	callMsg.Data, _ = common.ParseHexOrString(t.config.EthCallData)
+	// Set up the call message
+	callMsg.Data = common.FromHex(t.config.EthCallData)
 	address := common.HexToAddress(t.config.CallAddress)
 	callMsg.To = &address
 
+	// Get the client pool from the scheduler
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
 	// Get the latest block from the execution pool
@@ -95,10 +102,9 @@ func (t *Task) Execute(ctx context.Context) error {
 		return fmt.Errorf("no blocks found or the first block is nil")
 	}
 
+	// Get the head block
 	block := blocks[0].GetBlock()
-
-	t.logger.Infof("Fetched head block number %v", block.Number())
-	t.logger.Infof("Fetched head block hash %v", block.Hash().Hex())
+	t.logger.Infof("Fetched head block number %v for the ethCall parameter", block.Number())
 
 	// Get all the clients from the pool
 	poolClients := clientPool.GetAllClients()
@@ -123,20 +129,28 @@ func (t *Task) Execute(ctx context.Context) error {
 			}).Infof("sending ethCall ")
 
 			fetchedResult, err := client.GetRPCClient().GetEthCall(ctx, callMsg, block.Number())
-			if err == nil {
+			if err != nil {
+				t.logger.WithFields(logrus.Fields{
+					"client": client.GetName(),
+				}).Warnf("RPC error when sending ethCall %v: %v", callMsg, err)
 				return fmt.Errorf("ethCall failed with error: %v", err)
 			} else if len(fetchedResult) == 0 {
+				t.logger.WithFields(logrus.Fields{
+					"client": client.GetName(),
+				}).Warnf("RPC error when sending ethCall %v: %v", callMsg, err)
+
 				return fmt.Errorf("ethCall failed with empty result")
 			}
-			fmt.Println(fetchedResult)
-			t.logger.WithFields(logrus.Fields{
-				"client": client.GetName(),
-			}).Warnf("RPC error when sending ethCall %v: %v", callMsg, err)
 
-			fmt.Println(common.Hash(fetchedResult))
 			if common.Hash(fetchedResult).Hex() != t.config.ExpectResult {
 				return fmt.Errorf("expected result not found, expected: %v, got: %v", t.config.ExpectResult, common.Hash(fetchedResult).Hex())
 			}
+
+			t.logger.WithFields(logrus.Fields{
+				"client":         client.GetName(),
+				"ethCallResult":  common.Hash(fetchedResult),
+				"expectedResult": t.config.ExpectResult,
+			}).Infof("ethCall successful")
 		}
 	}
 
