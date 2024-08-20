@@ -7,7 +7,7 @@ config:
   initialSourceValidatorIndex: 10
   initialTargetValidatorIndex: 11
   finalTargetValidatorIndex: 12
-  waitForSlot: 120
+  waitForSlot: 41
 tasks:
   - name: check_clients_are_healthy
     title: "Check if at least one client is ready"
@@ -35,7 +35,15 @@ tasks:
           targetValidatorIndex: "initialTargetValidatorIndex"
 
   - name: check_consensus_validator_status
-    title: "Wait for validator to exit (${initialSourceValidatorIndex})"
+    title: "Wait for validator consolidation to start by checking if validator (${initialSourceValidatorIndex}) is exiting"
+    config:
+      validatorStatus:
+        - active_exiting
+    configVars:
+      validatorIndex: "initialSourceValidatorIndex"
+
+  - name: check_consensus_validator_status
+    title: "Wait for validator to exit (${initialSourceValidatorIndex}) to check consolidation status"
     config:
       validatorStatus:
         - exited_unslashed
@@ -43,3 +51,36 @@ tasks:
         - withdrawal_done
     configVars:
       validatorIndex: "initialSourceValidatorIndex"
+
+  - name: run_task_options
+    title: "Generate consolidations for second validator"
+    config:
+      task:
+        name: generate_consolidations
+        title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
+        config:
+          sourceIndexCount: 1
+          failOnReject: true
+          awaitReceipt: true
+        configVars:
+          walletPrivkey: "walletPrivkey"
+          sourceStartValidatorIndex: "initialTargetValidatorIndex"
+          targetValidatorIndex: "finalTargetValidatorIndex"
+
+  - name: check_consensus_validator_status
+    title: "Wait for validator consolidation to start by checking if validator (${initialSourceValidatorIndex}) is exiting"
+    config:
+      validatorStatus:
+        - active_exiting
+    configVars:
+      validatorIndex: "initialTargetValidatorIndex"
+
+  - name: check_consensus_validator_status
+    title: "Wait for validator to exit (${initialSourceValidatorIndex}) to check consolidation status"
+    config:
+      validatorStatus:
+        - exited_unslashed
+        - withdrawal_possible
+        - withdrawal_done
+    configVars:
+      validatorIndex: "initialTargetValidatorIndex"

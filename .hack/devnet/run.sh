@@ -30,7 +30,7 @@ kurtosis files inspect "$ENCLAVE_NAME" validator-ranges validator-ranges.yaml | 
 kurtosis files inspect "$ENCLAVE_NAME" assertoor-config assertoor-config.yaml | tail -n +2 > "${__dir}/generated-assertoor-config.yaml"
 
 # Inject dev settings
-export DEVNET_DIR="${__dir}"
+export DEVNET_DIR=".hack/devnet"
 cat "$config_file" | envsubst > "${__dir}/generated-assertoor-config-custom.yaml"
 yq eval-all '. as $item ireduce ({}; . *+ $item)' "${__dir}/generated-assertoor-config.yaml" "${__dir}/generated-assertoor-config-custom.yaml" > "${__dir}/generated-assertoor-config-final.yaml"
 mv "${__dir}/generated-assertoor-config-final.yaml" "${__dir}/generated-assertoor-config.yaml"

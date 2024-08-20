@@ -3,6 +3,9 @@ package checkethcall
 import (
 	"context"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
@@ -68,10 +71,68 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
-func (t *Task) Execute(_ context.Context) error {
+func (t *Task) Execute(ctx context.Context) error {
 	t.logger.Info("Checking eth_call...")
+	// Log all the parameters sent to it
 	t.logger.Infof("EthCallData: %v", t.config.EthCallData)
 	t.logger.Infof("ExpectResult: %v", t.config.ExpectResult)
+	t.logger.Infof("CallAddress: %v", t.config.CallAddress)
+	t.logger.Infof("CallAddressPointer: %v", &t.config.CallAddress)
+
+	var clients []*execution.Client
+	var callMsg ethereum.CallMsg
+	callMsg.Data = []byte(t.config.EthCallData)
+	address := common.HexToAddress(t.config.CallAddress)
+	callMsg.To = &address
+
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
+
+	// Get the latest block from the execution pool
+	blocks := clientPool.GetExecutionPool().GetBlockCache().GetCachedBlocks()
+
+	if len(blocks) == 0 || blocks[0] == nil || blocks[0].GetBlock() == nil {
+		t.logger.Error("No blocks found or the first block is nil")
+		return fmt.Errorf("no blocks found or the first block is nil")
+	}
+
+	block := blocks[0].GetBlock()
+
+	t.logger.Infof("Fetched head block number %v", block.Number())
+	t.logger.Infof("Fetched head block hash %v", block.Hash().Hex())
+
+	// Get all the clients from the pool
+	poolClients := clientPool.GetAllClients()
+	if len(poolClients) == 0 {
+		return fmt.Errorf("no client found in pool")
+	}
+	// Get the execution clients from the pool clients
+	clients = make([]*execution.Client, len(poolClients))
+	for i, c := range poolClients {
+		clients[i] = c.ExecutionClient
+	}
+
+	if len(clients) == 0 {
+		return fmt.Errorf("no healthy clients found")
+	} else {
+		// Send the eth_call to all the clients
+		for i := 0; i < len(clients); i++ {
+			client := clients[i]
+			fetchedResult := common.Hash{}
+			t.logger.WithFields(logrus.Fields{
+				"client": client.GetName(),
+			}).Infof("sending ethCall ")
+
+			fetchedResult, err := client.GetRPCClient().GetEthCall(ctx, callMsg, block.Number())
+			if err == nil {
+				break
+			}
+
+			fmt.Println(fetchedResult)
+			t.logger.WithFields(logrus.Fields{
+				"client": client.GetName(),
+			}).Warnf("RPC error when sending ethCall %v: %v", callMsg, err)
+		}
+	}
 
 	return nil
 }

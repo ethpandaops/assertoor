@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"github.com/ethereum/go-ethereum"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -125,4 +126,9 @@ func (ec *ExecutionClient) GetTransactionReceipt(ctx context.Context, txHash com
 
 func (ec *ExecutionClient) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	return ec.ethClient.SendTransaction(ctx, tx)
+}
+
+func (ec *ExecutionClient) GetEthCall(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) (common.Hash, error) {
+	response, err := ec.ethClient.CallContract(ctx, msg, blockNumber)
+	return common.Hash(response), err
 }

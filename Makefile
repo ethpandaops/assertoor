@@ -26,5 +26,9 @@ devnet:
 devnet-run: devnet
 	go run main.go --config .hack/devnet/generated-assertoor-config.yaml
 
+devnet-run-docker: devnet
+	docker build --file ./Dockerfile-local -t assertoor:devnet-run .
+	docker run --rm -v $(PWD):/workspace -it -p 8080:8080 assertoor:devnet-run --config .hack/devnet/generated-assertoor-config.yaml
+
 devnet-clean:
 	.hack/devnet/cleanup.sh
