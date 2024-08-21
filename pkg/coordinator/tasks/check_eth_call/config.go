@@ -1,9 +1,14 @@
 package checkethcall
 
 type Config struct {
-	EthCallData  string `yaml:"EthCallData" json:"EthCallData"`
-	ExpectResult string `yaml:"ExpectResult" json:"ExpectResult"`
-	CallAddress  string `yaml:"CallAddress" json:"CallAddress"`
+	EthCallData    string `yaml:"EthCallData" json:"EthCallData"`
+	ExpectResult   string `yaml:"ExpectResult" json:"ExpectResult"`
+	CallAddress    string `yaml:"CallAddress" json:"CallAddress"`
+	BlockNumber    uint64 `yaml:"blockNumber" json:"blockNumber"`
+	FailOnMismatch bool   `yaml:"failOnMismatch" json:"failOnMismatch"`
+
+	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
+	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
 }
 
 func DefaultConfig() Config {

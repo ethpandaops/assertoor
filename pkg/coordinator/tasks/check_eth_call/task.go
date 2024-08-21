@@ -1,13 +1,15 @@
 package checkethcall
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"math/big"
+	"time"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
-	"math/big"
-	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
@@ -73,94 +75,139 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	t.logger.Info("Checking eth_call...")
-	// Log all the parameters sent to it
-	t.logger.Infof("CallAddress: %v", t.config.CallAddress)
-	t.logger.Infof("EthCallData: %v", t.config.EthCallData)
-	t.logger.Infof("ExpectResult: %v", t.config.ExpectResult)
+	executionPool := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool()
 
-	// Sleep so that we move ahead one slot
-	t.logger.Info("Sleeping for 20 seconds to move ahead atleast one slot")
-	time.Sleep(20 * time.Second)
-	t.logger.Info("Woke up after 20 seconds")
+	blockSubscription := executionPool.GetBlockCache().SubscribeBlockEvent(10)
+	defer blockSubscription.Unsubscribe()
 
-	var clients []*execution.Client
-	var callMsg ethereum.CallMsg
+	var latestBlock *execution.Block
 
-	// Set up the call message
-	callMsg.Data = common.FromHex(t.config.EthCallData)
-	address := common.HexToAddress(t.config.CallAddress)
-	callMsg.To = &address
-
-	// Get the latest block
-	blockNumber, err := t.getLatestBlockNumber(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting latest block: %v", err)
-	}
-
-	// Get the client pool from the scheduler
-	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
-
-	// Get all the clients from the pool
-	poolClients := clientPool.GetAllClients()
-	if len(poolClients) == 0 {
-		return fmt.Errorf("no client found in pool")
-	}
-	// Get the execution clients from the pool clients
-	clients = make([]*execution.Client, len(poolClients))
-	for i, c := range poolClients {
-		clients[i] = c.ExecutionClient
-	}
-
-	if len(clients) == 0 {
-		return fmt.Errorf("no healthy clients found")
-	} else {
-		// Send the eth_call to all the clients
-		for i := 0; i < len(clients); i++ {
-			client := clients[i]
-
-			// Log the client name
-			t.logger.Infof("sending ethCall to client %v", client.GetName())
-
-			// Initialize fetchedResult to zero
-			var fetchedResult []byte
-
-			// Send the eth_call
-			fetchedResult, err = client.GetRPCClient().GetEthCall(ctx, callMsg, blockNumber)
-			// Check if the eth_call was successful
-			if err != nil {
-				return fmt.Errorf("RPC error when sending ethCall %v: %v to client %v", callMsg, err, client.GetName())
-			} else if len(fetchedResult) == 0 {
-				return fmt.Errorf("RPC error when sending ethCall %v: %v to client %v", callMsg, err, client.GetName())
-			}
-			// Check if the fetched result is the expected result
-			if common.Hash(fetchedResult).Hex() != t.config.ExpectResult {
-				return fmt.Errorf("expected result not found, expected: %v, got: %v", t.config.ExpectResult, common.Hash(fetchedResult).Hex())
-			}
-
-			t.logger.Infof("ethCall to client %v was successful, ethCallResult: %v and expectedResult: %v", client.GetName(), common.Hash(fetchedResult), t.config.ExpectResult)
+	for _, block := range executionPool.GetBlockCache().GetCachedBlocks() {
+		if latestBlock == nil || block.Number > latestBlock.Number {
+			latestBlock = block
 		}
 	}
 
-	return nil
+	if latestBlock != nil {
+		t.runCheck(ctx, latestBlock)
+	}
+
+	for {
+		select {
+		case block := <-blockSubscription.Channel():
+			t.runCheck(ctx, block)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
 
-func (t *Task) getLatestBlockNumber(ctx context.Context) (*big.Int, error) {
+func (t *Task) runCheck(ctx context.Context, block *execution.Block) {
+	// Set up the call message
+	address := common.HexToAddress(t.config.CallAddress)
+	callMsg := ethereum.CallMsg{
+		Data: common.FromHex(t.config.EthCallData),
+		To:   &address,
+	}
 
 	// Get the client pool from the scheduler
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
-	// Get the latest block from the execution pool
-	blocks := clientPool.GetExecutionPool().GetBlockCache().GetCachedBlocks()
 
-	if len(blocks) == 0 || blocks[0] == nil || blocks[0].GetBlock() == nil {
-		t.logger.Error("No blocks found or the first block is nil")
-		return nil, fmt.Errorf("no blocks found or the first block is nil")
+	// Get matching the clients from the pool
+	var clients []*execution.Client
+
+	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
+		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
+		if len(clients) == 0 {
+			t.logger.Error("check failed: no matching clients found")
+			t.ctx.SetResult(types.TaskResultFailure)
+
+			return
+		}
+	} else {
+		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
+		if len(poolClients) == 0 {
+			t.logger.Error("check failed: no matching clients found with pattern %v", t.config.ClientPattern)
+			t.ctx.SetResult(types.TaskResultFailure)
+
+			return
+		}
+
+		clients = make([]*execution.Client, len(poolClients))
+		for i, c := range poolClients {
+			clients[i] = c.ExecutionClient
+		}
 	}
 
-	// Get the head block
-	block := blocks[0].GetBlock()
+	var callResult []byte
 
-	t.logger.Infof("Fetched head block number %v for the ethCall parameter", block.Number())
+	// Send the eth_call to all the clients
+	awaitCtx, cancelAwait := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelAwait()
 
-	return block.Number(), nil
+	checkedClients := 0
+
+	for i := 0; i < len(clients); i++ {
+		client := clients[i]
+
+		if !block.AwaitSeenBy(awaitCtx, client) {
+			t.logger.WithField("client", client.GetName()).Errorf("check failed: client did not see block #%v (%v)", block.Number, block.Hash.String())
+			continue
+		}
+
+		// Log the client name
+		t.logger.Infof("sending ethCall to client %v", client.GetName())
+
+		// Send the eth_call
+		blockNumber := big.NewInt(0).SetUint64(block.Number)
+		fetchedResult, err := client.GetRPCClient().GetEthCall(ctx, callMsg, blockNumber)
+
+		// Check if the eth_call was successful
+		if err != nil {
+			t.logger.WithField("client", client.GetName()).Errorf("RPC error when sending eth_call %v: %v", callMsg, err)
+			t.ctx.SetResult(types.TaskResultFailure)
+
+			return
+		}
+
+		// Check if the fetched result is the same as the result from previous client
+		if callResult == nil {
+			callResult = fetchedResult
+		} else if !bytes.Equal(callResult, fetchedResult) {
+			t.logger.WithField("client", client.GetName()).Errorf("eth_call results mismatch against other client (got: 0x%x, expected: 0x%x)", fetchedResult, callResult)
+
+			if t.config.FailOnMismatch {
+				t.ctx.SetResult(types.TaskResultFailure)
+			} else {
+				t.ctx.SetResult(types.TaskResultNone)
+			}
+
+			return
+		}
+
+		// Check if the fetched result is the expected result
+		if t.config.ExpectResult != "" {
+			expectedBytes := common.FromHex(t.config.ExpectResult)
+			if !bytes.Equal(fetchedResult, expectedBytes) {
+				t.logger.WithField("client", client.GetName()).Errorf("eth_call results mismatch against expected result (got 0x%x, expected: 0x%x)", fetchedResult, expectedBytes)
+
+				if t.config.FailOnMismatch {
+					t.ctx.SetResult(types.TaskResultFailure)
+				} else {
+					t.ctx.SetResult(types.TaskResultNone)
+				}
+
+				return
+			}
+		}
+
+		t.logger.Infof("eth_call to client %v was successful, ethCallResult: 0x%x", client.GetName(), fetchedResult)
+		t.ctx.Outputs.SetVar("callResult", fetchedResult)
+
+		checkedClients++
+	}
+
+	if checkedClients > 0 {
+		t.ctx.SetResult(types.TaskResultSuccess)
+	}
 }
