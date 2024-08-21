@@ -122,9 +122,12 @@ func (t *Task) Execute(ctx context.Context) error {
 			// Log the client name
 			t.logger.Infof("sending ethCall to client %v", client.GetName())
 
+			// Initialize fetchedResult to zero
+			var fetchedResult []byte
+			fmt.Printf("%v\n", fetchedResult)
 			// Send the eth_call
-			fetchedResult, err := client.GetRPCClient().GetEthCall(ctx, callMsg, blockNumber)
-
+			fetchedResult, err = client.GetRPCClient().GetEthCall(ctx, callMsg, blockNumber)
+			fmt.Printf("post call: %v\n", fetchedResult)
 			// Check if the eth_call was successful
 			if err != nil {
 				return fmt.Errorf("RPC error when sending ethCall %v: %v to client %v", callMsg, err, client.GetName())
