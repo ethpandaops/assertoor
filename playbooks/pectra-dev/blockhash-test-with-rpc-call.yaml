@@ -37,7 +37,10 @@ tasks:
     title: "Check EIP-2935 contract result"
     timeout: 5m
     config:
-      CallAddress: "0x0aae40965e6800cd9b1f4b05ff21581047e3f91e"
+      callAddress: "0x0aae40965e6800cd9b1f4b05ff21581047e3f91e"
+      ignoreResults:
+        - "0x0000000000000000000000000000000000000000000000000000000000000000"
+      failOnMismatch: true
     configVars:
-      EthCallData: "eip2935input"
-      ExpectResult: "headBlockHash"
+      ethCallData: "eip2935input"
+      expectResult: "headBlockHash"

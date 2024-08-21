@@ -26,10 +26,11 @@ var (
 )
 
 type Task struct {
-	ctx     *types.TaskContext
-	options *types.TaskOptions
-	config  Config
-	logger  logrus.FieldLogger
+	ctx           *types.TaskContext
+	options       *types.TaskOptions
+	config        Config
+	logger        logrus.FieldLogger
+	ignoreResults [][]byte
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -69,6 +70,11 @@ func (t *Task) LoadConfig() error {
 		return err
 	}
 
+	t.ignoreResults = make([][]byte, len(config.IgnoreResults))
+	for i, ignoreResult := range config.IgnoreResults {
+		t.ignoreResults[i] = common.FromHex(ignoreResult)
+	}
+
 	t.config = config
 
 	return nil
@@ -77,9 +83,11 @@ func (t *Task) LoadConfig() error {
 func (t *Task) Execute(ctx context.Context) error {
 	executionPool := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool()
 
+	// Subscribe to block events
 	blockSubscription := executionPool.GetBlockCache().SubscribeBlockEvent(10)
 	defer blockSubscription.Unsubscribe()
 
+	// Get the latest block
 	var latestBlock *execution.Block
 
 	for _, block := range executionPool.GetBlockCache().GetCachedBlocks() {
@@ -88,21 +96,43 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
+	// Run the check with the latest block
 	if latestBlock != nil {
-		t.runCheck(ctx, latestBlock)
+		if t.config.BlockNumber == 0 {
+			t.runCheck(ctx, latestBlock.Number, latestBlock)
+		} else if latestBlock.Number >= t.config.BlockNumber {
+			// if the block we're looking for already passed, run the check immediately and return
+			t.runCheck(ctx, t.config.BlockNumber, nil)
+			return nil
+		}
 	}
 
+	// Listen for new blocks and run the check for all blocks (without a specific block number)
+	// or once when the block we're looking for is reached
 	for {
 		select {
 		case block := <-blockSubscription.Channel():
-			t.runCheck(ctx, block)
+			if t.config.BlockNumber == 0 {
+				// Run the check for all blocks
+				t.runCheck(ctx, block.Number, block)
+			} else if block.Number >= t.config.BlockNumber {
+				// Run the check once for the block we're looking for
+				if block.Number != t.config.BlockNumber {
+					// already passed the block we're looking for, run the check without block reference
+					block = nil
+				}
+
+				t.runCheck(ctx, t.config.BlockNumber, block)
+
+				return nil
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-func (t *Task) runCheck(ctx context.Context, block *execution.Block) {
+func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *execution.Block) {
 	// Set up the call message
 	address := common.HexToAddress(t.config.CallAddress)
 	callMsg := ethereum.CallMsg{
@@ -150,7 +180,7 @@ func (t *Task) runCheck(ctx context.Context, block *execution.Block) {
 	for i := 0; i < len(clients); i++ {
 		client := clients[i]
 
-		if !block.AwaitSeenBy(awaitCtx, client) {
+		if block != nil && !block.AwaitSeenBy(awaitCtx, client) {
 			t.logger.WithField("client", client.GetName()).Errorf("check failed: client did not see block #%v (%v)", block.Number, block.Hash.String())
 			continue
 		}
@@ -159,8 +189,8 @@ func (t *Task) runCheck(ctx context.Context, block *execution.Block) {
 		t.logger.Infof("sending ethCall to client %v", client.GetName())
 
 		// Send the eth_call
-		blockNumber := big.NewInt(0).SetUint64(block.Number)
-		fetchedResult, err := client.GetRPCClient().GetEthCall(ctx, callMsg, blockNumber)
+		blockBigNumber := big.NewInt(0).SetUint64(blockNumber)
+		fetchedResult, err := client.GetRPCClient().GetEthCall(ctx, callMsg, blockBigNumber)
 
 		// Check if the eth_call was successful
 		if err != nil {
@@ -170,13 +200,20 @@ func (t *Task) runCheck(ctx context.Context, block *execution.Block) {
 			return
 		}
 
+		ignoreResult := t.ignoreResult(fetchedResult)
+
 		// Check if the fetched result is the same as the result from previous client
 		if callResult == nil {
 			callResult = fetchedResult
+			t.ctx.Outputs.SetVar("callResult", fmt.Sprintf("0x%x", fetchedResult))
 		} else if !bytes.Equal(callResult, fetchedResult) {
-			t.logger.WithField("client", client.GetName()).Errorf("eth_call results mismatch against other client (got: 0x%x, expected: 0x%x)", fetchedResult, callResult)
+			if ignoreResult {
+				t.logger.WithField("client", client.GetName()).Infof("eth_call results mismatch against other client (got: 0x%x, expected: 0x%x, ignored value)", fetchedResult, callResult)
+			} else {
+				t.logger.WithField("client", client.GetName()).Errorf("eth_call results mismatch against other client (got: 0x%x, expected: 0x%x)", fetchedResult, callResult)
+			}
 
-			if t.config.FailOnMismatch {
+			if t.config.FailOnMismatch && !ignoreResult {
 				t.ctx.SetResult(types.TaskResultFailure)
 			} else {
 				t.ctx.SetResult(types.TaskResultNone)
@@ -189,9 +226,13 @@ func (t *Task) runCheck(ctx context.Context, block *execution.Block) {
 		if t.config.ExpectResult != "" {
 			expectedBytes := common.FromHex(t.config.ExpectResult)
 			if !bytes.Equal(fetchedResult, expectedBytes) {
-				t.logger.WithField("client", client.GetName()).Errorf("eth_call results mismatch against expected result (got 0x%x, expected: 0x%x)", fetchedResult, expectedBytes)
+				if ignoreResult {
+					t.logger.WithField("client", client.GetName()).Infof("eth_call results mismatch against expected result (got 0x%x, expected: 0x%x, ignored value)", fetchedResult, expectedBytes)
+				} else {
+					t.logger.WithField("client", client.GetName()).Errorf("eth_call results mismatch against expected result (got 0x%x, expected: 0x%x)", fetchedResult, expectedBytes)
+				}
 
-				if t.config.FailOnMismatch {
+				if t.config.FailOnMismatch && !ignoreResult {
 					t.ctx.SetResult(types.TaskResultFailure)
 				} else {
 					t.ctx.SetResult(types.TaskResultNone)
@@ -202,7 +243,6 @@ func (t *Task) runCheck(ctx context.Context, block *execution.Block) {
 		}
 
 		t.logger.Infof("eth_call to client %v was successful, ethCallResult: 0x%x", client.GetName(), fetchedResult)
-		t.ctx.Outputs.SetVar("callResult", fmt.Sprintf("0x%x", fetchedResult))
 
 		checkedClients++
 	}
@@ -210,4 +250,14 @@ func (t *Task) runCheck(ctx context.Context, block *execution.Block) {
 	if checkedClients > 0 {
 		t.ctx.SetResult(types.TaskResultSuccess)
 	}
+}
+
+func (t *Task) ignoreResult(result []byte) bool {
+	for _, ignoreResult := range t.ignoreResults {
+		if bytes.Equal(result, ignoreResult) {
+			return true
+		}
+	}
+
+	return false
 }
