@@ -35,6 +35,7 @@ tasks:
         echo "::set-var eip2935input $hexval"
   - name: check_eth_call
     title: "Check EIP-2935 contract result"
+    timeout: 5m
     config:
       CallAddress: "0x0aae40965e6800cd9b1f4b05ff21581047e3f91e"
     configVars:

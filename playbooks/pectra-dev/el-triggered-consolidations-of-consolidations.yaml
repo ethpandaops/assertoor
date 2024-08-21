@@ -36,6 +36,7 @@ tasks:
 
   - name: check_consensus_validator_status
     title: "Wait for validator consolidation to start by checking if validator (${initialSourceValidatorIndex}) is exiting"
+    timeout: 30m
     config:
       validatorStatus:
         - active_exiting
@@ -44,6 +45,7 @@ tasks:
 
   - name: check_consensus_validator_status
     title: "Wait for validator to exit (${initialSourceValidatorIndex}) to check consolidation status"
+    timeout: 2h
     config:
       validatorStatus:
         - exited_unslashed
@@ -69,6 +71,7 @@ tasks:
 
   - name: check_consensus_validator_status
     title: "Wait for validator consolidation to start by checking if validator (${initialSourceValidatorIndex}) is exiting"
+    timeout: 30m
     config:
       validatorStatus:
         - active_exiting
@@ -77,6 +80,7 @@ tasks:
 
   - name: check_consensus_validator_status
     title: "Wait for validator to exit (${initialSourceValidatorIndex}) to check consolidation status"
+    timeout: 2h
     config:
       validatorStatus:
         - exited_unslashed
