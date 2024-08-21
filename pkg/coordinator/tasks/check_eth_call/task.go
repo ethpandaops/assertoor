@@ -202,7 +202,7 @@ func (t *Task) runCheck(ctx context.Context, block *execution.Block) {
 		}
 
 		t.logger.Infof("eth_call to client %v was successful, ethCallResult: 0x%x", client.GetName(), fetchedResult)
-		t.ctx.Outputs.SetVar("callResult", fetchedResult)
+		t.ctx.Outputs.SetVar("callResult", fmt.Sprintf("0x%x", fetchedResult))
 
 		checkedClients++
 	}
