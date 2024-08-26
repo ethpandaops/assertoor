@@ -1,10 +1,10 @@
-package checkexecutionblock
+package getexecutionblock
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	TaskName       = "check_execution_block"
+	TaskName       = "get_execution_block"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Checks the latest execution block.",
+		Description: "Gets the latest execution block.",
 		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
@@ -71,7 +71,7 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(_ context.Context) error {
-	t.logger.Info("Checking the latest execution block...")
+	t.logger.Info("Getting the latest execution block...")
 
 	executionPool := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool()
 	blocks := executionPool.GetBlockCache().GetCachedBlocks()
@@ -86,13 +86,11 @@ func (t *Task) Execute(_ context.Context) error {
 	t.logger.Infof("Fetched block number %v", block.Number())
 	t.logger.Infof("Fetched block hash %v", block.Hash().Hex())
 
-	jsonBytes, err := json.Marshal(block.Header())
-	if err != nil {
-		t.logger.Errorf("Error marshaling block to JSON: %v", err)
-		return err
+	if headerData, err := vars.GeneralizeData(block.Header()); err != nil {
+		t.logger.Warnf("Failed encoding block #%v header for 'header' output: %v", block.Number(), err)
+	} else {
+		t.ctx.Outputs.SetVar("header", headerData)
 	}
-
-	t.ctx.Vars.SetVar(t.config.BlockHeaderResultVar, string(jsonBytes))
 
 	return nil
 }
