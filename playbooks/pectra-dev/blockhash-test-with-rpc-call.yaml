@@ -1,0 +1,44 @@
+
+id: blockhash-test
+name: "BLOCKHASH opcode test"
+timeout: 1h
+config:
+#walletPrivkey: ""
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+  - name: get_execution_block
+    id: "get_head_block"
+    title: "Check head block and block hash from EL RPC"
+    timeout: 5m
+  - name: run_shell
+    title: "Convert block number to EIP-2935 input"
+    config:
+      shell: "bash"
+      envVars:
+        BLOCK_JSON: "tasks.get_head_block.outputs.header"
+      command: |
+        BLOCK_NUMBER=$(echo "$BLOCK_JSON" | jq -r '.number')
+        BLOCK_HASH=$(echo "$BLOCK_JSON" | jq -r '.hash')
+        echo "::set-var headBlockHash $BLOCK_HASH"
+        # Remove 0x from the block number
+        BLOCK_NUMBER="${BLOCK_NUMBER#0x}"
+        # Format the block number to 32 hexadecimal digits
+        hexval=$(printf "0x%064x" $((16#$BLOCK_NUMBER)))
+        echo $hexval
+        # Set the eip2935input variable
+        echo "::set-var eip2935input $hexval"
+  - name: check_eth_call
+    title: "Check EIP-2935 contract result"
+    timeout: 5m
+    config:
+      callAddress: "0x0aae40965e6800cd9b1f4b05ff21581047e3f91e"
+      ignoreResults:
+        - "0x0000000000000000000000000000000000000000000000000000000000000000"
+      failOnMismatch: true
+    configVars:
+      ethCallData: "eip2935input"
+      expectResult: "headBlockHash"
