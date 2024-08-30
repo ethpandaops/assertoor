@@ -313,8 +313,10 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 
 		var withdrPub common.BLSPubkey
 
-		copy(withdrPub[:], withdrPrivkey.PublicKey().Marshal())
-		t.logger.Debugf("generated withdrawal pubkey %v: 0x%x", withdrAccPath, withdrPub)
+		withdrPubKey := withdrPrivkey.PublicKey().Marshal()
+
+		copy(withdrPub[:], withdrPubKey)
+		t.logger.Debugf("generated withdrawal pubkey %v: 0x%x", withdrAccPath, withdrPubKey)
 
 		withdrCreds = withdrPub[:]
 		withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
