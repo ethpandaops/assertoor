@@ -198,12 +198,16 @@ tasks:
             minProposerSlashingCount: 1
 
 # exit 150 validators and wait for finality
-- name: generate_exits
-  title: "Exit 150 Validators"
+- name: run_task_options
+  title: "Exit 150 validators"
   config:
-    indexCount: 150
-  configVars:
-    mnemonic: "validatorMnemonic"
+    task:
+      name: generate_exits
+      title: "Exit 150 Validators"
+      config:
+        indexCount: 150
+      configVars:
+        mnemonic: "validatorMnemonic"
 - name: check_consensus_finality
   title: "Wait for consensus chain finality"
   timeout: 18h
@@ -238,7 +242,7 @@ tasks:
         matrixVar: "validatorPairName"
         task:
           name: check_consensus_block_proposals
-          title: "Wait for block proposal with deposits from ${validatorPairName}"
+          title: "Wait for block proposal with BLS changes from ${validatorPairName}"
           configVars:
             validatorNamePattern: "validatorPairName"
           config:
@@ -271,7 +275,7 @@ tasks:
         matrixVar: "validatorPairName"
         task:
           name: check_consensus_block_proposals
-          title: "Wait for block proposal with deposits from ${validatorPairName}"
+          title: "Wait for block proposal with exits from ${validatorPairName}"
           configVars:
             validatorNamePattern: "validatorPairName"
           config:
@@ -346,10 +350,14 @@ tasks:
             minProposerSlashingCount: 1
 
 cleanupTasks:
-- name: generate_exits
-  title: "Exit all test validators"
+- name: run_task_options
+  title: "Exit 150 validators"
   config:
-    limitTotal: 300
-    indexCount: 300
-  configVars:
-    mnemonic: "validatorMnemonic"
+    task:
+      name: generate_exits
+      title: "Exit all test validators"
+      config:
+        limitTotal: 300
+        indexCount: 300
+      configVars:
+        mnemonic: "validatorMnemonic"

@@ -164,6 +164,9 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) error {
 	var validator *v1.Validator
 
 	validatorPubkey := validatorPrivkey.PublicKey().Marshal()
+
+	t.logger.Debugf("generated validator pubkey %v: 0x%x", validatorKeyPath, validatorPubkey)
+
 	for _, val := range validatorSet {
 		if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
 			validator = val
@@ -189,6 +192,8 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) error {
 	var withdrPub common.BLSPubkey
 
 	copy(withdrPub[:], withdr.PublicKey().Marshal())
+
+	t.logger.Debugf("generated withdrawal pubkey %v: 0x%x", withdrAccPath, withdrPub)
 
 	msg := common.BLSToExecutionChange{
 		ValidatorIndex:     common.ValidatorIndex(validator.Index),

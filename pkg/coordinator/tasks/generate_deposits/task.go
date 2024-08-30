@@ -94,6 +94,8 @@ func (t *Task) LoadConfig() error {
 		return err
 	}
 
+	t.logger.Infof("validator key seed: 0x%x", t.valkeySeed)
+
 	t.walletPrivKey, err = crypto.HexToECDSA(config.WalletPrivkey)
 	if err != nil {
 		return err
@@ -284,6 +286,8 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 	var validator *v1.Validator
 
 	validatorPubkey := validatorPrivkey.PublicKey().Marshal()
+	t.logger.Debugf("generated validator pubkey %v: 0x%x", validatorKeyPath, validatorPubkey)
+
 	for _, val := range validatorSet {
 		if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
 			validator = val
@@ -310,6 +314,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		var withdrPub common.BLSPubkey
 
 		copy(withdrPub[:], withdrPrivkey.PublicKey().Marshal())
+		t.logger.Debugf("generated withdrawal pubkey %v: 0x%x", withdrAccPath, withdrPub)
 
 		withdrCreds = withdrPub[:]
 		withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
