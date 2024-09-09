@@ -1,6 +1,6 @@
 module github.com/ethpandaops/assertoor
 
-go 1.21.1
+go 1.22
 
 require (
 	github.com/attestantio/go-eth2-client v0.21.10
