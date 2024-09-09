@@ -109,4 +109,4 @@ require (
 
 replace github.com/attestantio/go-eth2-client => github.com/attestantio/go-eth2-client v0.0.0-20240701211822-0a60485fce68
 
-replace github.com/ethereum/go-ethereum => github.com/lightclient/go-ethereum v0.0.0-20240907155054-183e7b702a00
+replace github.com/ethereum/go-ethereum => github.com/MariusVanDerWijden/go-ethereum v0.0.0-20240909105731-23ae355c422d

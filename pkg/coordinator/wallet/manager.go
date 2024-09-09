@@ -93,7 +93,7 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 	for idx, tx := range blockData.Transactions() {
 		txFrom, err := ethtypes.Sender(signer, tx)
 		if err != nil {
-			manager.logger.Warnf("error decoding ts sender (block %v, tx %v): %v", block.Number, idx, err)
+			manager.logger.Warnf("error decoding tx sender (block %v, tx %v): %v", block.Number, idx, err)
 			continue
 		}
 
@@ -107,6 +107,22 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 			toWallet := wallets[*toAddr]
 			if toWallet != nil {
 				toWallet.processTransactionReceival(block, tx)
+			}
+		}
+
+		if tx.Type() == ethtypes.SetCodeTxType {
+			// in eip7702 transactions, the nonces of all authorities are increased by >= 1, so we need to resync all affected wallets
+			for _, authorization := range tx.AuthList() {
+				authority, err := authorization.Authority()
+				if err != nil {
+					manager.logger.Warnf("error decoding authority address (block %v, tx %v): %v", block.Number, idx, err)
+					continue
+				}
+
+				authorityWallet := wallets[authority]
+				if authorityWallet != nil {
+					authorityWallet.ResyncState()
+				}
 			}
 		}
 	}
