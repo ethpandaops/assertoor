@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
+
+	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 )
 
 var (
