@@ -10,6 +10,7 @@ tasks:
     matrixValues: "clientPairNames"
   config:
     runConcurrent: true
+    failTaskCount: 1
     matrixVar: "checkClient"
     task:
       name: run_tasks_concurrent

@@ -153,6 +153,10 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 		testConfig.Timeout = *extTestCfg.Timeout
 	}
 
+	if extTestCfg.Schedule != nil {
+		testConfig.Schedule = extTestCfg.Schedule
+	}
+
 	for k, v := range extTestCfg.Config {
 		testConfig.Config[k] = v
 		testVars.SetVar(k, v)

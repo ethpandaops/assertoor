@@ -2,8 +2,6 @@ module github.com/ethpandaops/assertoor
 
 go 1.22
 
-toolchain go1.22.4
-
 require (
 	github.com/attestantio/go-eth2-client v0.21.10
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
