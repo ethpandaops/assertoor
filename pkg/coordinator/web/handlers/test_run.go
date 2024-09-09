@@ -202,7 +202,11 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 						break
 					}
 
-					pageData.Tasks[i].GraphLevels[indentation-1] = 1
+					if len(pageData.Tasks[i].GraphLevels) < indentation {
+						pageData.Tasks[i].GraphLevels = append(pageData.Tasks[i].GraphLevels, 1)
+					} else {
+						pageData.Tasks[i].GraphLevels[indentation-1] = 1
+					}
 				}
 			}
 
