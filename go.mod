@@ -3,18 +3,18 @@ module github.com/ethpandaops/assertoor
 go 1.22
 
 require (
-	github.com/attestantio/go-eth2-client v0.21.10
+	github.com/attestantio/go-eth2-client v0.21.11
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
 	github.com/ethereum/go-ethereum v1.14.8
 	github.com/ethpandaops/ethwallclock v0.3.0
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/gorilla/mux v1.8.1
-	github.com/herumi/bls-eth-go-binary v1.35.0
+	github.com/herumi/bls-eth-go-binary v1.36.1
 	github.com/holiman/uint256 v1.3.1
 	github.com/itchyny/gojq v0.12.16
 	github.com/juliangruber/go-intersect v1.1.0
 	github.com/mashingan/smapping v0.1.19
-	github.com/prometheus/client_golang v1.20.0
+	github.com/prometheus/client_golang v1.20.3
 	github.com/protolambda/zrnt v0.32.3
 	github.com/protolambda/ztyp v0.2.2
 	github.com/rs/zerolog v1.33.0
