@@ -1,6 +1,8 @@
 module github.com/ethpandaops/assertoor
 
-go 1.21.1
+go 1.22
+
+toolchain go1.22.4
 
 require (
 	github.com/attestantio/go-eth2-client v0.21.10
@@ -41,10 +43,12 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
+	github.com/crate-crypto/go-ipa v0.0.0-20240223125850-b1e8a79f509c // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.0.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.1 // indirect
+	github.com/ethereum/go-verkle v0.1.1-0.20240829091221-dffa7562dbe9 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/ferranbt/fastssz v0.1.3 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
@@ -107,4 +111,4 @@ require (
 
 replace github.com/attestantio/go-eth2-client => github.com/attestantio/go-eth2-client v0.0.0-20240701211822-0a60485fce68
 
-replace github.com/ethereum/go-ethereum => github.com/lightclient/go-ethereum v0.0.0-20240716143145-1640531c26d3
+replace github.com/ethereum/go-ethereum => github.com/lightclient/go-ethereum v0.0.0-20240907155054-183e7b702a00

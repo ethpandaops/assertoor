@@ -34,11 +34,12 @@ var (
 )
 
 type Task struct {
-	ctx     *types.TaskContext
-	options *types.TaskOptions
-	config  Config
-	logger  logrus.FieldLogger
-	wallet  *wallet.Wallet
+	ctx                  *types.TaskContext
+	options              *types.TaskOptions
+	config               Config
+	logger               logrus.FieldLogger
+	wallet               *wallet.Wallet
+	authorizationWallets []*wallet.Wallet
 
 	targetAddr      common.Address
 	transactionData []byte
@@ -92,6 +93,25 @@ func (t *Task) LoadConfig() error {
 		return fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
+	// load authorization wallets
+	if config.SetCodeTxType && len(config.Authorizations) > 0 {
+		t.authorizationWallets = make([]*wallet.Wallet, 0, len(config.Authorizations))
+
+		for _, authorization := range config.Authorizations {
+			privKey, err2 := crypto.HexToECDSA(authorization.SignerPrivkey)
+			if err2 != nil {
+				return err2
+			}
+
+			authWallet, err2 := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
+			if err2 != nil {
+				return fmt.Errorf("cannot initialize authorization wallet: %w", err2)
+			}
+
+			t.authorizationWallets = append(t.authorizationWallets, authWallet)
+		}
+	}
+
 	// parse target addr
 	if config.TargetAddress != "" {
 		err = t.targetAddr.UnmarshalText([]byte(config.TargetAddress))
@@ -115,6 +135,15 @@ func (t *Task) Execute(ctx context.Context) error {
 	err := t.wallet.AwaitReady(ctx)
 	if err != nil {
 		return fmt.Errorf("cannot load wallet state: %w", err)
+	}
+
+	if t.config.SetCodeTxType {
+		for _, authWallet := range t.authorizationWallets {
+			err = authWallet.AwaitReady(ctx)
+			if err != nil {
+				return fmt.Errorf("cannot load authorization wallet state: %w", err)
+			}
+		}
 	}
 
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
@@ -253,6 +282,11 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
+	for _, authorizationWallet := range t.authorizationWallets {
+		// resync nonces of authorization wallets (might be increased by more than one, so we need to resync)
+		authorizationWallet.ResyncState()
+	}
+
 	return nil
 }
 
@@ -330,24 +364,16 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 		case t.config.SetCodeTxType:
 			authList := ethtypes.AuthorizationList{}
 
-			for _, authorization := range t.config.Authorizations {
+			for idx, authorization := range t.config.Authorizations {
 				authEntry := &ethtypes.Authorization{
 					ChainID: big.NewInt(0).SetUint64(authorization.ChainID),
 					Address: common.HexToAddress(authorization.CodeAddress),
 				}
 
-				if authorization.Nonce != nil {
-					authEntry.Nonce = []uint64{*authorization.Nonce}
-				} else {
-					authEntry.Nonce = []uint64{}
-				}
+				authWallet := t.authorizationWallets[idx]
+				authEntry.Nonce = authWallet.UseNextNonce(!bytes.Equal(authEntry.Address.Bytes(), t.wallet.GetAddress().Bytes()))
 
-				privKey, err := crypto.HexToECDSA(authorization.SignerPrivkey)
-				if err != nil {
-					return nil, err
-				}
-
-				authEntry, err = ethtypes.SignAuth(authEntry, privKey)
+				authEntry, err := ethtypes.SignAuth(authEntry, authWallet.GetPrivateKey())
 				if err != nil {
 					return nil, err
 				}
@@ -361,7 +387,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				GasTipCap: uint256.MustFromBig(&t.config.TipCap.Value),
 				GasFeeCap: uint256.MustFromBig(&t.config.FeeCap.Value),
 				Gas:       t.config.GasLimit,
-				To:        toAddr,
+				To:        *toAddr,
 				Value:     uint256.MustFromBig(txAmount),
 				Data:      txData,
 				AuthList:  authList,
