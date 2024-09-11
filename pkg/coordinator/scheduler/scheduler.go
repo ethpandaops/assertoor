@@ -2,19 +2,22 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 
+// TaskScheduler is a struct that manages the execution of tasks.
 type TaskScheduler struct {
 	services         types.TaskServices
 	logger           logrus.FieldLogger
 	rootVars         types.Variables
-	taskCount        types.TaskIndex
+	nextTaskIndex    types.TaskIndex
 	allTasks         []types.TaskIndex
 	rootTasks        []types.TaskIndex
 	allCleanupTasks  []types.TaskIndex
@@ -25,22 +28,35 @@ type TaskScheduler struct {
 	cancelCleanupCtx context.CancelFunc
 }
 
+// NewTaskScheduler creates a new TaskScheduler instance.
 func NewTaskScheduler(log logrus.FieldLogger, services types.TaskServices, variables types.Variables) *TaskScheduler {
 	return &TaskScheduler{
-		logger:       log,
-		rootVars:     variables,
-		taskCount:    1,
-		rootTasks:    make([]types.TaskIndex, 0),
-		allTasks:     make([]types.TaskIndex, 0),
-		taskStateMap: make(map[types.TaskIndex]*taskState),
-		services:     services,
+		logger:        log,
+		rootVars:      variables,
+		nextTaskIndex: 1,
+		rootTasks:     make([]types.TaskIndex, 0),
+		allTasks:      make([]types.TaskIndex, 0),
+		taskStateMap:  make(map[types.TaskIndex]*taskState),
+		services:      services,
 	}
 }
 
+// GetServices returns the task services associated with the scheduler.
 func (ts *TaskScheduler) GetServices() types.TaskServices {
 	return ts.services
 }
 
+// ParseTaskOptions parses the raw task options and returns the parsed task options.
+func (ts *TaskScheduler) ParseTaskOptions(rawtask *helper.RawMessage) (*types.TaskOptions, error) {
+	options := &types.TaskOptions{}
+	if err := rawtask.Unmarshal(&options); err != nil {
+		return nil, fmt.Errorf("error parsing task: %w", err)
+	}
+
+	return options, nil
+}
+
+// AddRootTask adds a root task to the scheduler and returns the task index.
 func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.TaskIndex, error) {
 	task, err := ts.newTaskState(options, nil, nil, false)
 	if err != nil {
@@ -52,6 +68,7 @@ func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.TaskInde
 	return task.index, nil
 }
 
+// AddCleanupTask adds a cleanup task to the scheduler and returns the task index.
 func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.TaskIndex, error) {
 	task, err := ts.newTaskState(options, nil, nil, true)
 	if err != nil {
@@ -63,6 +80,7 @@ func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.TaskI
 	return task.index, nil
 }
 
+// RunTasks runs all the tasks in the scheduler within the specified timeout.
 func (ts *TaskScheduler) RunTasks(ctx context.Context, timeout time.Duration) error {
 	var cleanupCtx, tasksCtx context.Context
 
@@ -92,6 +110,7 @@ func (ts *TaskScheduler) RunTasks(ctx context.Context, timeout time.Duration) er
 	return nil
 }
 
+// runCleanupTasks runs all the cleanup tasks in the scheduler.
 func (ts *TaskScheduler) runCleanupTasks(ctx context.Context) {
 	for _, taskIndex := range ts.rootCleanupTasks {
 		if ctx.Err() != nil {
@@ -106,6 +125,7 @@ func (ts *TaskScheduler) runCleanupTasks(ctx context.Context) {
 	}
 }
 
+// CancelTasks cancels all the tasks in the scheduler.
 func (ts *TaskScheduler) CancelTasks(cancelCleanup bool) {
 	if ts.cancelTaskCtx != nil {
 		ts.cancelTaskCtx()
@@ -116,6 +136,7 @@ func (ts *TaskScheduler) CancelTasks(cancelCleanup bool) {
 	}
 }
 
+// getTaskState returns the internal taskState of the task with the given task index.
 func (ts *TaskScheduler) getTaskState(taskIndex types.TaskIndex) *taskState {
 	ts.taskStateMutex.RLock()
 	defer ts.taskStateMutex.RUnlock()
@@ -123,10 +144,12 @@ func (ts *TaskScheduler) getTaskState(taskIndex types.TaskIndex) *taskState {
 	return ts.taskStateMap[taskIndex]
 }
 
+// GetTaskState returns the TaskState interface of the task with the given task index.
 func (ts *TaskScheduler) GetTaskState(taskIndex types.TaskIndex) types.TaskState {
 	return ts.getTaskState(taskIndex)
 }
 
+// GetAllTasks returns a list of all task indices in the scheduler.
 func (ts *TaskScheduler) GetAllTasks() []types.TaskIndex {
 	ts.taskStateMutex.RLock()
 	defer ts.taskStateMutex.RUnlock()
@@ -138,6 +161,7 @@ func (ts *TaskScheduler) GetAllTasks() []types.TaskIndex {
 	return taskList
 }
 
+// GetTaskCount returns the total number of tasks in the scheduler.
 func (ts *TaskScheduler) GetTaskCount() int {
 	if ts == nil {
 		return 0
@@ -146,6 +170,7 @@ func (ts *TaskScheduler) GetTaskCount() int {
 	return len(ts.allTasks)
 }
 
+// GetRootTasks returns a list of root task indices in the scheduler.
 func (ts *TaskScheduler) GetRootTasks() []types.TaskIndex {
 	ts.taskStateMutex.RLock()
 	defer ts.taskStateMutex.RUnlock()
@@ -156,6 +181,7 @@ func (ts *TaskScheduler) GetRootTasks() []types.TaskIndex {
 	return taskList
 }
 
+// GetAllCleanupTasks returns a list of all cleanup task indices in the scheduler.
 func (ts *TaskScheduler) GetAllCleanupTasks() []types.TaskIndex {
 	ts.taskStateMutex.RLock()
 	defer ts.taskStateMutex.RUnlock()
@@ -167,6 +193,7 @@ func (ts *TaskScheduler) GetAllCleanupTasks() []types.TaskIndex {
 	return taskList
 }
 
+// GetRootCleanupTasks returns a list of root cleanup task indices in the scheduler.
 func (ts *TaskScheduler) GetRootCleanupTasks() []types.TaskIndex {
 	ts.taskStateMutex.RLock()
 	defer ts.taskStateMutex.RUnlock()
@@ -177,6 +204,7 @@ func (ts *TaskScheduler) GetRootCleanupTasks() []types.TaskIndex {
 	return taskList
 }
 
+// sortTaskList sorts the task list based on the task relationships and indices.
 func (ts *TaskScheduler) sortTaskList(taskList []types.TaskIndex) {
 	sort.Slice(taskList, func(a, b int) bool {
 		taskStateA := ts.taskStateMap[taskList[a]]

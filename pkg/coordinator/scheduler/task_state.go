@@ -80,7 +80,7 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 	}
 
 	// create task state
-	taskIdx := ts.taskCount
+	taskIdx := ts.nextTaskIndex
 	taskState := &taskState{
 		index:       taskIdx,
 		options:     options,
@@ -107,7 +107,7 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 		tasksScope.SetSubScope(options.ID, taskState.taskStatusVars)
 	}
 
-	ts.taskCount++
+	ts.nextTaskIndex++
 
 	// create internal execution state
 	ts.taskStateMutex.Lock()
