@@ -87,6 +87,7 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 		descriptor:  taskDescriptor,
 		parentState: parentState,
 		taskVars:    variables,
+		isCleanup:   isCleanupTask,
 		logger: logger.NewLogger(&logger.ScopeOptions{
 			Parent:      ts.logger.WithField("task", options.Name).WithField("taskidx", taskIdx),
 			HistorySize: 1000,
