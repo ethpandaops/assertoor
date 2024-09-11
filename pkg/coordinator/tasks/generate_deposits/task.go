@@ -22,6 +22,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
+	"github.com/protolambda/zrnt/eth2/util/hashing"
 	"github.com/protolambda/ztyp/tree"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
@@ -311,14 +312,11 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 			return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err2)
 		}
 
-		var withdrPub common.BLSPubkey
-
 		withdrPubKey := withdrPrivkey.PublicKey().Marshal()
-
-		copy(withdrPub[:], withdrPubKey)
 		t.logger.Debugf("generated withdrawal pubkey %v: 0x%x", withdrAccPath, withdrPubKey)
 
-		withdrCreds = withdrPub[:]
+		withdrKeyHash := hashing.Hash(withdrPubKey)
+		withdrCreds = withdrKeyHash[:]
 		withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
 	} else {
 		withdrCreds = ethcommon.FromHex(t.config.WithdrawalCredentials)
