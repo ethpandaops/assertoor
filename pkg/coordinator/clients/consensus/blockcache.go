@@ -23,6 +23,7 @@ type BlockCache struct {
 
 	specMutex sync.RWMutex
 	specs     *ChainSpec
+	fullSpecs map[string]interface{}
 
 	genesisMutex sync.Mutex
 	genesis      *v1.Genesis
@@ -140,6 +141,7 @@ func (cache *BlockCache) SetClientSpecs(specValues map[string]interface{}) error
 	}
 
 	cache.specs = &specs
+	cache.fullSpecs = specValues
 
 	return nil
 }
@@ -149,6 +151,13 @@ func (cache *BlockCache) GetSpecs() *ChainSpec {
 	defer cache.specMutex.RUnlock()
 
 	return cache.specs
+}
+
+func (cache *BlockCache) GetSpecValues() map[string]interface{} {
+	cache.specMutex.RLock()
+	defer cache.specMutex.RUnlock()
+
+	return cache.fullSpecs
 }
 
 func (cache *BlockCache) InitWallclock() {
