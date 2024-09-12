@@ -160,7 +160,11 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
 		indentationMap := map[uint64]int{}
 
-		for idx, task := range taskScheduler.GetAllTasks() {
+		allTasks := taskScheduler.GetAllTasks()
+		cleanupTasks := taskScheduler.GetAllCleanupTasks()
+		allTasks = append(allTasks, cleanupTasks...)
+
+		for idx, task := range allTasks {
 			taskState := taskScheduler.GetTaskState(task)
 			taskStatus := taskState.GetTaskStatus()
 
@@ -193,6 +197,10 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 				taskData.GraphLevels[indentation-1] = 3
 
 				for i := idx - 1; i >= 0; i-- {
+					if len(pageData.Tasks[i].GraphLevels) < indentation {
+						continue
+					}
+
 					if pageData.Tasks[i].ParentIndex == taskData.ParentIndex {
 						pageData.Tasks[i].GraphLevels[indentation-1] = 2
 						break

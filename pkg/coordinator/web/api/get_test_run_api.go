@@ -81,7 +81,11 @@ func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
 
 	taskScheduler := testInstance.GetTaskScheduler()
 	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
-		for _, task := range taskScheduler.GetAllTasks() {
+		allTasks := taskScheduler.GetAllTasks()
+		cleanupTasks := taskScheduler.GetAllCleanupTasks()
+		allTasks = append(allTasks, cleanupTasks...)
+
+		for _, task := range allTasks {
 			taskState := taskScheduler.GetTaskState(task)
 			taskStatus := taskState.GetTaskStatus()
 

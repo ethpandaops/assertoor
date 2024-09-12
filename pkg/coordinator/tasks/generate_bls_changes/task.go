@@ -13,6 +13,7 @@ import (
 	"github.com/attestantio/go-eth2-client/spec/capella"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/tree"
@@ -111,15 +112,18 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	perSlotCount := 0
 	totalCount := 0
+	blsChangesList := []interface{}{}
 
 	for {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateBlsChange(ctx, accountIdx)
+		blsChange, err := t.generateBlsChange(ctx, accountIdx)
 		if err != nil {
 			t.logger.Errorf("error generating bls change: %v", err.Error())
 		} else {
+			blsChangesList = append(blsChangesList, blsChange)
+			t.ctx.Outputs.SetVar("blsChanges", blsChangesList)
 			t.ctx.SetResult(types.TaskResultSuccess)
 
 			perSlotCount++
@@ -147,16 +151,18 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
+	t.ctx.Outputs.SetVar("blsChanges", blsChangesList)
+
 	return nil
 }
 
-func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) error {
+func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) (interface{}, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
 	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, validatorKeyPath)
 	if err != nil {
-		return fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
+		return nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 	}
 
 	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
@@ -175,25 +181,25 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) error {
 	}
 
 	if validator == nil {
-		return fmt.Errorf("validator not found")
+		return nil, fmt.Errorf("validator not found")
 	}
 
 	if validator.Validator.WithdrawalCredentials[0] != 0x00 {
-		return fmt.Errorf("validator %v does not have 0x00 withdrawal creds", validator.Index)
+		return nil, fmt.Errorf("validator %v does not have 0x00 withdrawal creds", validator.Index)
 	}
 
 	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
 
 	withdr, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, withdrAccPath)
 	if err != nil {
-		return fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
+		return nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
 	}
 
 	var withdrPub common.BLSPubkey
 
 	copy(withdrPub[:], withdr.PublicKey().Marshal())
 
-	t.logger.Debugf("generated withdrawal pubkey %v: 0x%x", withdrAccPath, withdrPub)
+	t.logger.Debugf("generated withdrawal pubkey %v: 0x%x", withdrAccPath, withdrPub[:])
 
 	msg := common.BLSToExecutionChange{
 		ValidatorIndex:     common.ValidatorIndex(validator.Index),
@@ -205,7 +211,7 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) error {
 
 	err = secKey.Deserialize(withdr.Marshal())
 	if err != nil {
-		return fmt.Errorf("failed converting validator priv key: %w", err)
+		return nil, fmt.Errorf("failed converting validator priv key: %w", err)
 	}
 
 	msgRoot := msg.HashTreeRoot(tree.GetHashFn())
@@ -221,20 +227,29 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) error {
 
 	signedChangeJSON, err := json.Marshal(&signedMsg)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	var blsChangeRes interface{}
+	if blsc, err2 := vars.GeneralizeData(signedMsg); err2 == nil {
+		blsChangeRes = blsc
+	} else {
+		t.logger.Warnf("Failed encoding blschange output: %v", err2)
+	}
+
+	t.ctx.Outputs.SetVar("latestBlsChange", blsChangeRes)
 
 	var client *consensus.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		client = clientPool.GetConsensusPool().AwaitReadyEndpoint(ctx, consensus.AnyClient)
 		if client == nil {
-			return ctx.Err()
+			return nil, ctx.Err()
 		}
 	} else {
 		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(clients) == 0 {
-			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+			return nil, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
 
 		client = clients[0].ConsensusClient
@@ -244,17 +259,17 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) error {
 
 	err = json.Unmarshal(signedChangeJSON, blsChange)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	t.logger.WithField("client", client.GetName()).Infof("sending bls change for validator %v", validator.Index)
 
 	err = client.GetRPCClient().SubmitBLSToExecutionChanges(ctx, []*capella.SignedBLSToExecutionChange{blsChange})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return blsChangeRes, nil
 }
 
 func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {

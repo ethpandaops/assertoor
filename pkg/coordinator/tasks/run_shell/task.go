@@ -171,7 +171,7 @@ cmdloop:
 	// await completion
 	if execErr != nil {
 		cmdLogger.Errorf("failed command execution")
-		return err
+		return execErr
 	}
 
 	cmdLogger.Info("command run successfully")
