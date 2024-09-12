@@ -11,6 +11,7 @@ import (
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -160,6 +161,12 @@ func (t *Task) runValidatorStatusCheck() bool {
 
 		matchingValidators++
 
+		if body, err := vars.GeneralizeData(validator); err == nil {
+			t.ctx.Outputs.SetVar("validator", body)
+		} else {
+			t.logger.Warnf("Failed encoding validator info for validator output: %v", err)
+		}
+
 		if t.config.ValidatorInfoResultVar != "" {
 			validatorJSON, err := json.Marshal(validator)
 			if err == nil {
@@ -175,6 +182,8 @@ func (t *Task) runValidatorStatusCheck() bool {
 				t.logger.Errorf("could not marshal validator info for result var: %v", err)
 			}
 		}
+
+		t.ctx.Outputs.SetVar("pubkey", fmt.Sprintf("0x%x", validator.Validator.PublicKey[:]))
 
 		if t.config.ValidatorPubKeyResultVar != "" {
 			t.ctx.Vars.SetVar(t.config.ValidatorPubKeyResultVar, fmt.Sprintf("0x%x", validator.Validator.PublicKey[:]))
