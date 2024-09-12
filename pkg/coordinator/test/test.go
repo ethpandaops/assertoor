@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/scheduler"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,7 +38,7 @@ func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.Fie
 	}
 
 	// set test variables
-	test.variables = descriptor.Vars()
+	test.variables = vars.NewVariables(descriptor.Vars())
 
 	// parse tasks
 	test.taskScheduler = scheduler.NewTaskScheduler(test.logger, services, test.variables)
