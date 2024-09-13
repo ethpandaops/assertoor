@@ -10,15 +10,21 @@ ADD pkg ./pkg
 RUN make build
 
 FROM debian:stable-slim
-RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
+RUN dpkg --add-architecture amd64 \
+  && apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
   libssl-dev \
   ca-certificates \
   jq \
   git \
   curl \
   make \
+  build-essential \
+  python3 \
+  python3-pip \
+  libc6:amd64 \
   && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  && rm /usr/lib/python3*/EXTERNALLY-MANAGED
 COPY --from=builder /src/bin/assertoor /assertoor
 RUN mkdir /workspace
 WORKDIR /workspace

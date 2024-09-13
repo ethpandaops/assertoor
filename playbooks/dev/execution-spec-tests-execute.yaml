@@ -1,0 +1,140 @@
+id: execution-spec-tests-execute
+name: "Run 'execute' on execution spec tests"
+timeout: 1h
+config:
+  gitRepo: https://github.com/ethereum/execution-spec-tests.git
+  gitBranch: main
+  testPath: ""
+  chainID: "0"
+  rpcEndpoint: http://127.0.0.1:8545
+  privateKey: ""
+  seedAmount: "1" # (In Wei). Amount used to seed child accounts for test execution. Can also use "1 ether" or "10000 gwei" as input
+  extraFlags: ""
+  solcVersion: "0.8.24"
+tasks:
+  - name: run_shell
+    title: "Execute tests: ${gitRepo}@${gitBranch} [${testPath}]"
+    id: execute
+    config:
+      shell: bash
+      shellArgs: [--login]
+      envVars:
+        GIT_REPO: gitRepo
+        GIT_BRANCH: gitBranch
+        TEST_PATH: testPath
+        CHAIN_ID: chainID
+        RPC_ENDPOINT: rpcEndpoint
+        PRIVATE_KEY: privateKey
+        SEED_AMOUNT: seedAmount
+        EXTRA_FLAGS: extraFlags
+        SOLC_VERSION: "solcVersion"
+      command: |
+        set -e
+
+        # Convert env vars. They are passed as RAW JSON values
+
+        GIT_REPO=$(echo $GIT_REPO | jq -r)
+        GIT_BRANCH=$(echo $GIT_BRANCH | jq -r)
+        TEST_PATH=$(echo $TEST_PATH | jq -r)
+        CHAIN_ID=$(echo $CHAIN_ID | jq -r)
+        RPC_ENDPOINT=$(echo $RPC_ENDPOINT | jq -r)
+        PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
+        SEED_AMOUNT=$(echo $SEED_AMOUNT | jq -r)
+        EXTRA_FLAGS=$(echo $EXTRA_FLAGS | jq -r)
+        SOLC_VERSION=$(echo $SOLC_VERSION | jq -r)
+
+        echo "RPC_ENDPOINT: ${RPC_ENDPOINT}"
+        echo "CHAIN_ID: ${CHAIN_ID}"
+
+        # Validate some inputs
+        if [ -z "$TEST_PATH" ]; then
+          echo
+          exit "You need to provide a test path"
+        fi
+        if [ -z "$PRIVATE_KEY" ]; then
+          echo
+          exit "You need to provide a private key to fund the tests"
+        fi
+
+        # Check if pip (python package manager) is installed
+        if ! command -v pip &> /dev/null
+        then
+          echo "pip could not be found. Please install python3-pip"
+          exit 1
+        fi
+
+        # Create dir for temp files
+        tmp_dir=$(mktemp -d -t execution-spec-tests-XXXXXXXXXX)
+        cd $tmp_dir
+        export HOME=$tmp_dir
+        echo "============================"
+        echo "Temp dir created: ${tmp_dir}"
+        echo "============================"
+
+        function cleanup {
+          rv=$?
+          rm -rf "$tmp_dir"
+          echo "tmpdir removed"
+          exit $rv
+        }
+
+        trap cleanup EXIT # always remove tempdir on exit
+
+        echo "============================"
+        echo "Clone git repo ${GIT_REPO} @ ${GIT_BRANCH}"
+        echo "============================"
+        git clone ${GIT_REPO} --branch ${GIT_BRANCH} --single-branch
+        cd execution-spec-tests
+
+        echo "============================"
+        echo "Installing dependencies"
+        echo "============================"
+        pip install uv
+        uv sync --all-extras
+        uv run solc-select use "${SOLC_VERSION}" --always-install
+        source .venv/bin/activate
+
+        echo "============================"
+        echo "Running test: ${TEST_PATH}"
+        echo "============================"
+        uv run execute remote "${TEST_PATH}" \
+          --rpc-chain-id=${CHAIN_ID} \
+          --rpc-endpoint=${RPC_ENDPOINT} \
+          --rpc-seed-key=${PRIVATE_KEY} \
+          --seed-account-sweep-amount=${SEED_AMOUNT} \
+          --json-report \
+          --json-report-file=report.json \
+          --html=report.html \
+          ${EXTRA_FLAGS[@]}
+
+
+        # Export reports
+        REPORT_JSON=$(cat report.json)
+        REPORT_HTML=$(jq -Rs '.' report.html)
+        echo "::set-output reportHTML ${REPORT_HTML}"
+        echo "::set-output-json reportJSON ${REPORT_JSON}"
+
+  - name: run_task_matrix
+    title: "Show test results"
+    configVars:
+      matrixValues: "tasks.execute.outputs.reportJSON.tests"
+    config:
+      runConcurrent: true
+      matrixVar: "testResult"
+      task:
+        name: run_shell
+        title: "${{testResult.nodeid}}"
+        config:
+          shell: bash
+          envVars:
+            TEST_RESULT: testResult
+          command: |
+            DURATION_SECONDS=$(echo $TEST_RESULT | jq -r '.setup.duration + .call.duration + .teardown.duration')
+            echo "::set-output-json runeTimeOverrideSeconds ${DURATION_SECONDS}"
+            echo "::set-output-json execTestResult ${TEST_RESULT}"
+            if $(echo $TEST_RESULT | jq -e '.outcome == "passed"') ; then
+              echo "Test passed"
+            else
+              echo "Test failed"
+              exit 1
+            fi
