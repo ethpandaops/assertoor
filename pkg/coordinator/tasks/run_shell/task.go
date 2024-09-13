@@ -78,7 +78,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	cmdLogger.Info("running command")
 
 	//nolint:gosec // ignore
-	command := exec.CommandContext(ctx, t.config.Shell)
+	command := exec.CommandContext(ctx, t.config.Shell, t.config.ShellArgs...)
 
 	stdin, err := command.StdinPipe()
 	if err != nil {
