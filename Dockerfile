@@ -14,11 +14,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
   git \
   curl \
   make \
-  build-essential \
-  python3 \
-  python3-pip \
   && apt-get clean \
-  && rm -rf /var/lib/apt/lists/* \
-  && rm /usr/lib/python3*/EXTERNALLY-MANAGED
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /src/bin/assertoor /assertoor
 ENTRYPOINT ["/assertoor"]

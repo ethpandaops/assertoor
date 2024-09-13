@@ -7,7 +7,7 @@ config:
   testPath: ""
   chainID: "0"
   rpcEndpoint: http://127.0.0.1:8545
-  privateKey: ""
+  seedPrivateKey: ""
   seedAmount: "1" # (In Wei). Amount used to seed child accounts for test execution. Can also use "1 ether" or "10000 gwei" as input
   extraFlags: ""
   solcVersion: "0.8.24"
@@ -24,7 +24,7 @@ tasks:
         TEST_PATH: testPath
         CHAIN_ID: chainID
         RPC_ENDPOINT: rpcEndpoint
-        PRIVATE_KEY: privateKey
+        PRIVATE_KEY: seedPrivateKey
         SEED_AMOUNT: seedAmount
         EXTRA_FLAGS: extraFlags
         SOLC_VERSION: "solcVersion"
@@ -107,8 +107,9 @@ tasks:
           --html=report.html \
           ${EXTRA_FLAGS[@]}
 
-
-        # Export reports
+        echo "============================"
+        echo "Exporting reports
+        echo "============================"
         REPORT_JSON=$(cat report.json)
         REPORT_HTML=$(jq -Rs '.' report.html)
         echo "::set-output reportHTML ${REPORT_HTML}"
@@ -130,7 +131,7 @@ tasks:
             TEST_RESULT: testResult
           command: |
             DURATION_SECONDS=$(echo $TEST_RESULT | jq -r '.setup.duration + .call.duration + .teardown.duration')
-            echo "::set-output-json runeTimeOverrideSeconds ${DURATION_SECONDS}"
+            echo "::set-output-json customRunTimeSeconds ${DURATION_SECONDS}"
             echo "::set-output-json execTestResult ${TEST_RESULT}"
             if $(echo $TEST_RESULT | jq -e '.outcome == "passed"') ; then
               echo "Test passed"
