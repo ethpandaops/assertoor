@@ -197,16 +197,16 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 				taskData.GraphLevels[indentation-1] = 3
 
 				for i := idx - 1; i >= 0; i-- {
+					if pageData.Tasks[i].Index == taskData.ParentIndex {
+						break
+					}
+
 					if len(pageData.Tasks[i].GraphLevels) < indentation {
-						continue
+						break
 					}
 
 					if pageData.Tasks[i].ParentIndex == taskData.ParentIndex {
 						pageData.Tasks[i].GraphLevels[indentation-1] = 2
-						break
-					}
-
-					if pageData.Tasks[i].Index == taskData.ParentIndex {
 						break
 					}
 
