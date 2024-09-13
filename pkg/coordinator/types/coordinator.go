@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
@@ -13,6 +14,7 @@ import (
 type Coordinator interface {
 	Logger() logrus.FieldLogger
 	LogScope() *logger.LogScope
+	Database() *db.Database
 	ClientPool() *clients.ClientPool
 	WalletManager() *wallet.Manager
 	ValidatorNames() *names.ValidatorNames

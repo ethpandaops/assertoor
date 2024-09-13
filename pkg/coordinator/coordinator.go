@@ -15,6 +15,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
@@ -33,6 +34,7 @@ type Coordinator struct {
 	// Config is the coordinator configuration.
 	Config          *Config
 	log             *logger.LogScope
+	database        *db.Database
 	clientPool      *clients.ClientPool
 	walletManager   *wallet.Manager
 	webserver       *web.Server
@@ -97,6 +99,31 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	if err := c.testBlsMath(); err != nil {
 		c.log.GetLogger().Warnf("BLS key generation self test failed: %v", err)
 	}
+
+	// init database
+	database := db.NewDatabase(c.log.GetLogger())
+
+	if c.Config.Database == nil {
+		// use default in-memory database
+		c.Config.Database = &db.DatabaseConfig{
+			Engine: "sqlite",
+			Sqlite: &db.SqliteDatabaseConfig{
+				File: ":memory:?cache=shared",
+			},
+		}
+	}
+
+	err := database.InitDB(c.Config.Database)
+	if err != nil {
+		return err
+	}
+
+	err = database.ApplySchema(-2)
+	if err != nil {
+		return err
+	}
+
+	c.database = database
 
 	// init client pool
 	clientPool, err := clients.NewClientPool(c.log.GetLogger())
@@ -178,6 +205,10 @@ func (c *Coordinator) Logger() logrus.FieldLogger {
 
 func (c *Coordinator) LogScope() *logger.LogScope {
 	return c.log
+}
+
+func (c *Coordinator) Database() *db.Database {
+	return c.database
 }
 
 func (c *Coordinator) ClientPool() *clients.ClientPool {
