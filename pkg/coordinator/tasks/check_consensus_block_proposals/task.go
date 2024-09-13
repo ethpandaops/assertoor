@@ -434,7 +434,14 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 						continue
 					}
 
-					inter := intersect.Simple(att1.AttestingIndices, att2.AttestingIndices)
+					att1indices, err1 := att1.AttestingIndices()
+					att2indices, err2 := att2.AttestingIndices()
+
+					if err1 != nil || err2 != nil {
+						continue
+					}
+
+					inter := intersect.Simple(att1indices, att2indices)
 					for _, j := range inter {
 						valIdx, ok := j.(uint64)
 						if !ok {
