@@ -108,7 +108,7 @@ tasks:
           ${EXTRA_FLAGS[@]}
 
         echo "============================"
-        echo "Exporting reports
+        echo "Exporting reports"
         echo "============================"
         REPORT_JSON=$(cat report.json)
         REPORT_HTML=$(jq -Rs '.' report.html)

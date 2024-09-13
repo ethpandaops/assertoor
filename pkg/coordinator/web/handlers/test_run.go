@@ -28,25 +28,27 @@ type TestRunPage struct {
 }
 
 type TestRunTask struct {
-	Index       uint64            `json:"index"`
-	ParentIndex uint64            `json:"parent_index"`
-	GraphLevels []uint64          `json:"graph_levels"`
-	Name        string            `json:"name"`
-	Title       string            `json:"title"`
-	IsStarted   bool              `json:"started"`
-	IsCompleted bool              `json:"completed"`
-	StartTime   time.Time         `json:"start_time"`
-	StopTime    time.Time         `json:"stop_time"`
-	Timeout     time.Duration     `json:"timeout"`
-	HasTimeout  bool              `json:"has_timeout"`
-	RunTime     time.Duration     `json:"runtime"`
-	HasRunTime  bool              `json:"has_runtime"`
-	Status      string            `json:"status"`
-	Result      string            `json:"result"`
-	ResultError string            `json:"result_error"`
-	Log         []*TestRunTaskLog `json:"log"`
-	ConfigYaml  string            `json:"config_yaml"`
-	ResultYaml  string            `json:"result_yaml"`
+	Index            uint64            `json:"index"`
+	ParentIndex      uint64            `json:"parent_index"`
+	GraphLevels      []uint64          `json:"graph_levels"`
+	Name             string            `json:"name"`
+	Title            string            `json:"title"`
+	IsStarted        bool              `json:"started"`
+	IsCompleted      bool              `json:"completed"`
+	StartTime        time.Time         `json:"start_time"`
+	StopTime         time.Time         `json:"stop_time"`
+	Timeout          time.Duration     `json:"timeout"`
+	HasTimeout       bool              `json:"has_timeout"`
+	RunTime          time.Duration     `json:"runtime"`
+	HasRunTime       bool              `json:"has_runtime"`
+	CustomRunTime    time.Duration     `json:"custom_runtime"`
+	HasCustomRunTime bool              `json:"has_custom_runtime"`
+	Status           string            `json:"status"`
+	Result           string            `json:"result"`
+	ResultError      string            `json:"result_error"`
+	Log              []*TestRunTaskLog `json:"log"`
+	ConfigYaml       string            `json:"config_yaml"`
+	ResultYaml       string            `json:"result_yaml"`
 }
 
 type TestRunTaskLog struct {
@@ -267,7 +269,18 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 					taskData.ConfigYaml = fmt.Sprintf("\n%v\n", string(taskConfig))
 				}
 
-				taskResult, err := yaml.Marshal(taskState.GetTaskStatusVars().GetVarsMap(nil, false))
+				taskStatusVars := taskState.GetTaskStatusVars().GetVarsMap(nil, false)
+				if taskOutput, ok := taskStatusVars["outputs"]; ok {
+					taskOutputMap := taskOutput.(map[string]interface{})
+					if taskOutputMap != nil {
+						if customRunTimeSecondsRaw, ok := taskOutputMap["customRunTimeSeconds"]; ok {
+							taskData.CustomRunTime = time.Duration(customRunTimeSecondsRaw.(float64) * float64(time.Second))
+							taskData.HasCustomRunTime = true
+						}
+					}
+				}
+
+				taskResult, err := yaml.Marshal(taskStatusVars)
 				if err != nil {
 					taskData.ResultYaml = fmt.Sprintf("failed marshalling result: %v", err)
 				} else {
