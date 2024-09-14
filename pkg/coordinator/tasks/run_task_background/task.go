@@ -190,11 +190,12 @@ func (t *Task) execForegroundTask(ctx context.Context) {
 	}()
 
 	taskState := t.ctx.Scheduler.GetTaskState(t.foregroundTask)
-	taskResult := taskState.GetTaskStatus()
 
 	err := t.ctx.Scheduler.ExecuteTask(ctx, t.foregroundTask, func(ctx context.Context, _ context.CancelFunc, _ types.TaskIndex) {
 		t.watchTaskResult(ctx, taskState)
 	})
+
+	taskResult := taskState.GetTaskStatus()
 
 	taskStatus := "success"
 	if taskResult.Result == types.TaskResultFailure {
