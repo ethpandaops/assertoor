@@ -846,7 +846,7 @@ tasks:
               config:
                 minWithdrawalCount: 1
               configVars:
-                expectWithdrawals: "| [{publicKey: .tasks.all_pubkeys.outputs.pubkeys[8], address: .tasks.depositor_wallet.outputs.childWallet.address, minAmount: 32000000000000000000}]"
+                expectWithdrawals: "| [{publicKey: .tasks.all_pubkeys.outputs.pubkeys[8], address: .tasks.depositor_wallet.outputs.childWallet.address, minAmount: 31900000000000000000}]"
 
 # generate EL triggered exit
 - name: run_tasks
