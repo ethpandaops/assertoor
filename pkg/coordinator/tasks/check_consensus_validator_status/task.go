@@ -204,6 +204,16 @@ func (t *Task) runValidatorStatusCheck() bool {
 			}
 		}
 
+		if t.config.MinValidatorBalance > 0 && validator.Balance < phase0.Gwei(t.config.MinValidatorBalance) {
+			t.logger.Infof("check failed: validator balance below minimum: %v", validator.Balance)
+			continue
+		}
+
+		if t.config.MaxValidatorBalance != nil && validator.Balance > phase0.Gwei(*t.config.MaxValidatorBalance) {
+			t.logger.Infof("check failed: validator balance above maximum: %v", validator.Balance)
+			continue
+		}
+
 		return true
 	}
 

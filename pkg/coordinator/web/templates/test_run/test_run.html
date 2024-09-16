@@ -1,7 +1,7 @@
 {{ define "page" }}
 <div class="d-flex flex-column flex-grow-1 mt-3 container-fluid">
     <h2 class="py-2">Test Run {{ .RunID }}: {{ .Name }}</h2>
-    
+
     <!-- client pool status -->
     <table class="test-header">
       <tr>
@@ -9,7 +9,7 @@
           Test ID:
         </td>
         <td>
-          {{ .TestID }}     
+          {{ .TestID }}
         </td>
       </tr>
       <tr>
@@ -50,7 +50,7 @@
           Start Time:
         </td>
         <td>
-          {{ formatDateTime .StartTime.UTC }}     
+          {{ formatDateTime .StartTime.UTC }}
         </td>
       </tr>
       {{ end }}
@@ -60,7 +60,7 @@
           Finish Time:
         </td>
         <td>
-          {{ formatDateTime .StopTime.UTC }}     
+          {{ formatDateTime .StopTime.UTC }}
         </td>
       </tr>
       {{ end }}
@@ -69,11 +69,11 @@
           Timeout:
         </td>
         <td>
-          {{ .Timeout }}     
+          {{ .Timeout }}
         </td>
       </tr>
     </table>
-    
+
     <!-- task list -->
     <div class="task-list">
       <h5 class="mt-3 mb-0">Tasks</h5>
@@ -112,7 +112,17 @@
             </td>
             <td>{{ $task.Name }}</td>
             <td>{{ $task.Title }}</td>
-            <td>{{ if $task.HasRunTime }}{{ $task.RunTime }}{{ else }}?{{ end }}{{ if $task.HasTimeout }} / {{ $task.Timeout }}{{ end }}</td>
+            <td>
+              {{ if $task.HasRunTime }}{{ $task.RunTime }}{{ else }}?{{ end }}
+              {{ if $task.HasTimeout }} / {{ $task.Timeout }}{{ end }}
+              {{ if $task.HasCustomRunTime}}
+                <span data-bs-toggle="tooltip"
+                      data-bs-placement="top"
+                      data-bs-title="Custom timer via outputs.customRunTimeSeconds" >
+                  ({{ $task.CustomRunTime}})
+                </span>
+              {{ end }}
+            </td>
             <td>
               {{ if eq $task.Result "success" }}
                 <span class="badge rounded-pill text-bg-success">
@@ -259,10 +269,13 @@
                         </div>
                       </div>
                       <div class="tab-pane fade card-body" id="task{{ $task.Index }}-config" role="tabpanel" aria-labelledby="task{{ $task.Index }}-config-tab">
-                        <pre>{{ $task.ConfigYaml }}</pre>
+                        <pre style="text-wrap: pretty">{{ $task.ConfigYaml }}</pre>
                       </div>
                       <div class="tab-pane fade card-body" id="task{{ $task.Index }}-result" role="tabpanel" aria-labelledby="task{{ $task.Index }}-result-tab">
-                        <pre>{{ $task.ResultYaml }}</pre>
+                        <pre style="text-wrap: pretty">{{ $task.ResultYaml }}</pre>
+                      </div>
+                      <div class="tab-pane fade card-body" id="task{{ $task.Index }}-custom-html" role="tabpanel" aria-labelledby="task{{ $task.Index }}-custom-html-tab">
+                        <pre style="text-wrap: pretty">{{ $task.ResultYaml }}</pre>
                       </div>
                     </div>
                   </div>
