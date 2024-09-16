@@ -1115,7 +1115,7 @@ tasks:
             exit 1
           fi
     
-    # validator #5: 0 ETH (0 ETH EB), 0x01 withdrawal creds
+    # validator #5: 0 ETH (0 ETH EB), 0x02 withdrawal creds
     - name: check_consensus_validator_status
       title: "Get validator #5 info"
       id: validator_info_5
@@ -1144,8 +1144,8 @@ tasks:
           fi
 
           withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
-          if [[ ! "$withdrawal_creds" == "0x01"* ]]; then
-            echo "Invalid withdrawal credentials! expected: 0x01*, got: $withdrawal_creds"
+          if [[ ! "$withdrawal_creds" == "0x02"* ]]; then
+            echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
             exit 1
           fi
     
@@ -1160,20 +1160,20 @@ tasks:
       configVars:
         validatorPubKey: "tasks.all_pubkeys.outputs.pubkeys[7]"
     - name: run_shell
-      title: "Check validator #7 status: 48 ETH (48 ETH EB), 0x02 withdrawal creds"
+      title: "Check validator #7 status: 144 ETH (143 ETH EB), 0x02 withdrawal creds"
       config:
         envVars: 
           validator: "tasks.validator_info_7.outputs.validator"
         command: |
           balance=$(echo "$validator" | jq -r '.balance')
-          if [ "$balance" -lt 47900000000 ]; then
-            echo "Balance too low! expected: > 47.9 ETH, got: $balance Gwei"
+          if [ "$balance" -lt 143900000000 ]; then
+            echo "Balance too low! expected: > 143.9 ETH, got: $balance Gwei"
             exit 1
           fi
 
           effective_balance=$(echo "$validator" | jq -r '.validator.effective_balance')
-          if [ "$effective_balance" != "48000000000" ]; then
-            echo "Effective balance too low! expected: 48 ETH, got: $effective_balance Gwei"
+          if [ "$effective_balance" != "143000000000" ]; then
+            echo "Effective balance too low! expected: 143 ETH, got: $effective_balance Gwei"
             exit 1
           fi
 
