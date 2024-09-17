@@ -718,7 +718,7 @@ tasks:
     # wait for validator #1 exit
     - name: check_consensus_validator_status
       title: "Wait for validator #1 to exit (start of consolidation 1->5)"
-      timeout: 1h
+      timeout: 28h
       config:
         validatorStatus:
         - exited_unslashed
@@ -1236,7 +1236,7 @@ tasks:
               config:
                 minDepositRequestCount: 1
               configVars:
-                expectDepositRequests: "| [{validatorPubkey: .tasks.all_pubkeys.outputs.pubkeys[6], amount: 10000000000}]"
+                expectDepositRequests: "| [{validatorPubkey: .tasks.all_pubkeys.outputs.pubkeys[6], amount: 10000000000000000000}]"
 
     # validator #6: 42 ETH (42 ETH EB), 0x02 withdrawal creds
     - name: check_consensus_validator_status
@@ -1250,7 +1250,7 @@ tasks:
       configVars:
         validatorPubKey: "tasks.all_pubkeys.outputs.pubkeys[6]"
     - name: run_shell
-      title: "Check validator #6 status: 42 ETH (42 ETH EB), 0x00 withdrawal creds"
+      title: "Check validator #6 status: 42 ETH (41 ETH EB), 0x00 withdrawal creds"
       config:
         envVars: 
           validator: "tasks.validator_info_6.outputs.validator"
@@ -1262,8 +1262,8 @@ tasks:
           fi
 
           effective_balance=$(echo "$validator" | jq -r '.validator.effective_balance')
-          if [ "$effective_balance" != "42000000000" ]; then
-            echo "Effective balance too high! expected: 42 ETH, got: $effective_balance Gwei"
+          if [ "$effective_balance" != "41000000000" ]; then
+            echo "Effective balance too high! expected: 41 ETH, got: $effective_balance Gwei"
             exit 1
           fi
 
