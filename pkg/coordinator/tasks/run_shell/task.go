@@ -146,10 +146,10 @@ func (t *Task) Execute(ctx context.Context) error {
 	go func() {
 		defer close(waitChan)
 
-		execErr = command.Wait()
-
 		<-stdoutCloseChan
 		<-stderrCloseChan
+
+		execErr = command.Wait()
 	}()
 
 	// wait for output handler
