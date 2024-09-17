@@ -52,7 +52,7 @@ type Coordinator struct {
 	testDescriptorIndex  uint64
 
 	testRunMap           map[uint64]types.Test
-	testQueue            []types.Test
+	testQueue            []types.TestRunner
 	testHistory          []types.Test
 	testRegistryMutex    sync.RWMutex
 	testNotificationChan chan bool
@@ -75,7 +75,7 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Co
 
 		testDescriptors:      map[string]testDescriptorEntry{},
 		testRunMap:           map[uint64]types.Test{},
-		testQueue:            []types.Test{},
+		testQueue:            []types.TestRunner{},
 		testHistory:          []types.Test{},
 		testNotificationChan: make(chan bool, 1),
 	}
@@ -328,7 +328,9 @@ func (c *Coordinator) GetTestQueue() []types.Test {
 	defer c.testRegistryMutex.RUnlock()
 
 	tests := make([]types.Test, len(c.testQueue))
-	copy(tests, c.testQueue)
+	for idx, test := range c.testQueue {
+		tests[idx] = test
+	}
 
 	return tests
 }
@@ -355,7 +357,7 @@ func (c *Coordinator) startMetrics() error {
 	return err
 }
 
-func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.Test, error) {
+func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.TestRunner, error) {
 	if descriptor.Err() != nil {
 		return nil, fmt.Errorf("cannot create test from failed test descriptor: %w", descriptor.Err())
 	}
@@ -373,7 +375,7 @@ func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverri
 	return testRef, nil
 }
 
-func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.Test, error) {
+func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.TestRunner, error) {
 	c.testSchedulerMutex.Lock()
 	defer c.testSchedulerMutex.Unlock()
 
@@ -417,7 +419,7 @@ func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
 	semaphore := make(chan bool, concurrencyLimit)
 
 	for {
-		var nextTest types.Test
+		var nextTest types.TestRunner
 
 		c.testRegistryMutex.Lock()
 		if len(c.testQueue) > 0 {
@@ -429,7 +431,7 @@ func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
 
 		if nextTest != nil {
 			// run next test
-			testFunc := func(nextTest types.Test) {
+			testFunc := func(nextTest types.TestRunner) {
 				defer func() { <-semaphore }()
 				c.runTest(ctx, nextTest)
 			}
@@ -448,7 +450,7 @@ func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
 	}
 }
 
-func (c *Coordinator) runTest(ctx context.Context, testRef types.Test) {
+func (c *Coordinator) runTest(ctx context.Context, testRef types.TestRunner) {
 	c.lastExecutedRunID = testRef.RunID()
 
 	if err := testRef.Validate(); err != nil {

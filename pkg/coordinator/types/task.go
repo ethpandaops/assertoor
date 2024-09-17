@@ -79,7 +79,7 @@ type TaskStatus struct {
 }
 
 type TaskContext struct {
-	Scheduler TaskScheduler
+	Scheduler TaskSchedulerRunner
 	Index     TaskIndex
 	Vars      Variables
 	Outputs   Variables

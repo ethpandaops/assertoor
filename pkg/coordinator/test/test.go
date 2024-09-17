@@ -25,7 +25,7 @@ type Test struct {
 	timeout   time.Duration
 }
 
-func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.FieldLogger, services types.TaskServices) (types.Test, error) {
+func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.FieldLogger, services types.TaskServices) (types.TestRunner, error) {
 	test := &Test{
 		runID:      runID,
 		logger:     logger.WithField("RunID", runID).WithField("TestID", descriptor.ID()),

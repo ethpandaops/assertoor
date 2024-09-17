@@ -9,11 +9,15 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
 )
 
-type TaskScheduler interface {
+type TaskSchedulerRunner interface {
+	TaskScheduler
 	GetServices() TaskServices
 	ParseTaskOptions(rawtask *helper.RawMessage) (*TaskOptions, error)
 	ExecuteTask(ctx context.Context, taskIndex TaskIndex, taskWatchFn func(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)) error
 	WatchTaskPass(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)
+}
+
+type TaskScheduler interface {
 	GetTaskState(taskIndex TaskIndex) TaskState
 	GetTaskCount() int
 	GetAllTasks() []TaskIndex
