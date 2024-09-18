@@ -3,14 +3,16 @@ package runshell
 import "errors"
 
 type Config struct {
-	Shell   string            `yaml:"shell" json:"shell"`
-	EnvVars map[string]string `yaml:"envVars" json:"envVars"`
-	Command string            `yaml:"command" json:"command"`
+	Shell     string            `yaml:"shell" json:"shell"`
+	ShellArgs []string          `yaml:"shellArgs" json:"shellArgs"`
+	EnvVars   map[string]string `yaml:"envVars" json:"envVars"`
+	Command   string            `yaml:"command" json:"command"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Shell: "bash",
+		Shell:     "bash",
+		ShellArgs: []string{},
 	}
 }
 

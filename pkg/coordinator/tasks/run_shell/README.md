@@ -9,6 +9,9 @@ The `run_shell` task executes a series of commands within a shell environment. T
 - **`shell`**:\
   Specifies the type of shell to use for running the commands. Common shells include `sh`, `bash`, `zsh`, etc. The default is `sh`.
 
+- **`shellArgs`**:\
+  Additional arguments to pass to the shell. Example: `--login`.
+
 - **`envVars`**:\
   A dictionary specifying the environment variables to be used within the shell. Each key in this dictionary represents the name of an environment variable, and its corresponding value indicates the name of a variable from which the actual value should be read. \
   For instance, if `envVars` is set as `{"PATH_VAR": "MY_PATH", "USER_VAR": "MY_USER"}`, the task will use the values of `MY_PATH` and `MY_USER` variables from the current task variable context as the values for `PATH_VAR` and `USER_VAR` within the shell.
@@ -27,7 +30,7 @@ echo "::set-var USER_VAR new value"
 This feature allows the shell script to interact dynamically with the task context, modifying variables based on script execution.
 
 Please note that this feature is still under development and the format of these triggers may change in future versions of the tool. It's important to stay updated with the latest documentation and release notes for any modifications to this functionality.
-  
+
 
 ### Defaults
 
@@ -36,7 +39,8 @@ Default settings for the `run_shell` task:
 ```yaml
 - name: run_shell
   config:
-    shell: sh
+    shell: bash
+    shellArgs: []
     envVars: {}
     command: ""
 ```
