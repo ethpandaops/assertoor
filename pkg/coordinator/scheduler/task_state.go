@@ -5,10 +5,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/tasks"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
+	"github.com/jmoiron/sqlx"
 )
 
 type taskState struct {
@@ -38,6 +40,8 @@ type taskState struct {
 	taskError        error
 	resultNotifyChan chan bool
 	resultMutex      sync.RWMutex
+
+	dbTaskState *db.TaskState
 }
 
 func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *taskState, variables types.Variables, isCleanupTask bool) (*taskState, error) {
@@ -120,6 +124,30 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 		ts.allTasks = append(ts.allTasks, taskIdx)
 	}
 	ts.taskStateMutex.Unlock()
+
+	// add to database
+	if database := ts.services.Database(); database != nil {
+		taskState.dbTaskState = &db.TaskState{
+			RunID:     int(ts.testRunID),
+			TaskID:    int(taskIdx),
+			Name:      taskState.options.Name,
+			Title:     taskState.Title(),
+			Timeout:   int(taskState.options.Timeout.Seconds()),
+			IfCond:    taskState.options.If,
+			IsCleanup: taskState.isCleanup,
+		}
+
+		if parentState != nil {
+			taskState.dbTaskState.ParentTask = int(parentState.index)
+		}
+
+		err := database.RunTransaction(func(tx *sqlx.Tx) error {
+			return database.InsertTaskState(tx, taskState.dbTaskState)
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return taskState, nil
 }

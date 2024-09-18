@@ -188,7 +188,7 @@ func (db *Database) CloseDB() error {
 	return nil
 }
 
-func (db *Database) RunTransaction(handler func(tx *sqlx.Tx) error) (err error) {
+func (db *Database) RunTransaction(handler func(tx *sqlx.Tx) error) error {
 	if db.engine == EngineSqlite {
 		db.writerMutex.Lock()
 		defer db.writerMutex.Unlock()
@@ -200,10 +200,8 @@ func (db *Database) RunTransaction(handler func(tx *sqlx.Tx) error) (err error) 
 	}
 
 	defer func() {
-		err = tx.Rollback()
-		if err != nil {
-			db.logger.Errorf("error rolling back db transaction: %v", err)
-		}
+		//nolint:errcheck // ignore error
+		tx.Rollback()
 	}()
 
 	err = handler(tx)
@@ -216,7 +214,7 @@ func (db *Database) RunTransaction(handler func(tx *sqlx.Tx) error) (err error) 
 		return fmt.Errorf("error committing db transaction: %v", err)
 	}
 
-	return
+	return err
 }
 
 func (db *Database) ApplySchema(version int64) error {

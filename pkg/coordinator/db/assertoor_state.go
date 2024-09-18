@@ -27,7 +27,7 @@ func (db *Database) GetAssertoorState(key string, returnValue interface{}) (inte
 	return returnValue, nil
 }
 
-func (db *Database) SetExplorerState(tx *sqlx.Tx, key string, value interface{}) error {
+func (db *Database) SetAssertoorState(tx *sqlx.Tx, key string, value interface{}) error {
 	valueMarshal, err := json.Marshal(value)
 	if err != nil {
 		return err

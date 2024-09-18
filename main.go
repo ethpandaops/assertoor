@@ -1,22 +1,37 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/ethpandaops/assertoor/cmd"
 )
 
 func main() {
-	cancel := make(chan os.Signal, 1)
-	signal.Notify(cancel, syscall.SIGTERM, syscall.SIGINT)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancelSig := make(chan os.Signal, 1)
+	signal.Notify(cancelSig, syscall.SIGTERM, syscall.SIGINT)
 
-	go cmd.Execute()
+	runChan := make(chan bool)
+	go func() {
+		cmd.Execute(ctx)
+		close(runChan)
+	}()
 
-	sig := <-cancel
-	log.Printf("Caught signal: %v", sig)
+	sig := <-cancelSig
+	log.Printf("Caught signal: %v, shutdown gracefully...", sig)
+
+	cancel()
+
+	select {
+	case <-runChan:
+	case <-time.After(5 * time.Second):
+		log.Println("Graceful shutdown timed out")
+	}
 
 	os.Exit(0)
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
@@ -24,10 +25,12 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
 	"github.com/gorhill/cronexpr"
+	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
 	util "github.com/wealdtech/go-eth2-util"
+	"gopkg.in/yaml.v3"
 )
 
 type Coordinator struct {
@@ -60,7 +63,6 @@ type Coordinator struct {
 
 type testDescriptorEntry struct {
 	descriptor types.TestDescriptor
-	dynamic    bool
 	index      uint64
 }
 
@@ -125,6 +127,16 @@ func (c *Coordinator) Run(ctx context.Context) error {
 
 	c.database = database
 
+	defer func() {
+		fmt.Println("Closing database")
+		//nolint:errcheck // ignore error
+		c.database.CloseDB()
+	}()
+
+	// load state from database
+	//nolint:errcheck // ignore missing state
+	c.database.GetAssertoorState("test.lastRunId", &c.runIDCounter)
+
 	// init client pool
 	clientPool, err := clients.NewClientPool(c.log.GetLogger())
 	if err != nil {
@@ -182,7 +194,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	c.validatorNames.LoadValidatorNames()
 
 	// load tests
-	c.LoadTests(ctx)
+	c.loadTests(ctx)
 
 	// start test scheduler
 	go c.runTestScheduler(ctx)
@@ -227,53 +239,236 @@ func (c *Coordinator) GlobalVariables() types.Variables {
 	return c.globalVars
 }
 
-func (c *Coordinator) LoadTests(ctx context.Context) {
-	descriptors := test.LoadTestDescriptors(ctx, c.globalVars, c.Config.Tests, c.Config.ExternalTests)
+func (c *Coordinator) externalTestCfgToDB(cfgExternalTest *types.ExternalTestConfig) (*db.TestConfig, error) {
+	dbTestCfg := &db.TestConfig{
+		TestID: cfgExternalTest.ID,
+		Source: cfgExternalTest.File,
+		Name:   cfgExternalTest.Name,
+	}
+
+	if cfgExternalTest.Timeout != nil {
+		dbTestCfg.Timeout = int(cfgExternalTest.Timeout.Duration.Seconds())
+	}
+
+	if cfgExternalTest.Schedule != nil {
+		dbTestCfg.ScheduleStartup = cfgExternalTest.Schedule.Startup
+
+		if len(cfgExternalTest.Schedule.Cron) > 0 {
+			cronYaml, err := yaml.Marshal(cfgExternalTest.Schedule.Cron)
+			if err != nil {
+				return nil, fmt.Errorf("error encoding test cron schedule %v: %v", cfgExternalTest.ID, err)
+			}
+
+			dbTestCfg.ScheduleCronYaml = string(cronYaml)
+		}
+	} else {
+		dbTestCfg.ScheduleStartup = true
+	}
+
+	configYaml, err := yaml.Marshal(cfgExternalTest.Config)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding test config %v: %v", cfgExternalTest.ID, err)
+	}
+
+	dbTestCfg.Config = string(configYaml)
+
+	configVarsYaml, err := yaml.Marshal(cfgExternalTest.ConfigVars)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding test configVars %v: %v", cfgExternalTest.ID, err)
+	}
+
+	dbTestCfg.ConfigVars = string(configVarsYaml)
+
+	return dbTestCfg, nil
+}
+
+func (c *Coordinator) loadTests(ctx context.Context) {
+	dbTestConfigs, err := c.database.GetTestConfigs()
+	if err != nil {
+		c.log.GetLogger().Errorf("error loading test configs from db: %v", err)
+	}
+
+	externalTests := []*types.ExternalTestConfig{}
+
+	for _, dbTestConfig := range dbTestConfigs {
+		externalTest := &types.ExternalTestConfig{
+			ID:         dbTestConfig.TestID,
+			File:       dbTestConfig.Source,
+			Name:       dbTestConfig.Name,
+			Config:     map[string]interface{}{},
+			ConfigVars: map[string]string{},
+			Schedule: &types.TestSchedule{
+				Startup: dbTestConfig.ScheduleStartup,
+				Cron:    []string{},
+			},
+		}
+
+		if dbTestConfig.Timeout > 0 {
+			externalTest.Timeout = &helper.Duration{Duration: time.Duration(dbTestConfig.Timeout) * time.Second}
+		}
+
+		if err := yaml.Unmarshal([]byte(dbTestConfig.Config), &externalTest.Config); err != nil {
+			c.log.GetLogger().Errorf("error decoding test config %v from db: %v", dbTestConfig.TestID, err)
+			continue
+		}
+
+		if err := yaml.Unmarshal([]byte(dbTestConfig.ConfigVars), &externalTest.ConfigVars); err != nil {
+			c.log.GetLogger().Errorf("error decoding test configVars %v from db: %v", dbTestConfig.TestID, err)
+			continue
+		}
+
+		if dbTestConfig.ScheduleCronYaml != "" {
+			if err := yaml.Unmarshal([]byte(dbTestConfig.ScheduleCronYaml), &externalTest.Schedule.Cron); err != nil {
+				c.log.GetLogger().Errorf("error decoding test cron schedule %v from db: %v", dbTestConfig.TestID, err)
+				continue
+			}
+		}
+
+		externalTests = append(externalTests, externalTest)
+	}
+
+	newCfgTests := []*db.TestConfig{}
+
+	for _, cfgExternalTest := range c.Config.ExternalTests {
+		found := false
+
+		for _, externalTest := range externalTests {
+			if externalTest.ID != cfgExternalTest.ID && externalTest.File != cfgExternalTest.File {
+				continue
+			}
+
+			cfgExternalTest.Config = externalTest.Config
+			cfgExternalTest.ConfigVars = externalTest.ConfigVars
+			cfgExternalTest.Schedule = externalTest.Schedule
+			found = true
+
+			break
+		}
+
+		dbTestCfg, err := c.externalTestCfgToDB(cfgExternalTest)
+		if err != nil {
+			c.log.GetLogger().Errorf("error converting external test config %v to db: %v", cfgExternalTest.ID, err)
+		} else {
+			newCfgTests = append(newCfgTests, dbTestCfg)
+		}
+
+		if found {
+			continue
+		}
+
+		externalTests = append(externalTests, cfgExternalTest)
+	}
+
+	if len(newCfgTests) > 0 {
+		err := c.database.RunTransaction(func(tx *sqlx.Tx) error {
+			for _, dbTestCfg := range newCfgTests {
+				err := c.database.InsertTestConfig(tx, dbTestCfg)
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			c.log.GetLogger().Errorf("error adding new test configs to db: %v", err)
+		}
+	}
+
+	descriptors := test.LoadTestDescriptors(ctx, c.globalVars, c.Config.Tests, externalTests)
 	errCount := 0
 
 	c.testDescriptorsMutex.Lock()
 	defer c.testDescriptorsMutex.Unlock()
 
-	indexMap := map[string]uint64{}
-
-	for id, descriptorEntry := range c.testDescriptors {
-		if !descriptorEntry.dynamic {
-			delete(c.testDescriptors, id)
-
-			indexMap[id] = descriptorEntry.index
-		}
-	}
+	c.testDescriptors = map[string]testDescriptorEntry{}
 
 	for _, descriptor := range descriptors {
 		if descriptor.Err() != nil {
 			c.log.GetLogger().Errorf("error while loading test '%v': %v", descriptor.ID(), descriptor.Err())
 
 			errCount++
-		} else {
-			entryIndex := indexMap[descriptor.ID()]
-			if entryIndex == 0 {
-				c.testDescriptorIndex++
-				entryIndex = c.testDescriptorIndex
-			}
+		}
 
-			c.testDescriptors[descriptor.ID()] = testDescriptorEntry{
-				descriptor: descriptor,
-				dynamic:    false,
-				index:      entryIndex,
-			}
+		c.testDescriptorIndex++
+		entryIndex := c.testDescriptorIndex
+
+		c.testDescriptors[descriptor.ID()] = testDescriptorEntry{
+			descriptor: descriptor,
+			index:      entryIndex,
 		}
 	}
 
 	c.log.GetLogger().Infof("loaded %v test descriptors (%v errors)", len(descriptors), errCount)
 }
 
-func (c *Coordinator) AddTestDescriptor(testDescriptor types.TestDescriptor) error {
-	if testDescriptor.Err() != nil {
-		return fmt.Errorf("cannot add failed test descriptor: %v", testDescriptor.Err())
+func (c *Coordinator) AddLocalTest(testConfig *types.TestConfig) (types.TestDescriptor, error) {
+	if testConfig.ID == "" {
+		return nil, fmt.Errorf("cannot add test descriptor without ID")
 	}
 
-	if testDescriptor.ID() == "" {
-		return fmt.Errorf("cannot add test descriptor without ID")
+	testVars := vars.NewVariables(c.GlobalVariables())
+
+	for k, v := range testConfig.Config {
+		testVars.SetVar(k, v)
+	}
+
+	err := testVars.CopyVars(c.GlobalVariables(), testConfig.ConfigVars)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding configVars: %v", err)
+	}
+
+	testDescriptor := test.NewDescriptor(testConfig.ID, "api-call", testConfig, testVars)
+
+	c.testDescriptorsMutex.Lock()
+	defer c.testDescriptorsMutex.Unlock()
+
+	entryIndex := c.testDescriptors[testDescriptor.ID()].index
+	if entryIndex == 0 {
+		c.testDescriptorIndex++
+		entryIndex = c.testDescriptorIndex
+	}
+
+	c.testDescriptors[testDescriptor.ID()] = testDescriptorEntry{
+		descriptor: testDescriptor,
+		index:      entryIndex,
+	}
+
+	return testDescriptor, nil
+}
+
+func (c *Coordinator) AddExternalTest(ctx context.Context, extTestCfg *types.ExternalTestConfig) (types.TestDescriptor, error) {
+	testConfig, testVars, err := test.LoadExternalTestConfig(ctx, c.GlobalVariables(), extTestCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed loading test config from %v: %w", extTestCfg.File, err)
+	}
+
+	if testConfig.ID == "" {
+		return nil, errors.New("test id missing or empty")
+	}
+
+	if testConfig.Name == "" {
+		return nil, errors.New("test name missing or empty")
+	}
+
+	if len(testConfig.Tasks) == 0 {
+		return nil, errors.New("test must have 1 or more tasks")
+	}
+
+	testDescriptor := test.NewDescriptor(testConfig.ID, fmt.Sprintf("external:%v", extTestCfg.File), testConfig, testVars)
+
+	dbTestCfg, err := c.externalTestCfgToDB(extTestCfg)
+	if err != nil {
+		return nil, fmt.Errorf("error converting external test config %v for db: %v", extTestCfg.ID, err)
+	}
+
+	err = c.database.RunTransaction(func(tx *sqlx.Tx) error {
+		return c.database.InsertTestConfig(tx, dbTestCfg)
+	})
+
+	if err != nil {
+		c.log.GetLogger().Errorf("error adding new test configs to db: %v", err)
 	}
 
 	c.testDescriptorsMutex.Lock()
@@ -287,11 +482,10 @@ func (c *Coordinator) AddTestDescriptor(testDescriptor types.TestDescriptor) err
 
 	c.testDescriptors[testDescriptor.ID()] = testDescriptorEntry{
 		descriptor: testDescriptor,
-		dynamic:    true,
 		index:      entryIndex,
 	}
 
-	return nil
+	return testDescriptor, nil
 }
 
 func (c *Coordinator) GetTestDescriptors() []types.TestDescriptor {
@@ -390,16 +584,9 @@ func (c *Coordinator) createTestRun(descriptor types.TestDescriptor, configOverr
 	c.runIDCounter++
 	runID := c.runIDCounter
 
-	testRef, err := test.CreateTest(runID, descriptor, c.Logger().WithField("module", "test"), c)
+	testRef, err := test.CreateTest(runID, descriptor, c.Logger().WithField("module", "test"), c, configOverrides)
 	if err != nil {
 		return nil, fmt.Errorf("failed initializing test run #%v '%v': %w", runID, descriptor.Config().Name, err)
-	}
-
-	if configOverrides != nil {
-		testVars := testRef.GetTestVariables()
-		for cfgKey, cfgValue := range configOverrides {
-			testVars.SetVar(cfgKey, cfgValue)
-		}
 	}
 
 	c.testRegistryMutex.Lock()
@@ -417,7 +604,9 @@ func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
 	}
 
 	semaphore := make(chan bool, concurrencyLimit)
+	waitGroup := sync.WaitGroup{}
 
+runLoop:
 	for {
 		var nextTest types.TestRunner
 
@@ -430,24 +619,36 @@ func (c *Coordinator) runTestExecutionLoop(ctx context.Context) {
 		c.testRegistryMutex.Unlock()
 
 		if nextTest != nil {
+
 			// run next test
 			testFunc := func(nextTest types.TestRunner) {
-				defer func() { <-semaphore }()
+				defer func() {
+					<-semaphore
+					waitGroup.Done()
+				}()
+
 				c.runTest(ctx, nextTest)
 			}
 			semaphore <- true
+			if ctx.Err() != nil {
+				break runLoop
+			}
+
+			waitGroup.Add(1)
 
 			go testFunc(nextTest)
 		} else {
 			// sleep and wait for queue notification
 			select {
 			case <-ctx.Done():
-				return
+				break runLoop
 			case <-c.testNotificationChan:
 			case <-time.After(60 * time.Second):
 			}
 		}
 	}
+
+	waitGroup.Wait()
 }
 
 func (c *Coordinator) runTest(ctx context.Context, testRef types.TestRunner) {

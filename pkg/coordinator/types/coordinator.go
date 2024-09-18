@@ -20,8 +20,8 @@ type Coordinator interface {
 	ValidatorNames() *names.ValidatorNames
 	GlobalVariables() Variables
 
-	LoadTests(ctx context.Context)
-	AddTestDescriptor(testDescriptor TestDescriptor) error
+	AddLocalTest(testConfig *TestConfig) (TestDescriptor, error)
+	AddExternalTest(ctx context.Context, extTestConfig *ExternalTestConfig) (TestDescriptor, error)
 	GetTestDescriptors() []TestDescriptor
 	GetTestByRunID(runID uint64) Test
 	GetTestQueue() []Test

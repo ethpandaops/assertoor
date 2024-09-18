@@ -40,3 +40,14 @@ func (db *Database) InsertTestConfig(tx *sqlx.Tx, config *TestConfig) error {
 
 	return nil
 }
+
+func (db *Database) GetTestConfigs() ([]*TestConfig, error) {
+	var configs []*TestConfig
+
+	err := db.reader.Select(&configs, `SELECT * FROM test_configs`)
+	if err != nil {
+		return nil, err
+	}
+
+	return configs, nil
+}

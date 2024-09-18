@@ -14,6 +14,7 @@ type TaskScheduler struct {
 	services         types.TaskServices
 	logger           logrus.FieldLogger
 	rootVars         types.Variables
+	testRunID        uint64
 	taskCount        types.TaskIndex
 	allTasks         []types.TaskIndex
 	rootTasks        []types.TaskIndex
@@ -25,10 +26,11 @@ type TaskScheduler struct {
 	cancelCleanupCtx context.CancelFunc
 }
 
-func NewTaskScheduler(log logrus.FieldLogger, services types.TaskServices, variables types.Variables) *TaskScheduler {
+func NewTaskScheduler(log logrus.FieldLogger, services types.TaskServices, variables types.Variables, testRunID uint64) *TaskScheduler {
 	return &TaskScheduler{
 		logger:       log,
 		rootVars:     variables,
+		testRunID:    testRunID,
 		taskCount:    1,
 		rootTasks:    make([]types.TaskIndex, 0),
 		allTasks:     make([]types.TaskIndex, 0),

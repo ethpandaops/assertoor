@@ -27,8 +27,11 @@ CREATE TABLE IF NOT EXISTS public."task_states"
 type TaskState struct {
 	RunID      int    `db:"run_id"`
 	TaskID     int    `db:"task_id"`
-	Options    string `db:"options"`
 	ParentTask int    `db:"parent_task"`
+	Name       string `db:"name"`
+	Title      string `db:"title"`
+	Timeout    int    `db:"timeout"`
+	IfCond     string `db:"ifcond"`
 	IsCleanup  bool   `db:"is_cleanup"`
 	IsStarted  bool   `db:"is_started"`
 	IsRunning  bool   `db:"is_running"`
@@ -45,12 +48,15 @@ func (db *Database) InsertTaskState(tx *sqlx.Tx, state *TaskState) error {
 	_, err := tx.Exec(db.EngineQuery(map[EngineType]string{
 		EnginePgsql: `
 			INSERT INTO task_states (
-				run_id, task_id, options, parent_task, is_cleanup, is_started, is_running, is_skipped, is_timeout, 
+				run_id, task_id, parent_task, name, title, timeout, ifcond, is_cleanup, is_started, is_running, is_skipped, is_timeout, 
 				start_time, stop_time, task_config, task_status, task_result
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 			ON CONFLICT (run_id, task_id) DO UPDATE SET
-				options = excluded.options,
 				parent_task = excluded.parent_task,
+				name = excluded.name,
+				title = excluded.title,
+				timeout = excluded.timeout,
+				ifcond = excluded.ifcond,
 				is_cleanup = excluded.is_cleanup,
 				is_started = excluded.is_started,
 				is_running = excluded.is_running,
@@ -63,11 +69,11 @@ func (db *Database) InsertTaskState(tx *sqlx.Tx, state *TaskState) error {
 				task_result = excluded.task_result`,
 		EngineSqlite: `
 			INSERT OR REPLACE INTO task_states (
-				run_id, task_id, options, parent_task, is_cleanup, is_started, is_running, is_skipped, is_timeout, 
+				run_id, task_id, parent_task, name, title, timeout, ifcond, is_cleanup, is_started, is_running, is_skipped, is_timeout, 
 				start_time, stop_time, task_config, task_status, task_result
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
 	}),
-		state.RunID, state.TaskID, state.Options, state.ParentTask, state.IsCleanup, state.IsStarted, state.IsRunning,
+		state.RunID, state.TaskID, state.ParentTask, state.Name, state.Title, state.Timeout, state.IfCond, state.IsCleanup, state.IsStarted, state.IsRunning,
 		state.IsSkipped, state.IsTimeout, state.StartTime, state.StopTime, state.TaskConfig, state.TaskStatus,
 		state.TaskResult)
 	if err != nil {

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 )
 
@@ -63,31 +62,8 @@ func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.R
 		extTestCfg.Timeout = &helper.Duration{Duration: time.Duration(req.Timeout) * time.Second}
 	}
 
-	testConfig, testVars, err := test.LoadExternalTestConfig(r.Context(), ah.coordinator.GlobalVariables(), extTestCfg)
-	if err != nil {
-		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed loading test config from %v: %v", req.File, err), http.StatusBadRequest)
-		return
-	}
-
-	if testConfig.ID == "" {
-		ah.sendErrorResponse(w, r.URL.String(), "test id missing or empty", http.StatusBadRequest)
-		return
-	}
-
-	if testConfig.Name == "" {
-		ah.sendErrorResponse(w, r.URL.String(), "test name missing or empty", http.StatusBadRequest)
-		return
-	}
-
-	if len(testConfig.Tasks) == 0 {
-		ah.sendErrorResponse(w, r.URL.String(), "test must have 1 or more tasks", http.StatusBadRequest)
-		return
-	}
-
-	testDescriptor := test.NewDescriptor(testConfig.ID, fmt.Sprintf("api-call,external:%v", extTestCfg.File), testConfig, testVars)
-
 	// add test descriptor
-	err = ah.coordinator.AddTestDescriptor(testDescriptor)
+	testDescriptor, err := ah.coordinator.AddExternalTest(r.Context(), extTestCfg)
 	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed adding test: %v", err), http.StatusInternalServerError)
 		return

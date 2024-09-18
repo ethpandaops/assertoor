@@ -7,16 +7,17 @@ import (
 )
 
 type Config struct {
-	Tasks             []helper.RawMessage `yaml:"tasks" json:"tasks"`
-	StopChildOnResult bool                `yaml:"stopChildOnResult" json:"stopChildOnResult"`
-	ExpectFailure     bool                `yaml:"expectFailure" json:"expectFailure"`
-	ContinueOnFailure bool                `yaml:"continueOnFailure" json:"continueOnFailure"`
-	NewVariableScope  bool                `yaml:"newVariableScope" json:"newVariableScope"`
+	Tasks []helper.RawMessageMasked `yaml:"tasks" json:"tasks"`
+
+	StopChildOnResult bool `yaml:"stopChildOnResult" json:"stopChildOnResult"`
+	ExpectFailure     bool `yaml:"expectFailure" json:"expectFailure"`
+	ContinueOnFailure bool `yaml:"continueOnFailure" json:"continueOnFailure"`
+	NewVariableScope  bool `yaml:"newVariableScope" json:"newVariableScope"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Tasks:             []helper.RawMessage{},
+		Tasks:             []helper.RawMessageMasked{},
 		StopChildOnResult: true,
 	}
 }

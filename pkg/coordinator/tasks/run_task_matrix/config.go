@@ -23,7 +23,7 @@ type Config struct {
 	MatrixVar string `yaml:"matrixVar" json:"matrixVar"`
 
 	// child task
-	Task *helper.RawMessage `yaml:"task" json:"task"`
+	Task *helper.RawMessageMasked `yaml:"task" json:"task"`
 }
 
 func DefaultConfig() Config {

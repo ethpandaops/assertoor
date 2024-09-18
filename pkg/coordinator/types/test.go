@@ -33,7 +33,6 @@ type Test interface {
 	StartTime() time.Time
 	StopTime() time.Time
 	Timeout() time.Duration
-	Percent() float64
 	Status() TestStatus
 	Logger() logrus.FieldLogger
 	GetTaskScheduler() TaskScheduler
