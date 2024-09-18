@@ -3,7 +3,7 @@ id: 64-el-triggered-consolidation
 name: "EL-triggered consolidation test"
 timeout: 1h
 config:
-  validatorCount: 64
+  validatorCount: 300
   targetAddress: "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA"
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
   sourceValidatorIndex: 100
