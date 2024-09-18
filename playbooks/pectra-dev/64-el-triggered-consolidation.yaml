@@ -42,10 +42,11 @@ tasks:
   configVars:
     minSlotNumber: "consolidationWaitSlot"
 
-- name: run_task_options
+- name: run_tasks
   title: "Generate consolidations"
   config:
-    task:
+    stopChildOnResult: false
+    tasks:
       - name: generate_consolidations
         title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
         config:
