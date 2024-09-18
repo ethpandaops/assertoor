@@ -65,8 +65,9 @@ tasks:
         config:
           validatorStatus:
             - withdrawal_done
+            - withdrawal_possible
         configVars:
-          validatorIndex: "sourceValidatorIndex + consolidationNumber - 1"
+          validatorIndex: "sourceValidatorIndex + .consolidationNumber - 1"
 
       - name: run_shell
         title: "Check targetValidator status: 2048 ETH (64* 32 ETH EB), 0x02 withdrawal creds"
