@@ -42,48 +42,50 @@ tasks:
   configVars:
     minSlotNumber: "consolidationWaitSlot"
 
-- name: generate_consolidations
-  title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
+- name: run_task_options
+  title: "Generate consolidations"
   config:
-    sourceIndexCount: 64
-    failOnReject: true
-    awaitReceipt: true
-  configVars:
-    walletPrivkey: "walletPrivkey"
-    sourceStartValidatorIndex: "sourceValidatorIndex"
-    targetValidatorIndex: "targetValidatorIndex"
+    task:
+      - name: generate_consolidations
+        title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
+        config:
+          sourceIndexCount: 64
+          failOnReject: true
+          awaitReceipt: true
+        configVars:
+          walletPrivkey: "walletPrivkey"
+          sourceStartValidatorIndex: "sourceValidatorIndex"
+          targetValidatorIndex: "targetValidatorIndex"
 
+      - name: check_consensus_validator_status
+        title: "Wait for validator to completely exit (${sourceValidatorIndex})"
+        id: target_validator_info
+        config:
+          validatorStatus:
+            - withdrawal_done
+        configVars:
+          validatorIndex: "sourceValidatorIndex + 64"
 
-- name: check_consensus_validator_status
-  title: "Wait for validator to completely exit (${sourceValidatorIndex})"
-  id: target_validator_info
-  config:
-    validatorStatus:
-      - withdrawal_done
-  configVars:
-    validatorIndex: "sourceValidatorIndex + 64"
-
-
-- name: run_shell
-  title: "Check targetValidator status: 2048 ETH (64* 32 ETH EB), 0x02 withdrawal creds"
-  config:
-    envVars:
-      validator: "tasks.target_validator_info.outputs.validator"
-    command: |
-      balance=$(echo "$validator" | jq -r '.balance')
-      if [ "$balance" -lt 2047900000000 ]; then
-        echo "Balance too low! expected: > 2047.9 ETH, got: $balance Gwei"
-        exit 1
-      fi
-      
-      effective_balance=$(echo "$validator" | jq -r '.validator.effective_balance')
-      if [ "$effective_balance" != "2048000000000" ]; then
-        echo "Effective balance too low! expected: 2048 ETH, got: $effective_balance Gwei"
-        exit 1
-      fi
-      
-      withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
-      if [[ ! "$withdrawal_creds" == "0x02"* ]]; then
-        echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
-        exit 1
-      fi
+      - name: run_shell
+        title: "Check targetValidator status: 2048 ETH (64* 32 ETH EB), 0x02 withdrawal creds"
+        config:
+          envVars:
+            validator: "tasks.target_validator_info.outputs.validator"
+          command: |
+            balance=$(echo "$validator" | jq -r '.balance')
+            if [ "$balance" -lt 2047900000000 ]; then
+              echo "Balance too low! expected: > 2047.9 ETH, got: $balance Gwei"
+              exit 1
+            fi
+            
+            effective_balance=$(echo "$validator" | jq -r '.validator.effective_balance')
+            if [ "$effective_balance" != "2048000000000" ]; then
+              echo "Effective balance too low! expected: 2048 ETH, got: $effective_balance Gwei"
+              exit 1
+            fi
+            
+            withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
+            if [[ ! "$withdrawal_creds" == "0x02"* ]]; then
+              echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
+              exit 1
+            fi
