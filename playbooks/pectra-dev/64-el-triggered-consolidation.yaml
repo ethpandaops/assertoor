@@ -4,6 +4,7 @@ name: "EL-triggered consolidation test"
 timeout: 1h
 config:
   validatorCount: 300
+  consolidationNumber: 64
   targetAddress: "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA"
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
   sourceValidatorIndex: 100
@@ -50,10 +51,10 @@ tasks:
       - name: generate_consolidations
         title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
         config:
-          sourceIndexCount: 64
           failOnReject: true
           awaitReceipt: true
         configVars:
+          sourceIndexCount: "consolidationNumber"
           walletPrivkey: "walletPrivkey"
           sourceStartValidatorIndex: "sourceValidatorIndex"
           targetValidatorIndex: "targetValidatorIndex"
@@ -65,7 +66,7 @@ tasks:
           validatorStatus:
             - withdrawal_done
         configVars:
-          validatorIndex: "sourceValidatorIndex + 64"
+          validatorIndex: "sourceValidatorIndex + consolidationNumber - 1"
 
       - name: run_shell
         title: "Check targetValidator status: 2048 ETH (64* 32 ETH EB), 0x02 withdrawal creds"
