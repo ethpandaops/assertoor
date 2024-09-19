@@ -16,6 +16,12 @@ tasks:
     config:
       minClientCount: 1
 
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= 34"
+    timeout: 30m
+    configVars:
+      minSlotNumber: "34"
+
   - name: generate_random_mnemonic
     title: "Generate random mnemonic"
     config:
@@ -49,7 +55,6 @@ tasks:
             depositAmount: 32
             awaitReceipt: true
             failOnReject: true
-            validatorPubkeysResultVar: "validatorPubkeys"
           configVars:
             walletPrivkey: "depositorPrivateKey"
             mnemonic: "validatorMnemonic"
@@ -72,7 +77,6 @@ tasks:
             startIndex: 1
             awaitReceipt: true
             failOnReject: true
-            validatorPubkeysResultVar: "validatorPubkeys"
           configVars:
             walletPrivkey: "depositorPrivateKey"
             mnemonic: "validatorMnemonic"
@@ -86,4 +90,4 @@ tasks:
       validatorStatus:
         - active_ongoing
     configVars:
-      validatorIndex: "tasks.validator_32_eth_deposit.outputs.validatorPubkeysResultVar"
+      validatorIndex: "tasks.validator_32_eth_deposit.outputs.validatorPubkeys[0]"
