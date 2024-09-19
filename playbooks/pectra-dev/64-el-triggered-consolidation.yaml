@@ -27,6 +27,7 @@ tasks:
 
 - name: run_task_options
   title: "Generate ${validatorCount} BLS changes"
+  timeout: 5m
   config:
     task:
       name: generate_bls_changes
@@ -45,11 +46,13 @@ tasks:
 
 - name: run_tasks
   title: "Generate consolidations"
+  timeout: 3h
   config:
     stopChildOnResult: false
     tasks:
       - name: generate_consolidations
         title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
+        timeout: 5m
         config:
           failOnReject: true
           awaitReceipt: true
@@ -61,6 +64,7 @@ tasks:
 
       - name: check_consensus_validator_status
         title: "Wait for validator to completely exit (${sourceValidatorIndex})"
+        timeout: 150m
         id: target_validator_info
         config:
           validatorStatus:
@@ -70,6 +74,7 @@ tasks:
           validatorIndex: "sourceValidatorIndex + .consolidationNumber - 1"
 
       - name: run_shell
+        timeout: 5m
         title: "Check targetValidator status: 2048 ETH (64* 32 ETH EB), 0x02 withdrawal creds"
         config:
           envVars:
