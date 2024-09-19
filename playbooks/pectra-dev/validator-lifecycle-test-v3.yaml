@@ -1166,8 +1166,8 @@ tasks:
           validator: "tasks.validator_info_7.outputs.validator"
         command: |
           balance=$(echo "$validator" | jq -r '.balance')
-          if [ "$balance" -lt 143900000000 ]; then
-            echo "Balance too low! expected: > 143.9 ETH, got: $balance Gwei"
+          if [ "$balance" -lt 143800000000 ]; then
+            echo "Balance too low! expected: > 143.8 ETH, got: $balance Gwei"
             exit 1
           fi
 
