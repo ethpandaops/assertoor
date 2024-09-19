@@ -75,7 +75,7 @@ type TaskStatus struct {
 	StopTime    time.Time
 	Result      TaskResult
 	Error       error
-	Logger      *logger.LogScope
+	Logger      logger.LogReader
 }
 
 type TaskContext struct {

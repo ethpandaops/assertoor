@@ -2,8 +2,9 @@ package logger
 
 import (
 	"io"
-	"sync"
+	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/sirupsen/logrus"
 )
 
@@ -12,22 +13,20 @@ type LogScope struct {
 	logger       *logrus.Logger
 	parentLogger *logrus.Logger
 	parentFields logrus.Fields
-
-	bufIdx uint64
-	bufMtx sync.Mutex
-	buf    []*logrus.Entry
+	dbWriter     *logDBWriter
+	memBuffer    *logMemBuffer
 }
 
 type ScopeOptions struct {
-	Parent      logrus.FieldLogger
-	HistorySize uint64
+	Parent     logrus.FieldLogger
+	BufferSize uint64
+	FlushDelay time.Duration
+	Database   *db.Database
+	TestRunID  uint64
+	TaskID     uint64
 }
 
 type logForwarder struct {
-	logger *LogScope
-}
-
-type logHistory struct {
 	logger *LogScope
 }
 
@@ -36,10 +35,13 @@ func NewLogger(options *ScopeOptions) *LogScope {
 		options = &ScopeOptions{}
 	}
 
+	if options.BufferSize == 0 {
+		options.BufferSize = 100
+	}
+
 	logger := &LogScope{
 		options: options,
 		logger:  logrus.New(),
-		buf:     []*logrus.Entry{},
 	}
 
 	logger.logger.SetOutput(io.Discard)
@@ -54,10 +56,12 @@ func NewLogger(options *ScopeOptions) *LogScope {
 		})
 	}
 
-	if options.HistorySize > 0 {
-		logger.logger.AddHook(&logHistory{
-			logger: logger,
-		})
+	if options.Database != nil {
+		logger.dbWriter = newLogDBWriter(logger, options.BufferSize, options.FlushDelay)
+		logger.logger.AddHook(logger.dbWriter)
+	} else {
+		logger.memBuffer = newLogMemBuffer(logger, options.BufferSize)
+		logger.logger.AddHook(logger.memBuffer)
 	}
 
 	return logger
@@ -76,58 +80,36 @@ func (lf *logForwarder) Fire(entry *logrus.Entry) error {
 	return nil
 }
 
-func (lh *logHistory) Levels() []logrus.Level {
-	return logrus.AllLevels
-}
-
-func (lh *logHistory) Fire(entry *logrus.Entry) error {
-	lh.logger.bufMtx.Lock()
-	defer lh.logger.bufMtx.Unlock()
-
-	if lh.logger.bufIdx >= lh.logger.options.HistorySize {
-		bufIdx := lh.logger.bufIdx % lh.logger.options.HistorySize
-		lh.logger.buf[bufIdx] = entry
-	} else {
-		lh.logger.buf = append(lh.logger.buf, entry)
-	}
-
-	lh.logger.bufIdx++
-
-	return nil
-}
-
 func (ls *LogScope) GetLogger() *logrus.Logger {
 	return ls.logger
 }
 
-func (ls *LogScope) GetLogEntries() []*logrus.Entry {
-	ls.bufMtx.Lock()
-	defer ls.bufMtx.Unlock()
-
-	var entries []*logrus.Entry
-
-	if ls.bufIdx >= ls.options.HistorySize {
-		entries = make([]*logrus.Entry, ls.options.HistorySize)
-		firstIdx := ls.bufIdx % ls.options.HistorySize
-
-		copy(entries, ls.buf[firstIdx:])
-		copy(entries[ls.options.HistorySize-firstIdx:], ls.buf[0:firstIdx])
-	} else {
-		entries = make([]*logrus.Entry, ls.bufIdx)
-		copy(entries, ls.buf)
+func (ls *LogScope) Flush() {
+	if ls.dbWriter != nil {
+		ls.dbWriter.flushToDB()
 	}
-
-	return entries
 }
 
-func (ls *LogScope) GetLogEntriesSince(since int64) []*logrus.Entry {
-	entries := ls.GetLogEntries()
-
-	for idx, entry := range entries {
-		if entry.Time.UnixNano() > since {
-			return entries[idx:]
-		}
+func (ls *LogScope) GetLogEntryCount() int {
+	if ls.memBuffer != nil {
+		return ls.memBuffer.GetLogEntryCount()
 	}
 
-	return []*logrus.Entry{}
+	if ls.dbWriter != nil {
+		return ls.dbWriter.GetLogEntryCount()
+	}
+
+	return 0
+}
+
+func (ls *LogScope) GetLogEntries(from, limit int) []*db.TaskLog {
+	if ls.memBuffer != nil {
+		return ls.memBuffer.GetLogEntries(from, limit)
+	}
+
+	if ls.dbWriter != nil {
+		return ls.dbWriter.GetLogEntries(from, limit)
+	}
+
+	return nil
 }

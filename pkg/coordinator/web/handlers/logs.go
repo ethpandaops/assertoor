@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
 
 type Logs struct {
@@ -55,21 +56,23 @@ func (fh *FrontendHandler) LogsData(w http.ResponseWriter, r *http.Request) {
 func (fh *FrontendHandler) getLogsPageData(since int64) *Logs {
 	pageData := &Logs{}
 
-	taskLog := fh.coordinator.LogScope().GetLogEntriesSince(since)
+	taskLog := fh.coordinator.LogReader().GetLogEntries(int(since), 0)
 	pageData.Log = make([]*LogsEntry, len(taskLog))
 
 	for i, log := range taskLog {
 		logData := &LogsEntry{
-			TIdx:    log.Time.UnixNano(),
-			Time:    log.Time,
-			Level:   uint64(log.Level),
-			Message: log.Message,
+			TIdx:    int64(log.LogIndex),
+			Time:    time.Unix(0, log.LogTime*int64(time.Millisecond)),
+			Level:   uint64(log.LogLevel),
+			Message: log.LogMessage,
 			Data:    map[string]string{},
-			DataLen: uint64(len(log.Data)),
 		}
 
-		for dataKey, dataVal := range log.Data {
-			logData.Data[dataKey] = fmt.Sprintf("%v", dataVal)
+		if log.LogFields != "" {
+			err := yaml.Unmarshal([]byte(log.LogFields), &logData.Data)
+			if err == nil {
+				logData.DataLen = uint64(len(logData.Data))
+			}
 		}
 
 		pageData.Log[i] = logData

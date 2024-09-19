@@ -30,10 +30,20 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 	taskState.taskStatusVars.SetVar("started", true)
 	taskState.taskStatusVars.SetVar("running", true)
 
+	if err := taskState.updateTaskState(); err != nil {
+		taskLogger.Errorf("task state update on db failed: %v", err)
+	}
+
 	defer func() {
 		taskState.isRunning = false
 		taskState.stopTime = time.Now()
 		taskState.taskStatusVars.SetVar("running", false)
+
+		if err := taskState.updateTaskState(); err != nil {
+			taskLogger.Errorf("task state update on db failed: %v", err)
+		}
+
+		taskState.logger.Flush()
 	}()
 
 	// check task condition if defined

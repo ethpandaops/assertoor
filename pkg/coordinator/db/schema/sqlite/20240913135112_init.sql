@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS "task_states"
     "task_config" TEXT NOT NULL,
     "task_status" TEXT NOT NULL,
     "task_result" INTEGER NOT NULL,
+    "task_error" TEXT NOT NULL,
     CONSTRAINT "task_states_pkey" PRIMARY KEY ("run_id", "task_id")
 );
 
@@ -60,11 +61,12 @@ CREATE TABLE IF NOT EXISTS "task_logs"
 (
     "run_id" INTEGER NOT NULL,
     "task_id" INTEGER NOT NULL,
+    "log_idx" INTEGER NOT NULL,
     "log_time" INTEGER NOT NULL,
-    "log_level" TEXT NOT NULL,
+    "log_level" INTEGER NOT NULL,
     "log_fields" TEXT NOT NULL,
     "log_message" TEXT NOT NULL,
-    CONSTRAINT "task_logs_pkey" PRIMARY KEY ("run_id", "task_id", "log_time")
+    CONSTRAINT "task_logs_pkey" PRIMARY KEY ("run_id", "task_id", "log_idx")
 );
 
 -- +goose StatementEnd

@@ -69,8 +69,8 @@ type testDescriptorEntry struct {
 func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Coordinator {
 	return &Coordinator{
 		log: logger.NewLogger(&logger.ScopeOptions{
-			Parent:      log,
-			HistorySize: 5000,
+			Parent:     log,
+			BufferSize: 5000,
 		}),
 		Config:      config,
 		metricsPort: metricsPort,
@@ -215,7 +215,7 @@ func (c *Coordinator) Logger() logrus.FieldLogger {
 	return c.log.GetLogger()
 }
 
-func (c *Coordinator) LogScope() *logger.LogScope {
+func (c *Coordinator) LogReader() logger.LogReader {
 	return c.log
 }
 
@@ -619,7 +619,6 @@ runLoop:
 		c.testRegistryMutex.Unlock()
 
 		if nextTest != nil {
-
 			// run next test
 			testFunc := func(nextTest types.TestRunner) {
 				defer func() {

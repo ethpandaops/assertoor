@@ -13,7 +13,7 @@ import (
 
 type Coordinator interface {
 	Logger() logrus.FieldLogger
-	LogScope() *logger.LogScope
+	LogReader() logger.LogReader
 	Database() *db.Database
 	ClientPool() *clients.ClientPool
 	WalletManager() *wallet.Manager

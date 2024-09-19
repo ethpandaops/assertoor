@@ -243,20 +243,30 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 			}
 
 			if !fh.securityTrimmed {
-				taskLog := taskStatus.Logger.GetLogEntries()
+				logCount := taskStatus.Logger.GetLogEntryCount()
+				logStart := 0
+				logLimit := 100
+
+				if logCount > logLimit {
+					logStart = logCount - logLimit
+				}
+
+				taskLog := taskStatus.Logger.GetLogEntries(logStart, logLimit)
 				taskData.Log = make([]*TestRunTaskLog, len(taskLog))
 
 				for i, log := range taskLog {
 					logData := &TestRunTaskLog{
-						Time:    log.Time,
-						Level:   uint64(log.Level),
-						Message: log.Message,
+						Time:    time.Unix(0, log.LogTime*int64(time.Millisecond)),
+						Level:   uint64(log.LogLevel),
+						Message: log.LogMessage,
 						Data:    map[string]string{},
-						DataLen: uint64(len(log.Data)),
 					}
 
-					for dataKey, dataVal := range log.Data {
-						logData.Data[dataKey] = fmt.Sprintf("%v", dataVal)
+					if log.LogFields != "" {
+						err := yaml.Unmarshal([]byte(log.LogFields), &logData.Data)
+						if err == nil {
+							logData.DataLen = uint64(len(logData.Data))
+						}
 					}
 
 					taskData.Log[i] = logData

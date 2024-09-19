@@ -112,17 +112,17 @@ func (t *Test) updateTestStatus() error {
 	if t.startTime.IsZero() {
 		t.dbTestRun.StartTime = 0
 	} else {
-		t.dbTestRun.StartTime = t.startTime.Unix()
+		t.dbTestRun.StartTime = t.startTime.UnixMilli()
 	}
 
 	if t.stopTime.IsZero() {
 		t.dbTestRun.StopTime = 0
 	} else {
-		t.dbTestRun.StopTime = t.stopTime.Unix()
+		t.dbTestRun.StopTime = t.stopTime.UnixMilli()
 	}
 
 	if err := t.services.Database().RunTransaction(func(tx *sqlx.Tx) error {
-		return t.services.Database().InsertTestRun(tx, t.dbTestRun)
+		return t.services.Database().UpdateTestRunStatus(tx, t.dbTestRun)
 	}); err != nil {
 		return err
 	}
