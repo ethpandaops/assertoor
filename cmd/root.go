@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"os"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
@@ -62,13 +61,8 @@ var (
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute(ctx context.Context) {
-	err := rootCmd.ExecuteContext(ctx)
-	if err != nil {
-		os.Exit(1)
-	}
-
-	os.Exit(0)
+func Execute(ctx context.Context) error {
+	return rootCmd.ExecuteContext(ctx)
 }
 
 func init() {
