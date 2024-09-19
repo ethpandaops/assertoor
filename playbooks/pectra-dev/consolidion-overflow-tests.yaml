@@ -42,12 +42,12 @@ tasks:
   # generate deposits & wait for activation
   - name: run_tasks
     title: "Generate 32 ETH deposit & track inclusion"
-    id: validator_32_eth_deposit
     config:
       stopChildOnResult: false
       tasks:
         - name: generate_deposits
           title: "Generate 1 deposits with 32 ETH"
+          id: validator_32_eth_deposit
           config:
             limitTotal: 1
             limitPerSlot: 1
@@ -63,12 +63,12 @@ tasks:
 
   - name: run_tasks
     title: "Generate 2048 ETH deposit & track inclusion"
-    id: validator_2048_eth_deposit
     config:
       stopChildOnResult: false
       tasks:
         - name: generate_deposits
           title: "Generate 1 deposits with 2048 ETH"
+          id: validator_2048_eth_deposit
           config:
             limitTotal: 1
             limitPerSlot: 1
