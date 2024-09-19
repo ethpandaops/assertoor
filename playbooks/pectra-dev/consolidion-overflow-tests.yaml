@@ -8,7 +8,7 @@ config:
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
   sourceValidatorIndex: 100
   targetValidatorIndex: 200
-  consolidationWaitSlot: 60
+  depositWaitSlot: 34
 tasks:
   - name: check_clients_are_healthy
     title: "Check if at least one client is ready"
@@ -17,10 +17,10 @@ tasks:
       minClientCount: 1
 
   - name: check_consensus_slot_range
-    title: "Wait for slot >= 34"
+    title: "Wait for slot >= ${depositWaitSlot}"
     timeout: 30m
     configVars:
-      minSlotNumber: "34"
+      minSlotNumber: "depositWaitSlot"
 
   - name: generate_random_mnemonic
     title: "Generate random mnemonic"
@@ -84,10 +84,19 @@ tasks:
             withdrawalCredentials: "| \"0x020000000000000000000000\" + (.targetAddress | capture(\"(0x)?(?<addr>.+)\").addr)"
 
   - name: check_consensus_validator_status
-    title: "Wait for validator to completely exit (${sourceValidatorIndex})"
+    title: "Wait for validator to completely be active"
     timeout: 150m
     config:
       validatorStatus:
         - active_ongoing
     configVars:
-      validatorIndex: "tasks.validator_32_eth_deposit.outputs.validatorPubkeys[0]"
+      validatorPubKey: "tasks.validator_32_eth_deposit.outputs.validatorPubkeys[0]"
+
+  - name: check_consensus_validator_status
+    title: "Wait for validator to completely be active"
+    timeout: 150m
+    config:
+      validatorStatus:
+        - active_ongoing
+    configVars:
+      validatorPubKey: "tasks.validator_2048_eth_deposit.outputs.validatorPubkeys[0]"
