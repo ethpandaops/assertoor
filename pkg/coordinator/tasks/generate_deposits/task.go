@@ -297,7 +297,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 	}
 
 	if validator != nil {
-		return nil, nil, fmt.Errorf("validator already exists on chain")
+		t.logger.Warnf("validator already exists on chain (index: %v)", validator.Index)
 	}
 
 	var pub common.BLSPubkey

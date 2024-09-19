@@ -6,7 +6,7 @@ RUN go mod download
 COPY . .
 RUN make build
 
-FROM ubuntu:latest  
+FROM ubuntu:latest
 RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
   libssl-dev \
   ca-certificates \

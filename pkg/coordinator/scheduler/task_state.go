@@ -84,6 +84,9 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 	}
 
 	// create task state
+	ts.taskStateMutex.Lock()
+	defer ts.taskStateMutex.Unlock()
+
 	taskIdx := ts.taskCount
 	taskState := &taskState{
 		index:       taskIdx,
@@ -114,8 +117,6 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 
 	ts.taskCount++
 
-	// create internal execution state
-	ts.taskStateMutex.Lock()
 	ts.taskStateMap[taskIdx] = taskState
 
 	if isCleanupTask {
@@ -123,7 +124,6 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 	} else {
 		ts.allTasks = append(ts.allTasks, taskIdx)
 	}
-	ts.taskStateMutex.Unlock()
 
 	// add to database
 	if database := ts.services.Database(); database != nil {
