@@ -1,0 +1,89 @@
+id: consolidation_overflow_tests
+name: "consolidation overflow test"
+timeout: 672h
+config:
+  #walletPrivkey: ""
+  depositContract: "0x4242424242424242424242424242424242424242"
+  targetAddress: "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA"
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  sourceValidatorIndex: 100
+  targetValidatorIndex: 200
+  consolidationWaitSlot: 60
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  - name: generate_random_mnemonic
+    title: "Generate random mnemonic"
+    config:
+      mnemonicResultVar: "validatorMnemonic"
+  - name: generate_child_wallet
+    title: "Generate wallet for lifecycle test"
+    config:
+      prefundMinBalance: 5001000000000000000000 # ensure 5001 ETH
+      walletAddressResultVar: "depositorAddress"
+      walletPrivateKeyResultVar: "depositorPrivateKey"
+    configVars:
+      privateKey: "walletPrivkey"
+  - name: sleep
+    title: "wait for child wallet availablility"
+    config:
+      duration: 12s # wait 1 slot to ensure all ELs have the proper child wallet balance
+
+  # generate deposits & wait for activation
+  - name: run_tasks
+    title: "Generate 32 ETH deposit & track inclusion"
+    id: validator_32_eth_deposit
+    config:
+      stopChildOnResult: false
+      tasks:
+        - name: generate_deposits
+          title: "Generate 1 deposits with 32 ETH"
+          config:
+            limitTotal: 1
+            limitPerSlot: 1
+            limitPending: 1
+            depositAmount: 32
+            awaitReceipt: true
+            failOnReject: true
+            validatorPubkeysResultVar: "validatorPubkeys"
+          configVars:
+            walletPrivkey: "depositorPrivateKey"
+            mnemonic: "validatorMnemonic"
+            depositContract: "depositContract"
+            withdrawalCredentials: "| \"0x020000000000000000000000\" + (.targetAddress | capture(\"(0x)?(?<addr>.+)\").addr)"
+
+  - name: run_tasks
+    title: "Generate 2048 ETH deposit & track inclusion"
+    id: validator_2048_eth_deposit
+    config:
+      stopChildOnResult: false
+      tasks:
+        - name: generate_deposits
+          title: "Generate 1 deposits with 2048 ETH"
+          config:
+            limitTotal: 1
+            limitPerSlot: 1
+            limitPending: 1
+            depositAmount: 2048
+            startIndex: 1
+            awaitReceipt: true
+            failOnReject: true
+            validatorPubkeysResultVar: "validatorPubkeys"
+          configVars:
+            walletPrivkey: "depositorPrivateKey"
+            mnemonic: "validatorMnemonic"
+            depositContract: "depositContract"
+            withdrawalCredentials: "| \"0x020000000000000000000000\" + (.targetAddress | capture(\"(0x)?(?<addr>.+)\").addr)"
+
+  - name: check_consensus_validator_status
+    title: "Wait for validator to completely exit (${sourceValidatorIndex})"
+    timeout: 150m
+    config:
+      validatorStatus:
+        - active_ongoing
+    configVars:
+      validatorIndex: "tasks.validator_32_eth_deposit.outputs.validatorPubkeysResultVar"

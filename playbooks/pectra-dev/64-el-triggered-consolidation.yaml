@@ -48,30 +48,42 @@ tasks:
   title: "Generate consolidations"
   timeout: 3h
   config:
-    stopChildOnResult: false
     tasks:
-      - name: generate_consolidations
-        title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
-        timeout: 5m
+      - name: run_task_options
+        title: "Generate consolidation"
         config:
-          failOnReject: true
-          awaitReceipt: true
-        configVars:
-          sourceIndexCount: "consolidationNumber"
-          walletPrivkey: "walletPrivkey"
-          sourceStartValidatorIndex: "sourceValidatorIndex"
-          targetValidatorIndex: "targetValidatorIndex"
+          task:
+            name: generate_consolidations
+            title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
+            timeout: 5m
+            config:
+              failOnReject: true
+              awaitReceipt: true
+            configVars:
+              sourceIndexCount: "consolidationNumber"
+              walletPrivkey: "walletPrivkey"
+              sourceStartValidatorIndex: "sourceValidatorIndex"
+              targetValidatorIndex: "targetValidatorIndex"
 
       - name: check_consensus_validator_status
         title: "Wait for validator to completely exit (${sourceValidatorIndex})"
         timeout: 150m
-        id: target_validator_info
         config:
           validatorStatus:
             - withdrawal_done
             - withdrawal_possible
         configVars:
           validatorIndex: "sourceValidatorIndex + .consolidationNumber - 1"
+
+      - name: check_consensus_validator_status
+        title: "Fetch the data for the target validator  (${targetValidatorIndex})"
+        timeout: 5m
+        id: target_validator_info
+        config:
+          validatorStatus:
+            - active_ongoing
+        configVars:
+          validatorIndex: "targetValidatorIndex"
 
       - name: run_shell
         timeout: 5m
