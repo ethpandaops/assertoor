@@ -61,7 +61,7 @@ type TaskState interface {
 	Timeout() time.Duration
 	GetTaskStatus() *TaskStatus
 	GetTaskStatusVars() Variables
-	GetTaskVars() Variables
+	GetScopeOwner() TaskIndex
 	GetTaskResultUpdateChan(oldResult TaskResult) <-chan bool
 }
 

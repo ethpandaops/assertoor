@@ -2,24 +2,24 @@ package logger
 
 import "github.com/ethpandaops/assertoor/pkg/coordinator/db"
 
-type LogDBReader struct {
+type logDBReader struct {
 	database  *db.Database
-	testRunID uint64
-	taskID    uint64
+	testRunID int
+	taskID    int
 	lastIdx   *int
 }
 
-func NewLogDBReader(database *db.Database, testRunID, taskID uint64) *LogDBReader {
-	return &LogDBReader{
+func NewLogDBReader(database *db.Database, testRunID, taskID int) LogReader {
+	return &logDBReader{
 		database:  database,
 		testRunID: testRunID,
 		taskID:    taskID,
 	}
 }
 
-func (ls *LogDBReader) GetLogEntryCount() int {
+func (ls *logDBReader) GetLogEntryCount() int {
 	if ls.lastIdx == nil {
-		lastIdx, err := ls.database.GetLastLogIndex(int(ls.testRunID), int(ls.taskID))
+		lastIdx, err := ls.database.GetLastLogIndex(ls.testRunID, ls.taskID)
 		if err != nil {
 			return 0
 		}
@@ -34,8 +34,8 @@ func (ls *LogDBReader) GetLogEntryCount() int {
 	return *ls.lastIdx
 }
 
-func (ls *LogDBReader) GetLogEntries(from, limit int) []*db.TaskLog {
-	dbEntries, err := ls.database.GetTaskLogs(int(ls.testRunID), int(ls.taskID), from, limit)
+func (ls *logDBReader) GetLogEntries(from, limit int) []*db.TaskLog {
+	dbEntries, err := ls.database.GetTaskLogs(ls.testRunID, ls.taskID, from, limit)
 	if err != nil {
 		return nil
 	}

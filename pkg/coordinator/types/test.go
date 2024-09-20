@@ -23,6 +23,7 @@ type TestRunner interface {
 	Test
 	Validate() error
 	Run(ctx context.Context) error
+	Logger() logrus.FieldLogger
 	GetTestVariables() Variables
 }
 
@@ -34,7 +35,6 @@ type Test interface {
 	StopTime() time.Time
 	Timeout() time.Duration
 	Status() TestStatus
-	Logger() logrus.FieldLogger
 	GetTaskScheduler() TaskScheduler
 	AbortTest(skipCleanup bool)
 }

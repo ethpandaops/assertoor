@@ -294,11 +294,9 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 					refComment := ""
 
 					if taskState.ID() != "" {
-						scopeOwner := taskState.GetTaskVars().GetVar("scopeOwner")
-						if scopeOwner != nil {
-							scopeOwner = fmt.Sprintf("task %v", scopeOwner)
-						} else {
-							scopeOwner = "root"
+						scopeOwner := "root"
+						if scopeOwnerID := taskState.GetScopeOwner(); scopeOwnerID != 0 {
+							scopeOwner = fmt.Sprintf("task %v", scopeOwnerID)
 						}
 
 						refComment = fmt.Sprintf("# available from %v scope via `tasks.%v`:\n", scopeOwner, taskState.ID())

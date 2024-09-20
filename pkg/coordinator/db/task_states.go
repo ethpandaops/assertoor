@@ -7,82 +7,71 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-/*
-CREATE TABLE IF NOT EXISTS public."task_states"
-(
-
-	"run_id" INTEGER NOT NULL,
-	"task_id" INTEGER NOT NULL,
-	"options" TEXT NOT NULL,
-	"parent_task" INTEGER NOT NULL,
-	"is_cleanup" BOOLEAN NOT NULL,
-	"is_started" BOOLEAN NOT NULL,
-	"is_running" BOOLEAN NOT NULL,
-	"is_skipped" BOOLEAN NOT NULL,
-	"is_timeout" BOOLEAN NOT NULL,
-	"start_time" BIGINT NOT NULL,
-	"stop_time" BIGINT NOT NULL,
-	"task_config" TEXT NOT NULL,
-	"task_status" TEXT NOT NULL,
-	"task_result" INTEGER NOT NULL,
-	CONSTRAINT "task_states_pkey" PRIMARY KEY ("run_id", "task_id")
-
-);
-*/
 type TaskState struct {
 	RunID      int    `db:"run_id"`
 	TaskID     int    `db:"task_id"`
 	ParentTask int    `db:"parent_task"`
 	Name       string `db:"name"`
 	Title      string `db:"title"`
+	RefID      string `db:"ref_id"`
 	Timeout    int    `db:"timeout"`
 	IfCond     string `db:"ifcond"`
-	IsCleanup  bool   `db:"is_cleanup"`
-	IsStarted  bool   `db:"is_started"`
-	IsRunning  bool   `db:"is_running"`
-	IsSkipped  bool   `db:"is_skipped"`
-	IsTimeout  bool   `db:"is_timeout"`
+	RunFlags   uint32 `db:"run_flags"`
 	StartTime  int64  `db:"start_time"`
 	StopTime   int64  `db:"stop_time"`
+	ScopeOwner int    `db:"scope_owner"`
 	TaskConfig string `db:"task_config"`
 	TaskStatus string `db:"task_status"`
 	TaskResult int    `db:"task_result"`
 	TaskError  string `db:"task_error"`
 }
 
+type TaskStateIndex struct {
+	TaskID     int    `db:"task_id"`
+	ParentTask int    `db:"parent_task"`
+	RunFlags   uint32 `db:"run_flags"`
+}
+
+var (
+	TaskRunFlagCleanup uint32 = 0x01
+	TaskRunFlagStarted uint32 = 0x02
+	TaskRunFlagRunning uint32 = 0x04
+	TaskRunFlagSkipped uint32 = 0x08
+	TaskRunFlagTimeout uint32 = 0x10
+)
+
+// InsertTaskState inserts a task state into the database.
 func (db *Database) InsertTaskState(tx *sqlx.Tx, state *TaskState) error {
 	_, err := tx.Exec(db.EngineQuery(map[EngineType]string{
 		EnginePgsql: `
 			INSERT INTO task_states (
-				run_id, task_id, parent_task, name, title, timeout, ifcond, is_cleanup, is_started, is_running, is_skipped, is_timeout, 
-				start_time, stop_time, task_config, task_status, task_result, task_error
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+				run_id, task_id, parent_task, name, title, ref_id, timeout, ifcond, run_flags, 
+				start_time, stop_time, scope_owner, task_config, task_status, task_result, task_error
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 			ON CONFLICT (run_id, task_id) DO UPDATE SET
 				parent_task = excluded.parent_task,
 				name = excluded.name,
 				title = excluded.title,
+				ref_id = excluded.ref_id,
 				timeout = excluded.timeout,
 				ifcond = excluded.ifcond,
-				is_cleanup = excluded.is_cleanup,
-				is_started = excluded.is_started,
-				is_running = excluded.is_running,
-				is_skipped = excluded.is_skipped,
-				is_timeout = excluded.is_timeout,
+				run_flags = excluded.run_flags,
 				start_time = excluded.start_time,
 				stop_time = excluded.stop_time,
+				scope_owner = excluded.scope_owner,
 				task_config = excluded.task_config,
 				task_status = excluded.task_status,
 				task_result = excluded.task_result,
 				task_error = excluded.task_error`,
 		EngineSqlite: `
 			INSERT OR REPLACE INTO task_states (
-				run_id, task_id, parent_task, name, title, timeout, ifcond, is_cleanup, is_started, is_running, is_skipped, is_timeout, 
-				start_time, stop_time, task_config, task_status, task_result, task_error
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+				run_id, task_id, parent_task, name, title, ref_id, timeout, ifcond, run_flags, 
+				start_time, stop_time, scope_owner, task_config, task_status, task_result, task_error
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
 	}),
-		state.RunID, state.TaskID, state.ParentTask, state.Name, state.Title, state.Timeout, state.IfCond, state.IsCleanup, state.IsStarted, state.IsRunning,
-		state.IsSkipped, state.IsTimeout, state.StartTime, state.StopTime, state.TaskConfig, state.TaskStatus,
-		state.TaskResult, state.TaskError)
+		state.RunID, state.TaskID, state.ParentTask, state.Name, state.Title, state.RefID, state.Timeout,
+		state.IfCond, state.RunFlags, state.StartTime, state.StopTime, state.ScopeOwner, state.TaskConfig,
+		state.TaskStatus, state.TaskResult, state.TaskError)
 	if err != nil {
 		return err
 	}
@@ -90,7 +79,8 @@ func (db *Database) InsertTaskState(tx *sqlx.Tx, state *TaskState) error {
 	return nil
 }
 
-func (db *Database) UpdateTaskState(tx *sqlx.Tx, state *TaskState, updateFields []string) error {
+// UpdateTaskStateStatus updates the status fields of a task state.
+func (db *Database) UpdateTaskStateStatus(tx *sqlx.Tx, state *TaskState, updateFields []string) error {
 	var sql strings.Builder
 
 	args := []any{}
@@ -106,18 +96,9 @@ func (db *Database) UpdateTaskState(tx *sqlx.Tx, state *TaskState, updateFields 
 		case "title":
 			fmt.Fprintf(&sql, `title = $%v`, len(args)+1)
 			args = append(args, state.Title)
-		case "is_started":
-			fmt.Fprintf(&sql, `is_started = $%v`, len(args)+1)
-			args = append(args, state.IsStarted)
-		case "is_running":
-			fmt.Fprintf(&sql, `is_running = $%v`, len(args)+1)
-			args = append(args, state.IsRunning)
-		case "is_skipped":
-			fmt.Fprintf(&sql, `is_skipped = $%v`, len(args)+1)
-			args = append(args, state.IsSkipped)
-		case "is_timeout":
-			fmt.Fprintf(&sql, `is_timeout = $%v`, len(args)+1)
-			args = append(args, state.IsTimeout)
+		case "run_flags":
+			fmt.Fprintf(&sql, `run_flags = $%v`, len(args)+1)
+			args = append(args, state.RunFlags)
 		case "start_time":
 			fmt.Fprintf(&sql, `start_time = $%v`, len(args)+1)
 			args = append(args, state.StartTime)
@@ -150,4 +131,36 @@ func (db *Database) UpdateTaskState(tx *sqlx.Tx, state *TaskState, updateFields 
 	}
 
 	return nil
+}
+
+// GetTaskStateIndex returns the task index for a given test run.
+func (db *Database) GetTaskStateIndex(runID int) ([]*TaskStateIndex, error) {
+	var states []*TaskStateIndex
+
+	err := db.reader.Select(&states, `
+		SELECT task_id, parent_task, run_flags
+		FROM task_states
+		WHERE run_id = $1
+		ORDER BY task_id ASC`,
+		runID)
+	if err != nil {
+		return nil, err
+	}
+
+	return states, nil
+}
+
+// GetTaskStateByTaskID returns a task state by task ID.
+func (db *Database) GetTaskStateByTaskID(runID, taskID int) (*TaskState, error) {
+	var state TaskState
+
+	err := db.reader.Get(&state, `
+		SELECT * FROM task_states
+		WHERE run_id = $1 AND task_id = $2`,
+		runID, taskID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &state, nil
 }

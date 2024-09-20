@@ -69,3 +69,33 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	runtasksconcurrent.TaskDescriptor,
 	sleep.TaskDescriptor,
 }
+
+func GetTaskDescriptor(name string) *types.TaskDescriptor {
+	// lookup task descriptor by name
+	var taskDescriptor *types.TaskDescriptor
+
+	for _, taskDesc := range AvailableTaskDescriptors {
+		if taskDesc.Name == name {
+			taskDescriptor = taskDesc
+			break
+		}
+
+		if len(taskDesc.Aliases) > 0 {
+			isAlias := false
+
+			for _, alias := range taskDesc.Aliases {
+				if alias == name {
+					isAlias = true
+					break
+				}
+			}
+
+			if isAlias {
+				taskDescriptor = taskDesc
+				break
+			}
+		}
+	}
+
+	return taskDescriptor
+}

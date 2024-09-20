@@ -56,7 +56,6 @@ type Coordinator struct {
 
 	testRunMap           map[uint64]types.Test
 	testQueue            []types.TestRunner
-	testHistory          []types.Test
 	testRegistryMutex    sync.RWMutex
 	testNotificationChan chan bool
 }
@@ -78,7 +77,6 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Co
 		testDescriptors:      map[string]testDescriptorEntry{},
 		testRunMap:           map[uint64]types.Test{},
 		testQueue:            []types.TestRunner{},
-		testHistory:          []types.Test{},
 		testNotificationChan: make(chan bool, 1),
 	}
 }
@@ -530,13 +528,7 @@ func (c *Coordinator) GetTestQueue() []types.Test {
 }
 
 func (c *Coordinator) GetTestHistory() []types.Test {
-	c.testRegistryMutex.RLock()
-	defer c.testRegistryMutex.RUnlock()
-
-	tests := make([]types.Test, len(c.testHistory))
-	copy(tests, c.testHistory)
-
-	return tests
+	return nil
 }
 
 func (c *Coordinator) startMetrics() error {
@@ -614,7 +606,6 @@ runLoop:
 		if len(c.testQueue) > 0 {
 			nextTest = c.testQueue[0]
 			c.testQueue = c.testQueue[1:]
-			c.testHistory = append(c.testHistory, nextTest)
 		}
 		c.testRegistryMutex.Unlock()
 
@@ -787,21 +778,7 @@ func (c *Coordinator) runTestCleanup(ctx context.Context) {
 }
 
 func (c *Coordinator) cleanupTestHistory(retentionTime time.Duration) {
-	c.testRegistryMutex.Lock()
-	defer c.testRegistryMutex.Unlock()
-
-	cleanedHistory := []types.Test{}
-
-	for _, test := range c.testHistory {
-		if test.Status() != types.TestStatusPending && test.StartTime().Add(retentionTime).Compare(time.Now()) == -1 {
-			test.Logger().Infof("cleanup test")
-			continue
-		}
-
-		cleanedHistory = append(cleanedHistory, test)
-	}
-
-	c.testHistory = cleanedHistory
+	// TODO: clean db
 }
 
 func (c *Coordinator) runEpochGC(ctx context.Context) {

@@ -13,6 +13,7 @@ type TestConfig struct {
 	ScheduleCronYaml string `db:"schedule_cron_yaml"`
 }
 
+// InsertTestConfig inserts a test config into the database.
 func (db *Database) InsertTestConfig(tx *sqlx.Tx, config *TestConfig) error {
 	_, err := tx.Exec(db.EngineQuery(map[EngineType]string{
 		EnginePgsql: `
@@ -41,6 +42,7 @@ func (db *Database) InsertTestConfig(tx *sqlx.Tx, config *TestConfig) error {
 	return nil
 }
 
+// GetTestConfigs returns all test configs.
 func (db *Database) GetTestConfigs() ([]*TestConfig, error) {
 	var configs []*TestConfig
 
