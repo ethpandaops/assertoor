@@ -23,6 +23,9 @@ The `generate_deposits` task focuses on creating deposit transactions and sendin
 - **`indexCount`**:\
   The total number of validator keys to generate from the mnemonic. This number determines how many unique deposit transactions will be created.
 
+- **`publicKey`**\
+  The publickey of the validator to generate a deposit for. This is for topup deposits only.
+
 - **`walletPrivkey`**:\
   The private key of the wallet from which the deposit will be made. This key is crucial for initiating the deposit transaction.
 
@@ -40,6 +43,9 @@ The `generate_deposits` task focuses on creating deposit transactions and sendin
 
 - **`withdrawalCredentials`**:\
   Specifies the withdrawal credentials for the deposited ETH. If left empty, it defaults to a standard `0x00...` credentials based on the validator mnemonic.
+
+- **`topUpDeposit`**:\
+  Specifies if the deposit should be a topup deposit (without withdrawal credentials or signature)
 
 - **`clientPattern`**:\
   A regex pattern to select specific client endpoints for sending deposit transactions. If left blank, any available endpoint will be used.
@@ -76,12 +82,14 @@ Default settings for the `generate_deposits` task:
     mnemonic: ""
     startIndex: 0
     indexCount: 0
+    publicKey: ""
     walletPrivkey: ""
     depositContract: ""
     depositAmount: 32
     depositTxFeeCap: 100000000000
     depositTxTipCap: 1000000000
     withdrawalCredentials: ""
+    topUpDeposit: false
     clientPattern: ""
     excludeClientPattern: ""
     awaitReceipt: false
