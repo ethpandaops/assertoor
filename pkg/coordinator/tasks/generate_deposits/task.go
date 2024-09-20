@@ -26,6 +26,7 @@ import (
 	"github.com/protolambda/ztyp/tree"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
+	e2types "github.com/wealdtech/go-eth2-types/v2"
 	util "github.com/wealdtech/go-eth2-util"
 
 	depositcontract "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_deposits/deposit_contract"
@@ -90,12 +91,14 @@ func (t *Task) LoadConfig() error {
 		return valerr
 	}
 
-	t.valkeySeed, err = t.mnemonicToSeed(config.Mnemonic)
-	if err != nil {
-		return err
-	}
+	if config.Mnemonic != "" {
+		t.valkeySeed, err = t.mnemonicToSeed(config.Mnemonic)
+		if err != nil {
+			return err
+		}
 
-	t.logger.Infof("validator key seed: 0x%x", t.valkeySeed)
+		t.logger.Infof("validator key seed: 0x%x", t.valkeySeed)
+	}
 
 	t.walletPrivKey, err = crypto.HexToECDSA(config.WalletPrivkey)
 	if err != nil {
@@ -274,20 +277,29 @@ func (t *Task) Execute(ctx context.Context) error {
 
 func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*common.BLSPubkey, *ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
-	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
-	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
-
-	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, validatorKeyPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
-	}
-
 	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
 
-	var validator *v1.Validator
+	var validatorPubkey []byte
 
-	validatorPubkey := validatorPrivkey.PublicKey().Marshal()
-	t.logger.Debugf("generated validator pubkey %v: 0x%x", validatorKeyPath, validatorPubkey)
+	var validatorPrivkey *e2types.BLSPrivateKey
+
+	if t.valkeySeed != nil {
+		validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
+
+		validatorPriv, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, validatorKeyPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
+		}
+
+		validatorPrivkey = validatorPriv
+
+		validatorPubkey = validatorPrivkey.PublicKey().Marshal()
+		t.logger.Debugf("generated validator pubkey %v: 0x%x", validatorKeyPath, validatorPubkey)
+	} else {
+		validatorPubkey = ethcommon.FromHex(t.config.PublicKey)
+	}
+
+	var validator *v1.Validator
 
 	for _, val := range validatorSet {
 		if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
@@ -296,8 +308,10 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		}
 	}
 
-	if validator != nil {
+	if t.valkeySeed != nil && validator != nil {
 		t.logger.Warnf("validator already exists on chain (index: %v)", validator.Index)
+	} else if t.valkeySeed == nil && validator == nil {
+		t.logger.Warnf("validator not found on chain for topup deposit")
 	}
 
 	var pub common.BLSPubkey
@@ -306,7 +320,12 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 
 	copy(pub[:], validatorPubkey)
 
-	if t.config.WithdrawalCredentials == "" {
+	switch {
+	case t.config.TopUpDeposit:
+		withdrCreds = ethcommon.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000")
+	case t.config.WithdrawalCredentials == "":
+		withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
+
 		withdrPrivkey, err2 := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
 		if err2 != nil {
 			return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err2)
@@ -318,7 +337,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		withdrKeyHash := hashing.Hash(withdrPubKey)
 		withdrCreds = withdrKeyHash[:]
 		withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
-	} else {
+	default:
 		withdrCreds = ethcommon.FromHex(t.config.WithdrawalCredentials)
 	}
 
@@ -328,20 +347,23 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		Amount:                common.Gwei(t.config.DepositAmount * 1000000000),
 		Signature:             common.BLSSignature{},
 	}
-	msgRoot := data.ToMessage().HashTreeRoot(tree.GetHashFn())
 
-	var secKey hbls.SecretKey
+	if !t.config.TopUpDeposit {
+		msgRoot := data.ToMessage().HashTreeRoot(tree.GetHashFn())
 
-	err = secKey.Deserialize(validatorPrivkey.Marshal())
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot convert validator priv key")
+		var secKey hbls.SecretKey
+
+		err := secKey.Deserialize(validatorPrivkey.Marshal())
+		if err != nil {
+			return nil, nil, fmt.Errorf("cannot convert validator priv key")
+		}
+
+		genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
+		dom := common.ComputeDomain(common.DOMAIN_DEPOSIT, common.Version(genesis.GenesisForkVersion), common.Root{})
+		msg := common.ComputeSigningRoot(msgRoot, dom)
+		sig := secKey.SignHash(msg[:])
+		copy(data.Signature[:], sig.Serialize())
 	}
-
-	genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
-	dom := common.ComputeDomain(common.DOMAIN_DEPOSIT, common.Version(genesis.GenesisForkVersion), common.Root{})
-	msg := common.ComputeSigningRoot(msgRoot, dom)
-	sig := secKey.SignHash(msg[:])
-	copy(data.Signature[:], sig.Serialize())
 
 	dataRoot := data.HashTreeRoot(tree.GetHashFn())
 
