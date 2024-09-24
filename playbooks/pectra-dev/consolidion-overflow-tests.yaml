@@ -130,28 +130,29 @@ tasks:
   - name: run_tasks
     title: "Check consolidation overflow"
     timeout: 10m
-    tasks:
-    - name: run_shell
-      timeout: 5m
-      title: "Check targetValidator status is indeed at ceiling of MaxEB"
-      config:
-        envVars:
-          validator: "tasks.validator_2048_eth_info.outputs.validator.index | tonumber"
-        command: |
-          balance=$(echo "$validator" | jq -r '.balance')
-          if [ "$balance" -lt 2079900000000 ]; then
-            echo "Balance too low! expected: > 2079.9 ETH, got: $balance Gwei"
-            exit 1
-          fi
-          
-          effective_balance=$(echo "$validator" | jq -r '.validator.effective_balance')
-          if [ "$effective_balance" != "2048000000000" ]; then
-            echo "Effective balance too low! expected: 2048 ETH, got: $effective_balance Gwei"
-            exit 1
-          fi
-          
-          withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
-          if [[ ! "$withdrawal_creds" == "0x02"* ]]; then
-            echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
-            exit 1
-          fi
+    config:
+      tasks:
+        - name: run_shell
+          timeout: 5m
+          title: "Check targetValidator status is indeed at ceiling of MaxEB"
+          config:
+            envVars:
+              validator: "tasks.validator_2048_eth_info.outputs.validator.index | tonumber"
+            command: |
+              balance=$(echo "$validator" | jq -r '.balance')
+              if [ "$balance" -lt 2079900000000 ]; then
+                echo "Balance too low! expected: > 2079.9 ETH, got: $balance Gwei"
+                exit 1
+              fi
+              
+              effective_balance=$(echo "$validator" | jq -r '.validator.effective_balance')
+              if [ "$effective_balance" != "2048000000000" ]; then
+                echo "Effective balance too low! expected: 2048 ETH, got: $effective_balance Gwei"
+                exit 1
+              fi
+              
+              withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
+              if [[ ! "$withdrawal_creds" == "0x02"* ]]; then
+                echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
+                exit 1
+              fi
