@@ -6,8 +6,6 @@ config:
   depositContract: "0x4242424242424242424242424242424242424242"
   targetAddress: "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA"
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
-  sourceValidatorIndex: 100
-  targetValidatorIndex: 200
   depositWaitSlot: 34
 tasks:
   - name: check_clients_are_healthy
@@ -85,6 +83,7 @@ tasks:
 
   - name: check_consensus_validator_status
     title: "Wait for validator to completely be active"
+    id: validator_32_eth_info
     timeout: 150m
     config:
       validatorStatus:
@@ -94,9 +93,56 @@ tasks:
 
   - name: check_consensus_validator_status
     title: "Wait for validator to completely be active"
+    id: validator_2048_eth_info
     timeout: 150m
     config:
       validatorStatus:
         - active_ongoing
     configVars:
       validatorPubKey: "tasks.validator_2048_eth_deposit.outputs.validatorPubkeys[0]"
+
+  - name: generate_consolidations
+    title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
+    timeout: 5m
+    config:
+      failOnReject: true
+      awaitReceipt: true
+      sourceIndexCount: 2
+    configVars:
+      walletPrivkey: "walletPrivkey"
+      sourceStartValidatorIndex: "tasks.validator_32_eth_info.outputs.validator.index | tonumber"
+      targetValidatorIndex: "tasks.validator_2048_eth_info.outputs.validator.index | tonumber"
+
+  - name: check_consensus_validator_status
+    title: "Wait for validator to completely exit (${tasks.validator_32_eth_info.outputs.validator.index | tonumber})"
+    timeout: 150m
+    config:
+      validatorStatus:
+        - withdrawal_done
+    configVars:
+      validatorIndex: "tasks.validator_32_eth_info.outputs.validator.index | tonumber"
+
+  - name: run_shell
+    timeout: 5m
+    title: "Check targetValidator status is indeed at ceiling of MaxEB"
+    config:
+      envVars:
+        validator: "tasks.validator_2048_eth_info.outputs.validator.index | tonumber"
+      command: |
+        balance=$(echo "$validator" | jq -r '.balance')
+        if [ "$balance" -lt 2079900000000 ]; then
+          echo "Balance too low! expected: > 2079.9 ETH, got: $balance Gwei"
+          exit 1
+        fi
+        
+        effective_balance=$(echo "$validator" | jq -r '.validator.effective_balance')
+        if [ "$effective_balance" != "2048000000000" ]; then
+          echo "Effective balance too low! expected: 2048 ETH, got: $effective_balance Gwei"
+          exit 1
+        fi
+        
+        withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
+        if [[ ! "$withdrawal_creds" == "0x02"* ]]; then
+          echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
+          exit 1
+        fi
