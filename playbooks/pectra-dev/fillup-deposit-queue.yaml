@@ -7,6 +7,7 @@ config:
   depositCount: 1010
   depositMaxIndex: 100
   depositContract: "0x4242424242424242424242424242424242424242"
+  walletSeed: ""
 tasks:
 - name: check_clients_are_healthy
   title: "Check if at least one client is ready"
@@ -65,7 +66,7 @@ tasks:
           id: depositor_wallet
           title: "Generate wallet for lifecycle test"
           configVars:
-            walletSeed: "| \"fillup-deposit-queue-\" + (.worker.index | tostring)"
+            walletSeed: "| \"fillup-deposit-queue-\" + .walletSeed + (.worker.index | tostring)"
             prefundMinBalance: "| (.worker.depositCount + 1) * 1000000000000000000"
             privateKey: "walletPrivkey"
         
