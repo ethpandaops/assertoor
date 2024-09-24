@@ -42,7 +42,7 @@ func (fh *FrontendHandler) LogsData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check bounds before converting to int
-	if sinceTime < math.MinInt || sinceTime > math.MaxInt {
+	if sinceTime < math.MinInt32 || sinceTime > math.MaxInt32 {
 		fmt.Printf("timestamp out of int bounds: %v", sinceTime)
 		sinceTime = 0
 	}
