@@ -118,14 +118,14 @@ tasks:
           sourceStartValidatorIndex: "tasks.validator_32_eth_info.outputs.validator.index | tonumber"
           targetValidatorIndex: "tasks.validator_2048_eth_info.outputs.validator.index | tonumber"
 
-      - name: check_consensus_validator_status
-        title: "Wait for validator to completely exit (${tasks.validator_32_eth_info.outputs.validator.index | tonumber})"
-        timeout: 150m
-        config:
-          validatorStatus:
-            - withdrawal_done
-        configVars:
-          validatorIndex: "tasks.validator_32_eth_info.outputs.validator.index | tonumber"
+  - name: check_consensus_validator_status
+    title: "Wait for validator to completely exit (${tasks.validator_32_eth_info.outputs.validator.index | tonumber})"
+    timeout: 150m
+    config:
+      validatorStatus:
+        - withdrawal_done
+    configVars:
+      validatorIndex: "tasks.validator_32_eth_info.outputs.validator.index | tonumber"
 
   - name: run_tasks
     title: "Check consolidation overflow"
