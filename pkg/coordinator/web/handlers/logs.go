@@ -34,16 +34,10 @@ func (fh *FrontendHandler) LogsData(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
-	sinceTime, err := strconv.ParseInt(vars["since"], 10, 64)
+	sinceTime, err := strconv.ParseInt(vars["since"], 10, 32)
 	if err != nil {
 		fmt.Printf("err: %v", err)
 
-		sinceTime = 0
-	}
-
-	// Check bounds before converting to int
-	if sinceTime < math.MinInt32 || sinceTime > math.MaxInt32 {
-		fmt.Printf("timestamp out of int bounds: %v", sinceTime)
 		sinceTime = 0
 	}
 
