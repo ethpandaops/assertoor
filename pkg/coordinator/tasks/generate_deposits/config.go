@@ -11,12 +11,14 @@ type Config struct {
 	Mnemonic              string `yaml:"mnemonic" json:"mnemonic"`
 	StartIndex            int    `yaml:"startIndex" json:"startIndex"`
 	IndexCount            int    `yaml:"indexCount" json:"indexCount"`
+	PublicKey             string `yaml:"publicKey" json:"publicKey"`
 	WalletPrivkey         string `yaml:"walletPrivkey" json:"walletPrivkey"`
 	DepositContract       string `yaml:"depositContract" json:"depositContract"`
 	DepositAmount         uint64 `yaml:"depositAmount" json:"depositAmount"`
 	DepositTxFeeCap       int64  `yaml:"depositTxFeeCap" json:"depositTxFeeCap"`
 	DepositTxTipCap       int64  `yaml:"depositTxTipCap" json:"depositTxTipCap"`
 	WithdrawalCredentials string `yaml:"withdrawalCredentials" json:"withdrawalCredentials"`
+	TopUpDeposit          bool   `yaml:"topUpDeposit" json:"topUpDeposit"`
 	ClientPattern         string `yaml:"clientPattern" json:"clientPattern"`
 	ExcludeClientPattern  string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
 	AwaitReceipt          bool   `yaml:"awaitReceipt" json:"awaitReceipt"`
@@ -40,8 +42,13 @@ func (c *Config) Validate() error {
 		return errors.New("either limitPerSlot or limitTotal or indexCount must be set")
 	}
 
-	if c.Mnemonic == "" {
-		return errors.New("mnemonic must be set")
+	switch {
+	case c.Mnemonic == "" && c.PublicKey == "":
+		return errors.New("mnemonic or publickey must be set")
+	case c.Mnemonic != "" && c.PublicKey != "":
+		return errors.New("only one of mnemonic or publickey must be set")
+	case c.PublicKey != "" && !c.TopUpDeposit:
+		return errors.New("publicKey can only be used with topUpDeposit")
 	}
 
 	if c.WalletPrivkey == "" {
