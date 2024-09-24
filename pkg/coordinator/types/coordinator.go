@@ -19,12 +19,16 @@ type Coordinator interface {
 	WalletManager() *wallet.Manager
 	ValidatorNames() *names.ValidatorNames
 	GlobalVariables() Variables
+	TestRegistry() TestRegistry
 
+	GetTestByRunID(runID uint64) Test
+	GetTestQueue() []Test
+	GetTestHistory(testID string, firstRunID *uint64, limit uint64) []Test
+	ScheduleTest(descriptor TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (TestRunner, error)
+}
+
+type TestRegistry interface {
 	AddLocalTest(testConfig *TestConfig) (TestDescriptor, error)
 	AddExternalTest(ctx context.Context, extTestConfig *ExternalTestConfig) (TestDescriptor, error)
 	GetTestDescriptors() []TestDescriptor
-	GetTestByRunID(runID uint64) Test
-	GetTestQueue() []Test
-	GetTestHistory() []Test
-	ScheduleTest(descriptor TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (TestRunner, error)
 }

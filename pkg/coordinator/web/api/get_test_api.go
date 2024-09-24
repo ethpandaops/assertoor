@@ -39,7 +39,7 @@ func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
 
 	var testDescriptor types.TestDescriptor
 
-	for _, testDescr := range ah.coordinator.GetTestDescriptors() {
+	for _, testDescr := range ah.coordinator.TestRegistry().GetTestDescriptors() {
 		if testDescr.Err() != nil {
 			continue
 		}

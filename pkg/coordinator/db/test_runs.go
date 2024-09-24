@@ -1,6 +1,9 @@
 package db
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/jmoiron/sqlx"
 )
 
@@ -71,4 +74,41 @@ func (db *Database) GetTestRunByRunID(runID int) (*TestRun, error) {
 	}
 
 	return &run, nil
+}
+
+// GetTestRunRange returns a range of test runs.
+func (db *Database) GetTestRunRange(testID string, firstRunID, limit int) ([]*TestRun, error) {
+	var runs []*TestRun
+
+	var sql strings.Builder
+
+	fmt.Fprint(&sql, `SELECT * FROM test_runs `)
+
+	args := []any{}
+	whereGlue := "WHERE"
+
+	if testID != "" {
+		fmt.Fprintf(&sql, `%v test_id = $%v `, whereGlue, len(args)+1)
+		args = append(args, testID)
+		whereGlue = "AND"
+	}
+
+	if firstRunID > 0 {
+		fmt.Fprintf(&sql, `%v run_id <= $%v `, whereGlue, len(args)+1)
+		args = append(args, firstRunID)
+	}
+
+	fmt.Fprintf(&sql, `ORDER BY run_id DESC `)
+
+	if limit > 0 {
+		fmt.Fprintf(&sql, ` LIMIT $%v`, len(args)+1)
+		args = append(args, limit)
+	}
+
+	err := db.reader.Select(&runs, sql.String(), args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
 }

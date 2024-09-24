@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 )
@@ -33,12 +34,14 @@ func (ah *APIHandler) GetTestRuns(w http.ResponseWriter, r *http.Request) {
 	filterTestID := q.Get("test_id")
 	testRuns := []*GetTestRunsResponse{}
 
-	testInstances := append(ah.coordinator.GetTestHistory(), ah.coordinator.GetTestQueue()...)
-	for _, testInstance := range testInstances {
-		if filterTestID != "" && filterTestID != testInstance.TestID() {
-			continue
-		}
+	testInstances := append(ah.coordinator.GetTestHistory(filterTestID, nil, 100), ah.coordinator.GetTestQueue()...)
 
+	// sort descending by index
+	sort.Slice(testInstances, func(i, j int) bool {
+		return testInstances[i].RunID() < testInstances[j].RunID()
+	})
+
+	for _, testInstance := range testInstances {
 		testRun := &GetTestRunsResponse{
 			RunID:  testInstance.RunID(),
 			TestID: testInstance.TestID(),

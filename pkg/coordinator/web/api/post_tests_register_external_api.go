@@ -63,7 +63,7 @@ func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.R
 	}
 
 	// add test descriptor
-	testDescriptor, err := ah.coordinator.AddExternalTest(r.Context(), extTestCfg)
+	testDescriptor, err := ah.coordinator.TestRegistry().AddExternalTest(r.Context(), extTestCfg)
 	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed adding test: %v", err), http.StatusInternalServerError)
 		return

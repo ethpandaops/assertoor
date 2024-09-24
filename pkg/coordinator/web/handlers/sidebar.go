@@ -50,7 +50,7 @@ func (fh *FrontendHandler) getSidebarData(activeTestID string) *SidebarData {
 	}
 
 	// get test descriptors
-	for _, testDescr := range fh.coordinator.GetTestDescriptors() {
+	for _, testDescr := range fh.coordinator.TestRegistry().GetTestDescriptors() {
 		if testDescr.Err() != nil {
 			continue
 		}

@@ -25,7 +25,7 @@ func (ah *APIHandler) GetTests(w http.ResponseWriter, r *http.Request) {
 
 	tests := []*GetTestsResponse{}
 
-	for _, testDescr := range ah.coordinator.GetTestDescriptors() {
+	for _, testDescr := range ah.coordinator.TestRegistry().GetTestDescriptors() {
 		if testDescr.Err() != nil {
 			continue
 		}

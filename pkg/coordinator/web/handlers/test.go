@@ -87,7 +87,7 @@ func (fh *FrontendHandler) TestPageData(w http.ResponseWriter, r *http.Request) 
 func (fh *FrontendHandler) getTestPageData(testID string) (*TestPage, error) {
 	var testDescriptor types.TestDescriptor
 
-	for _, testDescr := range fh.coordinator.GetTestDescriptors() {
+	for _, testDescr := range fh.coordinator.TestRegistry().GetTestDescriptors() {
 		if testDescr.Err() != nil {
 			continue
 		}
@@ -125,12 +125,8 @@ func (fh *FrontendHandler) getTestPageData(testID string) (*TestPage, error) {
 	// test runs
 	pageData.Tests = []*TestRunData{}
 
-	testInstances := append(fh.coordinator.GetTestHistory(), fh.coordinator.GetTestQueue()...)
+	testInstances := append(fh.coordinator.GetTestHistory(testID, nil, 100), fh.coordinator.GetTestQueue()...)
 	for idx, test := range testInstances {
-		if test.TestID() != testID {
-			continue
-		}
-
 		pageData.Tests = append(pageData.Tests, fh.getTestRunData(idx, test))
 	}
 

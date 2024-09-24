@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
@@ -95,9 +96,20 @@ func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
 	}
 
 	// tasks list
-	pageData.Tests = []*TestRunData{}
+	testInstances := fh.coordinator.GetTestQueue()
 
-	testInstances := append(fh.coordinator.GetTestHistory(), fh.coordinator.GetTestQueue()...)
+	// sort descending by index
+	sort.Slice(testInstances, func(i, j int) bool {
+		return testInstances[i].RunID() > testInstances[j].RunID()
+	})
+
+	if len(testInstances) < 100 {
+		// append test history
+		limit := 100 - len(testInstances)
+		testHistory := fh.coordinator.GetTestHistory("", nil, uint64(limit))
+		testInstances = append(testInstances, testHistory...)
+	}
+
 	for idx, test := range testInstances {
 		pageData.Tests = append(pageData.Tests, fh.getTestRunData(idx, test))
 	}

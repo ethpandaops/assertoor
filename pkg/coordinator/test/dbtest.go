@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
@@ -15,9 +16,11 @@ import (
 type dbTest struct {
 	database *db.Database
 
-	runID     int
-	testRun   *db.TestRun
-	taskIndex []*db.TaskStateIndex
+	runID   int
+	testRun *db.TestRun
+
+	taskIndexMtx sync.Mutex
+	taskIndex    []*db.TaskStateIndex
 }
 
 func LoadTestFromDB(database *db.Database, runID int) (types.Test, error) {
@@ -27,17 +30,19 @@ func LoadTestFromDB(database *db.Database, runID int) (types.Test, error) {
 		return nil, err
 	}
 
-	taskIndex, err := database.GetTaskStateIndex(runID)
-	if err != nil {
-		return nil, err
-	}
-
 	return &dbTest{
-		database:  database,
-		runID:     runID,
-		testRun:   testRun,
-		taskIndex: taskIndex,
+		database: database,
+		runID:    runID,
+		testRun:  testRun,
 	}, nil
+}
+
+func WrapDBTestRun(database *db.Database, test *db.TestRun) types.Test {
+	return &dbTest{
+		database: database,
+		runID:    test.RunID,
+		testRun:  test,
+	}
 }
 
 func (dbt *dbTest) RunID() uint64 {
@@ -75,10 +80,29 @@ func (dbt *dbTest) GetTaskScheduler() types.TaskScheduler {
 func (dbt *dbTest) AbortTest(_ bool) {}
 
 func (dbt *dbTest) GetTaskCount() int {
+	dbt.loadTaskIndex()
 	return len(dbt.taskIndex)
 }
 
+func (dbt *dbTest) loadTaskIndex() {
+	dbt.taskIndexMtx.Lock()
+	defer dbt.taskIndexMtx.Unlock()
+
+	if dbt.taskIndex != nil {
+		return
+	}
+
+	taskIndex, err := dbt.database.GetTaskStateIndex(dbt.runID)
+	if err != nil {
+		return
+	}
+
+	dbt.taskIndex = taskIndex
+}
+
 func (dbt *dbTest) GetAllTasks() []types.TaskIndex {
+	dbt.loadTaskIndex()
+
 	taskIDs := make([]types.TaskIndex, 0)
 
 	for _, task := range dbt.taskIndex {
@@ -93,6 +117,8 @@ func (dbt *dbTest) GetAllTasks() []types.TaskIndex {
 }
 
 func (dbt *dbTest) GetRootTasks() []types.TaskIndex {
+	dbt.loadTaskIndex()
+
 	taskIDs := make([]types.TaskIndex, 0)
 
 	for _, task := range dbt.taskIndex {
@@ -111,6 +137,8 @@ func (dbt *dbTest) GetRootTasks() []types.TaskIndex {
 }
 
 func (dbt *dbTest) GetAllCleanupTasks() []types.TaskIndex {
+	dbt.loadTaskIndex()
+
 	taskIDs := make([]types.TaskIndex, 0)
 
 	for _, task := range dbt.taskIndex {
@@ -125,6 +153,8 @@ func (dbt *dbTest) GetAllCleanupTasks() []types.TaskIndex {
 }
 
 func (dbt *dbTest) GetRootCleanupTasks() []types.TaskIndex {
+	dbt.loadTaskIndex()
+
 	taskIDs := make([]types.TaskIndex, 0)
 
 	for _, task := range dbt.taskIndex {

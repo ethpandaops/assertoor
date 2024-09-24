@@ -48,7 +48,7 @@ func (ah *APIHandler) PostTestRunsSchedule(w http.ResponseWriter, r *http.Reques
 	// get test descriptor by test id
 	var testDescriptor types.TestDescriptor
 
-	for _, testDescr := range ah.coordinator.GetTestDescriptors() {
+	for _, testDescr := range ah.coordinator.TestRegistry().GetTestDescriptors() {
 		if testDescr.Err() != nil {
 			continue
 		}
