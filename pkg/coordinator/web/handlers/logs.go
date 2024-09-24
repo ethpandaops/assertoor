@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -37,6 +38,12 @@ func (fh *FrontendHandler) LogsData(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Printf("err: %v", err)
 
+		sinceTime = 0
+	}
+
+	// Check bounds before converting to int
+	if sinceTime < math.MinInt || sinceTime > math.MaxInt {
+		fmt.Printf("timestamp out of int bounds: %v", sinceTime)
 		sinceTime = 0
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"runtime"
 	"runtime/debug"
@@ -224,6 +225,10 @@ func (c *Coordinator) GetTestByRunID(runID uint64) types.Test {
 	testRef := c.runner.GetTestByRunID(runID)
 	if testRef != nil {
 		return testRef
+	}
+
+	if runID > math.MaxInt {
+		return nil
 	}
 
 	testRef, err := test.LoadTestFromDB(c.database, int(runID))
