@@ -127,6 +127,17 @@ tasks:
     configVars:
       validatorIndex: "tasks.validator_32_eth_info.outputs.validator.index | tonumber"
 
+  - name: check_consensus_validator_status
+    title: "Refresh balance"
+    id: validator_2048_eth_post_consolidation_info
+    timeout: 150m
+    config:
+      validatorStatus:
+        - active_ongoing
+    configVars:
+      validatorPubKey: "tasks.validator_2048_eth_deposit.outputs.validatorPubkeys[0]"
+
+  # checks if the balance is over 2070ETH but the effective balance is 2048ETH (max)
   - name: run_tasks
     title: "Check consolidation overflow"
     timeout: 10m
@@ -137,11 +148,11 @@ tasks:
           title: "Check targetValidator status is indeed at ceiling of MaxEB"
           config:
             envVars:
-              validator: "tasks.validator_2048_eth_info.outputs.validator.index | tonumber"
+              validator: "tasks.validator_2048_eth_post_consolidation_info.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
-              if [ "$balance" -lt 2079900000000 ]; then
-                echo "Balance too low! expected: > 2079.9 ETH, got: $balance Gwei"
+              if [ "$balance" -lt 2070000000000 ]; then
+                echo "Balance too low! expected: > 2070.0 ETH, got: $balance Gwei"
                 exit 1
               fi
               
