@@ -2,9 +2,8 @@ id: consolidation_overflow_tests
 name: "consolidation overflow test"
 timeout: 672h
 config:
-  #walletPrivkey: ""
+  walletPrivkey: ""
   depositContract: "0x4242424242424242424242424242424242424242"
-  targetAddress: "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA"
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
   depositWaitSlot: 34
 tasks:
@@ -14,9 +13,23 @@ tasks:
     config:
       minClientCount: 1
 
+  # wait for electra activation
+  - name: get_consensus_specs
+    id: get_specs
+    title: "Get consensus chain specs"
+  - name: check_consensus_slot_range
+    title: "Wait for electra activation"
+    configVars:
+      minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
+
+  - name: get_wallet_details
+    title: "Get target wallet address"
+    id: target_wallet
+    configVars:
+      privateKey: "walletPrivkey"
+
   - name: check_consensus_slot_range
     title: "Wait for slot >= ${depositWaitSlot}"
-    timeout: 30m
     configVars:
       minSlotNumber: "depositWaitSlot"
 
@@ -26,10 +39,9 @@ tasks:
       mnemonicResultVar: "validatorMnemonic"
   - name: generate_child_wallet
     title: "Generate wallet for lifecycle test"
+    id: depositor_wallet
     config:
       prefundMinBalance: 5001000000000000000000 # ensure 5001 ETH
-      walletAddressResultVar: "depositorAddress"
-      walletPrivateKeyResultVar: "depositorPrivateKey"
     configVars:
       privateKey: "walletPrivkey"
   - name: sleep
@@ -54,10 +66,10 @@ tasks:
             awaitReceipt: true
             failOnReject: true
           configVars:
-            walletPrivkey: "depositorPrivateKey"
+            walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
             mnemonic: "validatorMnemonic"
             depositContract: "depositContract"
-            withdrawalCredentials: "| \"0x020000000000000000000000\" + (.targetAddress | capture(\"(0x)?(?<addr>.+)\").addr)"
+            withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.target_wallet.outputs.address | capture(\"(0x)?(?<addr>.+)\").addr)"
 
   - name: run_tasks
     title: "Generate 2048 ETH deposit & track inclusion"
@@ -76,10 +88,10 @@ tasks:
             awaitReceipt: true
             failOnReject: true
           configVars:
-            walletPrivkey: "depositorPrivateKey"
+            walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
             mnemonic: "validatorMnemonic"
             depositContract: "depositContract"
-            withdrawalCredentials: "| \"0x020000000000000000000000\" + (.targetAddress | capture(\"(0x)?(?<addr>.+)\").addr)"
+            withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.target_wallet.outputs.address | capture(\"(0x)?(?<addr>.+)\").addr)"
 
   - name: check_consensus_validator_status
     title: "Wait for validator to completely be active"
@@ -107,7 +119,7 @@ tasks:
       stopChildOnResult: false
       tasks:
       - name: generate_consolidations
-        title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
+        title: "Consolidate Validator ${{tasks.validator_32_eth_info.outputs.validator.index}} to ${{tasks.validator_2048_eth_info.outputs.validator.index}}"
         timeout: 5m
         config:
           failOnReject: true
@@ -119,7 +131,7 @@ tasks:
           targetValidatorIndex: "tasks.validator_2048_eth_info.outputs.validator.index | tonumber"
 
   - name: check_consensus_validator_status
-    title: "Wait for validator to completely exit (${tasks.validator_32_eth_info.outputs.validator.index | tonumber})"
+    title: "Wait for validator to completely exit (${{tasks.validator_32_eth_info.outputs.validator.index | tonumber}})"
     timeout: 150m
     config:
       validatorStatus:

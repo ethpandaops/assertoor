@@ -3,11 +3,11 @@ id: 64-el-triggered-consolidation
 name: "EL-triggered consolidation test"
 timeout: 1h
 config:
+  walletPrivkey: ""
   validatorCount: 300
-  consolidationNumber: 64
-  targetAddress: "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA"
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
   sourceValidatorIndex: 100
+  consolidationNumber: 64
   targetValidatorIndex: 200
   blsChangesWaitSlot: 41
   consolidationWaitSlot: 60
@@ -17,6 +17,21 @@ tasks:
   timeout: 5m
   config:
     minClientCount: 1
+
+# wait for electra activation
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+- name: check_consensus_slot_range
+  title: "Wait for electra activation"
+  configVars:
+    minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
+
+- name: get_wallet_details
+  title: "Get target wallet address"
+  id: target_wallet
+  configVars:
+    privateKey: "walletPrivkey"
 
 - name: check_consensus_slot_range
   title: "Wait for slot >= ${blsChangesWaitSlot}"
@@ -34,7 +49,7 @@ tasks:
       title: "Generate ${validatorCount} BLS changes"
       configVars:
         mnemonic: "validatorMnemonic"
-        targetAddress: "targetAddress"
+        targetAddress: "tasks.target_wallet.outputs.address"
         limitTotal: "validatorCount"
         indexCount: "validatorCount"
 
@@ -54,7 +69,7 @@ tasks:
         config:
           task:
             name: generate_consolidations
-            title: "Consolidate Validator ${sourceValidatorIndex} to ${targetValidatorIndex}"
+            title: "Consolidate Validator ${sourceValidatorIndex}-${{sourceValidatorIndex + .consolidationNumber - 1}} to ${targetValidatorIndex}"
             timeout: 5m
             config:
               failOnReject: true
