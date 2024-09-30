@@ -243,15 +243,11 @@ func (c *Coordinator) GetTestQueue() []types.Test {
 	return c.runner.GetTestQueue()
 }
 
-func (c *Coordinator) GetTestHistory(testID string, firstRunID *uint64, limit uint64) []types.Test {
-	if firstRunID == nil {
-		lastRunID := c.runner.lastExecutedRunID
-		firstRunID = &lastRunID
-	}
+func (c *Coordinator) GetTestHistory(testID string, firstRunID uint64, offset uint64, limit uint64) ([]types.Test, int) {
 
-	dbTests, err := c.database.GetTestRunRange(testID, int(*firstRunID), int(limit))
+	dbTests, totalTests, err := c.database.GetTestRunRange(testID, int(firstRunID), int(offset), int(limit))
 	if err != nil {
-		return nil
+		return nil, 0
 	}
 
 	tests := make([]types.Test, len(dbTests))
@@ -264,7 +260,7 @@ func (c *Coordinator) GetTestHistory(testID string, firstRunID *uint64, limit ui
 		}
 	}
 
-	return tests
+	return tests, totalTests
 }
 
 func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.TestRunner, error) {

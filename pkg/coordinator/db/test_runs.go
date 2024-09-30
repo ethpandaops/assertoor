@@ -77,12 +77,17 @@ func (db *Database) GetTestRunByRunID(runID int) (*TestRun, error) {
 }
 
 // GetTestRunRange returns a range of test runs.
-func (db *Database) GetTestRunRange(testID string, firstRunID, limit int) ([]*TestRun, error) {
+func (db *Database) GetTestRunRange(testID string, firstRunID, offset, limit int) ([]*TestRun, int, error) {
 	var runs []*TestRun
 
 	var sql strings.Builder
 
-	fmt.Fprint(&sql, `SELECT * FROM test_runs `)
+	fmt.Fprint(&sql, `
+	WITH cte AS (
+		SELECT
+			run_id, test_id, name, source, config, start_time, stop_time, timeout, status
+		FROM test_runs
+	`)
 
 	args := []any{}
 	whereGlue := "WHERE"
@@ -98,17 +103,39 @@ func (db *Database) GetTestRunRange(testID string, firstRunID, limit int) ([]*Te
 		args = append(args, firstRunID)
 	}
 
-	fmt.Fprintf(&sql, `ORDER BY run_id DESC `)
+	fmt.Fprintf(&sql, `) 
+	SELECT 
+		count(*) AS run_id, 
+		"" AS test_id, 
+		"" AS name, 
+		"" AS source, 
+		"" AS config, 
+		0 AS start_time, 
+		0 AS stop_time, 
+		0 AS timeout, 
+		"" AS status
+	FROM cte
+	UNION ALL SELECT * FROM (
+	SELECT * FROM cte
+	ORDER BY run_id DESC 
+	`)
 
 	if limit > 0 {
 		fmt.Fprintf(&sql, ` LIMIT $%v`, len(args)+1)
 		args = append(args, limit)
 	}
 
-	err := db.reader.Select(&runs, sql.String(), args...)
-	if err != nil {
-		return nil, err
+	if offset > 0 {
+		fmt.Fprintf(&sql, ` OFFSET $%v`, len(args)+1)
+		args = append(args, offset)
 	}
 
-	return runs, nil
+	fmt.Fprintf(&sql, `)`)
+
+	err := db.reader.Select(&runs, sql.String(), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return runs[1:], runs[0].RunID, nil
 }

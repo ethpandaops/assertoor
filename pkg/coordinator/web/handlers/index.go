@@ -2,17 +2,33 @@ package handlers
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
-	"sort"
+	"strconv"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 
+type IndexPageArgs struct {
+	PageSize uint64 `json:"ps"`
+	Page     uint64 `json:"p"`
+}
+
 type IndexPage struct {
-	CanCancel bool           `json:"can_cancel"`
-	Tests     []*TestRunData `json:"tests"`
+	CanCancel      bool           `json:"can_cancel"`
+	Tests          []*TestRunData `json:"tests"`
+	TotalTests     uint64         `json:"total_tests"`
+	FirstTestIndex uint64         `json:"first_test_index"`
+	LastTestIndex  uint64         `json:"last_test_index"`
+
+	TotalPages       uint64 `json:"total_pages"`
+	PageSize         uint64 `json:"page_size"`
+	CurrentPageIndex uint64 `json:"current_page_index"`
+	PrevPageIndex    uint64 `json:"prev_page_index"`
+	NextPageIndex    uint64 `json:"next_page_index"`
+	LastPageIndex    uint64 `json:"last_page_index"`
 }
 
 type TestRunData struct {
@@ -32,6 +48,30 @@ type TestRunData struct {
 	TaskCount   uint64        `json:"task_count"`
 }
 
+func (fh *FrontendHandler) parseIndexPageArgs(r *http.Request) *IndexPageArgs {
+	urlArgs := r.URL.Query()
+	pageArgs := &IndexPageArgs{
+		PageSize: 25,
+		Page:     1,
+	}
+
+	if urlArgs.Has("ps") {
+		val, err := strconv.ParseUint(urlArgs.Get("ps"), 10, 32)
+		if err == nil && val > 0 && val <= 200 {
+			pageArgs.PageSize = val
+		}
+	}
+
+	if urlArgs.Has("p") {
+		val, err := strconv.ParseUint(urlArgs.Get("p"), 10, 32)
+		if err == nil && val > 0 {
+			pageArgs.Page = val
+		}
+	}
+
+	return pageArgs
+}
+
 // Index will return the "index" page using a go template
 func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 	urlArgs := r.URL.Query()
@@ -48,9 +88,10 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 	)
 	pageTemplate := fh.templates.GetTemplate(templateFiles...)
 	data := fh.initPageData(r, "index", "/", "Index", templateFiles)
+	pageArgs := fh.parseIndexPageArgs(r)
 
 	var pageError error
-	data.Data, pageError = fh.getIndexPageData()
+	data.Data, pageError = fh.getIndexPageData(pageArgs)
 
 	if pageError != nil {
 		fh.HandlePageError(w, r, pageError)
@@ -71,7 +112,9 @@ func (fh *FrontendHandler) IndexData(w http.ResponseWriter, r *http.Request) {
 	var pageData *IndexPage
 
 	var pageError error
-	pageData, pageError = fh.getIndexPageData()
+
+	pageArgs := fh.parseIndexPageArgs(r)
+	pageData, pageError = fh.getIndexPageData(pageArgs)
 
 	if pageError != nil {
 		fh.HandlePageError(w, r, pageError)
@@ -90,28 +133,32 @@ func (fh *FrontendHandler) IndexData(w http.ResponseWriter, r *http.Request) {
 }
 
 //nolint:unparam // ignore
-func (fh *FrontendHandler) getIndexPageData() (*IndexPage, error) {
+func (fh *FrontendHandler) getIndexPageData(pageArgs *IndexPageArgs) (*IndexPage, error) {
 	pageData := &IndexPage{
 		CanCancel: fh.isAPIEnabled && !fh.securityTrimmed,
 	}
 
-	// tasks list
-	testInstances := fh.coordinator.GetTestQueue()
-
-	// sort descending by index
-	sort.Slice(testInstances, func(i, j int) bool {
-		return testInstances[i].RunID() > testInstances[j].RunID()
-	})
-
-	if len(testInstances) < 100 {
-		// append test history
-		limit := 100 - len(testInstances)
-		testHistory := fh.coordinator.GetTestHistory("", nil, uint64(limit))
-		testInstances = append(testInstances, testHistory...)
-	}
+	pageOffset := (pageArgs.Page - 1) * pageArgs.PageSize
+	testInstances, totalTests := fh.coordinator.GetTestHistory("", 0, pageOffset, pageArgs.PageSize)
 
 	for idx, test := range testInstances {
 		pageData.Tests = append(pageData.Tests, fh.getTestRunData(idx, test))
+	}
+
+	pageData.TotalTests = uint64(totalTests)
+	pageData.TotalPages = uint64(math.Ceil(float64(totalTests) / float64(pageArgs.PageSize)))
+	pageData.CurrentPageIndex = pageArgs.Page
+	pageData.PageSize = pageArgs.PageSize
+	pageData.FirstTestIndex = (pageArgs.Page - 1) * pageArgs.PageSize
+	pageData.LastTestIndex = pageData.FirstTestIndex + uint64(len(pageData.Tests)) - 1
+	pageData.LastPageIndex = pageData.TotalPages - 1
+
+	if pageData.CurrentPageIndex > 1 {
+		pageData.PrevPageIndex = pageData.CurrentPageIndex - 1
+	}
+
+	if pageData.CurrentPageIndex < pageData.TotalPages {
+		pageData.NextPageIndex = pageData.CurrentPageIndex + 1
 	}
 
 	return pageData, nil

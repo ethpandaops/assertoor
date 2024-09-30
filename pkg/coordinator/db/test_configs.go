@@ -1,6 +1,8 @@
 package db
 
-import "github.com/jmoiron/sqlx"
+import (
+	"github.com/jmoiron/sqlx"
+)
 
 type TestConfig struct {
 	TestID           string `db:"test_id"`
@@ -52,4 +54,22 @@ func (db *Database) GetTestConfigs() ([]*TestConfig, error) {
 	}
 
 	return configs, nil
+}
+
+type TestRunStats struct {
+	TestID  string `db:"test_id"`
+	Count   int    `db:"count"`
+	LastRun uint64 `db:"last_run"`
+}
+
+// GetTestRunStats returns the test run stats for all tests.
+func (db *Database) GetTestRunStats() ([]*TestRunStats, error) {
+	var stats []*TestRunStats
+
+	err := db.reader.Select(&stats, `SELECT test_id, COUNT(*) AS count, MAX(start_time) AS last_run FROM test_runs GROUP BY test_id`)
+	if err != nil {
+		return nil, err
+	}
+
+	return stats, nil
 }

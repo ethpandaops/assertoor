@@ -1,25 +1,26 @@
-
 {{ define "test_runs" }}
-
   <!-- test list -->
   <div class="test-list">
     <table class="table table-condensed table-striped details-table">
       <thead>
         <tr>
-          <th style="width: 50px"></th>
+          <th style="width: 30px"><input type="checkbox" id="select-all-checkbox"></th>
           <th style="width: 100px;">Run ID</th>
           <th style="min-width:200px;">Test Name</th>
           <th style="width:20%; min-width:200px;">Start Time</th>
           <th style="width:20%; min-width:150px;">Run Time</th>
           <th style="width:10%; min-width:100px;">Status</th>
+          <th style="width: 100px">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr class="details-row"></tr>
         {{ $canCancel := .CanCancel }}
         {{ range $i, $test := .Tests }}
-        <tr data-bs-toggle="collapse" data-bs-target="#run-details-{{ $test.RunID }}" class="accordion-toggle">
-          <td class="p-0"><button class="btn btn-default btn-xs"><i class="fa fa-eye" aria-hidden="true"></i></button></td>
+        <tr class="accordion-toggle" data-target="#run-details-{{ $test.RunID }}">
+          <td class="checkbox-field">
+            <input type="checkbox" class="run-checkbox" data-runid="{{ $test.RunID }}">
+          </td>
           <td>{{ $test.RunID }}</td>
           <td>{{ $test.Name }}</td>
           <td>{{ if $test.IsStarted }}{{ formatDateTime $test.StartTime.UTC }}{{ end }}</td>
@@ -51,9 +52,42 @@
               </span>
             {{ end }}
           </td>
+          <td class="p-0">
+            <div class="input-group" role="group">
+              <a href="/run/{{ $test.RunID }}" role="button" class="btn btn-default btn-xs">
+                <i class="fa fa-eye" aria-hidden="true"></i>
+              </a>
+              <button type="button" class="btn btn-default btn-xs dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="visually-hidden">Toggle Dropdown</span>
+              </button>
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item" href="/run/{{ $test.RunID }}">
+                    <i class="fa fa-eye mx-1" aria-hidden="true"></i>
+                    View Test Details
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                {{ if $canCancel }}
+                <li>
+                  <a class="dropdown-item test-cancel-button" href="#" data-testid="{{ $test.TestID }}" data-runid="{{ $test.RunID }}">
+                    <i class="fas fa-times-circle mx-1"></i>
+                    Cancel Test Run
+                  </a>
+                </li>
+                {{ end }}
+                <li>
+                  <a class="dropdown-item test-delete-button" href="#" data-runid="{{ $test.RunID }}">
+                    <i class="fas fa-trash-alt mx-1"></i>
+                    Delete Test Run
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </td>
         </tr>
         <tr>
-          <td colspan="12" class="details-row">
+          <td colspan="13" class="details-row">
             <div class="accordian-body collapse" id="run-details-{{ $test.RunID }}">
               <div class="container-fluid details-content">
                 <div class="row">
@@ -121,8 +155,73 @@
       </tbody>
     </table>
   </div>
+  <div class="mt-3 d-flex justify-content-between align-items-center">
+    <div class="btn-group" role="group">
+      <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" id="selected-action-button" disabled>
+        Selected Test Runs
+      </button>
+      <ul class="dropdown-menu">
+        <li>
+          <a class="dropdown-item" href="#" id="delete-selected">
+            <i class="fas fa-trash-alt mx-1"></i>
+            Delete Selected
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="d-flex align-items-center">
+      <div class="px-2">
+        <div class="table-meta" role="status" aria-live="polite">
+          Showing test runs {{ .FirstTestIndex }} to {{ .LastTestIndex }} of {{ .TotalTests }}
+        </div>
+      </div>
+      <div class="d-inline-block px-2">
+        <ul class="pagination mb-0">
+          <li class="first paginate_button page-item {{ if eq .CurrentPageIndex 1 }}disabled{{ end }}" id="tpg_first">
+            <a tab-index="1" aria-controls="tpg_first" class="page-link" href="#">First</a>
+          </li>
+          <li class="previous paginate_button page-item {{ if eq .PrevPageIndex 0 }}disabled{{ end }}" id="tpg_previous">
+            <a tab-index="1" aria-controls="tpg_previous" class="page-link" href="#"><i class="fas fa-chevron-left"></i></a>
+          </li>
+          <li class="page-item disabled">
+            <a class="page-link" style="background-color: transparent;">{{ .CurrentPageIndex }} of {{ .TotalPages }}</a>
+          </li>
+          <li class="next paginate_button page-item {{ if eq .NextPageIndex 0 }}disabled{{ end }}" id="tpg_next">
+            <a tab-index="1" aria-controls="tpg_next" class="page-link" href="#"><i class="fas fa-chevron-right"></i></a>
+          </li>
+          <li class="last paginate_button page-item {{ if or (eq .TotalPages 0) (ge .CurrentPageIndex .TotalPages) }}disabled{{ end }}" id="tpg_last">
+            <a tab-index="1" aria-controls="tpg_last" class="page-link" href="#">Last</a>
+          </li>
+        </ul>
+      </div>
+      <div class="px-2">
+        <select id="page-size-select" class="form-select form-select-sm">
+          <option value="25" {{ if eq .PageSize 25 }}selected{{ end }}>25</option>
+          <option value="50" {{ if eq .PageSize 50 }}selected{{ end }}>50</option>
+          <option value="100" {{ if eq .PageSize 100 }}selected{{ end }}>100</option>
+          <option value="200" {{ if eq .PageSize 200 }}selected{{ end }}>200</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
   <script type="text/javascript">
     $(function() {
+      // update pagination links
+      var currentPageIndex = {{ .CurrentPageIndex }};
+      var lastPageIndex = {{ .TotalPages }};
+      if (currentPageIndex > 1) {
+        $("#tpg_first a").attr("href", updateQueryStringParameter(window.location.href, "p", 1));
+        $("#tpg_previous a").attr("href", updateQueryStringParameter(window.location.href, "p", currentPageIndex - 1));
+      }
+
+      if (currentPageIndex < lastPageIndex) {
+        $("#tpg_next a").attr("href", updateQueryStringParameter(window.location.href, "p", currentPageIndex + 1));
+        $("#tpg_last a").attr("href", updateQueryStringParameter(window.location.href, "p", lastPageIndex));
+      }
+
+      // Existing cancel button logic
       $(".test-cancel-button").on("click", function() {
         var testId = $(this).data("testid");
         var runId = $(this).data("runid");
@@ -155,13 +254,126 @@
           alert("Could not cancel test: " + err.toString());
         });
       });
+
+      // Expand test details on row click
+      $(".accordion-toggle").on("click", function(evt) {
+        var closestBtn;
+        
+        if(evt.target.tagName.toLowerCase() == "button" || evt.target.tagName.toLowerCase() == "input")
+          closestBtn = $(evt.target);
+        else {
+          closestBtn = $(evt.target).closest("button")
+          if(closestBtn.length == 0)
+            closestBtn = $(evt.target).closest(".btn");
+        }
+        if(closestBtn.length > 0)
+          return;
+        var target = $(this).data("target");
+
+        if($(target).hasClass("show")) {
+          $(target).collapse("hide");
+        } else {
+          $(target).collapse("show");
+        }
+      });
+
+      $(".checkbox-field").on("click", function(e) {
+        if(e.target.tagName.toLowerCase() == "input")
+          return;
+        e.stopPropagation();
+        $(this).find("input").prop("checked", !$(this).find("input").prop("checked"));
+        updateSelectedActionButton();
+      });
+
+      // New delete button logic
+      $(".test-delete-button").on("click", function(e) {
+        e.stopPropagation();
+        var runId = $(this).data("runid");
+        deleteTestRuns([runId]);
+      });
+
+      // Select all checkbox logic
+      $("#select-all-checkbox").on("change", function() {
+        $(".run-checkbox").prop("checked", $(this).prop("checked"));
+        updateSelectedActionButton();
+      });
+
+      // Individual checkbox logic
+      $(".run-checkbox").on("change", function(e) {
+        e.stopPropagation();
+        updateSelectedActionButton();
+      });
+
+      // Delete selected button logic
+      $("#delete-selected").on("click", function() {
+        var selectedRunIds = $(".run-checkbox:checked").map(function() {
+          return $(this).data("runid");
+        }).get();
+        deleteTestRuns(selectedRunIds);
+      });
+
+      function updateSelectedActionButton() {
+        $("#selected-action-button").prop("disabled", $(".run-checkbox:checked").length === 0);
+      }
+
+      function deleteTestRuns(runIds) {
+        if (!confirm("Are you sure you want to delete the selected test run(s)?")) {
+          return;
+        }
+
+        $.ajax({
+          type: "POST",
+          url: "/api/v1/test_runs/delete",
+          dataType: "json",
+          data: JSON.stringify({ run_ids: runIds }),
+          success: function(res) {
+            if (res && res.status === "OK") {
+              location.reload();
+            } else {
+              alert("Could not delete test run(s): " + (res.message || "Unknown error"));
+            }
+          },
+          error: function(xhr, status, error) {
+            alert("Could not delete test run(s): " + error);
+          }
+        });
+      }
+
+      // Add event listener for page size change
+      $("#page-size-select").on("change", function() {
+        var newPageSize = $(this).val();
+        var uri = window.location.href;
+        uri = updateQueryStringParameter(uri, "ps", newPageSize);
+        uri = updateQueryStringParameter(uri, "p", 1);
+        window.location.href = uri;
+      });
+
+      // Helper function to update query string parameters
+      function updateQueryStringParameter(uri, key, value) {
+        if(uri.indexOf('#') !== -1)
+          uri = uri.split('#')[0];
+        var re = new RegExp("([?&])" + key + "=.*?(&|$)", "i");
+        var separator = uri.indexOf('?') !== -1 ? "&" : "?";
+        if (uri.match(re)) {
+          return uri.replace(re, '$1' + key + "=" + value + '$2');
+        }
+        else {
+          return uri + separator + key + "=" + value;
+        }
+      }
     });
   </script>
+
   <style>
-    .test-cancel-button {
-      padding: 0 8px;
-      font-size: 0.9rem;
-      margin-left: 20px;
+    .pagination {
+      margin-bottom: 0;
+    }
+    .page-link {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.875rem;
+    }
+    #page-size-select {
+      width: auto;
     }
   </style>
 {{ end }}

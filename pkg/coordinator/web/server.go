@@ -115,6 +115,7 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 			)
 
 			ws.router.HandleFunc("/", frontendHandler.Index).Methods("GET")
+			ws.router.HandleFunc("/registry", frontendHandler.Registry).Methods("GET")
 			ws.router.HandleFunc("/test/{testId}", frontendHandler.TestPage).Methods("GET")
 			ws.router.HandleFunc("/run/{runId}", frontendHandler.TestRun).Methods("GET")
 			ws.router.HandleFunc("/clients", frontendHandler.Clients).Methods("GET")
