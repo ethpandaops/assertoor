@@ -341,7 +341,7 @@
 
       // Add event listener for page size change
       $("#page-size-select").on("change", function() {
-        var newPageSize = $(this).val();
+        var newPageSize = encodeURIComponent($(this).val());
         var uri = window.location.href;
         uri = updateQueryStringParameter(uri, "ps", newPageSize);
         uri = updateQueryStringParameter(uri, "p", 1);
