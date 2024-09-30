@@ -112,6 +112,13 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	//nolint:errcheck // ignore missing state
 	c.database.GetAssertoorState("test.lastRunId", &lastTestRunID)
 
+	err = c.database.RunTransaction(func(tx *sqlx.Tx) error {
+		return c.database.CleanupUncleanTestRuns(tx)
+	})
+	if err != nil {
+		return err
+	}
+
 	// init client pool
 	clientPool, err := clients.NewClientPool(c.log.GetLogger())
 	if err != nil {

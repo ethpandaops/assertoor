@@ -210,6 +210,13 @@ func (t *Test) Run(ctx context.Context) error {
 
 	err := t.taskScheduler.RunTasks(ctx, t.timeout)
 
+	if ctx.Err() != nil {
+		t.logger.Info("test aborted!")
+		t.status = types.TestStatusAborted
+
+		return fmt.Errorf("test aborted")
+	}
+
 	if t.status == types.TestStatusAborted {
 		t.logger.Info("test aborted!")
 

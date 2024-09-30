@@ -168,3 +168,28 @@ func (db *Database) DeleteTestRun(tx *sqlx.Tx, runID int) error {
 
 	return nil
 }
+
+// CleanupUncleanTestRuns updates all running test runs and its tasks to aborted
+func (db *Database) CleanupUncleanTestRuns(tx *sqlx.Tx) error {
+	// Update running test runs to aborted
+	_, err := tx.Exec(`
+		UPDATE test_runs
+		SET status = 'aborted'
+		WHERE status = 'running'
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Update running tasks to aborted
+	_, err = tx.Exec(fmt.Sprintf(`
+		UPDATE task_states
+		SET run_flags = run_flags & ~%v
+		WHERE run_flags & %v > 0
+	`, TaskRunFlagRunning, TaskRunFlagRunning))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
