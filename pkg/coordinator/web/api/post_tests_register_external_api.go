@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"gopkg.in/yaml.v3"
 )
 
 type PostTestsRegisterExternalRequest struct {
@@ -38,16 +39,27 @@ type PostTestsRegisterExternalResponse struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/tests/register_external [post]
 func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	// parse request body
 	req := &PostTestsRegisterExternalRequest{}
-	decoder := json.NewDecoder(r.Body)
 
-	err := decoder.Decode(req)
-	if err != nil {
-		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body json: %v", err), http.StatusBadRequest)
-		return
+	if r.Header.Get("Content-Type") == contentTypeYAML {
+		decoder := yaml.NewDecoder(r.Body)
+
+		err := decoder.Decode(req)
+		if err != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body yaml: %v", err), http.StatusBadRequest)
+			return
+		}
+	} else {
+		decoder := json.NewDecoder(r.Body)
+
+		err := decoder.Decode(req)
+		if err != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body json: %v", err), http.StatusBadRequest)
+			return
+		}
 	}
 
 	extTestCfg := &types.ExternalTestConfig{

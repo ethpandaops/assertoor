@@ -25,10 +25,12 @@ type Coordinator interface {
 	GetTestQueue() []Test
 	GetTestHistory(testID string, firstRunID uint64, offset uint64, limit uint64) ([]Test, int)
 	ScheduleTest(descriptor TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (TestRunner, error)
+	DeleteTestRun(runID uint64) error
 }
 
 type TestRegistry interface {
 	AddLocalTest(testConfig *TestConfig) (TestDescriptor, error)
 	AddExternalTest(ctx context.Context, extTestConfig *ExternalTestConfig) (TestDescriptor, error)
+	DeleteTest(testID string) error
 	GetTestDescriptors() []TestDescriptor
 }

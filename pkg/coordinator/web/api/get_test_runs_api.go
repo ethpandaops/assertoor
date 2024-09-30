@@ -27,7 +27,7 @@ type GetTestRunsResponse struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/test_runs [get]
 func (ah *APIHandler) GetTestRuns(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	q := r.URL.Query()
 	filterTestID := q.Get("test_id")

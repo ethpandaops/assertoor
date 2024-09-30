@@ -56,6 +56,26 @@ func (c *TestRunner) GetTestQueue() []types.Test {
 	return tests
 }
 
+func (c *TestRunner) RemoveTestFromQueue(runID uint64) bool {
+	c.testRegistryMutex.Lock()
+	defer c.testRegistryMutex.Unlock()
+
+	for idx, test := range c.testQueue {
+		if test.RunID() == runID {
+			if test.Status() == types.TestStatusRunning {
+				return false
+			}
+
+			c.testQueue = append(c.testQueue[:idx], c.testQueue[idx+1:]...)
+			delete(c.testRunMap, runID)
+
+			return true
+		}
+	}
+
+	return false
+}
+
 func (c *TestRunner) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.TestRunner, error) {
 	if descriptor.Err() != nil {
 		return nil, fmt.Errorf("cannot create test from failed test descriptor: %w", descriptor.Err())

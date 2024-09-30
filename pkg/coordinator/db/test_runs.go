@@ -139,3 +139,32 @@ func (db *Database) GetTestRunRange(testID string, firstRunID, offset, limit int
 
 	return runs[1:], runs[0].RunID, nil
 }
+
+// DeleteTestRun deletes a test run and all associated task states and logs.
+func (db *Database) DeleteTestRun(tx *sqlx.Tx, runID int) error {
+	_, err := tx.Exec(`
+		DELETE FROM test_runs
+		WHERE run_id = $1`,
+		runID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+		DELETE FROM task_states
+		WHERE run_id = $1`,
+		runID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+		DELETE FROM task_logs
+		WHERE run_id = $1`,
+		runID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

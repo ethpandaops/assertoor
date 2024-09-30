@@ -10,7 +10,6 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 )
 
 type RegistryPageArgs struct {
@@ -19,6 +18,10 @@ type RegistryPageArgs struct {
 }
 
 type RegistryPage struct {
+	CanRegister bool `json:"can_register"`
+	CanStart    bool `json:"can_start"`
+	CanDelete   bool `json:"can_delete"`
+
 	Tests          []*TestRegistryData `json:"tests"`
 	TotalTests     uint64              `json:"total_tests"`
 	FirstTestIndex uint64              `json:"first_test_index"`
@@ -127,7 +130,11 @@ func (fh *FrontendHandler) RegistryData(w http.ResponseWriter, r *http.Request) 
 }
 
 func (fh *FrontendHandler) getRegistryPageData(pageArgs *RegistryPageArgs) (*RegistryPage, error) {
-	pageData := &RegistryPage{}
+	pageData := &RegistryPage{
+		CanRegister: !fh.securityTrimmed,
+		CanStart:    !fh.securityTrimmed,
+		CanDelete:   !fh.securityTrimmed,
+	}
 
 	testDescriptors := fh.coordinator.TestRegistry().GetTestDescriptors()
 
@@ -181,6 +188,7 @@ func (fh *FrontendHandler) getTestRegistryData(idx int, test types.TestDescripto
 		Index:  uint64(idx),
 		TestID: test.ID(),
 		Source: test.Source(),
+		Config: "null",
 	}
 
 	if testError := test.Err(); testError != nil {
@@ -191,16 +199,18 @@ func (fh *FrontendHandler) getTestRegistryData(idx int, test types.TestDescripto
 		testData.Name = testConfig.Name
 	}
 
-	configYaml, err := yaml.Marshal(test.Vars().GetVarsMap(nil, true))
-	if err == nil {
-		testData.Config = string(configYaml)
+	if !fh.securityTrimmed {
+		configJSON, err := json.Marshal(test.Vars().GetVarsMap(nil, true))
+		if err == nil {
+			testData.Config = string(configJSON)
+		}
 	}
 
 	if runStats != nil {
 		testData.RunCount = runStats.Count
 
 		if runStats.LastRun > 0 {
-			lastRun := time.Unix(int64(runStats.LastRun), 0)
+			lastRun := time.UnixMilli(int64(runStats.LastRun))
 			testData.LastRun = &lastRun
 		}
 	}

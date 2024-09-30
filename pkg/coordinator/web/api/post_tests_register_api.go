@@ -40,12 +40,12 @@ type PostTestsRegisterResponse struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/tests/register [post]
 func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	// parse request body
 	req := &PostTestsRegisterRequest{}
 
-	if r.Header.Get("Content-Type") == "application/yaml" {
+	if r.Header.Get("Content-Type") == contentTypeYAML {
 		decoder := yaml.NewDecoder(r.Body)
 
 		err := decoder.Decode(req)

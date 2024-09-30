@@ -60,7 +60,7 @@ type GetTestRunDetailedTaskLog struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/test_run/{runId}/details [get]
 func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	vars := mux.Vars(r)
 

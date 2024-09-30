@@ -318,3 +318,19 @@ func (c *TestRegistry) externalTestCfgToDB(cfgExternalTest *types.ExternalTestCo
 
 	return dbTestCfg, nil
 }
+
+func (c *TestRegistry) DeleteTest(testID string) error {
+	c.testDescriptorsMutex.Lock()
+	if _, ok := c.testDescriptors[testID]; !ok {
+		c.testDescriptorsMutex.Unlock()
+		return nil
+	}
+
+	delete(c.testDescriptors, testID)
+
+	c.testDescriptorsMutex.Unlock()
+
+	return c.coordinator.Database().RunTransaction(func(tx *sqlx.Tx) error {
+		return c.coordinator.Database().DeleteTestConfig(tx, testID)
+	})
+}

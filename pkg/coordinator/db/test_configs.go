@@ -73,3 +73,13 @@ func (db *Database) GetTestRunStats() ([]*TestRunStats, error) {
 
 	return stats, nil
 }
+
+// DeleteTestConfig deletes a test config from the database.
+func (db *Database) DeleteTestConfig(tx *sqlx.Tx, testID string) error {
+	_, err := tx.Exec(`DELETE FROM test_configs WHERE test_id = $1`, testID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -68,7 +68,7 @@
                   </a>
                 </li>
                 <li><hr class="dropdown-divider"></li>
-                {{ if $canCancel }}
+                {{ if and $canCancel (or (eq $test.Status "pending") (eq $test.Status "running")) }}
                 <li>
                   <a class="dropdown-item test-cancel-button" href="#" data-testid="{{ $test.TestID }}" data-runid="{{ $test.RunID }}">
                     <i class="fas fa-times-circle mx-1"></i>
@@ -325,7 +325,7 @@
           type: "POST",
           url: "/api/v1/test_runs/delete",
           dataType: "json",
-          data: JSON.stringify({ run_ids: runIds }),
+          data: JSON.stringify({ test_runs: runIds }),
           success: function(res) {
             if (res && res.status === "OK") {
               location.reload();

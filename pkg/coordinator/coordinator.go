@@ -22,6 +22,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/web"
+	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
@@ -243,14 +244,13 @@ func (c *Coordinator) GetTestQueue() []types.Test {
 	return c.runner.GetTestQueue()
 }
 
-func (c *Coordinator) GetTestHistory(testID string, firstRunID uint64, offset uint64, limit uint64) ([]types.Test, int) {
-
+func (c *Coordinator) GetTestHistory(testID string, firstRunID, offset, limit uint64) (tests []types.Test, totalTests int) {
 	dbTests, totalTests, err := c.database.GetTestRunRange(testID, int(firstRunID), int(offset), int(limit))
 	if err != nil {
 		return nil, 0
 	}
 
-	tests := make([]types.Test, len(dbTests))
+	tests = make([]types.Test, len(dbTests))
 
 	for idx, dbTest := range dbTests {
 		if testRef := c.runner.GetTestByRunID(uint64(dbTest.RunID)); testRef != nil {
@@ -261,6 +261,25 @@ func (c *Coordinator) GetTestHistory(testID string, firstRunID uint64, offset ui
 	}
 
 	return tests, totalTests
+}
+
+func (c *Coordinator) DeleteTestRun(runID uint64) error {
+	testRef := c.runner.GetTestByRunID(runID)
+	if testRef != nil {
+		if testRef.Status() != types.TestStatusPending {
+			return errors.New("cannot delete running test")
+		}
+
+		if !c.runner.RemoveTestFromQueue(runID) {
+			return errors.New("could not remove test from queue")
+		}
+	}
+
+	err := c.database.RunTransaction(func(tx *sqlx.Tx) error {
+		return c.database.DeleteTestRun(tx, int(runID))
+	})
+
+	return err
 }
 
 func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.TestRunner, error) {

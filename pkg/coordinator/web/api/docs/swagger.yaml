@@ -180,6 +180,24 @@ definitions:
       test_id:
         type: string
     type: object
+  api.PostTestRunsDeleteRequest:
+    properties:
+      test_runs:
+        items:
+          type: integer
+        type: array
+    type: object
+  api.PostTestRunsDeleteResponse:
+    properties:
+      deleted:
+        items:
+          type: integer
+        type: array
+      errors:
+        items:
+          type: string
+        type: array
+    type: object
   api.PostTestRunsScheduleRequest:
     properties:
       allow_duplicate:
@@ -201,6 +219,24 @@ definitions:
         type: integer
       test_id:
         type: string
+    type: object
+  api.PostTestsDeleteRequest:
+    properties:
+      tests:
+        items:
+          type: string
+        type: array
+    type: object
+  api.PostTestsDeleteResponse:
+    properties:
+      deleted:
+        items:
+          type: string
+        type: array
+      errors:
+        items:
+          type: string
+        type: array
     type: object
   api.PostTestsRegisterExternalRequest:
     properties:
@@ -512,6 +548,43 @@ paths:
       summary: Get list of test runs
       tags:
       - TestRun
+  /api/v1/test_runs/delete:
+    post:
+      consumes:
+      - application/json
+      - application/yaml
+      description: Deletes test runs
+      operationId: postTestRunsDelete
+      parameters:
+      - description: Test configuration (json or yaml)
+        in: body
+        name: testConfig
+        required: true
+        schema:
+          $ref: '#/definitions/api.PostTestRunsDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.PostTestRunsDeleteResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Delete test runs
+      tags:
+      - TestRun
   /api/v1/test_runs/schedule:
     post:
       description: Returns the test & run id of the scheduled test execution.
@@ -574,6 +647,43 @@ paths:
           schema:
             $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
       summary: Get list of test definitions
+      tags:
+      - Test
+  /api/v1/tests/delete:
+    post:
+      consumes:
+      - application/json
+      - application/yaml
+      description: Deletes tests
+      operationId: postTestsDelete
+      parameters:
+      - description: Test configuration (json or yaml)
+        in: body
+        name: testConfig
+        required: true
+        schema:
+          $ref: '#/definitions/api.PostTestsDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.PostTestsDeleteResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Delete tests
       tags:
       - Test
   /api/v1/tests/register:

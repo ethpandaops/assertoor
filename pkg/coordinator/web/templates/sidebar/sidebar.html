@@ -25,13 +25,11 @@
     </div>
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
-      {{ if .CanRegisterTests }}
       <li class="nav-item">
         <a href="/registry" class="nav-link {{ if .RegistryActive }}active{{ end }}" aria-current="page">
           Test Registrations
         </a>
       </li>
-      {{ end }}
       <li class="nav-item">
         <a href="/" class="nav-link {{ if .AllTestsActive }}active{{ end }}" aria-current="page">
           All Test Runs
