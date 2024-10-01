@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
@@ -12,17 +13,24 @@ import (
 
 type Coordinator interface {
 	Logger() logrus.FieldLogger
-	LogScope() *logger.LogScope
+	LogReader() logger.LogReader
+	Database() *db.Database
 	ClientPool() *clients.ClientPool
 	WalletManager() *wallet.Manager
 	ValidatorNames() *names.ValidatorNames
 	GlobalVariables() Variables
+	TestRegistry() TestRegistry
 
-	LoadTests(ctx context.Context)
-	AddTestDescriptor(testDescriptor TestDescriptor) error
-	GetTestDescriptors() []TestDescriptor
 	GetTestByRunID(runID uint64) Test
 	GetTestQueue() []Test
-	GetTestHistory() []Test
-	ScheduleTest(descriptor TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (Test, error)
+	GetTestHistory(testID string, firstRunID uint64, offset uint64, limit uint64) ([]Test, int)
+	ScheduleTest(descriptor TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (TestRunner, error)
+	DeleteTestRun(runID uint64) error
+}
+
+type TestRegistry interface {
+	AddLocalTest(testConfig *TestConfig) (TestDescriptor, error)
+	AddExternalTest(ctx context.Context, extTestConfig *ExternalTestConfig) (TestDescriptor, error)
+	DeleteTest(testID string) error
+	GetTestDescriptors() []TestDescriptor
 }

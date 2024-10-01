@@ -5,19 +5,25 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/scheduler"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
+	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
 
 type Test struct {
 	runID         uint64
+	services      types.TaskServices
 	taskScheduler *scheduler.TaskScheduler
 	logger        logrus.FieldLogger
 	descriptor    types.TestDescriptor
 	config        *types.TestConfig
 	variables     types.Variables
+
+	dbTestRun *db.TestRun
 
 	status    types.TestStatus
 	startTime time.Time
@@ -25,9 +31,10 @@ type Test struct {
 	timeout   time.Duration
 }
 
-func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.FieldLogger, services types.TaskServices) (types.Test, error) {
+func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.FieldLogger, services types.TaskServices, configOverrides map[string]any) (types.TestRunner, error) {
 	test := &Test{
 		runID:      runID,
+		services:   services,
 		logger:     logger.WithField("RunID", runID).WithField("TestID", descriptor.ID()),
 		descriptor: descriptor,
 		config:     descriptor.Config(),
@@ -39,9 +46,39 @@ func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.Fie
 
 	// set test variables
 	test.variables = vars.NewVariables(descriptor.Vars())
+	for cfgKey, cfgValue := range configOverrides {
+		test.variables.SetVar(cfgKey, cfgValue)
+	}
+
+	// add test run to database
+	configYaml, err := yaml.Marshal(test.variables.GetVarsMap(nil, false))
+	if err != nil {
+		return nil, err
+	}
+
+	test.dbTestRun = &db.TestRun{
+		RunID:   int(runID),
+		TestID:  descriptor.ID(),
+		Name:    test.config.Name,
+		Source:  descriptor.Source(),
+		Config:  string(configYaml),
+		Timeout: int32(test.timeout.Seconds()),
+		Status:  string(test.status),
+	}
+
+	if err := services.Database().RunTransaction(func(tx *sqlx.Tx) error {
+		err := services.Database().InsertTestRun(tx, test.dbTestRun)
+		if err != nil {
+			return err
+		}
+
+		return services.Database().SetAssertoorState(tx, "test.lastRunId", runID)
+	}); err != nil {
+		return nil, err
+	}
 
 	// parse tasks
-	test.taskScheduler = scheduler.NewTaskScheduler(test.logger, services, test.variables)
+	test.taskScheduler = scheduler.NewTaskScheduler(test.logger, services, test.variables, runID)
 	for i := range test.config.Tasks {
 		taskOptions, err := test.taskScheduler.ParseTaskOptions(&test.config.Tasks[i])
 		if err != nil {
@@ -67,6 +104,31 @@ func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.Fie
 	}
 
 	return test, nil
+}
+
+func (t *Test) updateTestStatus() error {
+	// update test run in database
+	t.dbTestRun.Status = string(t.status)
+
+	if t.startTime.IsZero() {
+		t.dbTestRun.StartTime = 0
+	} else {
+		t.dbTestRun.StartTime = t.startTime.UnixMilli()
+	}
+
+	if t.stopTime.IsZero() {
+		t.dbTestRun.StopTime = 0
+	} else {
+		t.dbTestRun.StopTime = t.stopTime.UnixMilli()
+	}
+
+	if err := t.services.Database().RunTransaction(func(tx *sqlx.Tx) error {
+		return t.services.Database().UpdateTestRunStatus(tx, t.dbTestRun)
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (t *Test) RunID() uint64 {
@@ -131,14 +193,29 @@ func (t *Test) Run(ctx context.Context) error {
 	t.startTime = time.Now()
 	t.status = types.TestStatusRunning
 
+	if err := t.updateTestStatus(); err != nil {
+		t.logger.WithError(err).Error("failed updating test status")
+	}
+
 	defer func() {
 		t.stopTime = time.Now()
+
+		if err := t.updateTestStatus(); err != nil {
+			t.logger.WithError(err).Error("failed updating test status")
+		}
 	}()
 
 	// run test tasks
 	t.logger.WithField("timeout", t.timeout.String()).Info("starting test")
 
 	err := t.taskScheduler.RunTasks(ctx, t.timeout)
+
+	if ctx.Err() != nil {
+		t.logger.Info("test aborted!")
+		t.status = types.TestStatusAborted
+
+		return fmt.Errorf("test aborted")
+	}
 
 	if t.status == types.TestStatusAborted {
 		t.logger.Info("test aborted!")
@@ -174,8 +251,4 @@ func (t *Test) GetTaskScheduler() types.TaskScheduler {
 
 func (t *Test) GetTestVariables() types.Variables {
 	return t.variables
-}
-
-func (t *Test) Percent() float64 {
-	return 0
 }

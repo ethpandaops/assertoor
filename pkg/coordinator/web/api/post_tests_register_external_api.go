@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"gopkg.in/yaml.v3"
 )
 
 type PostTestsRegisterExternalRequest struct {
@@ -39,16 +39,27 @@ type PostTestsRegisterExternalResponse struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/tests/register_external [post]
 func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	// parse request body
 	req := &PostTestsRegisterExternalRequest{}
-	decoder := json.NewDecoder(r.Body)
 
-	err := decoder.Decode(req)
-	if err != nil {
-		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body json: %v", err), http.StatusBadRequest)
-		return
+	if r.Header.Get("Content-Type") == contentTypeYAML {
+		decoder := yaml.NewDecoder(r.Body)
+
+		err := decoder.Decode(req)
+		if err != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body yaml: %v", err), http.StatusBadRequest)
+			return
+		}
+	} else {
+		decoder := json.NewDecoder(r.Body)
+
+		err := decoder.Decode(req)
+		if err != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body json: %v", err), http.StatusBadRequest)
+			return
+		}
 	}
 
 	extTestCfg := &types.ExternalTestConfig{
@@ -63,31 +74,8 @@ func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.R
 		extTestCfg.Timeout = &helper.Duration{Duration: time.Duration(req.Timeout) * time.Second}
 	}
 
-	testConfig, testVars, err := test.LoadExternalTestConfig(r.Context(), ah.coordinator.GlobalVariables(), extTestCfg)
-	if err != nil {
-		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed loading test config from %v: %v", req.File, err), http.StatusBadRequest)
-		return
-	}
-
-	if testConfig.ID == "" {
-		ah.sendErrorResponse(w, r.URL.String(), "test id missing or empty", http.StatusBadRequest)
-		return
-	}
-
-	if testConfig.Name == "" {
-		ah.sendErrorResponse(w, r.URL.String(), "test name missing or empty", http.StatusBadRequest)
-		return
-	}
-
-	if len(testConfig.Tasks) == 0 {
-		ah.sendErrorResponse(w, r.URL.String(), "test must have 1 or more tasks", http.StatusBadRequest)
-		return
-	}
-
-	testDescriptor := test.NewDescriptor(testConfig.ID, fmt.Sprintf("api-call,external:%v", extTestCfg.File), testConfig, testVars)
-
 	// add test descriptor
-	err = ah.coordinator.AddTestDescriptor(testDescriptor)
+	testDescriptor, err := ah.coordinator.TestRegistry().AddExternalTest(r.Context(), extTestCfg)
 	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed adding test: %v", err), http.StatusInternalServerError)
 		return

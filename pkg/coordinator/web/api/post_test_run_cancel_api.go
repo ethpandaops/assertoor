@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"gopkg.in/yaml.v3"
 )
 
 type PostTestRunCancelRequest struct {
@@ -34,16 +35,27 @@ type PostTestRunCancelResponse struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/test_run/{runId}/cancel [post]
 func (ah *APIHandler) PostTestRunCancel(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	// parse request body
-	decoder := json.NewDecoder(r.Body)
 	req := &PostTestRunCancelRequest{}
 
-	err := decoder.Decode(req)
-	if err != nil {
-		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body: %v", err), http.StatusBadRequest)
-		return
+	if r.Header.Get("Content-Type") == contentTypeYAML {
+		decoder := yaml.NewDecoder(r.Body)
+
+		err := decoder.Decode(req)
+		if err != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body yaml: %v", err), http.StatusBadRequest)
+			return
+		}
+	} else {
+		decoder := json.NewDecoder(r.Body)
+
+		err := decoder.Decode(req)
+		if err != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body json: %v", err), http.StatusBadRequest)
+			return
+		}
 	}
 
 	// get test run by id

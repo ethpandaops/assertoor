@@ -27,18 +27,15 @@ type GetTestRunsResponse struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/test_runs [get]
 func (ah *APIHandler) GetTestRuns(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	q := r.URL.Query()
 	filterTestID := q.Get("test_id")
 	testRuns := []*GetTestRunsResponse{}
 
-	testInstances := append(ah.coordinator.GetTestHistory(), ah.coordinator.GetTestQueue()...)
-	for _, testInstance := range testInstances {
-		if filterTestID != "" && filterTestID != testInstance.TestID() {
-			continue
-		}
+	testInstances, _ := ah.coordinator.GetTestHistory(filterTestID, 0, 0, 100)
 
+	for _, testInstance := range testInstances {
 		testRun := &GetTestRunsResponse{
 			RunID:  testInstance.RunID(),
 			TestID: testInstance.TestID(),

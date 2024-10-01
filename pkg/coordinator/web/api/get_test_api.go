@@ -29,7 +29,7 @@ type GetTestResponse struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/test/{testId} [get]
 func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	vars := mux.Vars(r)
 	if vars["testId"] == "" {
@@ -39,7 +39,7 @@ func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
 
 	var testDescriptor types.TestDescriptor
 
-	for _, testDescr := range ah.coordinator.GetTestDescriptors() {
+	for _, testDescr := range ah.coordinator.TestRegistry().GetTestDescriptors() {
 		if testDescr.Err() != nil {
 			continue
 		}

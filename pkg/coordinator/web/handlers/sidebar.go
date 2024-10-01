@@ -12,6 +12,7 @@ type SidebarData struct {
 	ELHeadHash       []byte         `json:"el_head_hash"`
 	TestDescriptors  []*SidebarTest `json:"tests"`
 	AllTestsActive   bool           `json:"all_tests_active"`
+	RegistryActive   bool           `json:"registry_active"`
 	CanRegisterTests bool           `json:"can_register_tests"`
 	Version          string         `json:"version"`
 }
@@ -26,6 +27,7 @@ func (fh *FrontendHandler) getSidebarData(activeTestID string) *SidebarData {
 	sidebarData := &SidebarData{
 		TestDescriptors:  []*SidebarTest{},
 		AllTestsActive:   activeTestID == "*",
+		RegistryActive:   activeTestID == "*registry",
 		CanRegisterTests: !fh.securityTrimmed && fh.isAPIEnabled,
 		Version:          buildinfo.GetVersion(),
 	}
@@ -50,7 +52,7 @@ func (fh *FrontendHandler) getSidebarData(activeTestID string) *SidebarData {
 	}
 
 	// get test descriptors
-	for _, testDescr := range fh.coordinator.GetTestDescriptors() {
+	for _, testDescr := range fh.coordinator.TestRegistry().GetTestDescriptors() {
 		if testDescr.Err() != nil {
 			continue
 		}

@@ -7,8 +7,8 @@ import (
 )
 
 type Config struct {
-	ForegroundTask *helper.RawMessage `yaml:"foregroundTask" json:"foregroundTask"`
-	BackgroundTask *helper.RawMessage `yaml:"backgroundTask" json:"backgroundTask"`
+	ForegroundTask *helper.RawMessageMasked `yaml:"foregroundTask" json:"foregroundTask"`
+	BackgroundTask *helper.RawMessageMasked `yaml:"backgroundTask" json:"backgroundTask"`
 
 	ExitOnForegroundSuccess bool `yaml:"exitOnForegroundSuccess" json:"exitOnForegroundSuccess"`
 	ExitOnForegroundFailure bool `yaml:"exitOnForegroundFailure" json:"exitOnForegroundFailure"`

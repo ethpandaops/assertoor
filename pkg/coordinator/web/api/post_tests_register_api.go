@@ -6,9 +6,7 @@ import (
 	"net/http"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"gopkg.in/yaml.v3"
 )
 
@@ -42,12 +40,12 @@ type PostTestsRegisterResponse struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/tests/register [post]
 func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	// parse request body
 	req := &PostTestsRegisterRequest{}
 
-	if r.Header.Get("Content-Type") == "application/yaml" {
+	if r.Header.Get("Content-Type") == contentTypeYAML {
 		decoder := yaml.NewDecoder(r.Body)
 
 		err := decoder.Decode(req)
@@ -99,22 +97,8 @@ func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	testVars := vars.NewVariables(ah.coordinator.GlobalVariables())
-
-	for k, v := range testConfig.Config {
-		testVars.SetVar(k, v)
-	}
-
-	err := testVars.CopyVars(ah.coordinator.GlobalVariables(), testConfig.ConfigVars)
-	if err != nil {
-		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed decoding configVars: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	testDescriptor := test.NewDescriptor(req.ID, "api-call", testConfig, testVars)
-
 	// add test descriptor
-	err = ah.coordinator.AddTestDescriptor(testDescriptor)
+	testDescriptor, err := ah.coordinator.TestRegistry().AddLocalTest(testConfig)
 	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed adding test: %v", err), http.StatusInternalServerError)
 		return

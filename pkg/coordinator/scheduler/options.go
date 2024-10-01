@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func (ts *TaskScheduler) ParseTaskOptions(rawtask *helper.RawMessage) (*types.TaskOptions, error) {
+func (ts *TaskScheduler) ParseTaskOptions(rawtask helper.IRawMessage) (*types.TaskOptions, error) {
 	options := &types.TaskOptions{}
 	if err := rawtask.Unmarshal(&options); err != nil {
 		return nil, fmt.Errorf("error parsing task: %w", err)

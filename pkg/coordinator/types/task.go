@@ -61,7 +61,7 @@ type TaskState interface {
 	Timeout() time.Duration
 	GetTaskStatus() *TaskStatus
 	GetTaskStatusVars() Variables
-	GetTaskVars() Variables
+	GetScopeOwner() TaskIndex
 	GetTaskResultUpdateChan(oldResult TaskResult) <-chan bool
 }
 
@@ -75,11 +75,11 @@ type TaskStatus struct {
 	StopTime    time.Time
 	Result      TaskResult
 	Error       error
-	Logger      *logger.LogScope
+	Logger      logger.LogReader
 }
 
 type TaskContext struct {
-	Scheduler TaskScheduler
+	Scheduler TaskSchedulerRunner
 	Index     TaskIndex
 	Vars      Variables
 	Outputs   Variables

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"gopkg.in/yaml.v3"
 )
 
 type PostTestRunsScheduleRequest struct {
@@ -33,22 +34,33 @@ type PostTestRunsScheduleResponse struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/test_runs/schedule [post]
 func (ah *APIHandler) PostTestRunsSchedule(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	// parse request body
-	decoder := json.NewDecoder(r.Body)
 	req := &PostTestRunsScheduleRequest{}
 
-	err := decoder.Decode(req)
-	if err != nil {
-		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body: %v", err), http.StatusBadRequest)
-		return
+	if r.Header.Get("Content-Type") == contentTypeYAML {
+		decoder := yaml.NewDecoder(r.Body)
+
+		err := decoder.Decode(req)
+		if err != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body yaml: %v", err), http.StatusBadRequest)
+			return
+		}
+	} else {
+		decoder := json.NewDecoder(r.Body)
+
+		err := decoder.Decode(req)
+		if err != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body json: %v", err), http.StatusBadRequest)
+			return
+		}
 	}
 
 	// get test descriptor by test id
 	var testDescriptor types.TestDescriptor
 
-	for _, testDescr := range ah.coordinator.GetTestDescriptors() {
+	for _, testDescr := range ah.coordinator.TestRegistry().GetTestDescriptors() {
 		if testDescr.Err() != nil {
 			continue
 		}
