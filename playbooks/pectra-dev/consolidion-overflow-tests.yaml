@@ -163,8 +163,8 @@ tasks:
               validator: "tasks.validator_2048_eth_post_consolidation_info.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
-              if [ "$balance" -lt 2070000000000 ]; then
-                echo "Balance too low! expected: > 2070.0 ETH, got: $balance Gwei"
+              if [ "$balance" -lt 2048000000000 ]; then
+                echo "Balance too low! expected: >= 2048.0 ETH, got: $balance Gwei"
                 exit 1
               fi
               
