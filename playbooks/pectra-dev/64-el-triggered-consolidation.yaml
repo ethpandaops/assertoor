@@ -1,0 +1,126 @@
+
+id: 64-el-triggered-consolidation
+name: "EL-triggered consolidation test"
+timeout: 1h
+config:
+  walletPrivkey: ""
+  validatorCount: 300
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  sourceValidatorIndex: 100
+  consolidationNumber: 64
+  targetValidatorIndex: 200
+  blsChangesWaitSlot: 41
+  consolidationWaitSlot: 60
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# wait for electra activation
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+- name: check_consensus_slot_range
+  title: "Wait for electra activation"
+  configVars:
+    minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
+
+- name: get_wallet_details
+  title: "Get target wallet address"
+  id: target_wallet
+  configVars:
+    privateKey: "walletPrivkey"
+
+- name: check_consensus_slot_range
+  title: "Wait for slot >= ${blsChangesWaitSlot}"
+  timeout: 30m
+  configVars:
+    minSlotNumber: "blsChangesWaitSlot"
+
+
+- name: run_task_options
+  title: "Generate ${validatorCount} BLS changes"
+  timeout: 5m
+  config:
+    task:
+      name: generate_bls_changes
+      title: "Generate ${validatorCount} BLS changes"
+      configVars:
+        mnemonic: "validatorMnemonic"
+        targetAddress: "tasks.target_wallet.outputs.address"
+        limitTotal: "validatorCount"
+        indexCount: "validatorCount"
+
+- name: check_consensus_slot_range
+  title: "Wait for slot >= ${consolidationWaitSlot}"
+  timeout: 30m
+  configVars:
+    minSlotNumber: "consolidationWaitSlot"
+
+- name: run_tasks
+  title: "Generate consolidations"
+  timeout: 3h
+  config:
+    tasks:
+      - name: run_task_options
+        title: "Generate consolidation"
+        config:
+          task:
+            name: generate_consolidations
+            title: "Consolidate Validator ${sourceValidatorIndex}-${{sourceValidatorIndex + .consolidationNumber - 1}} to ${targetValidatorIndex}"
+            timeout: 5m
+            config:
+              failOnReject: true
+              awaitReceipt: true
+            configVars:
+              sourceIndexCount: "consolidationNumber"
+              walletPrivkey: "walletPrivkey"
+              sourceStartValidatorIndex: "sourceValidatorIndex"
+              targetValidatorIndex: "targetValidatorIndex"
+
+      - name: check_consensus_validator_status
+        title: "Wait for validator to completely exit (${sourceValidatorIndex})"
+        timeout: 150m
+        config:
+          validatorStatus:
+            - withdrawal_done
+            - withdrawal_possible
+        configVars:
+          validatorIndex: "sourceValidatorIndex + .consolidationNumber - 1"
+
+      - name: check_consensus_validator_status
+        title: "Fetch the data for the target validator  (${targetValidatorIndex})"
+        timeout: 5m
+        id: target_validator_info
+        config:
+          validatorStatus:
+            - active_ongoing
+        configVars:
+          validatorIndex: "targetValidatorIndex"
+
+      - name: run_shell
+        timeout: 5m
+        title: "Check targetValidator status: 2048 ETH (64* 32 ETH EB), 0x02 withdrawal creds"
+        config:
+          envVars:
+            validator: "tasks.target_validator_info.outputs.validator"
+          command: |
+            balance=$(echo "$validator" | jq -r '.balance')
+            if [ "$balance" -lt 2047900000000 ]; then
+              echo "Balance too low! expected: > 2047.9 ETH, got: $balance Gwei"
+              exit 1
+            fi
+            
+            effective_balance=$(echo "$validator" | jq -r '.validator.effective_balance')
+            if [ "$effective_balance" != "2048000000000" ]; then
+              echo "Effective balance too low! expected: 2048 ETH, got: $effective_balance Gwei"
+              exit 1
+            fi
+            
+            withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
+            if [[ ! "$withdrawal_creds" == "0x02"* ]]; then
+              echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
+              exit 1
+            fi
