@@ -13,6 +13,7 @@ type Config struct {
 	SourceStartIndex          int      `yaml:"sourceStartIndex" json:"sourceStartIndex"`
 	SourceStartValidatorIndex *uint64  `yaml:"sourceStartValidatorIndex" json:"sourceStartValidatorIndex"`
 	SourceIndexCount          int      `yaml:"sourceIndexCount" json:"sourceIndexCount"`
+	TargetPublicKey           string   `yaml:"targetPublicKey" json:"targetPublicKey"`
 	TargetValidatorIndex      *uint64  `yaml:"targetValidatorIndex" json:"targetValidatorIndex"`
 	ConsolidationEpoch        *uint64  `yaml:"consolidationEpoch" json:"consolidationEpoch"`
 	WalletPrivkey             string   `yaml:"walletPrivkey" json:"walletPrivkey"`
@@ -46,8 +47,8 @@ func (c *Config) Validate() error {
 		return errors.New("either sourceMnemonic with sourceStartIndex or sourceStartValidatorIndex must be set")
 	}
 
-	if c.TargetValidatorIndex == nil {
-		return errors.New("targetValidatorIndex must be set")
+	if c.TargetValidatorIndex == nil && c.TargetPublicKey == "" {
+		return errors.New("either targetValidatorIndex or targetPublicKey must be set")
 	}
 
 	return nil

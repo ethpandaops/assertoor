@@ -734,7 +734,6 @@ func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *s
 			for _, withdrawalRequest := range withdrawalRequests {
 				if expectedWithdrawalRequest.ValidatorPubkey == "" || bytes.Equal(withdrawalRequest.ValidatorPubkey[:], expectedPubKey) {
 					withdrawalAmount := big.NewInt(int64(withdrawalRequest.Amount))
-					withdrawalAmount = withdrawalAmount.Mul(withdrawalAmount, big.NewInt(1000000000))
 
 					switch {
 					case expectedWithdrawalRequest.SourceAddress != "" && !bytes.Equal(expectedAddress, withdrawalRequest.SourceAddress[:]):

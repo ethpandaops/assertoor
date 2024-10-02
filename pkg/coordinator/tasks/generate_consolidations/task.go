@@ -284,9 +284,24 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 		return nil, fmt.Errorf("source validator %s not found in validator set", sourceSelector)
 	}
 
-	targetValidator = validatorSet[phase0.ValidatorIndex(*t.config.TargetValidatorIndex)]
-	if targetValidator == nil {
-		return nil, fmt.Errorf("target validator (index: %v) not found", *t.config.TargetValidatorIndex)
+	if t.config.TargetValidatorIndex == nil {
+		// select by public key
+		targetPubkey := ethcommon.FromHex(t.config.TargetPublicKey)
+		for _, val := range validatorSet {
+			if bytes.Equal(val.Validator.PublicKey[:], targetPubkey) {
+				targetValidator = val
+				break
+			}
+		}
+
+		if targetValidator == nil {
+			return nil, fmt.Errorf("target validator (pubkey: 0x%x) not found", targetPubkey)
+		}
+	} else {
+		targetValidator = validatorSet[phase0.ValidatorIndex(*t.config.TargetValidatorIndex)]
+		if targetValidator == nil {
+			return nil, fmt.Errorf("target validator (index: %v) not found", *t.config.TargetValidatorIndex)
+		}
 	}
 
 	// generate consolidation transaction

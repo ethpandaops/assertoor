@@ -30,8 +30,11 @@ The source validators can be specified in two ways:
 - **`sourceIndexCount`**:
   The number of validators to include in the consolidation process from the source mnemonic.
 
+- **`targetPublicKey`**:
+  The public key of the target validator to which all consolidated funds will be transferred.
+
 - **`targetValidatorIndex`**:
-  The index of the target validator to which all consolidated funds will be transferred.
+  The index of the target validator to which all consolidated funds will be transferred. (alternative to targetPublicKey)
 
 - **`consolidationEpoch`**:
   The specific blockchain epoch during which the consolidations are to be executed, aligning the transactions with defined blockchain timings.
@@ -82,6 +85,7 @@ Default settings for the `generate_consolidations` task:
     sourceStartValidatorIndex: null
     sourceIndexCount: 0
     targetValidatorIndex: null
+    targetPublicKey: ""
     consolidationEpoch: null
     walletPrivkey: ""
     consolidationContract: 0x00b42dbF2194e931E80326D950320f7d9Dbeac02
