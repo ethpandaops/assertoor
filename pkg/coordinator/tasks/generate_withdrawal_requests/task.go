@@ -87,13 +87,13 @@ func (t *Task) LoadConfig() error {
 	if config.SourceMnemonic != "" {
 		t.sourceSeed, err = t.mnemonicToSeed(config.SourceMnemonic)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed parsing sourceMnemonic: %v", err)
 		}
 	}
 
 	t.walletPrivKey, err = crypto.HexToECDSA(config.WalletPrivkey)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed parsing walletPrivKey: %v", err)
 	}
 
 	t.withdrawalContractAddr = ethcommon.HexToAddress(config.WithdrawalContract)
