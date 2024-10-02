@@ -242,42 +242,50 @@ func (t *Task) Execute(ctx context.Context) error {
 func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
-	var sourceValidator *v1.Validator
+	var sourcePubkey []byte
 
-	if t.config.SourceIndexCount > 0 {
-		accountIdx %= uint64(t.config.SourceIndexCount)
-	}
+	if t.config.SourcePubkey != "" {
+		sourcePubkey = ethcommon.Hex2Bytes(t.config.SourcePubkey)
+	} else {
+		var sourceValidator *v1.Validator
 
-	validatorSet := clientPool.GetConsensusPool().GetValidatorSet()
-	sourceSelector := ""
-
-	if t.sourceSeed != nil {
-		// select by key index
-		validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
-
-		validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.sourceSeed, validatorKeyPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
+		if t.config.SourceIndexCount > 0 {
+			accountIdx %= uint64(t.config.SourceIndexCount)
 		}
 
-		sourceValidatorPubkey := validatorPrivkey.PublicKey().Marshal()
-		sourceSelector = fmt.Sprintf("(pubkey: 0x%x)", sourceValidatorPubkey)
+		validatorSet := clientPool.GetConsensusPool().GetValidatorSet()
+		sourceSelector := ""
 
-		for _, val := range validatorSet {
-			if bytes.Equal(val.Validator.PublicKey[:], sourceValidatorPubkey) {
-				sourceValidator = val
-				break
+		if t.sourceSeed != nil {
+			// select by key index
+			validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
+
+			validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.sourceSeed, validatorKeyPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 			}
-		}
-	} else if t.config.SourceStartValidatorIndex != nil {
-		// select by validator index
-		validatorIndex := *t.config.SourceStartValidatorIndex + accountIdx
-		sourceSelector = fmt.Sprintf("(index: %v)", validatorIndex)
-		sourceValidator = validatorSet[phase0.ValidatorIndex(validatorIndex)]
-	}
 
-	if sourceValidator == nil {
-		return nil, fmt.Errorf("source validator %s not found in validator set", sourceSelector)
+			sourceValidatorPubkey := validatorPrivkey.PublicKey().Marshal()
+			sourceSelector = fmt.Sprintf("(pubkey: 0x%x)", sourceValidatorPubkey)
+
+			for _, val := range validatorSet {
+				if bytes.Equal(val.Validator.PublicKey[:], sourceValidatorPubkey) {
+					sourceValidator = val
+					break
+				}
+			}
+		} else if t.config.SourceStartValidatorIndex != nil {
+			// select by validator index
+			validatorIndex := *t.config.SourceStartValidatorIndex + accountIdx
+			sourceSelector = fmt.Sprintf("(index: %v)", validatorIndex)
+			sourceValidator = validatorSet[phase0.ValidatorIndex(validatorIndex)]
+		}
+
+		if sourceValidator == nil {
+			return nil, fmt.Errorf("source validator %s not found in validator set", sourceSelector)
+		}
+
+		sourcePubkey = sourceValidator.Validator.PublicKey[:]
 	}
 
 	// generate withdrawal transaction
@@ -319,7 +327,7 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConf
 
 	tx, err := wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
 		txData := make([]byte, 64) // 48 bytes pubkey + 16 bytes amount
-		copy(txData[0:48], sourceValidator.Validator.PublicKey[:])
+		copy(txData[0:48], sourcePubkey)
 		copy(txData[48:], amountBytes)
 
 		txObj := &ethtypes.DynamicFeeTx{
@@ -344,7 +352,7 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConf
 
 		t.logger.WithFields(logrus.Fields{
 			"client": client.GetName(),
-		}).Infof("sending withdrawal transaction (source index: %v, amount: %v, nonce: %v)", sourceValidator.Index, amount.String(), tx.Nonce())
+		}).Infof("sending withdrawal transaction (source pubkey: 0x%x, amount: %v, nonce: %v)", sourcePubkey, amount.String(), tx.Nonce())
 
 		err = client.GetRPCClient().SendTransaction(ctx, tx)
 		if err == nil {

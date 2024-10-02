@@ -9,6 +9,7 @@ type Config struct {
 	LimitPerSlot              int      `yaml:"limitPerSlot" json:"limitPerSlot"`
 	LimitTotal                int      `yaml:"limitTotal" json:"limitTotal"`
 	LimitPending              int      `yaml:"limitPending" json:"limitPending"`
+	SourcePubkey              string   `yaml:"sourcePubkey" json:"sourcePubkey"`
 	SourceMnemonic            string   `yaml:"sourceMnemonic" json:"sourceMnemonic"`
 	SourceStartIndex          int      `yaml:"sourceStartIndex" json:"sourceStartIndex"`
 	SourceStartValidatorIndex *uint64  `yaml:"sourceStartValidatorIndex" json:"sourceStartValidatorIndex"`
@@ -41,8 +42,8 @@ func (c *Config) Validate() error {
 		return errors.New("either limitTotal or limitPerSlot must be set")
 	}
 
-	if c.SourceMnemonic == "" && c.SourceStartValidatorIndex == nil {
-		return errors.New("either sourceMnemonic with sourceStartIndex or sourceStartValidatorIndex must be set")
+	if c.SourcePubkey == "" && c.SourceMnemonic == "" && c.SourceStartValidatorIndex == nil {
+		return errors.New("either sourcePubkey or sourceMnemonic with sourceStartIndex or sourceStartValidatorIndex must be set")
 	}
 
 	return nil

@@ -3,6 +3,11 @@
 ### Description
 The `generate_withdrawal_requests` task facilitates the generation and submission of withdrawal requests to the Ethereum network. This task is crucial for simulating the process of withdrawing funds or exiting validators as part of execution layer triggered staking operations.
 
+The source validators can be specified in three ways:
+- By providing `sourcePubkey`, which is used as static pubkey for all requests
+- By providing `sourceMnemonic`, `sourceStartIndex` & `sourceIndexCount` to select the source validators by the pubkeys derived from the mnemonic & key range
+- By providing `sourceStartValidatorIndex` & `sourceIndexCount` to select the source validators by their validator index
+
 ### Configuration Parameters
 
 - **`limitPerSlot`**:
@@ -13,6 +18,9 @@ The `generate_withdrawal_requests` task facilitates the generation and submissio
 
 - **`limitPending`**:
   Defines the maximum number of pending withdrawal requests allowed at any given time.
+
+- **`sourcePubkey`**:
+  The static pubkey to include in the withdrawal requests.
 
 - **`sourceMnemonic`**:
   The mnemonic used to derive source validator keys from which withdrawals will be requested.
@@ -65,6 +73,7 @@ Default settings for the `generate_withdrawal_requests` task:
     limitPerSlot: 0
     limitTotal: 0
     limitPending: 0
+    sourcePubkey: ""
     sourceMnemonic: ""
     sourceStartIndex: 0
     sourceStartValidatorIndex: null
