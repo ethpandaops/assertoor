@@ -245,7 +245,7 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConf
 	var sourcePubkey []byte
 
 	if t.config.SourcePubkey != "" {
-		sourcePubkey = ethcommon.Hex2Bytes(t.config.SourcePubkey)
+		sourcePubkey = ethcommon.FromHex(t.config.SourcePubkey)
 	} else {
 		var sourceValidator *v1.Validator
 
@@ -321,12 +321,12 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConf
 	}
 
 	amount := big.NewInt(0).SetUint64(t.config.WithdrawAmount)
-	amountBytes := amount.FillBytes(make([]byte, 16))
+	amountBytes := amount.FillBytes(make([]byte, 8))
 
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
 
 	tx, err := wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
-		txData := make([]byte, 64) // 48 bytes pubkey + 16 bytes amount
+		txData := make([]byte, 56) // 48 bytes pubkey + 8 bytes amount
 		copy(txData[0:48], sourcePubkey)
 		copy(txData[48:], amountBytes)
 
