@@ -14,12 +14,12 @@ type Config struct {
 	FailTaskCount uint64 `yaml:"failTaskCount" json:"failTaskCount"`
 
 	// child tasks
-	Tasks []helper.RawMessage `yaml:"tasks" json:"tasks"`
+	Tasks []helper.RawMessageMasked `yaml:"tasks" json:"tasks"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Tasks:         []helper.RawMessage{},
+		Tasks:         []helper.RawMessageMasked{},
 		FailTaskCount: 1,
 	}
 }

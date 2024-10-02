@@ -5,13 +5,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/tasks"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
+	"github.com/jmoiron/sqlx"
+	"gopkg.in/yaml.v3"
 )
 
 type taskState struct {
+	ts          *TaskScheduler
 	index       types.TaskIndex
 	options     *types.TaskOptions
 	descriptor  *types.TaskDescriptor
@@ -38,6 +42,8 @@ type taskState struct {
 	taskError        error
 	resultNotifyChan chan bool
 	resultMutex      sync.RWMutex
+
+	dbTaskState *db.TaskState
 }
 
 func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *taskState, variables types.Variables, isCleanupTask bool) (*taskState, error) {
@@ -49,32 +55,7 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 		}
 	}
 
-	// lookup task descriptor by name
-	var taskDescriptor *types.TaskDescriptor
-
-	for _, taskDesc := range tasks.AvailableTaskDescriptors {
-		if taskDesc.Name == options.Name {
-			taskDescriptor = taskDesc
-			break
-		}
-
-		if len(taskDesc.Aliases) > 0 {
-			isAlias := false
-
-			for _, alias := range taskDesc.Aliases {
-				if alias == options.Name {
-					isAlias = true
-					break
-				}
-			}
-
-			if isAlias {
-				taskDescriptor = taskDesc
-				break
-			}
-		}
-	}
-
+	taskDescriptor := tasks.GetTaskDescriptor(options.Name)
 	if taskDescriptor == nil {
 		return nil, fmt.Errorf("unknown task name: %v", options.Name)
 	}
@@ -85,6 +66,7 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 
 	taskIdx := ts.taskCount
 	taskState := &taskState{
+		ts:          ts,
 		index:       taskIdx,
 		options:     options,
 		descriptor:  taskDescriptor,
@@ -92,8 +74,11 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 		taskVars:    variables,
 		isCleanup:   isCleanupTask,
 		logger: logger.NewLogger(&logger.ScopeOptions{
-			Parent:      ts.logger.WithField("task", options.Name).WithField("taskidx", taskIdx),
-			HistorySize: 1000,
+			Parent:     ts.logger.WithField("task", options.Name).WithField("taskidx", taskIdx),
+			BufferSize: 1000,
+			Database:   ts.services.Database(),
+			TestRunID:  ts.testRunID,
+			TaskID:     uint64(taskIdx),
 		}),
 		taskOutputs:    vars.NewVariables(nil),
 		taskStatusVars: vars.NewVariables(nil),
@@ -121,7 +106,137 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 		ts.allTasks = append(ts.allTasks, taskIdx)
 	}
 
+	// add to database
+	if database := ts.services.Database(); database != nil {
+		taskState.dbTaskState = &db.TaskState{
+			RunID:   int(ts.testRunID),
+			TaskID:  int(taskIdx),
+			Name:    taskState.options.Name,
+			Title:   taskState.Title(),
+			RefID:   taskState.options.ID,
+			Timeout: int(taskState.options.Timeout.Seconds()),
+			IfCond:  taskState.options.If,
+		}
+
+		if taskState.isCleanup {
+			taskState.dbTaskState.RunFlags |= db.TaskRunFlagCleanup
+		}
+
+		if parentState != nil {
+			taskState.dbTaskState.ParentTask = int(parentState.index)
+		}
+
+		err := database.RunTransaction(func(tx *sqlx.Tx) error {
+			return database.InsertTaskState(tx, taskState.dbTaskState)
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return taskState, nil
+}
+
+func (ts *taskState) updateTaskState() error {
+	if ts.dbTaskState == nil {
+		return nil
+	}
+
+	changedFields := []string{}
+
+	if ts.Title() != ts.dbTaskState.Title {
+		ts.dbTaskState.Title = ts.Title()
+
+		changedFields = append(changedFields, "title")
+	}
+
+	runFlags := uint32(0)
+
+	if ts.isCleanup {
+		runFlags |= db.TaskRunFlagCleanup
+	}
+
+	if ts.isStarted {
+		runFlags |= db.TaskRunFlagStarted
+	}
+
+	if ts.isRunning {
+		runFlags |= db.TaskRunFlagRunning
+	}
+
+	if ts.isSkipped {
+		runFlags |= db.TaskRunFlagSkipped
+	}
+
+	if ts.isTimeout {
+		runFlags |= db.TaskRunFlagTimeout
+	}
+
+	if runFlags != ts.dbTaskState.RunFlags {
+		ts.dbTaskState.RunFlags = runFlags
+
+		changedFields = append(changedFields, "run_flags")
+	}
+
+	if !ts.startTime.IsZero() && ts.startTime.UnixMilli() != ts.dbTaskState.StartTime {
+		ts.dbTaskState.StartTime = ts.startTime.UnixMilli()
+
+		changedFields = append(changedFields, "start_time")
+	}
+
+	if !ts.stopTime.IsZero() && ts.stopTime.UnixMilli() != ts.dbTaskState.StopTime {
+		ts.dbTaskState.StopTime = ts.stopTime.UnixMilli()
+
+		changedFields = append(changedFields, "stop_time")
+	}
+
+	taskStatusVars := ts.taskStatusVars.GetVarsMap(nil, false)
+
+	configVarsYaml, err := yaml.Marshal(ts.Config())
+	if err != nil {
+		return err
+	}
+
+	if string(configVarsYaml) != ts.dbTaskState.TaskConfig {
+		ts.dbTaskState.TaskConfig = string(configVarsYaml)
+
+		changedFields = append(changedFields, "task_config")
+	}
+
+	statusVarsYaml, err := yaml.Marshal(taskStatusVars)
+	if err != nil {
+		return err
+	}
+
+	if string(statusVarsYaml) != ts.dbTaskState.TaskStatus {
+		ts.dbTaskState.TaskStatus = string(statusVarsYaml)
+
+		changedFields = append(changedFields, "task_status")
+	}
+
+	if int(ts.taskResult) != ts.dbTaskState.TaskResult {
+		ts.dbTaskState.TaskResult = int(ts.taskResult)
+
+		changedFields = append(changedFields, "task_result")
+	}
+
+	if ts.taskError != nil && ts.taskError.Error() != ts.dbTaskState.TaskError {
+		ts.dbTaskState.TaskError = ts.taskError.Error()
+
+		changedFields = append(changedFields, "task_error")
+	}
+
+	if len(changedFields) == 0 {
+		return nil
+	}
+
+	if database := ts.ts.services.Database(); database != nil {
+		return database.RunTransaction(func(tx *sqlx.Tx) error {
+			return database.UpdateTaskStateStatus(tx, ts.dbTaskState, changedFields)
+		})
+	}
+
+	return nil
 }
 
 func (ts *taskState) setTaskResult(result types.TaskResult, setUpdated bool) {
@@ -138,6 +253,10 @@ func (ts *taskState) setTaskResult(result types.TaskResult, setUpdated bool) {
 
 	ts.taskResult = result
 	ts.taskStatusVars.SetVar("result", uint8(result))
+
+	if err := ts.updateTaskState(); err != nil {
+		ts.logger.GetLogger().Errorf("failed to update task state in db: %v", err)
+	}
 
 	if ts.resultNotifyChan != nil {
 		close(ts.resultNotifyChan)
@@ -169,8 +288,13 @@ func (ts *taskState) GetTaskStatusVars() types.Variables {
 	return ts.taskStatusVars
 }
 
-func (ts *taskState) GetTaskVars() types.Variables {
-	return ts.taskVars
+func (ts *taskState) GetScopeOwner() types.TaskIndex {
+	scopeOwner, found := ts.taskVars.LookupVar("scopeOwner")
+	if !found {
+		return 0
+	}
+
+	return scopeOwner.(types.TaskIndex)
 }
 
 func (ts *taskState) GetTaskResultUpdateChan(oldResult types.TaskResult) <-chan bool {

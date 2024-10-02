@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
@@ -12,6 +13,9 @@ import (
 )
 
 type Config struct {
+	// Database config
+	Database *db.DatabaseConfig `yaml:"database" json:"database"`
+
 	// List of execution & consensus clients to use.
 	Endpoints []clients.ClientConfig `yaml:"endpoints" json:"endpoints"`
 

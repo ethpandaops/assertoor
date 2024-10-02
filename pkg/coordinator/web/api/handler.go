@@ -16,6 +16,10 @@ import (
 // @tag.name TestRun
 // @tag.description All endpoints related to test runs
 
+const contentTypeYAML = "application/yaml"
+
+const contentTypeJSON = "application/json"
+
 type Response struct {
 	Status string      `json:"status"`
 	Data   interface{} `json:"data"`

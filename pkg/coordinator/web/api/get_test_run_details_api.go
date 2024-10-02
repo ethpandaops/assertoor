@@ -60,7 +60,7 @@ type GetTestRunDetailedTaskLog struct {
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/test_run/{runId}/details [get]
 func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 
 	vars := mux.Vars(r)
 
@@ -139,20 +139,30 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 				taskData.ResultError = taskStatus.Error.Error()
 			}
 
-			taskLog := taskStatus.Logger.GetLogEntries()
+			logCount := taskStatus.Logger.GetLogEntryCount()
+			logStart := 0
+			logLimit := 100
+
+			if logCount > logLimit {
+				logStart = logCount - logLimit
+			}
+
+			taskLog := taskStatus.Logger.GetLogEntries(logStart, logLimit)
 			taskData.Log = make([]*GetTestRunDetailedTaskLog, len(taskLog))
 
 			for i, log := range taskLog {
 				logData := &GetTestRunDetailedTaskLog{
-					Time:    log.Time,
-					Level:   uint64(log.Level),
-					Message: log.Message,
+					Time:    time.Unix(0, log.LogTime*int64(time.Millisecond)),
+					Level:   uint64(log.LogLevel),
+					Message: log.LogMessage,
 					Data:    map[string]string{},
-					DataLen: uint64(len(log.Data)),
 				}
 
-				for dataKey, dataVal := range log.Data {
-					logData.Data[dataKey] = fmt.Sprintf("%v", dataVal)
+				if log.LogFields != "" {
+					err := yaml.Unmarshal([]byte(log.LogFields), &logData.Data)
+					if err == nil {
+						logData.DataLen = uint64(len(logData.Data))
+					}
 				}
 
 				taskData.Log[i] = logData

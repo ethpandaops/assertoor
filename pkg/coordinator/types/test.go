@@ -19,21 +19,24 @@ const (
 	TestStatusAborted TestStatus = "aborted"
 )
 
-type Test interface {
+type TestRunner interface {
+	Test
 	Validate() error
 	Run(ctx context.Context) error
+	Logger() logrus.FieldLogger
+	GetTestVariables() Variables
+}
+
+type Test interface {
 	RunID() uint64
 	TestID() string
 	Name() string
 	StartTime() time.Time
 	StopTime() time.Time
 	Timeout() time.Duration
-	Percent() float64
 	Status() TestStatus
-	Logger() logrus.FieldLogger
-	AbortTest(skipCleanup bool)
 	GetTaskScheduler() TaskScheduler
-	GetTestVariables() Variables
+	AbortTest(skipCleanup bool)
 }
 
 type TestConfig struct {
