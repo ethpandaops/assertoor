@@ -26,6 +26,7 @@ import (
 	generatetransaction "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_transaction"
 	getconsensusspecs "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_consensus_specs"
 	checkexecutionblock "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_execution_block"
+	getpubkeysfrommnemonic "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_pubkeys_from_mnemonic"
 	getrandommnemonic "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_random_mnemonic"
 	getwalletdetails "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_wallet_details"
 	runcommand "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_command"
@@ -62,6 +63,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generateslashings.TaskDescriptor,
 	generatetransaction.TaskDescriptor,
 	generateconsolidations.TaskDescriptor,
+	getpubkeysfrommnemonic.TaskDescriptor,
 	getconsensusspecs.TaskDescriptor,
 	getrandommnemonic.TaskDescriptor,
 	getwalletdetails.TaskDescriptor,
