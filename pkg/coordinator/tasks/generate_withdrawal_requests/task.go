@@ -1,4 +1,4 @@
-package generateconsolidations
+package generatewithdrawalrequests
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"sync"
 	"time"
@@ -26,25 +27,24 @@ import (
 )
 
 var (
-	TaskName       = "generate_consolidations"
+	TaskName       = "generate_withdrawal_requests"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Generates consolidations and sends them to the network",
+		Description: "Generates withdrawal requests and sends them to the network",
 		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
 )
 
 type Task struct {
-	ctx                       *types.TaskContext
-	options                   *types.TaskOptions
-	config                    Config
-	logger                    logrus.FieldLogger
-	sourceSeed                []byte
-	nextIndex                 uint64
-	lastIndex                 uint64
-	walletPrivKey             *ecdsa.PrivateKey
-	consolidationContractAddr ethcommon.Address
+	ctx                    *types.TaskContext
+	options                *types.TaskOptions
+	config                 Config
+	logger                 logrus.FieldLogger
+	sourceSeed             []byte
+	nextIndex              uint64
+	walletPrivKey          *ecdsa.PrivateKey
+	withdrawalContractAddr ethcommon.Address
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -96,7 +96,7 @@ func (t *Task) LoadConfig() error {
 		return err
 	}
 
-	t.consolidationContractAddr = ethcommon.HexToAddress(config.ConsolidationContract)
+	t.withdrawalContractAddr = ethcommon.HexToAddress(config.WithdrawalContract)
 
 	t.config = config
 
@@ -106,10 +106,6 @@ func (t *Task) LoadConfig() error {
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.SourceStartIndex > 0 {
 		t.nextIndex = uint64(t.config.SourceStartIndex)
-	}
-
-	if t.config.SourceIndexCount > 0 {
-		t.lastIndex = t.nextIndex + uint64(t.config.SourceIndexCount)
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
@@ -129,28 +125,28 @@ func (t *Task) Execute(ctx context.Context) error {
 	perSlotCount := 0
 	totalCount := 0
 
-	consolidationTransactions := []string{}
-	consolidationReceipts := map[string]*ethtypes.Receipt{}
+	withdrawalTransactions := []string{}
+	withdrawalReceipts := map[string]*ethtypes.Receipt{}
 
 	for {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		tx, err := t.generateConsolidation(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
+		tx, err := t.generateWithdrawal(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
 			if pendingChan != nil {
 				<-pendingChan
 			}
 
-			consolidationReceipts[tx.Hash().Hex()] = receipt
+			withdrawalReceipts[tx.Hash().Hex()] = receipt
 
 			pendingWg.Done()
 
 			if receipt != nil {
-				t.logger.Infof("consolidation %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
+				t.logger.Infof("withdrawal %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
 			}
 		})
 		if err != nil {
-			t.logger.Errorf("error generating consolidation: %v", err.Error())
+			t.logger.Errorf("error generating withdrawal: %v", err.Error())
 		} else {
 			if pendingChan != nil {
 				select {
@@ -167,11 +163,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			perSlotCount++
 			totalCount++
 
-			consolidationTransactions = append(consolidationTransactions, tx.Hash().Hex())
-		}
-
-		if t.lastIndex > 0 && t.nextIndex >= t.lastIndex {
-			break
+			withdrawalTransactions = append(withdrawalTransactions, tx.Hash().Hex())
 		}
 
 		if t.config.LimitTotal > 0 && totalCount >= t.config.LimitTotal {
@@ -195,14 +187,14 @@ func (t *Task) Execute(ctx context.Context) error {
 		pendingWg.Wait()
 	}
 
-	t.ctx.Outputs.SetVar("transactionHashes", consolidationTransactions)
+	t.ctx.Outputs.SetVar("transactionHashes", withdrawalTransactions)
 
 	receiptList := []interface{}{}
 
-	for _, txhash := range consolidationTransactions {
+	for _, txhash := range withdrawalTransactions {
 		var receiptMap map[string]interface{}
 
-		receipt := consolidationReceipts[txhash]
+		receipt := withdrawalReceipts[txhash]
 		if receipt == nil {
 			receiptMap = nil
 		} else {
@@ -227,16 +219,16 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("transactionReceipts", receiptList)
 
 	if t.config.FailOnReject {
-		for _, txhash := range consolidationTransactions {
-			if consolidationReceipts[txhash] == nil {
-				t.logger.Errorf("no receipt for consolidation transaction: %v", txhash)
+		for _, txhash := range withdrawalTransactions {
+			if withdrawalReceipts[txhash] == nil {
+				t.logger.Errorf("no receipt for withdrawal transaction: %v", txhash)
 				t.ctx.SetResult(types.TaskResultFailure)
 
 				break
 			}
 
-			if consolidationReceipts[txhash].Status == 0 {
-				t.logger.Errorf("consolidation transaction failed: %v", txhash)
+			if withdrawalReceipts[txhash].Status == 0 {
+				t.logger.Errorf("withdrawal transaction failed: %v", txhash)
 				t.ctx.SetResult(types.TaskResultFailure)
 
 				break
@@ -247,10 +239,14 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*ethtypes.Transaction, error) {
+func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
-	var sourceValidator, targetValidator *v1.Validator
+	var sourceValidator *v1.Validator
+
+	if t.config.SourceIndexCount > 0 {
+		accountIdx %= uint64(t.config.SourceIndexCount)
+	}
 
 	validatorSet := clientPool.GetConsensusPool().GetValidatorSet()
 	sourceSelector := ""
@@ -284,12 +280,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 		return nil, fmt.Errorf("source validator %s not found in validator set", sourceSelector)
 	}
 
-	targetValidator = validatorSet[phase0.ValidatorIndex(*t.config.TargetValidatorIndex)]
-	if targetValidator == nil {
-		return nil, fmt.Errorf("target validator (index: %v) not found", *t.config.TargetValidatorIndex)
-	}
-
-	// generate consolidation transaction
+	// generate withdrawal transaction
 
 	var clients []*execution.Client
 
@@ -321,12 +312,15 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 		return nil, fmt.Errorf("cannot load wallet state: %w", err)
 	}
 
+	amount := big.NewInt(0).SetUint64(t.config.WithdrawAmount)
+	amountBytes := amount.FillBytes(make([]byte, 16))
+
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
 
 	tx, err := wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
-		txData := make([]byte, 96)
+		txData := make([]byte, 64) // 48 bytes pubkey + 16 bytes amount
 		copy(txData[0:48], sourceValidator.Validator.PublicKey[:])
-		copy(txData[48:], targetValidator.Validator.PublicKey[:])
+		copy(txData[48:], amountBytes)
 
 		txObj := &ethtypes.DynamicFeeTx{
 			ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
@@ -334,7 +328,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 			GasTipCap: t.config.TxTipCap,
 			GasFeeCap: t.config.TxFeeCap,
 			Gas:       t.config.TxGasLimit,
-			To:        &t.consolidationContractAddr,
+			To:        &t.withdrawalContractAddr,
 			Value:     t.config.TxAmount,
 			Data:      txData,
 		}
@@ -342,7 +336,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 		return ethtypes.NewTx(txObj), nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("cannot build consolidation transaction: %w", err)
+		return nil, fmt.Errorf("cannot build withdrawal transaction: %w", err)
 	}
 
 	for i := 0; i < len(clients); i++ {
@@ -350,7 +344,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 
 		t.logger.WithFields(logrus.Fields{
 			"client": client.GetName(),
-		}).Infof("sending consolidation transaction (source index: %v, target index: %v, nonce: %v)", sourceValidator.Index, targetValidator.Index, tx.Nonce())
+		}).Infof("sending withdrawal transaction (source index: %v, amount: %v, nonce: %v)", sourceValidator.Index, amount.String(), tx.Nonce())
 
 		err = client.GetRPCClient().SendTransaction(ctx, tx)
 		if err == nil {
@@ -359,7 +353,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed sending consolidation transaction: %w", err)
+		return nil, fmt.Errorf("failed sending withdrawal transaction: %w", err)
 	}
 
 	go func() {

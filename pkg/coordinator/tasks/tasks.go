@@ -24,6 +24,7 @@ import (
 	generateexits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_exits"
 	generateslashings "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_slashings"
 	generatetransaction "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_transaction"
+	generatewithdrawalrequests "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_withdrawal_requests"
 	getconsensusspecs "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_consensus_specs"
 	checkexecutionblock "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_execution_block"
 	getpubkeysfrommnemonic "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_pubkeys_from_mnemonic"
@@ -57,12 +58,13 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generateblobtransactions.TaskDescriptor,
 	generateblschanges.TaskDescriptor,
 	generatechildwallet.TaskDescriptor,
+	generateconsolidations.TaskDescriptor,
 	generateeoatransactions.TaskDescriptor,
 	generatedeposits.TaskDescriptor,
 	generateexits.TaskDescriptor,
 	generateslashings.TaskDescriptor,
 	generatetransaction.TaskDescriptor,
-	generateconsolidations.TaskDescriptor,
+	generatewithdrawalrequests.TaskDescriptor,
 	getpubkeysfrommnemonic.TaskDescriptor,
 	getconsensusspecs.TaskDescriptor,
 	getrandommnemonic.TaskDescriptor,
