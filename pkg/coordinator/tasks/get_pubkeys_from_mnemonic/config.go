@@ -4,7 +4,7 @@ import "fmt"
 
 type Config struct {
 	Mnemonic   string `yaml:"mnemonic" json:"mnemonic"`
-	StartIndex int    `yaml:"start_index" json:"start_index"`
+	StartIndex int    `yaml:"startIndex" json:"startIndex"`
 	Count      int    `yaml:"count" json:"count"`
 }
 
