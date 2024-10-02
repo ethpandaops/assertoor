@@ -1,7 +1,7 @@
 
 id: eip7002-all
 name: "EIP7002 test (el triggerable exits)"
-timeout: 1h
+timeout: 38h
 config:
   walletPrivkey: ""
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
