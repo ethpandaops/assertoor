@@ -1236,7 +1236,7 @@ tasks:
               config:
                 minDepositRequestCount: 1
               configVars:
-                expectDepositRequests: "| [{validatorPubkey: .tasks.all_pubkeys.outputs.pubkeys[6], amount: 10000000000000000000}]"
+                expectDepositRequests: "| [{validatorPubkey: .tasks.all_pubkeys.outputs.pubkeys[6], amount: 1000000000}]"
 
     # validator #6: 42 ETH (42 ETH EB), 0x02 withdrawal creds
     - name: check_consensus_validator_status

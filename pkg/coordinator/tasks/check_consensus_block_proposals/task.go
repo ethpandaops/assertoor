@@ -680,7 +680,6 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 			for _, depositRequest := range depositRequests {
 				if expectedDepositRequest.PublicKey == "" || depositRequest.Pubkey.String() == expectedDepositRequest.PublicKey {
 					depositAmount := big.NewInt(int64(depositRequest.Amount))
-					depositAmount = depositAmount.Mul(depositAmount, big.NewInt(1000000000))
 
 					switch {
 					case expectedDepositRequest.WithdrawalCredentials != "" && !bytes.Equal(expectedWithdrawalCreds, depositRequest.WithdrawalCredentials):
