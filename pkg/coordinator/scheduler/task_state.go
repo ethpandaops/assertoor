@@ -294,7 +294,7 @@ func (ts *taskState) GetScopeOwner() types.TaskIndex {
 		return 0
 	}
 
-	return scopeOwner.(types.TaskIndex)
+	return types.TaskIndex(scopeOwner.(uint64))
 }
 
 func (ts *taskState) GetTaskResultUpdateChan(oldResult types.TaskResult) <-chan bool {
