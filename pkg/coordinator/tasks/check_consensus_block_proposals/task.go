@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/attestantio/go-eth2-client/spec"
@@ -519,7 +520,7 @@ func (t *Task) checkBlockBlsChanges(block *consensus.Block, blockData *spec.Vers
 				}
 
 				if validator.Validator.PublicKey.String() == expectedBlsChange.PublicKey {
-					if expectedBlsChange.Address != "" && expectedBlsChange.Address != blsChange.Message.ToExecutionAddress.String() {
+					if expectedBlsChange.Address != "" && !strings.EqualFold(expectedBlsChange.Address, blsChange.Message.ToExecutionAddress.String()) {
 						t.logger.Warnf("check failed: bls change found, but execution address does not match (have: %v, want: %v)", blsChange.Message.ToExecutionAddress.String(), expectedBlsChange.Address)
 					} else {
 						found = true
