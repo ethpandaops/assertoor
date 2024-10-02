@@ -321,9 +321,11 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 	copy(pub[:], validatorPubkey)
 
 	switch {
+	case t.config.WithdrawalCredentials != "":
+		withdrCreds = ethcommon.FromHex(t.config.WithdrawalCredentials)
 	case t.config.TopUpDeposit:
 		withdrCreds = ethcommon.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000")
-	case t.config.WithdrawalCredentials == "":
+	default:
 		withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
 
 		withdrPrivkey, err2 := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
@@ -337,8 +339,6 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		withdrKeyHash := hashing.Hash(withdrPubKey)
 		withdrCreds = withdrKeyHash[:]
 		withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
-	default:
-		withdrCreds = ethcommon.FromHex(t.config.WithdrawalCredentials)
 	}
 
 	data := common.DepositData{
