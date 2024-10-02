@@ -180,7 +180,7 @@ func (lh *logDBWriter) GetLogEntries(from, limit int) []*db.TaskLog {
 		return dbEntries
 	}
 
-	if dbEntries[len(dbEntries)-1].LogIndex >= bufEntries[0].LogIndex {
+	if len(dbEntries) > 0 && dbEntries[len(dbEntries)-1].LogIndex >= bufEntries[0].LogIndex {
 		// remove overlapping entries
 		bufEntries = bufEntries[dbEntries[len(dbEntries)-1].LogIndex-bufEntries[0].LogIndex+1:]
 	}
