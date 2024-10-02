@@ -66,9 +66,9 @@ tasks:
     # generate deposits
     - name: generate_deposits
       id: new_deposits
-      title: "Generate 20 deposits with 32 ETH each and 0x00 withdrawal credentials"
+      title: "Generate 10 deposits with 32 ETH each and 0x00 withdrawal credentials"
       config:
-        limitTotal: 20
+        limitTotal: 10
         depositAmount: 32
         awaitReceipt: true
         failOnReject: true
@@ -97,7 +97,7 @@ tasks:
   id: validator_pubkeys
   title: "Get test validator pubkeys"
   config:
-    count: 20
+    count: 10
   configVars:
     startIndex: "validatorStartIndex"
     mnemonic: "validatorMnemonic"
@@ -720,15 +720,15 @@ cleanupTasks:
     - name: generate_bls_changes
       title: "Generate bls changes for all test validators"
       config:
-        limitTotal: 20
-        indexCount: 20
+        limitTotal: 10
+        indexCount: 10
       configVars:
         mnemonic: "validatorMnemonic"
         targetAddress: "tasks.wallet_details.outputs.address"
     - name: generate_exits
       title: "Exit all test validators"
       config:
-        limitTotal: 20
-        indexCount: 20
+        limitTotal: 10
+        indexCount: 10
       configVars:
         mnemonic: "validatorMnemonic"
