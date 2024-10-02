@@ -214,6 +214,11 @@ func (t *Task) runValidatorStatusCheck() bool {
 			continue
 		}
 
+		if t.config.WithdrawalCredsPrefix != "" && !bytes.HasPrefix(validator.Validator.WithdrawalCredentials, common.FromHex(t.config.WithdrawalCredsPrefix)) {
+			t.logger.Infof("check failed: withdrawal creds prefix mismatch")
+			continue
+		}
+
 		return true
 	}
 

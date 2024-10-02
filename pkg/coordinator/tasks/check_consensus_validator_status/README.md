@@ -23,6 +23,9 @@ The `check_consensus_validator_status` task is focused on verifying the status o
 - **`maxValidatorBalance`**:\
   The maximum balance of the validator to match.
 
+- **`withdrawalCredsPrefix`**:\
+  The withdrawal credentials prefix the validator should have.
+
 - **`failOnCheckMiss`**:\
   Determines the task's behavior if the validator's status does not match any of the statuses in `validatorStatus`. If `false`, the task will continue running and wait for the validator to match the expected status. If `true`, the task will fail immediately upon a status mismatch.
 
@@ -42,6 +45,7 @@ These are the default settings for the `check_consensus_validator_status` task:
     validatorStatus: []
     minValidatorBalance: 0
     maxValidatorBalance: null
+    withdrawalCredsPrefix: ""
     failOnCheckMiss: false
     validatorInfoResultVar: ""
 ```
