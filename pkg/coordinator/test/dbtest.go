@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -113,6 +114,8 @@ func (dbt *dbTest) GetAllTasks() []types.TaskIndex {
 		taskIDs = append(taskIDs, types.TaskIndex(task.TaskID))
 	}
 
+	dbt.sortTaskList(taskIDs)
+
 	return taskIDs
 }
 
@@ -149,6 +152,8 @@ func (dbt *dbTest) GetAllCleanupTasks() []types.TaskIndex {
 		taskIDs = append(taskIDs, types.TaskIndex(task.TaskID))
 	}
 
+	dbt.sortTaskList(taskIDs)
+
 	return taskIDs
 }
 
@@ -170,6 +175,60 @@ func (dbt *dbTest) GetRootCleanupTasks() []types.TaskIndex {
 	}
 
 	return taskIDs
+}
+
+func (dbt *dbTest) sortTaskList(taskList []types.TaskIndex) {
+	taskMap := map[types.TaskIndex]*db.TaskStateIndex{}
+
+	for _, task := range dbt.taskIndex {
+		taskMap[types.TaskIndex(task.TaskID)] = task
+	}
+
+	sort.Slice(taskList, func(a, b int) bool {
+		taskStateA := taskMap[taskList[a]]
+		taskStateB := taskMap[taskList[b]]
+
+		if taskStateA == nil || taskStateB == nil {
+			return false
+		}
+
+		if taskStateA.ParentTask == taskStateB.ParentTask {
+			return taskStateA.TaskID < taskStateB.TaskID
+		}
+
+		for {
+			switch {
+			case taskStateA.ParentTask == int(taskList[b]):
+				return false
+			case taskStateB.ParentTask == int(taskList[a]):
+				return true
+			}
+
+			taskStateADepth := 0
+			for taskState := taskStateA; taskState != nil && taskState.ParentTask != 0; taskState = taskMap[types.TaskIndex(taskState.ParentTask)] {
+				taskStateADepth++
+			}
+
+			taskStateBDepth := 0
+			for taskState := taskStateB; taskState != nil && taskState.ParentTask != 0; taskState = taskMap[types.TaskIndex(taskState.ParentTask)] {
+				taskStateBDepth++
+			}
+
+			switch {
+			case taskStateADepth > taskStateBDepth:
+				taskStateA = taskMap[types.TaskIndex(taskStateA.ParentTask)]
+			case taskStateBDepth > taskStateADepth:
+				taskStateB = taskMap[types.TaskIndex(taskStateB.ParentTask)]
+			default:
+				taskStateA = taskMap[types.TaskIndex(taskStateA.ParentTask)]
+				taskStateB = taskMap[types.TaskIndex(taskStateB.ParentTask)]
+			}
+
+			if taskStateA.ParentTask == taskStateB.ParentTask {
+				return taskStateA.TaskID < taskStateB.TaskID
+			}
+		}
+	})
 }
 
 func (dbt *dbTest) GetTaskState(taskIndex types.TaskIndex) types.TaskState {
