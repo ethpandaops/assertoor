@@ -573,7 +573,7 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 					withdrawalAmount = withdrawalAmount.Mul(withdrawalAmount, big.NewInt(1000000000))
 
 					switch {
-					case expectedWithdrawal.Address != "" && expectedWithdrawal.Address != withdrawal.Address.String():
+					case expectedWithdrawal.Address != "" && !strings.EqualFold(expectedWithdrawal.Address, withdrawal.Address.String()):
 						t.logger.Warnf("check failed: withdrawal found, but execution address does not match (have: %v, want: %v)", withdrawal.Address.String(), expectedWithdrawal.Address)
 					case expectedWithdrawal.MinAmount.Cmp(big.NewInt(0)) > 0 && expectedWithdrawal.MinAmount.Cmp(withdrawalAmount) > 0:
 						t.logger.Warnf("check failed: withdrawal found, but amount lower than minimum (have: %v, want >= %v)", withdrawalAmount, expectedWithdrawal.MinAmount)
