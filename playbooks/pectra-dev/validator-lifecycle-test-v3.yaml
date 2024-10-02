@@ -840,7 +840,7 @@ tasks:
               config:
                 minWithdrawalRequestCount: 1
               configVars:
-                expectWithdrawalRequests: "| [{validatorPubkey: .tasks.all_pubkeys.outputs.pubkeys[8], sourceAddress: .tasks.depositor_wallet.outputs.childWallet.address, amount: 32000000000000000000}]"
+                expectWithdrawalRequests: "| [{validatorPubkey: .tasks.all_pubkeys.outputs.pubkeys[8], sourceAddress: .tasks.depositor_wallet.outputs.childWallet.address, amount: 32000000000}]"
             - name: check_consensus_block_proposals
               title: "Wait for EL triggered withdrawal for key 8"
               config:
