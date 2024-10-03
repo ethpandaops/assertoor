@@ -1,0 +1,204 @@
+
+id: eip7002-all
+name: "EIP7002 test (el triggerable exits)"
+timeout: 38h
+config:
+  walletPrivkey: ""
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  validatorStartIndex: 0
+  depositContract: "0x4242424242424242424242424242424242424242"
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# wait for electra activation
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+- name: check_consensus_slot_range
+  title: "Wait for electra activation"
+  timeout: 1h
+  configVars:
+    minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
+
+# get wallet details
+- name: get_wallet_details
+  id: wallet_details
+  configVars:
+    privateKey: "walletPrivkey"
+
+# get pubkeys for the test validators
+- name: get_pubkeys_from_mnemonic
+  id: validator_pubkeys
+  title: "Get test validator pubkeys"
+  config:
+    count: 10
+  configVars:
+    startIndex: "validatorStartIndex"
+    mnemonic: "validatorMnemonic"
+
+# wait for exitability
+- name: run_tasks
+  title: "Wait for validators to be exitable (${{ tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD }} epochs)"
+  config:
+    stopChildOnResult: true
+    tasks:
+    - name: check_consensus_validator_status
+      title: "Get validator info for last key"
+      id: last_validator_info
+      timeout: 1m
+      config:
+        validatorStatus:
+        - active_ongoing
+      configVars:
+        validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[-1]"
+    - name: check_consensus_slot_range
+      title: "Wait for validators to be exitable (epoch >= ${{ |(.tasks.last_validator_info.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber) }})"
+      timeout: 28h  # 256 epochs = ~27.3h
+      configVars:
+        minEpochNumber: "|(.tasks.last_validator_info.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber)"
+
+
+## all preparations are done, now we can start the actual tests
+- name: run_tasks_concurrent
+  title: "Run eip 7002 tests"
+  id: tests
+  config:
+    failTaskCount: 0
+    tasks:
+
+
+    # Test3: Submit a exit request from an address with 0x02 credentials, assert exit
+    # keys: 2
+    - name: run_tasks
+      title: "Test3: Submit a exit request from an address with 0x02 credentials, assert exit"
+      config:
+        tasks:
+        # generate BLS change & wait for inclusion
+        - name: run_task_background
+          title: "Generate BLS change for key 2 & track inclusion"
+          timeout: 10m
+          config:
+            onBackgroundComplete: failOrIgnore
+            backgroundTask:
+              name: generate_bls_changes
+              title: "Send BLS change for key 2 (0x02 credentials)"
+              config:
+                limitTotal: 1
+                indexCount: 1
+              configVars:
+                mnemonic: "validatorMnemonic"
+                targetAddress: "tasks.wallet_details.outputs.address"
+                startIndex: "validatorStartIndex + 2"
+            foregroundTask:
+              name: check_consensus_block_proposals
+              title: "Wait for inclusion of BLS change for key 2"
+              config:
+                minBlsChangeCount: 1
+              configVars:
+                expectBlsChanges: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[2], address: .tasks.wallet_details.outputs.address}]"
+
+        - name: sleep
+          title: "Wait"
+          config:
+            duration: 1m
+
+        # generate deposit for key 2 (add 1 ETH) & wait for inclusion
+        - name: run_task_background
+          title: "Generate deposit with 0x02 credential change for key 2 & track inclusion"
+          timeout: 10m
+          config:
+            onBackgroundComplete: failOrIgnore
+            backgroundTask:
+              name: generate_deposits
+              title: "Generate deposit with 0x02 credential change for key 2"
+              config:
+                limitTotal: 1
+                indexCount: 1
+                depositAmount: 1
+                topUpDeposit: false
+                awaitReceipt: true
+                failOnReject: true
+              configVars:
+                mnemonic: "validatorMnemonic"
+                startIndex: "validatorStartIndex + 2"
+                walletPrivkey: "walletPrivkey"
+                depositContract: "depositContract"
+                withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.wallet_details.outputs.address | capture(\"(0x)?(?<addr>.+)\").addr)"
+            foregroundTask:
+              name: check_consensus_block_proposals
+              title: "Wait for inclusion of top-up deposit for key 2"
+              config:
+                minDepositRequestCount: 1
+              configVars:
+                expectDepositRequests: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[2], amount: 1000000000}]"
+        
+        # check if key 2 has 0x02 credentials
+        - name: check_consensus_validator_status
+          title: "Get validator info for key 2 (expect 0x02 credentials)"
+          id: key2_status
+          timeout: 30m
+          config:
+            withdrawalCredsPrefix: "0x02"
+            validatorStatus:
+            - active_ongoing
+          configVars:
+            validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[2]"
+        - name: run_shell
+          title: "Check if key 2 has 0x02 credentials"
+          config:
+            envVars: 
+              validator: "tasks.key2_status.outputs.validator"
+            command: |
+              withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
+              echo "Withdrawal credentials: $withdrawal_creds"
+
+              if [[ ! "$withdrawal_creds" == "0x02"* ]]; then
+                echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
+                exit 1
+              fi
+
+        - name: sleep
+          title: "Wait"
+          config:
+            duration: 1m
+
+        # generate withdrawal & wait for inclusion
+        - name: run_task_background
+          title: "Generate EL triggered exit for key 2 & track inclusion"
+          timeout: 10m
+          config:
+            onBackgroundComplete: failOrIgnore
+            backgroundTask:
+              name: generate_withdrawal_requests
+              title: "Send EL triggered exit transaction for key 2"
+              config:
+                limitTotal: 1
+                withdrawAmount: 0 # 0 ETH - exit
+                awaitReceipt: true
+                failOnReject: true
+              configVars:
+                sourcePubkey: "tasks.validator_pubkeys.outputs.pubkeys[2]"
+                walletPrivkey: "walletPrivkey"
+            foregroundTask:
+              name: check_consensus_block_proposals
+              title: "Wait for inclusion of EL triggered exit request for key 2"
+              config:
+                minWithdrawalRequestCount: 1
+              configVars:
+                expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[2], sourceAddress: .tasks.wallet_details.outputs.address, amount: 0}]"
+        
+        # wait for exit to be processed
+        - name: check_consensus_validator_status
+          title: "Wait for key 2 to exit"
+          timeout: 1h
+          config:
+            validatorStatus:
+            - active_exiting
+            - exited_unslashed
+          configVars:
+            validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[2]"
+
