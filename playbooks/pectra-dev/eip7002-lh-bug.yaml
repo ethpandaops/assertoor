@@ -1,6 +1,6 @@
 
-id: eip7002-all
-name: "EIP7002 test (el triggerable exits)"
+id: eip7002-lh-bug
+name: "devnet3-lh-bug"
 timeout: 38h
 config:
   walletPrivkey: ""
