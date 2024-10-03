@@ -116,7 +116,7 @@ tasks:
         validatorStatus:
         - active_ongoing
       configVars:
-        validatorPubKey: "task.validator_pubkeys.outputs.pubkeys[-1]"
+        validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[-1]"
     - name: check_consensus_slot_range
       title: "Wait for validators to be exitable (epoch >= ${{ |(.tasks.last_validator_info.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber) }})"
       timeout: 28h  # 256 epochs = ~27.3h
