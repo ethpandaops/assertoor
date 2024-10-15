@@ -657,12 +657,13 @@ func (t *Task) checkBlockBlobs(block *consensus.Block, blockData *spec.Versioned
 }
 
 func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	depositRequests, err := getExecutionDepositRequests(blockData)
+	executionRequests, err := blockData.ExecutionRequests()
 	if err != nil {
-		t.logger.Warnf("could not get deposit requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
 		return false
 	}
 
+	depositRequests := executionRequests.Deposits
 	if len(depositRequests) < t.config.MinDepositRequestCount {
 		t.logger.Infof("check failed for block %v [0x%x]: not enough deposit requests (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinDepositRequestCount, len(depositRequests))
 		return false
@@ -706,12 +707,13 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 }
 
 func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	withdrawalRequests, err := getExecutionWithdrawalRequests(blockData)
+	executionRequests, err := blockData.ExecutionRequests()
 	if err != nil {
-		t.logger.Warnf("could not get withdrawal requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
 		return false
 	}
 
+	withdrawalRequests := executionRequests.Withdrawals
 	if len(withdrawalRequests) < t.config.MinWithdrawalRequestCount {
 		t.logger.Infof("check failed for block %v [0x%x]: not enough withdrawal requests (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinWithdrawalRequestCount, len(withdrawalRequests))
 		return false
@@ -759,12 +761,13 @@ func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *s
 }
 
 func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	consolidationRequests, err := getExecutionConsolidationRequests(blockData)
+	executionRequests, err := blockData.ExecutionRequests()
 	if err != nil {
-		t.logger.Warnf("could not get consolidation requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
 		return false
 	}
 
+	consolidationRequests := executionRequests.Consolidations
 	if len(consolidationRequests) < t.config.MinConsolidationRequestCount {
 		t.logger.Infof("check failed for block %v [0x%x]: not enough consolidation requests (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinConsolidationRequestCount, len(consolidationRequests))
 		return false
