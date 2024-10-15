@@ -25,7 +25,7 @@ tasks:
 - name: generate_transaction
   title: "Exit Validator ${validatorIndex} via EL"
   config:
-    targetAddress: "0x00A3ca265EBcb825B45F985A16CEFB49958cE017"
+    targetAddress: "0x09Fc772D0857550724b07B850a4323f39112aAaA"
     feeCap: 50000000000 # 50 gwei
     gasLimit: 1000000
     amount: "500000000000000000" # 0.5 ETH

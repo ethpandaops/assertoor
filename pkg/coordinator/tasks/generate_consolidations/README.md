@@ -88,7 +88,7 @@ Default settings for the `generate_consolidations` task:
     targetPublicKey: ""
     consolidationEpoch: null
     walletPrivkey: ""
-    consolidationContract: 0x00b42dbF2194e931E80326D950320f7d9Dbeac02
+    consolidationContract: 0x01aBEa29659e5e97C95107F20bb753cD3e09bBBb
     txAmount: "500000000000000000"
     txFeeCap: "100000000000"
     txTipCap: "1000000000"

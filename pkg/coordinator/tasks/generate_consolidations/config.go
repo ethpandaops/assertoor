@@ -30,7 +30,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		ConsolidationContract: "0x00b42dbF2194e931E80326D950320f7d9Dbeac02",
+		ConsolidationContract: "0x01aBEa29659e5e97C95107F20bb753cD3e09bBBb",
 		TxAmount:              big.NewInt(500000000000000000), // 0.5 ETH
 		TxFeeCap:              big.NewInt(100000000000),       // 100 Gwei
 		TxTipCap:              big.NewInt(1000000000),         // 1 Gwei
