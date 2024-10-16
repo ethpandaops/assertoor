@@ -1,0 +1,26 @@
+id: bls-changes
+name: "Generate BLS changes"
+timeout: 1h
+config:
+  validatorCount: 64
+  targetAddress: "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA"
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: run_task_options
+  title: "Generate ${validatorCount} BLS changes"
+  config:
+    task:
+      name: generate_bls_changes
+      title: "Generate ${validatorCount} BLS changes"
+      configVars:
+        mnemonic: "validatorMnemonic"
+        targetAddress: "targetAddress"
+        limitTotal: "validatorCount"
+        indexCount: "validatorCount"

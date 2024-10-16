@@ -4,6 +4,8 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -77,7 +79,7 @@ func (ec *ExecutionClient) GetNodeSyncing(ctx context.Context) (*SyncStatus, err
 		return nil, err
 	}
 
-	if status == nil && err == nil {
+	if status == nil {
 		// Not syncing
 		ss := &SyncStatus{}
 		ss.IsSyncing = false
@@ -125,4 +127,9 @@ func (ec *ExecutionClient) GetTransactionReceipt(ctx context.Context, txHash com
 
 func (ec *ExecutionClient) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	return ec.ethClient.SendTransaction(ctx, tx)
+}
+
+//nolint:gocritic // ignore
+func (ec *ExecutionClient) GetEthCall(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	return ec.ethClient.CallContract(ctx, msg, blockNumber)
 }

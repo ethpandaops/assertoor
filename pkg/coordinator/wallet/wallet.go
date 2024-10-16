@@ -242,6 +242,16 @@ func (wallet *Wallet) AwaitReady(ctx context.Context) error {
 	return nil
 }
 
+func (wallet *Wallet) UseNextNonce(increase bool) uint64 {
+	nextNonce := wallet.pendingNonce
+
+	if increase {
+		wallet.pendingNonce++
+	}
+
+	return nextNonce
+}
+
 func (wallet *Wallet) BuildTransaction(ctx context.Context, buildFn func(ctx context.Context, nonce uint64, signer bind.SignerFn) (*types.Transaction, error)) (*types.Transaction, error) {
 	err := wallet.AwaitReady(ctx)
 	if err != nil {
@@ -251,7 +261,7 @@ func (wallet *Wallet) BuildTransaction(ctx context.Context, buildFn func(ctx con
 	wallet.txBuildMutex.Lock()
 	defer wallet.txBuildMutex.Unlock()
 
-	signer := types.LatestSignerForChainID(wallet.manager.clientPool.GetBlockCache().GetChainID())
+	signer := types.NewPragueSigner(wallet.manager.clientPool.GetBlockCache().GetChainID())
 	nonce := wallet.pendingNonce
 	tx, err := buildFn(ctx, nonce, func(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
 		if !bytes.Equal(addr[:], wallet.address[:]) {
