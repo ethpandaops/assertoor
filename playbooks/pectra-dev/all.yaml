@@ -36,7 +36,7 @@ tasks:
     config:
       minSlotNumber: 42
   - name: run_external_tasks
-    title: "Generate massive deposit with 0x02 creds"
+    title: "Deploy and test blockhash contract"
     timeout: 30m
     config:
       testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/blockhash-test.yaml
