@@ -23,16 +23,6 @@ tasks:
   configVars:
     minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
 
-# get pubkeys for the test validators
-- name: get_pubkeys_from_mnemonic
-  id: validator_pubkeys
-  title: "Get test validator pubkey"
-  config:
-    count: 1
-  configVars:
-    startIndex: ""
-    mnemonic: "validatorMnemonic"
-
 # wait for exitability
 
 - name: run_tasks
