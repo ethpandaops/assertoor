@@ -30,7 +30,7 @@ tasks:
   config:
     stopChildOnResult: false
     tasks:
-    - name: generate_consolidation_requests
+    - name: generate_consolidations
       title: "Send 100 EL triggered consolidation transactions for key 0"
       config:
         limitTotal: 100
