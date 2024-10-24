@@ -289,7 +289,8 @@ tasks:
                 failOnReject: true
               configVars:
                 sourceMnemonic: "validatorMnemonic"
-                targetValidatorIndex: "validatorStartIndex + 2"
+                targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[2]"
+                sourceStartIndex: "validatorStartIndex + 2"
                 walletPrivkey: "walletPrivkey"
             
             foregroundTask:
@@ -444,7 +445,7 @@ tasks:
             onBackgroundComplete: failOrIgnore
             backgroundTask:
               name: generate_bls_changes
-              title: "Send BLS change for key 4 (0x02 credentials)"
+              title: "Send BLS change for key 4 (0x01 credentials)"
               config:
                 limitTotal: 1
                 indexCount: 1
@@ -460,27 +461,55 @@ tasks:
               configVars:
                 expectBlsChanges: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[4], address: .tasks.wallet_details.outputs.address}]"
 
+        # generate self consolidation for key 4 & wait for inclusion
+        - name: run_task_background
+          title: "Generate self consolidation for key 4 & track inclusion"
+          timeout: 10m
+          config:
+            onBackgroundComplete: failOrIgnore
+            backgroundTask:
+              name: generate_consolidations
+              title: "Generate 1 self consolidation (key 4)"
+              config:
+                limitTotal: 1
+                sourceIndexCount: 1
+                awaitReceipt: true
+                failOnReject: true
+              configVars:
+                sourceMnemonic: "validatorMnemonic"
+                targetValidatorIndex: "validatorStartIndex + 4"
+                targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[4]"
+                sourceStartIndex: "validatorStartIndex + 4"
+                walletPrivkey: "walletPrivkey"
+            
+            foregroundTask:
+              name: check_consensus_block_proposals
+              title: "Wait for inclusion of self consolidation request for key 4"
+              config:
+                minConsolidationRequestCount: 1
+              configVars:
+                expectConsolidationRequests: "| [{sourceAddress: .tasks.wallet_details.outputs.address, sourcePubkey: .tasks.validator_pubkeys.outputs.pubkeys[4]}]"
+
         # generate top-up deposit for key 4 (add 2 ETH) & wait for inclusion
         - name: run_task_background
-          title: "Generate top-up deposit with 0x02 credential change for key 4 & track inclusion"
+          title: "Generate top-up deposit for key 4 & track inclusion"
           timeout: 10m
           config:
             onBackgroundComplete: failOrIgnore
             backgroundTask:
               name: generate_deposits
-              title: "Generate top-up deposit with 0x02 credential change for key 4"
+              title: "Generate top-up deposit for key 4"
               config:
                 limitTotal: 1
                 indexCount: 1
                 depositAmount: 2
                 awaitReceipt: true
                 failOnReject: true
+                topUpDeposit: true
               configVars:
-                mnemonic: "validatorMnemonic"
-                startIndex: "validatorStartIndex + 4"
+                publicKey: "tasks.validator_pubkeys.outputs.pubkeys[4]"
                 walletPrivkey: "walletPrivkey"
                 depositContract: "depositContract"
-                withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.wallet_details.outputs.address | capture(\"(0x)?(?<addr>.+)\").addr)"
             foregroundTask:
               name: check_consensus_block_proposals
               title: "Wait for inclusion of top-up deposit for key 4"
@@ -596,27 +625,54 @@ tasks:
               configVars:
                 expectBlsChanges: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[5], address: .tasks.wallet_details.outputs.address}]"
 
+        # generate self consolidation for key 5 & wait for inclusion
+        - name: run_task_background
+          title: "Generate self consolidation for key 5 & track inclusion"
+          timeout: 10m
+          config:
+            onBackgroundComplete: failOrIgnore
+            backgroundTask:
+              name: generate_consolidations
+              title: "Generate 1 self consolidation (key 5)"
+              config:
+                limitTotal: 1
+                sourceIndexCount: 1
+                awaitReceipt: true
+                failOnReject: true
+              configVars:
+                sourceMnemonic: "validatorMnemonic"
+                targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[5]"
+                sourceStartIndex: "validatorStartIndex + 5"
+                walletPrivkey: "walletPrivkey"
+            
+            foregroundTask:
+              name: check_consensus_block_proposals
+              title: "Wait for inclusion of self consolidation request for key 5"
+              config:
+                minConsolidationRequestCount: 1
+              configVars:
+                expectConsolidationRequests: "| [{sourceAddress: .tasks.wallet_details.outputs.address, sourcePubkey: .tasks.validator_pubkeys.outputs.pubkeys[5]}]"
+        
         # generate top-up deposit for key 5 (add 1 ETH) & wait for inclusion
         - name: run_task_background
-          title: "Generate top-up deposit with 0x02 credential change for key 5 & track inclusion"
+          title: "Generate top-up deposit for key 5 & track inclusion"
           timeout: 10m
           config:
             onBackgroundComplete: failOrIgnore
             backgroundTask:
               name: generate_deposits
-              title: "Generate top-up deposit with 0x02 credential change for key 5"
+              title: "Generate top-up deposit for key 5"
               config:
                 limitTotal: 1
                 indexCount: 1
                 depositAmount: 1
                 awaitReceipt: true
                 failOnReject: true
+                topUpDeposit: true
               configVars:
-                mnemonic: "validatorMnemonic"
-                startIndex: "validatorStartIndex + 5"
+                publicKey: "tasks.validator_pubkeys.outputs.pubkeys[5]"
                 walletPrivkey: "walletPrivkey"
                 depositContract: "depositContract"
-                withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.wallet_details.outputs.address | capture(\"(0x)?(?<addr>.+)\").addr)"
             foregroundTask:
               name: check_consensus_block_proposals
               title: "Wait for inclusion of top-up deposit for key 5"
@@ -625,7 +681,7 @@ tasks:
               configVars:
                 expectDepositRequests: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[5], amount: 1000000000}]"
 
-        # check if key 5 has 0x02 credentials
+        # check if key 5 has 0x02 credentials and topped up balance
         - name: check_consensus_validator_status
           title: "Get validator info for key 5 (expect 0x02 credentials)"
           id: key5_status
@@ -634,6 +690,7 @@ tasks:
             withdrawalCredsPrefix: "0x02"
             validatorStatus:
             - active_ongoing
+            minValidatorBalance: 32900000000
           configVars:
             validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[5]"
         - name: run_shell
