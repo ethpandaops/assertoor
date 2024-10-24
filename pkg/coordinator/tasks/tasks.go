@@ -13,16 +13,20 @@ import (
 	checkconsensusslotrange "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_slot_range"
 	checkconsensussyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_sync_status"
 	checkconsensusvalidatorstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_validator_status"
+	checkethcall "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_eth_call"
 	checkexecutionsyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_execution_sync_status"
 	generateblobtransactions "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_blob_transactions"
 	generateblschanges "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_bls_changes"
 	generatechildwallet "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_child_wallet"
+	generateconsolidations "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_consolidations"
 	generatedeposits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_deposits"
 	generateeoatransactions "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_eoa_transactions"
 	generateexits "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_exits"
 	generateslashings "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_slashings"
 	generatetransaction "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_transaction"
+	generatewithdrawalrequests "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_withdrawal_requests"
 	getconsensusspecs "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_consensus_specs"
+	checkexecutionblock "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_execution_block"
 	getpubkeysfrommnemonic "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_pubkeys_from_mnemonic"
 	getrandommnemonic "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_random_mnemonic"
 	getwalletdetails "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_wallet_details"
@@ -48,15 +52,19 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkconsensusslotrange.TaskDescriptor,
 	checkconsensussyncstatus.TaskDescriptor,
 	checkconsensusvalidatorstatus.TaskDescriptor,
+	checkexecutionblock.TaskDescriptor,
+	checkethcall.TaskDescriptor,
 	checkexecutionsyncstatus.TaskDescriptor,
 	generateblobtransactions.TaskDescriptor,
 	generateblschanges.TaskDescriptor,
 	generatechildwallet.TaskDescriptor,
+	generateconsolidations.TaskDescriptor,
 	generateeoatransactions.TaskDescriptor,
 	generatedeposits.TaskDescriptor,
 	generateexits.TaskDescriptor,
 	generateslashings.TaskDescriptor,
 	generatetransaction.TaskDescriptor,
+	generatewithdrawalrequests.TaskDescriptor,
 	getpubkeysfrommnemonic.TaskDescriptor,
 	getconsensusspecs.TaskDescriptor,
 	getrandommnemonic.TaskDescriptor,

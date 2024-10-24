@@ -27,6 +27,7 @@ type ChainSpec struct {
 	CappellaForkEpoch    uint64         `yaml:"CAPELLA_FORK_EPOCH"`
 	SecondsPerSlot       time.Duration  `yaml:"SECONDS_PER_SLOT"`
 	SlotsPerEpoch        uint64         `yaml:"SLOTS_PER_EPOCH"`
+	MaxCommitteesPerSlot uint64         `yaml:"MAX_COMMITTEES_PER_SLOT"`
 }
 
 func (chain *ChainSpec) CheckMismatch(chain2 *ChainSpec) []string {

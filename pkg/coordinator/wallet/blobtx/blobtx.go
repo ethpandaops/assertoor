@@ -31,7 +31,7 @@ func GenerateBlobSidecar(blobRefs []string, txIdx, replacementIdx uint64) ([]com
 		}
 
 		blobHashes = append(blobHashes, blobCommitment.VersionedHash)
-		blobSidecar.Blobs = append(blobSidecar.Blobs, blobCommitment.Blob)
+		blobSidecar.Blobs = append(blobSidecar.Blobs, *blobCommitment.Blob)
 		blobSidecar.Commitments = append(blobSidecar.Commitments, blobCommitment.Commitment)
 		blobSidecar.Proofs = append(blobSidecar.Proofs, blobCommitment.Proof)
 	}
