@@ -126,6 +126,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	totalCount := 0
 
 	withdrawalTransactions := []string{}
+	receiptsMapMutex := sync.Mutex{}
 	withdrawalReceipts := map[string]*ethtypes.Receipt{}
 
 	for {
@@ -137,7 +138,9 @@ func (t *Task) Execute(ctx context.Context) error {
 				<-pendingChan
 			}
 
+			receiptsMapMutex.Lock()
 			withdrawalReceipts[tx.Hash().Hex()] = receipt
+			receiptsMapMutex.Unlock()
 
 			pendingWg.Done()
 
@@ -190,6 +193,9 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("transactionHashes", withdrawalTransactions)
 
 	receiptList := []interface{}{}
+
+	receiptsMapMutex.Lock()
+	defer receiptsMapMutex.Unlock()
 
 	for _, txhash := range withdrawalTransactions {
 		var receiptMap map[string]interface{}

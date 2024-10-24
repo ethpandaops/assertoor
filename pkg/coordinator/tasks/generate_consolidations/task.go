@@ -131,6 +131,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	consolidationTransactions := []string{}
 	consolidationReceipts := map[string]*ethtypes.Receipt{}
+	receiptsMapMutex := sync.Mutex{}
 
 	for {
 		accountIdx := t.nextIndex
@@ -141,7 +142,9 @@ func (t *Task) Execute(ctx context.Context) error {
 				<-pendingChan
 			}
 
+			receiptsMapMutex.Lock()
 			consolidationReceipts[tx.Hash().Hex()] = receipt
+			receiptsMapMutex.Unlock()
 
 			pendingWg.Done()
 
@@ -198,6 +201,9 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("transactionHashes", consolidationTransactions)
 
 	receiptList := []interface{}{}
+
+	receiptsMapMutex.Lock()
+	defer receiptsMapMutex.Unlock()
 
 	for _, txhash := range consolidationTransactions {
 		var receiptMap map[string]interface{}
