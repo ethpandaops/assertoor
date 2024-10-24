@@ -272,35 +272,33 @@ tasks:
               configVars:
                 expectBlsChanges: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[2], address: .tasks.wallet_details.outputs.address}]"
 
-        # generate deposit for key 2 (add 1 ETH) & wait for inclusion
+        # generate self consolidation for key 2 & wait for inclusion
         - name: run_task_background
-          title: "Generate deposit with 0x02 credential change for key 2 & track inclusion"
+          title: "Generate self consolidation for key 2 & track inclusion"
           timeout: 10m
           config:
             onBackgroundComplete: failOrIgnore
             backgroundTask:
-              name: generate_deposits
-              title: "Generate deposit with 0x02 credential change for key 2"
+              name: generate_consolidations
+              title: "Generate 1 self consolidation (key 2)"
               config:
                 limitTotal: 1
-                indexCount: 1
-                depositAmount: 1
-                topUpDeposit: false
+                sourceStartIndex: 2
+                sourceIndexCount: 1
                 awaitReceipt: true
                 failOnReject: true
               configVars:
-                mnemonic: "validatorMnemonic"
-                startIndex: "validatorStartIndex + 2"
+                sourceMnemonic: "validatorMnemonic"
+                targetValidatorIndex: "validatorStartIndex + 2"
                 walletPrivkey: "walletPrivkey"
-                depositContract: "depositContract"
-                withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.wallet_details.outputs.address | capture(\"(0x)?(?<addr>.+)\").addr)"
+            
             foregroundTask:
               name: check_consensus_block_proposals
-              title: "Wait for inclusion of top-up deposit for key 2"
+              title: "Wait for inclusion of self consolidation request for key 2"
               config:
-                minDepositRequestCount: 1
+                minConsolidationRequestCount: 1
               configVars:
-                expectDepositRequests: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[2], amount: 1000000000}]"
+                expectConsolidationRequests: "| [{sourceAddress: .tasks.wallet_details.outputs.address, sourcePubkey: .tasks.validator_pubkeys.outputs.pubkeys[2]}]"
         
         # check if key 2 has 0x02 credentials
         - name: check_consensus_validator_status

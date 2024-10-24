@@ -1197,46 +1197,44 @@ tasks:
 
 
 ##
-## STEP 6: change withdrawal credentials (0x01->0x02) via deposit & wait for inclusion
+## STEP 6: change withdrawal credentials (0x01->0x02) via self consolidation & wait for inclusion
 ##
 
 # change withdrawal credentials
 - name: run_tasks
-  title: "Change withdrawal credentials (0x01->0x02) via deposit & track inclusion"
+  title: "Change withdrawal credentials (0x01->0x02) via self consolidation & track inclusion"
   config:
     tasks:
 
     - name: run_task_background
-      title: "Change withdrawal credentials (0x01->0x02) via deposit & track inclusion"
+      title: "Change withdrawal credentials (0x01->0x02) via self consolidation & track inclusion"
       config:
         onBackgroundComplete: failOrIgnore
         backgroundTask:
-          name: generate_deposits
-          title: "Generate 1 deposit with 10 ETH and 0x02 withdrawal creds (index 6)"
-          id: deposit_3
+          name: generate_consolidations
+          title: "Generate 1 self consolidation (index 6 -> index 6)"
           config:
             limitTotal: 1
-            startIndex: 6
+            sourceStartIndex: 6
+            sourceIndexCount: 1
             awaitReceipt: true
             failOnReject: true
-            depositAmount: 10
           configVars:
+            sourceMnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+            targetValidatorIndex: "tasks.validator_info_6.outputs.validator.index | tonumber"
             walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
-            mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-            depositContract: "depositContract"
-            withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.depositor_wallet.outputs.childWallet.address | capture(\"(0x)?(?<addr>.+)\").addr)"
         
         foregroundTask:
           name: run_tasks_concurrent
-          title: "Wait for inclusion of deposit request"
+          title: "Wait for inclusion of self consolidation request"
           config:
             tasks:
             - name: check_consensus_block_proposals
-              title: "Wait for inclusion of deposit request for key 6"
+              title: "Wait for inclusion of self consolidation request for key 6"
               config:
-                minDepositRequestCount: 1
+                minConsolidationRequestCount: 1
               configVars:
-                expectDepositRequests: "| [{validatorPubkey: .tasks.all_pubkeys.outputs.pubkeys[6], amount: 1000000000}]"
+                expectConsolidationRequests: "| [{sourceAddress: .tasks.depositor_wallet.outputs.childWallet.address, sourcePubkey: .tasks.all_pubkeys.outputs.pubkeys[6]}]"
 
     # validator #6: 42 ETH (42 ETH EB), 0x02 withdrawal creds
     - name: check_consensus_validator_status
