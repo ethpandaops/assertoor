@@ -13,7 +13,7 @@ tasks:
     title: "Generate BLS changes for validator 0-300"
     timeout: 30m
     config:
-      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/kurtosis/bls-changes.yaml
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/kurtosis/bls-changes.yaml
       testConfig:
         validatorCount: 300
   
