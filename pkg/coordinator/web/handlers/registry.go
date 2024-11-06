@@ -199,7 +199,7 @@ func (fh *FrontendHandler) getTestRegistryData(idx int, test types.TestDescripto
 		testData.Name = testConfig.Name
 	}
 
-	if !fh.securityTrimmed {
+	if !fh.securityTrimmed && test.Vars() != nil {
 		configJSON, err := json.Marshal(test.Vars().GetVarsMap(nil, true))
 		if err == nil {
 			testData.Config = string(configJSON)

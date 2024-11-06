@@ -1,0 +1,24 @@
+id: fund-wallet
+name: "Send funds to a wallet"
+timeout: 12h
+config:
+  targetAddress: "0x000000000000000000000000000000000000dEaD"
+  amount: "1000000000000000000" # 1 ETH
+  walletPrivkey: ""
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: generate_transaction
+  title: "Send funds to the target address"
+  config:
+    feeCap: 5000000000 # 5 gwei
+    gasLimit: 100000
+    awaitReceipt: true
+  configVars:
+    privateKey: "walletPrivkey"
+    targetAddress: "targetAddress"
+    amount: "amount"
