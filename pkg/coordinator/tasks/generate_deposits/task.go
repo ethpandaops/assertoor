@@ -152,8 +152,6 @@ func (t *Task) Execute(ctx context.Context) error {
 				<-pendingChan
 			}
 
-			pendingWg.Done()
-
 			depositReceiptsMtx.Lock()
 			depositReceipts[tx.Hash().Hex()] = receipt
 			depositReceiptsMtx.Unlock()
@@ -161,6 +159,8 @@ func (t *Task) Execute(ctx context.Context) error {
 			if receipt != nil {
 				t.logger.Infof("deposit %v confirmed in block %v (nonce: %v, status: %v)", tx.Hash().Hex(), receipt.BlockNumber, tx.Nonce(), receipt.Status)
 			}
+
+			pendingWg.Done()
 		})
 		if err != nil {
 			t.logger.Errorf("error generating deposit: %v", err.Error())
