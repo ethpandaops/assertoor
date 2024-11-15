@@ -1,0 +1,36 @@
+name: Kurtosis Ethereum Cluster Setup and Tests
+
+on:
+  push:
+    branches:
+      - master  # Specify the branch(es) to trigger the workflow
+      - develop  # Add more branches if needed
+    paths:
+      - '**'  # Trigger on changes to any file (default behavior)
+
+jobs:
+  setup-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Kurtosis CLI
+        run: |
+          echo "deb [trusted=yes] https://apt.fury.io/kurtosis-tech/ /" | sudo tee /etc/apt/sources.list.d/kurtosis.list
+          sudo apt update
+          sudo apt install -y kurtosis-cli
+
+      - name: Start Kurtosis Engine
+        run: kurtosis engine start
+
+      - name: Run Ethereum Package with Local Network Params
+        run: |
+          # Run the Ethereum Package using the local network_params.yaml file
+          kurtosis run --enclave my-testnet github.com/ethpandaops/ethereum-package --args-file https://raw.githubusercontent.com/jer117/docker-eth-nethermind/refs/heads/Add_Nethermind_All_Consenus_clients_tests/.github/network_params.yml
+
+      - name: Load Network Params and Run Ethereum Package
+        run: |
+          # Create a local network_params.yaml file from the repository or use an existing one
+          echo "Hello!"
