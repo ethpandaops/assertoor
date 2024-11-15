@@ -1,0 +1,31 @@
+name: Kurtosis Ethereum Cluster Setup and Tests
+
+on:
+    push:
+      branches:
+        - main
+    pull_request: # Trigger on new releases from Nethermind
+
+jobs:
+  setup-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Kurtosis CLI
+        run: |
+          echo "deb [trusted=yes] https://apt.fury.io/kurtosis-tech/ /" | sudo tee /etc/apt/sources.list.d/kurtosis.list
+          sudo apt update
+          sudo apt install -y kurtosis-cli
+
+          - name: Run Ethereum Package with Local Network Params
+          run: |
+            # Run the Ethereum Package using the local network_params.yaml file
+            kurtosis run --enclave my-testnet github.com/ethpandaops/ethereum-package --args-file .github/workflows/network_params.yaml
+
+      - name: Load Network Params and Run Ethereum Package
+        run: |
+          # Create a local network_params.yaml file from the repository or use an existing one
+          echo "Hello!"

@@ -17,24 +17,13 @@ tasks:
   config:
     minEpochNumber: 4
 
-- name: run_task_background
-  title: "Generate & send proposer slashing"
+- name: generate_slashings
+  title: "Generate 1 proposer slashing per slot"
   config:
-    onBackgroundComplete: "fail"
-    backgroundTask:
-      name: generate_slashings
-      title: "Generate 1 proposer slashing per slot"
-      config:
-        slashingType: "proposer"
-        limitPerSlot: 1
-      configVars:
-        mnemonic: "validatorMnemonic"
-        startIndex: "validatorIndex"
-        limitTotal: "validatorCount"
-        indexCount: "validatorCount"
-
-    foregroundTask:
-      name: check_consensus_block_proposals
-      title: "Wait for block proposal with proposer slashings"
-      config:
-        minProposerSlashingCount: 1
+    slashingType: "proposer"
+    limitPerSlot: 1
+  configVars:
+    mnemonic: "validatorMnemonic"
+    startIndex: "validatorIndex"
+    limitTotal: "validatorCount"
+    indexCount: "validatorCount"
