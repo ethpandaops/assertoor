@@ -125,6 +125,12 @@ func (ec *ExecutionClient) GetTransactionReceipt(ctx context.Context, txHash com
 	return ec.ethClient.TransactionReceipt(ctx, txHash)
 }
 
+func (ec *ExecutionClient) GetBlockReceipts(ctx context.Context, blockHash common.Hash) ([]*types.Receipt, error) {
+	return ec.ethClient.BlockReceipts(ctx, rpc.BlockNumberOrHash{
+		BlockHash: &blockHash,
+	})
+}
+
 func (ec *ExecutionClient) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	return ec.ethClient.SendTransaction(ctx, tx)
 }

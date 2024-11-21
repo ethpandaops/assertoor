@@ -292,7 +292,106 @@ func (wallet *Wallet) BuildTransaction(ctx context.Context, buildFn func(ctx con
 	return signedTx, nil
 }
 
-func (wallet *Wallet) AwaitTransaction(ctx context.Context, tx *types.Transaction) (*types.Receipt, error) {
+type TxConfirmFn func(tx *types.Transaction, receipt *types.Receipt, err error)
+type TxLogFn func(client *execution.Client, retry int, rebroadcast int, err error)
+
+type SendTransactionOptions struct {
+	Clients            []*execution.Client
+	ClientsStartOffset int
+
+	OnConfirm TxConfirmFn
+	LogFn     TxLogFn
+
+	MaxRebroadcasts     int
+	RebroadcastInterval time.Duration
+}
+
+func (wallet *Wallet) SendTransaction(ctx context.Context, tx *types.Transaction, options *SendTransactionOptions) error {
+	var confirmCtx context.Context
+
+	var confirmCancel context.CancelFunc
+
+	if options.OnConfirm != nil || options.MaxRebroadcasts > 0 {
+		confirmCtx, confirmCancel = context.WithCancel(ctx)
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+
+		go func() {
+			var receipt *types.Receipt
+
+			var err error
+
+			defer confirmCancel()
+
+			if options.OnConfirm != nil {
+				defer func() {
+					options.OnConfirm(tx, receipt, err)
+				}()
+			}
+
+			receipt, err = wallet.awaitTransaction(confirmCtx, tx, wg)
+			if confirmCtx.Err() != nil {
+				err = nil
+			}
+		}()
+
+		wg.Wait()
+	}
+
+	var err error
+
+	for i := 0; i < len(options.Clients); i++ {
+		client := options.Clients[(i+options.ClientsStartOffset)%len(options.Clients)]
+
+		err = client.GetRPCClient().SendTransaction(ctx, tx)
+
+		if options.LogFn != nil {
+			options.LogFn(client, i, 0, err)
+		}
+
+		if err == nil {
+			break
+		}
+	}
+
+	if err != nil {
+		if confirmCancel != nil {
+			confirmCancel()
+		}
+
+		return err
+	}
+
+	if options.MaxRebroadcasts > 0 {
+		go func() {
+			for i := 0; i < options.MaxRebroadcasts; i++ {
+				select {
+				case <-confirmCtx.Done():
+					return
+				case <-time.After(options.RebroadcastInterval):
+				}
+
+				for j := 0; j < len(options.Clients); j++ {
+					client := options.Clients[(i+j+options.ClientsStartOffset+1)%len(options.Clients)]
+
+					err = client.GetRPCClient().SendTransaction(ctx, tx)
+
+					if options.LogFn != nil {
+						options.LogFn(client, j, i+1, err)
+					}
+
+					if err == nil {
+						break
+					}
+				}
+			}
+		}()
+	}
+
+	return nil
+}
+
+func (wallet *Wallet) awaitTransaction(ctx context.Context, tx *types.Transaction, wg *sync.WaitGroup) (*types.Receipt, error) {
 	err := wallet.AwaitReady(ctx)
 	if err != nil {
 		return nil, err
@@ -300,6 +399,10 @@ func (wallet *Wallet) AwaitTransaction(ctx context.Context, tx *types.Transactio
 
 	txHash := tx.Hash()
 	nonceChan := wallet.getTxNonceChan(tx.Nonce())
+
+	if wg != nil {
+		wg.Done()
+	}
 
 	if nonceChan != nil {
 		select {
@@ -318,17 +421,20 @@ func (wallet *Wallet) AwaitTransaction(ctx context.Context, tx *types.Transactio
 		}
 	}
 
-	client := wallet.manager.clientPool.AwaitReadyEndpoint(ctx, execution.AnyClient)
-	if client == nil {
-		return nil, ctx.Err()
-	}
+	return wallet.loadTransactionReceipt(ctx, nil, tx), nil
+}
 
-	return client.GetRPCClient().GetTransactionReceipt(ctx, txHash)
+func (wallet *Wallet) AwaitTransaction(ctx context.Context, tx *types.Transaction) (*types.Receipt, error) {
+	return wallet.awaitTransaction(ctx, tx, nil)
 }
 
 func (wallet *Wallet) getTxNonceChan(targetNonce uint64) *nonceStatus {
 	wallet.txNonceMutex.Lock()
 	defer wallet.txNonceMutex.Unlock()
+
+	if wallet.confirmedNonce > targetNonce {
+		return nil
+	}
 
 	nonceChan := wallet.txNonceChans[targetNonce]
 	if nonceChan != nil {
@@ -343,18 +449,21 @@ func (wallet *Wallet) getTxNonceChan(targetNonce uint64) *nonceStatus {
 	return nonceChan
 }
 
-func (wallet *Wallet) processTransactionInclusion(block *execution.Block, tx *types.Transaction) {
+func (wallet *Wallet) processTransactionInclusion(block *execution.Block, tx *types.Transaction, receipt *types.Receipt) {
 	if !wallet.isReady {
 		return
 	}
 
-	receipt := wallet.loadTransactionReceipt(block, tx)
-	nonce := tx.Nonce() + 1
+	if receipt == nil {
+		receipt = wallet.loadTransactionReceipt(context.Background(), block, tx)
+	}
+
+	nonce := tx.Nonce()
 
 	wallet.txNonceMutex.Lock()
 	defer wallet.txNonceMutex.Unlock()
 
-	if wallet.confirmedNonce >= nonce {
+	if wallet.confirmedNonce > nonce {
 		return
 	}
 
@@ -368,17 +477,17 @@ func (wallet *Wallet) processTransactionInclusion(block *execution.Block, tx *ty
 	}
 
 	for n := range wallet.txNonceChans {
-		if n == nonce-1 {
+		if n == nonce {
 			wallet.txNonceChans[n].receipt = receipt
 		}
 
-		if n < nonce {
+		if n <= nonce {
 			close(wallet.txNonceChans[n].channel)
 			delete(wallet.txNonceChans, n)
 		}
 	}
 
-	wallet.confirmedNonce = nonce
+	wallet.confirmedNonce = nonce + 1
 	if wallet.confirmedNonce > wallet.pendingNonce {
 		wallet.pendingNonce = wallet.confirmedNonce
 		wallet.pendingBalance = new(big.Int).Set(wallet.confirmedBalance)
@@ -426,15 +535,30 @@ func (wallet *Wallet) processTransactionReceival(_ *execution.Block, tx *types.T
 	wallet.confirmedBalance = wallet.confirmedBalance.Add(wallet.confirmedBalance, tx.Value())
 }
 
-func (wallet *Wallet) loadTransactionReceipt(block *execution.Block, tx *types.Transaction) *types.Receipt {
+func (wallet *Wallet) loadTransactionReceipt(ctx context.Context, block *execution.Block, tx *types.Transaction) *types.Receipt {
 	retryCount := uint64(0)
+	readyClients := wallet.manager.clientPool.GetReadyEndpoints()
+
+	var clients []*execution.Client
 
 	for {
-		clients := block.GetSeenBy()
+		if block != nil {
+			clients = block.GetSeenBy()
+		}
+
+		if len(clients) == 0 {
+			clients = readyClients
+		}
+
 		cliIdx := retryCount % uint64(len(clients))
 		client := clients[cliIdx]
 
-		receipt, err := client.GetRPCClient().GetTransactionReceipt(context.Background(), tx.Hash())
+		reqCtx, reqCtxCancel := context.WithTimeout(ctx, 5*time.Second)
+
+		//nolint:gocritic // ignore
+		defer reqCtxCancel()
+
+		receipt, err := client.GetRPCClient().GetTransactionReceipt(reqCtx, tx.Hash())
 		if err == nil {
 			return receipt
 		}

@@ -20,6 +20,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/util/hashing"
@@ -147,7 +148,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		pubkey, tx, err := t.generateDeposit(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
+		pubkey, tx, err := t.generateDeposit(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt, err error) {
 			if pendingChan != nil {
 				<-pendingChan
 			}
@@ -156,8 +157,13 @@ func (t *Task) Execute(ctx context.Context) error {
 			depositReceipts[tx.Hash().Hex()] = receipt
 			depositReceiptsMtx.Unlock()
 
-			if receipt != nil {
+			switch {
+			case receipt != nil:
 				t.logger.Infof("deposit %v confirmed in block %v (nonce: %v, status: %v)", tx.Hash().Hex(), receipt.BlockNumber, tx.Nonce(), receipt.Status)
+			case err != nil:
+				t.logger.Errorf("error awaiting deposit transaction receipt: %v", err.Error())
+			default:
+				t.logger.Warnf("no receipt for deposit transaction: %v", tx.Hash().Hex())
 			}
 
 			pendingWg.Done()
@@ -275,7 +281,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*common.BLSPubkey, *ethtypes.Transaction, error) {
+func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm wallet.TxConfirmFn) (*common.BLSPubkey, *ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
 
@@ -394,25 +400,25 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		return nil, nil, fmt.Errorf("cannot create bound instance of DepositContract: %w", err)
 	}
 
-	wallet, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
+	txWallet, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
-	err = wallet.AwaitReady(ctx)
+	err = txWallet.AwaitReady(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot load wallet state: %w", err)
 	}
 
-	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
+	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", txWallet.GetAddress().Hex(), txWallet.GetNonce(), txWallet.GetReadableBalance(18, 0, 4, false, false))
 
-	tx, err := wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
+	tx, err := txWallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
 		amount := big.NewInt(int64(data.Amount))
 
 		amount.Mul(amount, big.NewInt(1000000000))
 
 		return depositContract.Deposit(&bind.TransactOpts{
-			From:      wallet.GetAddress(),
+			From:      txWallet.GetAddress(),
 			Nonce:     big.NewInt(int64(nonce)),
 			Value:     amount,
 			GasLimit:  200000,
@@ -426,43 +432,29 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		return nil, nil, fmt.Errorf("cannot build deposit transaction: %w", err)
 	}
 
-	for i := 0; i < len(clients); i++ {
-		client := clients[i%len(clients)]
+	err = txWallet.SendTransaction(ctx, tx, &wallet.SendTransactionOptions{
+		Clients:   clients,
+		OnConfirm: onConfirm,
+		LogFn: func(client *execution.Client, retry int, rebroadcast int, err error) {
+			if err != nil {
+				return
+			}
 
-		t.logger.WithFields(logrus.Fields{
-			"client": client.GetName(),
-		}).Infof("sending deposit transaction (account idx: %v, nonce: %v)", accountIdx, tx.Nonce())
+			logEntry := t.logger.WithFields(logrus.Fields{
+				"client": client.GetName(),
+			})
 
-		err = client.GetRPCClient().SendTransaction(ctx, tx)
-		if err == nil {
-			break
-		}
-	}
+			if rebroadcast > 0 {
+				logEntry = logEntry.WithField("rebroadcast", rebroadcast)
+			}
+
+			logEntry.Infof("submitted deposit transaction (account idx: %v, nonce: %v, attempt: %v)", accountIdx, tx.Nonce(), retry)
+		},
+	})
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed sending deposit transaction: %w", err)
 	}
-
-	go func() {
-		var receipt *ethtypes.Receipt
-
-		if onConfirm != nil {
-			defer func() {
-				onConfirm(tx, receipt)
-			}()
-		}
-
-		receipt, err := wallet.AwaitTransaction(ctx, tx)
-
-		if ctx.Err() != nil {
-			return
-		}
-
-		if err != nil {
-			t.logger.Errorf("failed awaiting transaction receipt: %w", err)
-			return
-		}
-	}()
 
 	return &pub, tx, nil
 }

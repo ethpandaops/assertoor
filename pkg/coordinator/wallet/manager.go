@@ -75,7 +75,7 @@ func (manager *Manager) runBlockTransactionsLoop() {
 }
 
 func (manager *Manager) processBlockTransactions(block *execution.Block) {
-	blockData := block.AwaitBlock(context.Background(), 2*time.Second)
+	blockData := block.AwaitBlock(context.Background(), 4*time.Second)
 	if blockData == nil {
 		return
 	}
@@ -83,14 +83,33 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 	manager.walletsMutex.Lock()
 
 	wallets := map[common.Address]*Wallet{}
+	pendingTxCount := uint64(0)
+
 	for addr := range manager.walletsMap {
 		wallets[addr] = manager.walletsMap[addr]
+		pendingTxCount += wallets[addr].pendingNonce - wallets[addr].confirmedNonce
 	}
 
 	manager.walletsMutex.Unlock()
 
+	manager.logger.Infof("processing block %v with %v transactions", block.Number, len(blockData.Transactions()))
+
+	var blockReceipts []*ethtypes.Receipt
+
+	if pendingTxCount > 10 {
+		// load all receipts for block to avoid receipt polling for each pending transaction
+		blockReceipts = manager.loadBlockReceipts(block)
+	}
+
 	signer := ethtypes.LatestSignerForChainID(manager.clientPool.GetBlockCache().GetChainID())
+
 	for idx, tx := range blockData.Transactions() {
+		var txReceipt *ethtypes.Receipt
+
+		if blockReceipts != nil && idx < len(blockReceipts) {
+			txReceipt = blockReceipts[idx]
+		}
+
 		txFrom, err := ethtypes.Sender(signer, tx)
 		if err != nil {
 			manager.logger.Warnf("error decoding tx sender (block %v, tx %v): %v", block.Number, idx, err)
@@ -99,7 +118,7 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 
 		fromWallet := wallets[txFrom]
 		if fromWallet != nil {
-			fromWallet.processTransactionInclusion(block, tx)
+			fromWallet.processTransactionInclusion(block, tx, txReceipt)
 		}
 
 		toAddr := tx.To()
@@ -129,5 +148,46 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 
 	for _, wallet := range wallets {
 		wallet.processStaleConfirmations(block)
+	}
+}
+
+func (manager *Manager) loadBlockReceipts(block *execution.Block) []*ethtypes.Receipt {
+	retryCount := uint64(0)
+	readyClients := manager.clientPool.GetReadyEndpoints()
+
+	for {
+		clients := block.GetSeenBy()
+		if len(clients) == 0 {
+			clients = readyClients
+		}
+
+		cliIdx := retryCount % uint64(len(clients))
+		client := clients[cliIdx]
+
+		reqCtx, reqCtxCancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+		//nolint:gocritic // ignore
+		defer reqCtxCancel()
+
+		receipts, err := client.GetRPCClient().GetBlockReceipts(reqCtx, block.Hash)
+		if err == nil {
+			return receipts
+		}
+
+		if retryCount > 2 {
+			manager.logger.WithFields(logrus.Fields{
+				"client": client.GetName(),
+				"block":  block.Number,
+				"hash":   block.Hash.Hex(),
+			}).Warnf("could not load block receipts: %v", err)
+		}
+
+		if retryCount < 5 {
+			time.Sleep(1 * time.Second)
+
+			retryCount++
+		} else {
+			return nil
+		}
 	}
 }
