@@ -94,11 +94,9 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 	manager.walletsMutex.Lock()
 
 	wallets := map[common.Address]*Wallet{}
-	pendingTxCount := uint64(0)
 
 	for addr := range manager.walletsMap {
 		wallets[addr] = manager.walletsMap[addr]
-		pendingTxCount += wallets[addr].pendingNonce - wallets[addr].confirmedNonce
 	}
 
 	manager.walletsMutex.Unlock()
@@ -107,20 +105,11 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 
 	var blockReceipts []*ethtypes.Receipt
 
-	if pendingTxCount > 10 {
-		// load all receipts for block to avoid receipt polling for each pending transaction
-		blockReceipts = manager.loadBlockReceipts(block)
-	}
+	receiptsLoaded := false
 
 	signer := ethtypes.LatestSignerForChainID(manager.clientPool.GetBlockCache().GetChainID())
 
 	for idx, tx := range blockData.Transactions() {
-		var txReceipt *ethtypes.Receipt
-
-		if blockReceipts != nil && idx < len(blockReceipts) {
-			txReceipt = blockReceipts[idx]
-		}
-
 		txFrom, err := ethtypes.Sender(signer, tx)
 		if err != nil {
 			manager.logger.Warnf("error decoding tx sender (block %v, tx %v): %v", block.Number, idx, err)
@@ -129,6 +118,17 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 
 		fromWallet := wallets[txFrom]
 		if fromWallet != nil {
+			if !receiptsLoaded {
+				blockReceipts = manager.loadBlockReceipts(block)
+				receiptsLoaded = true
+			}
+
+			var txReceipt *ethtypes.Receipt
+
+			if blockReceipts != nil && idx < len(blockReceipts) {
+				txReceipt = blockReceipts[idx]
+			}
+
 			fromWallet.processTransactionInclusion(block, tx, txReceipt)
 		}
 

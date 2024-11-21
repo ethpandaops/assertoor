@@ -454,10 +454,6 @@ func (wallet *Wallet) processTransactionInclusion(block *execution.Block, tx *ty
 		return
 	}
 
-	if receipt == nil {
-		receipt = wallet.loadTransactionReceipt(context.Background(), block, tx)
-	}
-
 	nonce := tx.Nonce()
 
 	wallet.txNonceMutex.Lock()
