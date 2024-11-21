@@ -385,6 +385,8 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConf
 
 			logEntry.Infof("submitted withdrawal transaction (source pubkey: 0x%x, amount: %v, nonce: %v)", sourcePubkey, amount.String(), tx.Nonce())
 		},
+		RebroadcastInterval: 30 * time.Second,
+		MaxRebroadcasts:     5,
 	})
 
 	if err != nil {

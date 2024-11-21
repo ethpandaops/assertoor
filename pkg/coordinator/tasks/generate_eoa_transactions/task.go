@@ -389,6 +389,8 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 
 			logEntry.Infof("submitted tx %v: %v", transactionIdx, tx.Hash().Hex())
 		},
+		RebroadcastInterval: 30 * time.Second,
+		MaxRebroadcasts:     5,
 	})
 
 	if err != nil {

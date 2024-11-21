@@ -450,6 +450,8 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 
 			logEntry.Infof("submitted deposit transaction (account idx: %v, nonce: %v, attempt: %v)", accountIdx, tx.Nonce(), retry)
 		},
+		RebroadcastInterval: 30 * time.Second,
+		MaxRebroadcasts:     5,
 	})
 
 	if err != nil {

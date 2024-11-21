@@ -347,5 +347,7 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 
 			logEntry.Infof("submitted blob transaction %v (nonce: %v, attempt: %v)", transactionIdx, tx.Nonce(), retry)
 		},
+		RebroadcastInterval: 30 * time.Second,
+		MaxRebroadcasts:     5,
 	})
 }

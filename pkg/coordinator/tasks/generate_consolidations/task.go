@@ -391,6 +391,8 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 
 			logEntry.Infof("submitted consolidation transaction (source index: %v, target index: %v, nonce: %v, attempt: %v)", sourceValidator.Index, targetValidator.Index, tx.Nonce(), retry)
 		},
+		RebroadcastInterval: 30 * time.Second,
+		MaxRebroadcasts:     5,
 	})
 
 	if err != nil {
