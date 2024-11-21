@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 
@@ -13,20 +14,27 @@ import (
 )
 
 type ExecutionClient struct {
-	name      string
-	endpoint  string
-	headers   map[string]string
-	rpcClient *rpc.Client
-	ethClient *ethclient.Client
+	name             string
+	endpoint         string
+	headers          map[string]string
+	rpcClient        *rpc.Client
+	ethClient        *ethclient.Client
+	concurrencyLimit int
+	requestTimeout   time.Duration
+	concurrencyChan  chan struct{}
 }
 
 // NewExecutionClient is used to create a new execution client
 func NewExecutionClient(name, url string, headers map[string]string) (*ExecutionClient, error) {
 	client := &ExecutionClient{
-		name:     name,
-		endpoint: url,
-		headers:  headers,
+		name:             name,
+		endpoint:         url,
+		headers:          headers,
+		concurrencyLimit: 20,
+		requestTimeout:   30 * time.Second,
 	}
+
+	client.concurrencyChan = make(chan struct{}, client.concurrencyLimit)
 
 	return client, nil
 }
@@ -49,6 +57,14 @@ func (ec *ExecutionClient) Initialize(ctx context.Context) error {
 	ec.ethClient = ethclient.NewClient(rpcClient)
 
 	return nil
+}
+
+func (ec *ExecutionClient) enforceConcurrencyLimit() func() {
+	ec.concurrencyChan <- struct{}{}
+
+	return func() {
+		<-ec.concurrencyChan
+	}
 }
 
 func (ec *ExecutionClient) GetEthClient() *ethclient.Client {
@@ -96,7 +112,10 @@ func (ec *ExecutionClient) GetNodeSyncing(ctx context.Context) (*SyncStatus, err
 }
 
 func (ec *ExecutionClient) GetLatestBlock(ctx context.Context) (*types.Block, error) {
-	block, err := ec.ethClient.BlockByNumber(ctx, nil)
+	reqCtx, reqCtxCancel := context.WithTimeout(ctx, ec.requestTimeout)
+	defer reqCtxCancel()
+
+	block, err := ec.ethClient.BlockByNumber(reqCtx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +124,10 @@ func (ec *ExecutionClient) GetLatestBlock(ctx context.Context) (*types.Block, er
 }
 
 func (ec *ExecutionClient) GetBlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
-	block, err := ec.ethClient.BlockByHash(ctx, hash)
+	reqCtx, reqCtxCancel := context.WithTimeout(ctx, ec.requestTimeout)
+	defer reqCtxCancel()
+
+	block, err := ec.ethClient.BlockByHash(reqCtx, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -114,28 +136,61 @@ func (ec *ExecutionClient) GetBlockByHash(ctx context.Context, hash common.Hash)
 }
 
 func (ec *ExecutionClient) GetNonceAt(ctx context.Context, wallet common.Address, blockNumber *big.Int) (uint64, error) {
-	return ec.ethClient.NonceAt(ctx, wallet, blockNumber)
+	closeFn := ec.enforceConcurrencyLimit()
+	defer closeFn()
+
+	reqCtx, reqCtxCancel := context.WithTimeout(ctx, ec.requestTimeout)
+	defer reqCtxCancel()
+
+	return ec.ethClient.NonceAt(reqCtx, wallet, blockNumber)
 }
 
 func (ec *ExecutionClient) GetBalanceAt(ctx context.Context, wallet common.Address, blockNumber *big.Int) (*big.Int, error) {
-	return ec.ethClient.BalanceAt(ctx, wallet, blockNumber)
+	closeFn := ec.enforceConcurrencyLimit()
+	defer closeFn()
+
+	reqCtx, reqCtxCancel := context.WithTimeout(ctx, ec.requestTimeout)
+	defer reqCtxCancel()
+
+	return ec.ethClient.BalanceAt(reqCtx, wallet, blockNumber)
 }
 
 func (ec *ExecutionClient) GetTransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	return ec.ethClient.TransactionReceipt(ctx, txHash)
+	closeFn := ec.enforceConcurrencyLimit()
+	defer closeFn()
+
+	reqCtx, reqCtxCancel := context.WithTimeout(ctx, ec.requestTimeout)
+	defer reqCtxCancel()
+
+	return ec.ethClient.TransactionReceipt(reqCtx, txHash)
 }
 
 func (ec *ExecutionClient) GetBlockReceipts(ctx context.Context, blockHash common.Hash) ([]*types.Receipt, error) {
-	return ec.ethClient.BlockReceipts(ctx, rpc.BlockNumberOrHash{
+	closeFn := ec.enforceConcurrencyLimit()
+	defer closeFn()
+
+	reqCtx, reqCtxCancel := context.WithTimeout(ctx, ec.requestTimeout)
+	defer reqCtxCancel()
+
+	return ec.ethClient.BlockReceipts(reqCtx, rpc.BlockNumberOrHash{
 		BlockHash: &blockHash,
 	})
 }
 
 func (ec *ExecutionClient) SendTransaction(ctx context.Context, tx *types.Transaction) error {
-	return ec.ethClient.SendTransaction(ctx, tx)
+	closeFn := ec.enforceConcurrencyLimit()
+	defer closeFn()
+
+	reqCtx, reqCtxCancel := context.WithTimeout(ctx, ec.requestTimeout)
+	defer reqCtxCancel()
+
+	return ec.ethClient.SendTransaction(reqCtx, tx)
 }
 
 //nolint:gocritic // ignore
 func (ec *ExecutionClient) GetEthCall(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	closeFn := ec.enforceConcurrencyLimit()
+	defer closeFn()
+
 	return ec.ethClient.CallContract(ctx, msg, blockNumber)
 }
