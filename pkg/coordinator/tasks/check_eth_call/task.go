@@ -147,7 +147,7 @@ func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *executio
 	var clients []*execution.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
+		clients = clientPool.GetExecutionPool().GetReadyEndpoints(true)
 		if len(clients) == 0 {
 			t.logger.Error("check failed: no matching clients found")
 			t.ctx.SetResult(types.TaskResultFailure)

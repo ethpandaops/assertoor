@@ -308,7 +308,7 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
+		clients = clientPool.GetExecutionPool().GetReadyEndpoints(true)
 	} else {
 		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(poolClients) == 0 {

@@ -322,7 +322,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 	var clients []*execution.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
+		clients = clientPool.GetExecutionPool().GetReadyEndpoints(true)
 	} else {
 		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(poolClients) == 0 {

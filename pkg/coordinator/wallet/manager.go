@@ -164,7 +164,7 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 
 func (manager *Manager) loadBlockReceipts(block *execution.Block) []*ethtypes.Receipt {
 	retryCount := uint64(0)
-	readyClients := manager.clientPool.GetReadyEndpoints()
+	readyClients := manager.clientPool.GetReadyEndpoints(true)
 
 	for {
 		clients := block.GetSeenBy()

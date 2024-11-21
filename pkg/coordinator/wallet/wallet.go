@@ -533,7 +533,7 @@ func (wallet *Wallet) processTransactionReceival(_ *execution.Block, tx *types.T
 
 func (wallet *Wallet) loadTransactionReceipt(ctx context.Context, block *execution.Block, tx *types.Transaction) *types.Receipt {
 	retryCount := uint64(0)
-	readyClients := wallet.manager.clientPool.GetReadyEndpoints()
+	readyClients := wallet.manager.clientPool.GetReadyEndpoints(true)
 
 	var clients []*execution.Client
 
