@@ -20,6 +20,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/wallet"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
 	util "github.com/wealdtech/go-eth2-util"
@@ -103,6 +104,7 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
+//nolint:gocyclo // no need to reduce complexity
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.SourceStartIndex > 0 {
 		t.nextIndex = uint64(t.config.SourceStartIndex)
@@ -137,7 +139,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		tx, err := t.generateConsolidation(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
+		tx, err := t.generateConsolidation(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt, err error) {
 			if pendingChan != nil {
 				<-pendingChan
 			}
@@ -148,8 +150,13 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			pendingWg.Done()
 
-			if receipt != nil {
-				t.logger.Infof("consolidation %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
+			switch {
+			case receipt != nil:
+				t.logger.Infof("consolidation %v confirmed in block %v (nonce: %v, status: %v)", tx.Hash().Hex(), receipt.BlockNumber, tx.Nonce(), receipt.Status)
+			case err != nil:
+				t.logger.Errorf("error awaiting consolidation transaction receipt: %v", err.Error())
+			default:
+				t.logger.Warnf("no receipt for consolidation transaction: %v", tx.Hash().Hex())
 			}
 		})
 		if err != nil {
@@ -253,7 +260,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onConfirm func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) (*ethtypes.Transaction, error) {
+func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onConfirm wallet.TxConfirmFn) (*ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
 	var sourceValidator, targetValidator *v1.Validator
@@ -332,19 +339,19 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 		return nil, fmt.Errorf("no ready clients available")
 	}
 
-	wallet, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
+	txWallet, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
-	err = wallet.AwaitReady(ctx)
+	err = txWallet.AwaitReady(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("cannot load wallet state: %w", err)
 	}
 
-	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
+	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", txWallet.GetAddress().Hex(), txWallet.GetNonce(), txWallet.GetReadableBalance(18, 0, 4, false, false))
 
-	tx, err := wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
+	tx, err := txWallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
 		txData := make([]byte, 96)
 		copy(txData[0:48], sourceValidator.Validator.PublicKey[:])
 		copy(txData[48:], targetValidator.Validator.PublicKey[:])
@@ -366,43 +373,29 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 		return nil, fmt.Errorf("cannot build consolidation transaction: %w", err)
 	}
 
-	for i := 0; i < len(clients); i++ {
-		client := clients[i%len(clients)]
+	err = txWallet.SendTransaction(ctx, tx, &wallet.SendTransactionOptions{
+		Clients:   clients,
+		OnConfirm: onConfirm,
+		LogFn: func(client *execution.Client, retry int, rebroadcast int, err error) {
+			if err != nil {
+				return
+			}
 
-		t.logger.WithFields(logrus.Fields{
-			"client": client.GetName(),
-		}).Infof("sending consolidation transaction (source index: %v, target index: %v, nonce: %v)", sourceValidator.Index, targetValidator.Index, tx.Nonce())
+			logEntry := t.logger.WithFields(logrus.Fields{
+				"client": client.GetName(),
+			})
 
-		err = client.GetRPCClient().SendTransaction(ctx, tx)
-		if err == nil {
-			break
-		}
-	}
+			if rebroadcast > 0 {
+				logEntry = logEntry.WithField("rebroadcast", rebroadcast)
+			}
+
+			logEntry.Infof("submitted consolidation transaction (source index: %v, target index: %v, nonce: %v, attempt: %v)", sourceValidator.Index, targetValidator.Index, tx.Nonce(), retry)
+		},
+	})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed sending consolidation transaction: %w", err)
 	}
-
-	go func() {
-		var receipt *ethtypes.Receipt
-
-		if onConfirm != nil {
-			defer func() {
-				onConfirm(tx, receipt)
-			}()
-		}
-
-		receipt, err := wallet.AwaitTransaction(ctx, tx)
-
-		if ctx.Err() != nil {
-			return
-		}
-
-		if err != nil {
-			t.logger.Errorf("failed awaiting transaction receipt: %w", err)
-			return
-		}
-	}()
 
 	return tx, nil
 }
