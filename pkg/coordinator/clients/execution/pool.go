@@ -122,6 +122,7 @@ func (pool *Pool) GetReadyEndpoints(shuffle bool) []*Client {
 	if shuffle {
 		shuffledClients := make([]*Client, len(readyClients))
 		perm := rand.Perm(len(readyClients))
+
 		for i, v := range perm {
 			shuffledClients[v] = readyClients[i]
 		}
