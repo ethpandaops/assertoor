@@ -126,6 +126,8 @@ func (pool *Pool) GetReadyEndpoints(shuffle bool) []*Client {
 		for i, v := range perm {
 			shuffledClients[v] = readyClients[i]
 		}
+
+		return shuffledClients
 	}
 
 	return readyClients
