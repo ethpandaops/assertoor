@@ -263,7 +263,7 @@ func (t *Task) parseOutputVars(line string) bool {
 				t.logger.Warnf("error parsing ::set-output-json expression: %v", err.Error())
 			} else {
 				t.ctx.Outputs.SetVar(match[3], varValue)
-				t.logger.Infof("set output %v: (json) %v", match[3], varValue)
+				t.logger.Infof("set output %v: (json)", match[3])
 
 				return true
 			}

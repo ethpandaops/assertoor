@@ -10,13 +10,13 @@ import (
 )
 
 type BlobCommitment struct {
-	Blob          kzg4844.Blob
+	Blob          *kzg4844.Blob
 	Commitment    kzg4844.Commitment
 	Proof         kzg4844.Proof
 	VersionedHash common.Hash
 }
 
-func encodeBlobData(data []byte) kzg4844.Blob {
+func encodeBlobData(data []byte) *kzg4844.Blob {
 	blob := kzg4844.Blob{}
 	fieldIndex := -1
 
@@ -34,7 +34,7 @@ func encodeBlobData(data []byte) kzg4844.Blob {
 		copy(blob[fieldIndex*32+1:], data[i:maxpos])
 	}
 
-	return blob
+	return &blob
 }
 
 func EncodeBlob(data []byte) (*BlobCommitment, error) {
@@ -50,13 +50,13 @@ func EncodeBlob(data []byte) (*BlobCommitment, error) {
 	var err error
 
 	// generate blob commitment
-	blobCommitment.Commitment, err = kzg4844.BlobToCommitment(&blobCommitment.Blob)
+	blobCommitment.Commitment, err = kzg4844.BlobToCommitment(blobCommitment.Blob)
 	if err != nil {
 		return nil, fmt.Errorf("failed generating blob commitment: %w", err)
 	}
 
 	// generate blob proof
-	blobCommitment.Proof, err = kzg4844.ComputeBlobProof(&blobCommitment.Blob, blobCommitment.Commitment)
+	blobCommitment.Proof, err = kzg4844.ComputeBlobProof(blobCommitment.Blob, blobCommitment.Commitment)
 	if err != nil {
 		return nil, fmt.Errorf("failed generating blob proof: %w", err)
 	}

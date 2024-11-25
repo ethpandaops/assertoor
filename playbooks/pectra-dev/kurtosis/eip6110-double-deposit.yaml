@@ -1,0 +1,58 @@
+
+id: eip6110-double-deposit
+name: "EIP6110 double deposit test"
+timeout: 1h
+config:
+  walletPrivkey: ""
+  depositContract: "0x4242424242424242424242424242424242424242"
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# wait for electra activation
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+- name: check_consensus_slot_range
+  title: "Wait for electra activation"
+  timeout: 1h
+  configVars:
+    minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
+
+- name: get_random_mnemonic
+  id: test_mnemonic
+  title: "Generate random mnemonic"
+
+- name: run_tasks_concurrent
+  title: "Generate 2 deposits for same pubkey"
+  config:
+    tasks:
+    - name: generate_deposits
+      title: "Generate deposit with 33 ETH"
+      config:
+        limitTotal: 1
+        limitPerSlot: 1
+        limitPending: 1
+        depositAmount: 33
+        awaitReceipt: true
+        failOnReject: true
+      configVars:
+        walletPrivkey: "walletPrivkey"
+        mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+        depositContract: "depositContract"
+    - name: generate_deposits
+      title: "Generate deposits with 33 ETH"
+      config:
+        limitTotal: 1
+        limitPerSlot: 1
+        limitPending: 1
+        depositAmount: 33
+        awaitReceipt: true
+        failOnReject: true
+      configVars:
+        walletPrivkey: "walletPrivkey"
+        mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+        depositContract: "depositContract"

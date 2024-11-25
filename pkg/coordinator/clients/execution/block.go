@@ -17,6 +17,7 @@ type Block struct {
 	blockChan  chan bool
 	block      *types.Block
 	seenMutex  sync.RWMutex
+	seenChan   chan bool
 	seenMap    map[uint16]*Client
 }
 
@@ -40,6 +41,41 @@ func (block *Block) SetSeenBy(client *Client) {
 	block.seenMutex.Lock()
 	defer block.seenMutex.Unlock()
 	block.seenMap[client.clientIdx] = client
+
+	if block.seenChan != nil {
+		close(block.seenChan)
+	}
+}
+
+func (block *Block) AwaitSeenBy(ctx context.Context, client *Client) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	for {
+		seen, seenChan := block.checkSeenBy(client)
+		if seen {
+			return true
+		}
+
+		select {
+		case <-seenChan:
+		case <-ctx.Done():
+			return false
+		}
+	}
+}
+
+func (block *Block) checkSeenBy(client *Client) (seen bool, seenChan chan bool) {
+	block.seenMutex.RLock()
+	defer block.seenMutex.RUnlock()
+
+	_, ok := block.seenMap[client.clientIdx]
+	if !ok && block.seenChan == nil {
+		block.seenChan = make(chan bool)
+	}
+
+	return ok, block.seenChan
 }
 
 func (block *Block) GetBlock() *types.Block {

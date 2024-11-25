@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -86,7 +87,7 @@ func (pool *Pool) GetAllEndpoints() []*Client {
 }
 
 func (pool *Pool) GetReadyEndpoint(clientType ClientType) *Client {
-	readyClients := pool.GetReadyEndpoints()
+	readyClients := pool.GetReadyEndpoints(true)
 	selectedClient := pool.runClientScheduler(readyClients, clientType)
 
 	return selectedClient
@@ -107,7 +108,7 @@ func (pool *Pool) AwaitReadyEndpoint(ctx context.Context, clientType ClientType)
 	}
 }
 
-func (pool *Pool) GetReadyEndpoints() []*Client {
+func (pool *Pool) GetReadyEndpoints(shuffle bool) []*Client {
 	canonicalFork := pool.GetCanonicalFork(-1)
 	if canonicalFork == nil {
 		return nil
@@ -116,6 +117,17 @@ func (pool *Pool) GetReadyEndpoints() []*Client {
 	readyClients := canonicalFork.ReadyClients
 	if len(readyClients) == 0 {
 		return nil
+	}
+
+	if shuffle {
+		shuffledClients := make([]*Client, len(readyClients))
+		perm := rand.Perm(len(readyClients))
+
+		for i, v := range perm {
+			shuffledClients[v] = readyClients[i]
+		}
+
+		return shuffledClients
 	}
 
 	return readyClients

@@ -1,0 +1,12 @@
+id: wait-for-slot
+name: "Wait for specific slot"
+timeout: 2h
+config:
+  slot: 34
+
+tasks:
+- name: check_consensus_slot_range
+  title: "Wait for slot >= ${slot}"
+  timeout: 2h
+  configVars:
+    minSlotNumber: "slot"
