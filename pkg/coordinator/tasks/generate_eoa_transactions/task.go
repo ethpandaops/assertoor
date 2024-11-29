@@ -115,6 +115,7 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
+//nolint:gocyclo // ignore
 func (t *Task) Execute(ctx context.Context) error {
 	if t.walletPool != nil {
 		err := t.walletPool.GetRootWallet().AwaitReady(ctx)
@@ -168,6 +169,16 @@ func (t *Task) Execute(ctx context.Context) error {
 		txIndex := t.txIndex
 		t.txIndex++
 
+		if pendingChan != nil {
+			select {
+			case <-ctx.Done():
+				return nil
+			case pendingChan <- true:
+			}
+		}
+
+		pendingWaitGroup.Add(1)
+
 		err := t.generateTransaction(ctx, txIndex, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt, err error) {
 			if pendingChan != nil {
 				<-pendingChan
@@ -196,17 +207,13 @@ func (t *Task) Execute(ctx context.Context) error {
 		})
 		if err != nil {
 			t.logger.Errorf("error generating transaction: %v", err.Error())
-		} else {
+
 			if pendingChan != nil {
-				select {
-				case <-ctx.Done():
-					return nil
-				case pendingChan <- true:
-				}
+				<-pendingChan
 			}
 
-			pendingWaitGroup.Add(1)
-
+			pendingWaitGroup.Done()
+		} else {
 			perBlockCount++
 			totalCount++
 		}

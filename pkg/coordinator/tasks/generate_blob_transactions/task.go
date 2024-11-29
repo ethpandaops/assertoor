@@ -163,6 +163,14 @@ func (t *Task) Execute(ctx context.Context) error {
 		txIndex := t.txIndex
 		t.txIndex++
 
+		if pendingChan != nil {
+			select {
+			case <-ctx.Done():
+				return nil
+			case pendingChan <- true:
+			}
+		}
+
 		err := t.generateTransaction(ctx, txIndex, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt, err error) {
 			if pendingChan != nil {
 				<-pendingChan
@@ -179,15 +187,11 @@ func (t *Task) Execute(ctx context.Context) error {
 		})
 		if err != nil {
 			t.logger.Errorf("error generating transaction: %v", err.Error())
-		} else {
-			if pendingChan != nil {
-				select {
-				case <-ctx.Done():
-					return nil
-				case pendingChan <- true:
-				}
-			}
 
+			if pendingChan != nil {
+				<-pendingChan
+			}
+		} else {
 			perBlockCount++
 			totalCount++
 		}

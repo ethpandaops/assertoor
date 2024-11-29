@@ -139,6 +139,16 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
+		if pendingChan != nil {
+			select {
+			case <-ctx.Done():
+				return nil
+			case pendingChan <- true:
+			}
+		}
+
+		pendingWg.Add(1)
+
 		tx, err := t.generateConsolidation(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt, err error) {
 			if pendingChan != nil {
 				<-pendingChan
@@ -161,17 +171,13 @@ func (t *Task) Execute(ctx context.Context) error {
 		})
 		if err != nil {
 			t.logger.Errorf("error generating consolidation: %v", err.Error())
-		} else {
+
 			if pendingChan != nil {
-				select {
-				case <-ctx.Done():
-					return nil
-				case pendingChan <- true:
-				}
+				<-pendingChan
 			}
 
-			pendingWg.Add(1)
-
+			pendingWg.Done()
+		} else {
 			t.ctx.SetResult(types.TaskResultSuccess)
 
 			perSlotCount++
