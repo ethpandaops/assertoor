@@ -64,6 +64,7 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 	ts.taskStateMutex.Lock()
 	defer ts.taskStateMutex.Unlock()
 
+	ts.taskCount++
 	taskIdx := ts.taskCount
 	taskState := &taskState{
 		ts:          ts,
@@ -95,8 +96,6 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 		tasksScope := variables.GetSubScope("tasks")
 		tasksScope.SetSubScope(options.ID, taskState.taskStatusVars)
 	}
-
-	ts.taskCount++
 
 	ts.taskStateMap[taskIdx] = taskState
 

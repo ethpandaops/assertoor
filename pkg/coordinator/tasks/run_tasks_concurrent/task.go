@@ -77,7 +77,7 @@ func (t *Task) LoadConfig() error {
 	}
 
 	// init child tasks
-	childTasks := []types.TaskIndex{}
+	childTasks := make([]types.TaskIndex, 0, len(config.Tasks))
 	childScopes := vars.NewVariables(nil)
 
 	for i := range config.Tasks {
