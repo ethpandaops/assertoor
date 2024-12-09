@@ -11,8 +11,8 @@ require (
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/gorilla/mux v1.8.1
 	github.com/herumi/bls-eth-go-binary v1.36.1
-	github.com/holiman/uint256 v1.3.1
-	github.com/itchyny/gojq v0.12.16
+	github.com/holiman/uint256 v1.3.2
+	github.com/itchyny/gojq v0.12.17
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/juliangruber/go-intersect v1.1.0
 	github.com/lib/pq v1.10.9
