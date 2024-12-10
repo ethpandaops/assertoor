@@ -317,6 +317,10 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 			}
 		}
 
+		if t.config.Nonce != nil {
+			nonce = *t.config.Nonce
+		}
+
 		txData := []byte{}
 		if t.transactionData != nil {
 			txData = t.transactionData
@@ -371,7 +375,12 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				}
 
 				authWallet := t.authorizationWallets[idx]
-				authEntry.Nonce = authWallet.UseNextNonce(!bytes.Equal(authEntry.Address.Bytes(), t.wallet.GetAddress().Bytes()))
+
+				if authorization.Nonce != nil {
+					authEntry.Nonce = *authorization.Nonce
+				} else {
+					authEntry.Nonce = authWallet.UseNextNonce(!bytes.Equal(authEntry.Address.Bytes(), t.wallet.GetAddress().Bytes()))
+				}
 
 				authEntry, err := ethtypes.SignAuth(authEntry, authWallet.GetPrivateKey())
 				if err != nil {

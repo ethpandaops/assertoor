@@ -286,7 +286,10 @@ func (wallet *Wallet) BuildTransaction(ctx context.Context, buildFn func(ctx con
 		return nil, err
 	}
 
-	wallet.pendingNonce++
+	if wallet.pendingNonce < tx.Nonce()+1 {
+		wallet.pendingNonce = tx.Nonce() + 1
+	}
+
 	wallet.pendingBalance = wallet.pendingBalance.Sub(wallet.pendingBalance, tx.Value())
 
 	return signedTx, nil

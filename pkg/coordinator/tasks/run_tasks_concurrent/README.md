@@ -11,6 +11,9 @@ The `run_tasks_concurrent` task allows for the parallel execution of multiple ta
 - **`failTaskCount`**:\
   The minimum number of child tasks that need to complete with a "failure" result for the `run_tasks_concurrent` task to stop and return a failure result. A value of 1 means the overall task will fail as soon as one child task fails.
 
+- **`newVariableScope`**:\
+  If set to true, a new variable scope will be created for the child tasks, if not, the child tasks will use the same variable scope as the parent task.
+
 - **`tasks`**:\
   An array of child tasks to be executed concurrently. Each task in this array should be defined according to the standard task structure.
 
@@ -23,5 +26,6 @@ Default settings for the `run_tasks_concurrent` task:
   config:
     succeedTaskCount: 0
     failTaskCount: 1
+    newVariableScope: true
     tasks: []
 ```

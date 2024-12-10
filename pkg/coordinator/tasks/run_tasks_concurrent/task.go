@@ -86,8 +86,13 @@ func (t *Task) LoadConfig() error {
 			return fmt.Errorf("failed parsing child task config #%v : %w", i, err)
 		}
 
-		taskVars := t.ctx.Vars.NewScope()
-		taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
+		var taskVars types.Variables
+		if config.NewVariableScope {
+			taskVars = t.ctx.Vars.NewScope()
+			taskVars.SetVar("scopeOwner", uint64(t.ctx.Index))
+		} else {
+			taskVars = t.ctx.Vars
+		}
 
 		task, err := t.ctx.NewTask(taskOpts, taskVars)
 		if err != nil {
@@ -99,7 +104,9 @@ func (t *Task) LoadConfig() error {
 		childScopes.SetSubScope(fmt.Sprintf("%v", i), vars.NewScopeFilter(taskVars))
 	}
 
-	t.ctx.Outputs.SetSubScope("childScopes", childScopes)
+	if config.NewVariableScope {
+		t.ctx.Outputs.SetSubScope("childScopes", childScopes)
+	}
 
 	t.config = config
 	t.tasks = childTasks

@@ -24,6 +24,7 @@ type Config struct {
 	BlobData           string         `yaml:"blobData" json:"blobData"`
 	RandomAmount       bool           `yaml:"randomAmount" json:"randomAmount"`
 	Amount             *helper.BigInt `yaml:"amount" json:"amount"`
+	Nonce              *uint64        `yaml:"nonce" json:"nonce"`
 	Authorizations     []struct {
 		ChainID       uint64  `yaml:"chainId" json:"chainId"`
 		Nonce         *uint64 `yaml:"nonce" json:"nonce"`

@@ -56,6 +56,9 @@ The `generate_transaction` task creates and sends a single transaction to the ne
 - **`amount`**:\
   The amount of cryptocurrency to be sent in the transaction.
 
+- **`nonce`**:\
+  The nonce for the transaction. If not set, the nonce is incremented by 1.
+
 - **`clientPattern`**:\
   A regex pattern to select specific client endpoints for sending the transaction.
 
@@ -110,6 +113,7 @@ Default settings for the `generate_transaction` task:
     authorizations: []
     randomAmount: false
     amount: "0"
+    nonce: null
     clientPattern: ""
     excludeClientPattern: ""
     awaitReceipt: true

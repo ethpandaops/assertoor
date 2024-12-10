@@ -13,14 +13,18 @@ type Config struct {
 	// number of failed child tasks to make this task fail (0 = all tasks)
 	FailTaskCount uint64 `yaml:"failTaskCount" json:"failTaskCount"`
 
+	// create a new variable scope for the child tasks
+	NewVariableScope bool `yaml:"newVariableScope" json:"newVariableScope"`
+
 	// child tasks
 	Tasks []helper.RawMessageMasked `yaml:"tasks" json:"tasks"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Tasks:         []helper.RawMessageMasked{},
-		FailTaskCount: 1,
+		Tasks:            []helper.RawMessageMasked{},
+		FailTaskCount:    1,
+		NewVariableScope: true,
 	}
 }
 
