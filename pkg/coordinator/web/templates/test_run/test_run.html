@@ -93,7 +93,7 @@
           <tr class="details-row"></tr>
           {{ $isSecTrimmed := .IsSecTrimmed }}
           {{ range $i, $task := .Tasks }}
-          <tr data-bs-toggle="collapse" data-bs-target="#task-details-{{ $task.Index }}" class="accordion-toggle">
+          <tr class="accordion-toggle task-row" data-task-id="{{ $task.Index }}" data-parent-id="{{ $task.ParentIndex }}" data-task-status="{{ $task.Status }}" data-task-result="{{ $task.Result }}">
             <td class="task-graph">
               <div class="graph-container">
                 {{ range $l, $graph := $task.GraphLevels }}
@@ -101,6 +101,14 @@
                   {{ if gt $graph 1 }}
                   <div class="graph-item"></div>
                   {{ end }}
+                </div>
+                {{ end }}
+                {{ if $task.HasChildren }}
+                <div class="graph-button expanded">
+                  <button class="btn btn-link btn-sm p-0 me-1 task-collapse-btn">
+                    <i class="fas fa-square-minus"></i>
+                  </button>
+                  <div class="graph-expand-line"></div>
                 </div>
                 {{ end }}
                 <div class="graph-label">
@@ -148,7 +156,7 @@
                 </span>
               {{ end }}
             </td>
-            <td class="p-0"><button class="btn btn-default btn-xs"><i class="fa fa-eye" aria-hidden="true"></i></button></td>
+            <td class="p-0"><button class="btn btn-default btn-xs task-details-btn" data-bs-toggle="collapse" data-bs-target="#task-details-{{ $task.Index }}"><i class="fa fa-eye" aria-hidden="true"></i></button></td>
           </tr>
           <tr>
             <td colspan="12" class="details-row task-panel">
@@ -297,6 +305,115 @@
 {{ define "sidebar" }}
 {{ end }}
 {{ define "js" }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // build task relationship map
+  var taskParentMap = {};
+  var expandedState = {};
+  var taskRows = $(".details-table tr.task-row");
+  taskRows.each(function() {
+    var taskId = $(this).data("task-id");
+    var parentId = $(this).data("parent-id");
+    taskParentMap[taskId] = parentId;
+    expandedState[parentId] = true;
+  });
+
+  // set initial expand state
+  taskRows.each(function() {
+    var taskId = $(this).data("task-id");
+
+    var taskResult = $(this).data("task-result");
+    var taskStatus = $(this).data("task-status");
+
+    if (taskStatus == "running") return;
+    if (taskResult == "failure") return;
+
+    updateExpandState($(this), false);
+  });
+
+  
+  // Handle collapse/expand buttons
+  document.querySelectorAll('.task-collapse-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation(); // Prevent row expansion
+
+      var taskRow = $(this).closest("tr.task-row");
+      var taskId = taskRow.data("task-id");
+
+      var isExpanded = expandedState[taskId];
+      updateExpandState(taskRow, !isExpanded);
+    });
+  });
+
+  taskRows.each(function() {
+    $(this).click(function(e) {
+      if (e.target.classList.contains('task-details-btn')) return;
+      $(this).find('.task-details-btn').click();
+    });
+  });
+
+  function updateExpandState(taskRow, expand) {
+    var taskId = taskRow.data("task-id");
+    expandedState[taskId] = expand;
+
+    updateExpandRow(taskRow, expand);
+
+    if (expand) {
+      // expand all children (including children of children, but only if not collapsed by itself)
+      var expandTaskIds = Object.keys(taskParentMap).filter(function(childId) {
+        if(taskId == childId ||!isParentTask(taskId, childId)) return false;
+
+        var parentId = taskParentMap[childId];
+        while (parentId != taskId && parentId != 0) {
+          if (!expandedState[parentId]) return false;
+          parentId = taskParentMap[parentId];
+        }
+
+        return true;
+      });
+
+      expandTaskIds.forEach(function(taskId) {
+        $(`.task-row[data-task-id="${taskId}"]`).removeClass('d-none');
+      });
+    } else {
+      // collapse all children (including children of children)
+      var hideTaskIds = Object.keys(taskParentMap).filter(function(childId) {
+        return taskId != childId && isParentTask(taskId, childId);
+      });
+
+      hideTaskIds.forEach(function(taskId) {
+        $(`.task-row[data-task-id="${taskId}"]`).addClass('d-none');
+      });
+    }
+  }
+
+  function isParentTask(taskId, headTaskId) {
+    var currentTaskId = headTaskId;
+    while (currentTaskId != taskId && currentTaskId != 0) {
+      currentTaskId = taskParentMap[currentTaskId];
+    }
+    return currentTaskId == taskId;
+  }
+
+  function updateExpandRow(taskRow, isExpanded) {
+    var icon = taskRow.find(".task-collapse-btn i");
+    if (isExpanded) {
+      icon.removeClass('fa-square-plus');
+      icon.addClass('fa-square-minus');
+    } else {
+      icon.removeClass('fa-square-minus');
+      icon.addClass('fa-square-plus');
+    }
+
+    var graphButton = taskRow.find(".graph-button");
+    if (isExpanded) {
+      graphButton.addClass('expanded');
+    } else {
+      graphButton.removeClass('expanded');
+    }
+  }
+});
+</script>
 {{ end }}
 {{ define "css" }}
 <style>
@@ -328,19 +445,40 @@
   height: 100%;
   display: flex;
   flex-direction: row;
-
+  
   --graph-border: 1px dotted;
+}
+
+.task-graph .graph-container .graph-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.task-graph .graph-container .graph-button .graph-expand-line {
+  position: absolute;
+  top: calc(50% + 11px);
+  bottom: 0;
+  left: 6px;
+  border-left: var(--graph-border);
+  visibility: hidden;
+}
+
+.task-graph .graph-container .graph-button.expanded .graph-expand-line {
+  visibility: visible;
 }
 
 .task-graph .graph-level {
   position: relative;
   width: 10px;
-  margin-left: 10px;
+  margin-left: 8px;
 }
 
 .task-graph .graph-label {
   flex-grow: 1;
   padding: 8px;
+  align-self: center;
 }
 
 .task-graph .graph-item {
@@ -371,5 +509,13 @@
   border-left: var(--graph-border);
 }
 
+.task-collapse-btn {
+  color: #666;
+  text-decoration: none;
+}
+
+.task-collapse-btn:hover {
+  color: #333;
+}
 </style>
 {{ end }}
