@@ -1,0 +1,29 @@
+id: validator-slashing-single
+name: "Validator Slashing Single"
+timeout: 1h
+config:
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  validatorIndex: 0
+  validatorCount: 1
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+- name: check_consensus_slot_range
+  title: "Wait for epoch >= 4"
+  timeout: 1h  # 4 epochs = ~0.5h
+  config:
+    minEpochNumber: 4
+
+- name: generate_slashings
+  title: "Generate 1 proposer slashing per slot"
+  config:
+    slashingType: "proposer"
+    limitPerSlot: 1
+  configVars:
+    mnemonic: "validatorMnemonic"
+    startIndex: "validatorIndex"
+    limitTotal: "validatorCount"
+    indexCount: "validatorCount"

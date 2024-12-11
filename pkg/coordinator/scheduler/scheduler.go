@@ -31,7 +31,7 @@ func NewTaskScheduler(log logrus.FieldLogger, services types.TaskServices, varia
 		logger:       log,
 		rootVars:     variables,
 		testRunID:    testRunID,
-		taskCount:    1,
+		taskCount:    0,
 		rootTasks:    make([]types.TaskIndex, 0),
 		allTasks:     make([]types.TaskIndex, 0),
 		taskStateMap: make(map[types.TaskIndex]*taskState),
