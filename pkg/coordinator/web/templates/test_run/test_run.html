@@ -95,26 +95,28 @@
           {{ range $i, $task := .Tasks }}
           <tr class="accordion-toggle task-row" data-task-id="{{ $task.Index }}" data-parent-id="{{ $task.ParentIndex }}" data-task-status="{{ $task.Status }}" data-task-result="{{ $task.Result }}">
             <td class="task-graph">
-              <div class="graph-container">
-                {{ range $l, $graph := $task.GraphLevels }}
-                <div class="graph-level {{ if gt $graph 0 }}graph-line{{ end }} {{ if eq $graph 3 }}graph-last{{ end }}">
-                  {{ if gt $graph 1 }}
-                  <div class="graph-item"></div>
+              <div class="task-graph-cell">
+                <div class="graph-container">
+                  {{ range $l, $graph := $task.GraphLevels }}
+                  <div class="graph-level {{ if gt $graph 0 }}graph-line{{ end }} {{ if eq $graph 3 }}graph-last{{ end }}">
+                    {{ if gt $graph 1 }}
+                    <div class="graph-item"></div>
+                    {{ end }}
+                  </div>
                   {{ end }}
-                </div>
-                {{ end }}
-                {{ if $task.HasChildren }}
-                <div class="graph-button expanded">
-                  <button class="btn btn-link btn-sm p-0 me-1 task-collapse-btn">
-                    <i class="fas fa-square-minus"></i>
-                  </button>
-                  <div class="graph-expand-line"></div>
-                </div>
-                {{ end }}
-                <div class="graph-label">
-                  <span>
-                    {{ $task.Index }}
-                  </span>
+                  {{ if $task.HasChildren }}
+                  <div class="graph-button expanded">
+                    <button class="btn btn-link btn-sm p-0 me-1 task-collapse-btn">
+                      <i class="fas fa-square-minus"></i>
+                    </button>
+                    <div class="graph-expand-line"></div>
+                  </div>
+                  {{ end }}
+                  <div class="graph-label">
+                    <span>
+                      {{ $task.Index }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </td>
@@ -441,8 +443,12 @@ document.addEventListener('DOMContentLoaded', function() {
   height: 1px;
 }
 
+.task-list .task-graph .task-graph-cell {
+  height:100%;
+}
+
 .task-list .task-graph .graph-container {
-  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: row;
   
@@ -482,13 +488,19 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .task-graph .graph-item {
+  position: relative;
   width: 100%;
-  height: 50%;
-  border-bottom: var(--graph-border);
+  height: 100%;
 }
 
-.task-graph .graph-level.graph-last {
-  height: 50%;
+.task-graph .graph-level .graph-item:after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  border-bottom: var(--graph-border);
 }
 
 .task-graph .graph-last .graph-item {
@@ -507,6 +519,10 @@ document.addEventListener('DOMContentLoaded', function() {
   bottom:0;
   left:0;
   border-left: var(--graph-border);
+}
+
+.task-graph .graph-level.graph-line.graph-last:before {
+  bottom: 50%;
 }
 
 .task-collapse-btn {
