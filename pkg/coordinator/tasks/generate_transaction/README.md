@@ -14,6 +14,9 @@ The `generate_transaction` task creates and sends a single transaction to the ne
 - **`blobTxType`**:\
   If `true`, generates a blob (type 3) transaction. Otherwise, a dynamic fee (type 2) transaction is used.
 
+- **`setCodeTxType`**:\
+  If `true`, generates a set code (type 4) transaction. Otherwise, a dynamic fee (type 2) transaction is used.
+
 - **`blobFeeCap`**:\
   The fee cap for blob transactions. Used only if `blobTxType` is `true`.
 
@@ -41,11 +44,20 @@ The `generate_transaction` task creates and sends a single transaction to the ne
 - **`blobData`**:\
   Data for the blob component of the transaction. Used only if `blobTxType` is `true`.
 
+- **`authorizations`**:\
+  EOA code authorizations. Used only if `setCodeTxType` is `true`.
+  ```yaml
+  - { "chainId": 0, "nonce": null, "codeAddress": "0x000...", "signerPrivkey": "000..." }
+  ```
+
 - **`randomAmount`**:\
   If `true`, the transaction amount is randomized.
 
 - **`amount`**:\
   The amount of cryptocurrency to be sent in the transaction.
+
+- **`nonce`**:\
+  The nonce for the transaction. If not set, the nonce is incremented by 1.
 
 - **`clientPattern`**:\
   A regex pattern to select specific client endpoints for sending the transaction.
@@ -88,6 +100,7 @@ Default settings for the `generate_transaction` task:
     privateKey: ""
     legacyTxType: false
     blobTxType: false
+    setCodeTxType: false
     blobFeeCap: null
     feeCap: "100000000000"
     tipCap: "1000000000"
@@ -97,8 +110,10 @@ Default settings for the `generate_transaction` task:
     contractDeployment: false
     callData: ""
     blobData: ""
+    authorizations: []
     randomAmount: false
     amount: "0"
+    nonce: null
     clientPattern: ""
     excludeClientPattern: ""
     awaitReceipt: true

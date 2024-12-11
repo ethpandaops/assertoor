@@ -34,7 +34,7 @@ func main() {
 		select {
 		case <-runChan:
 			// graceful shutdown completed
-		case <-time.After(5 * time.Second):
+		case <-time.After(30 * time.Second):
 			log.Println("Graceful shutdown timed out")
 		}
 	}

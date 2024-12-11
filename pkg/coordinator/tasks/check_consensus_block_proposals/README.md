@@ -1,7 +1,7 @@
 ## `check_consensus_block_proposals` Task
 
 ### Description
-The `check_consensus_block_proposals` task checks consensus block proposals to make sure they meet certain requirements. It looks at various details of the blocks to confirm they follow the rules or patterns you set.
+The `check_consensus_block_proposals` task assesses consensus block proposals against specified criteria to ensure they comply with expected blockchain operations and standards. This task is crucial for validating the integrity and content of blocks proposed on the consensus layer.
 
 ### Configuration Parameters
 
@@ -9,63 +9,86 @@ The `check_consensus_block_proposals` task checks consensus block proposals to m
   The number of blocks that need to match your criteria for the task to be successful.
 
 - **`graffitiPattern`**:\
-  A pattern to match the graffiti on the blocks.
+  A regex pattern to match against the graffiti field of the block, allowing for specific textual content verification.
 
 - **`validatorNamePattern`**:\
-  A pattern to identify blocks by the names of their validators.
+  A regex pattern to select validators by name involved in block proposals.
 
 - **`extraDataPattern`**:\
-  A pattern to match the execution layer extra data on the blocks.
+  A regex pattern to validate the extra data field within the block header.
 
 - **`minAttestationCount`**:\
-  The minimum number of attestations (votes or approvals) in a block.
+  The minimum number of attestations required in the block to satisfy the check.
 
 - **`minDepositCount`**:\
-  The minimum number of deposit actions required in a block.
+  The minimum number of deposit events that must be included in the block.
 
 - **`minExitCount`**:\
-  The minimum number of exit operations in a block.
+  The minimum number of validator exits required in the block.
 
 - **`minSlashingCount`**:\
-  The minimum total number of slashing events (penalties for bad actions) in a block.
+  The minimum number of slashing events the block must contain.
 
 - **`minAttesterSlashingCount`**:\
-  The minimum number of attester slashings in a block.
+  The minimum number of attester slashing operations required in the block.
 
 - **`minProposerSlashingCount`**:\
-  The minimum number of proposer slashings in a block.
+  The minimum number of proposer slashing operations the block must include.
 
 - **`minBlsChangeCount`**:\
-  The minimum number of BLS changes in a block.
+  The minimum number of BLS key changes needed in the block.
 
 - **`minWithdrawalCount`**:\
-  The minimum number of withdrawal actions in a block.
+  The minimum number of withdrawals that must be processed in the block.
 
 - **`minTransactionCount`**:\
-  The minimum total number of transactions (any type) needed in a block.
+  The minimum number of transactions (of any type) required in the block.
 
 - **`minBlobCount`**:\
-  The minimum number of blob sidecars (extra data packets) in a block.
+  The minimum number of blob sidecars that must be included in the block.
+
+- **`minDepositRequestCount`**:\
+  The minimum number of deposit request operations needed in the block.
+
+- **`minWithdrawalRequestCount`**:\
+  The minimum number of withdrawal requests required in the block.
+
+- **`minConsolidationRequestCount`**:\
+  The minimum number of consolidation requests that the block must include.
 
 - **`expectDeposits`**:\
-  A list of validator public keys expected to have deposit operations included in the block.
+  A list of validator public keys, specifying which validators should have deposit transactions included in the block.
 
 - **`expectExits`**:\
-  A list of validator public keys expected to have exit operations included in the block.
+  A list of validator public keys indicating which validators should have exit transactions included in the block.
 
 - **`expectSlashings`**:\
-  A list of expected slashing operations in the block, each specified as an object with a `publicKey` and a `slashingType` ("attester" or "proposer"). If `slashingType` is omitted, any type of slashing is accepted.
+  A list detailing expected slashing operations in the block, with each entry specifying a public key and a slashing type (`attester` or `proposer`). If the slashing type is omitted, any type of slashing is accepted.
+  `{publicKey: "0x0000...", slashingType: "attester"|"proposer"}`
 
 - **`expectBlsChanges`**:\
-  A list of expected BLS change operations in the block, each as an object with a `publicKey` and the target `address` (optional).
+  Specifies expected BLS key changes in the block, with each object detailing a public key and a new address for the key change.
+  `{publicKey: "0x0000...", address: "0x00..."}`
 
 - **`expectWithdrawals`**:\
-  A list of expected withdrawal operations in the block, each as an object with a `publicKey`, `address`, and a `minAmount` specifying the minimum amount expected for the withdrawal.
+  Specifies expected withdrawal operations, including public keys, destination addresses, and minimum withdrawal amounts.
+  `{publicKey: "0x0000...", address: "0x00...", minAmount: 0}`
 
+- **`expectDepositRequests`**:\
+  Specifies expected deposit request operations, each object detailing the public key, withdrawal credentials, and deposit amount.
+  `{publicKey:"0x0000...", withdrawalCredentials: "0x0000...", amount: 0}`
+
+- **`expectWithdrawalRequests`**:\
+  Specifies expected withdrawal request operations, each detailing the source address, validator public key, and amount to be withdrawn.
+  `{sourceAddress:"0x0000...", validatorPubkey: "0x0000...", amount: 0}`
+
+- **`expectConsolidationRequests`**:\
+  Specifies expected consolidation request operations, each specifying source addresses, source public keys, and target public keys for consolidation.
+  `{sourceAddress:"0x0000...", sourcePubkey: "0x0000...", targetPubkey: "0x0000..."}`
 
 ### Defaults
 
-These are the default settings for the `check_consensus_block_proposals` task:
+Default settings for the `check_consensus_block_proposals` task:
 
 ```yaml
 - name: check_consensus_block_proposals
@@ -84,9 +107,15 @@ These are the default settings for the `check_consensus_block_proposals` task:
     minWithdrawalCount: 0
     minTransactionCount: 0
     minBlobCount: 0
+    minDepositRequestCount: 0
+    minWithdrawalRequestCount: 0
+    minConsolidationRequestCount: 0
     expectDeposits: []
     expectExits: []
     expectSlashings: []
     expectBlsChanges: []
     expectWithdrawals: []
+    expectDepositRequests: []
+    expectWithdrawalRequests: []
+    expectConsolidationRequests: []
 ```

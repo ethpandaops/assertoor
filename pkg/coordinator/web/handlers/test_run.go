@@ -31,6 +31,7 @@ type TestRunTask struct {
 	Index            uint64            `json:"index"`
 	ParentIndex      uint64            `json:"parent_index"`
 	GraphLevels      []uint64          `json:"graph_levels"`
+	HasChildren      bool              `json:"has_children"`
 	Name             string            `json:"name"`
 	Title            string            `json:"title"`
 	IsStarted        bool              `json:"started"`
@@ -200,6 +201,7 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 
 				for i := idx - 1; i >= 0; i-- {
 					if pageData.Tasks[i].Index == taskData.ParentIndex {
+						pageData.Tasks[i].HasChildren = true
 						break
 					}
 

@@ -1,0 +1,42 @@
+
+id: eip7251-mass-consolidations
+name: "EIP7251 mass consolidations test"
+timeout: 38h
+config:
+  walletPrivkey: ""
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  validatorStartIndex: 0
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# wait for electra activation
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+- name: check_consensus_slot_range
+  title: "Wait for electra activation"
+  timeout: 1h
+  configVars:
+    minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
+
+# wait for exitability
+
+- name: run_tasks
+  title: "Send mass el triggered withdrawals"
+  config:
+    stopChildOnResult: false
+    tasks:
+    - name: generate_consolidations
+      title: "Send 100 EL triggered consolidation transactions for key 0"
+      config:
+        limitTotal: 100
+        awaitReceipt: true
+        failOnReject: true
+      configVars:
+        sourceStartValidatorIndex: "validatorStartIndex"
+        targetValidatorIndex: "validatorStartIndex"
+        walletPrivkey: "walletPrivkey"

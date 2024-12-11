@@ -1,0 +1,181 @@
+id: consolidation_overflow_tests
+name: "consolidation overflow test"
+timeout: 672h
+config:
+  walletPrivkey: ""
+  depositContract: "0x4242424242424242424242424242424242424242"
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  depositWaitSlot: 34
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  # wait for electra activation
+  - name: get_consensus_specs
+    id: get_specs
+    title: "Get consensus chain specs"
+  - name: check_consensus_slot_range
+    title: "Wait for electra activation"
+    configVars:
+      minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
+
+  - name: get_wallet_details
+    title: "Get target wallet address"
+    id: target_wallet
+    configVars:
+      privateKey: "walletPrivkey"
+
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= ${depositWaitSlot}"
+    configVars:
+      minSlotNumber: "depositWaitSlot"
+
+  - name: generate_random_mnemonic
+    title: "Generate random mnemonic"
+    config:
+      mnemonicResultVar: "validatorMnemonic"
+  - name: generate_child_wallet
+    title: "Generate wallet for lifecycle test"
+    id: depositor_wallet
+    config:
+      prefundMinBalance: 5001000000000000000000 # ensure 5001 ETH
+    configVars:
+      privateKey: "walletPrivkey"
+  - name: sleep
+    title: "wait for child wallet availablility"
+    config:
+      duration: 12s # wait 1 slot to ensure all ELs have the proper child wallet balance
+
+  # generate deposits & wait for activation
+  - name: run_tasks
+    title: "Generate 32 ETH deposit & track inclusion"
+    config:
+      stopChildOnResult: false
+      tasks:
+        - name: generate_deposits
+          title: "Generate 1 deposits with 32 ETH"
+          id: validator_32_eth_deposit
+          config:
+            limitTotal: 1
+            limitPerSlot: 1
+            limitPending: 1
+            depositAmount: 32
+            awaitReceipt: true
+            failOnReject: true
+          configVars:
+            walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
+            mnemonic: "validatorMnemonic"
+            depositContract: "depositContract"
+            withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.target_wallet.outputs.address | capture(\"(0x)?(?<addr>.+)\").addr)"
+
+  - name: run_tasks
+    title: "Generate 2048 ETH deposit & track inclusion"
+    config:
+      stopChildOnResult: false
+      tasks:
+        - name: generate_deposits
+          title: "Generate 1 deposits with 2048 ETH"
+          id: validator_2048_eth_deposit
+          config:
+            limitTotal: 1
+            limitPerSlot: 1
+            limitPending: 1
+            depositAmount: 2048
+            startIndex: 1
+            awaitReceipt: true
+            failOnReject: true
+          configVars:
+            walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
+            mnemonic: "validatorMnemonic"
+            depositContract: "depositContract"
+            withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.target_wallet.outputs.address | capture(\"(0x)?(?<addr>.+)\").addr)"
+
+  - name: check_consensus_validator_status
+    title: "Wait for validator to completely be active"
+    id: validator_32_eth_info
+    timeout: 150m
+    config:
+      validatorStatus:
+        - active_ongoing
+    configVars:
+      validatorPubKey: "tasks.validator_32_eth_deposit.outputs.validatorPubkeys[0]"
+
+  - name: check_consensus_validator_status
+    title: "Wait for validator to completely be active"
+    id: validator_2048_eth_info
+    timeout: 150m
+    config:
+      validatorStatus:
+        - active_ongoing
+    configVars:
+      validatorPubKey: "tasks.validator_2048_eth_deposit.outputs.validatorPubkeys[0]"
+
+  - name: run_tasks
+    title: "Trigger consolidation overflow"
+    config:
+      stopChildOnResult: false
+      tasks:
+      - name: generate_consolidations
+        title: "Consolidate Validator ${{tasks.validator_32_eth_info.outputs.validator.index}} to ${{tasks.validator_2048_eth_info.outputs.validator.index}}"
+        timeout: 5m
+        config:
+          failOnReject: true
+          awaitReceipt: true
+          sourceIndexCount: 2
+        configVars:
+          walletPrivkey: "walletPrivkey"
+          sourceStartValidatorIndex: "tasks.validator_32_eth_info.outputs.validator.index | tonumber"
+          targetValidatorIndex: "tasks.validator_2048_eth_info.outputs.validator.index | tonumber"
+
+  - name: check_consensus_validator_status
+    title: "Wait for validator to completely exit (${{tasks.validator_32_eth_info.outputs.validator.index | tonumber}})"
+    timeout: 150m
+    config:
+      validatorStatus:
+        - withdrawal_done
+    configVars:
+      validatorIndex: "tasks.validator_32_eth_info.outputs.validator.index | tonumber"
+
+  - name: check_consensus_validator_status
+    title: "Refresh balance"
+    id: validator_2048_eth_post_consolidation_info
+    timeout: 150m
+    config:
+      validatorStatus:
+        - active_ongoing
+    configVars:
+      validatorPubKey: "tasks.validator_2048_eth_deposit.outputs.validatorPubkeys[0]"
+
+  # checks if the balance is over 2070ETH but the effective balance is 2048ETH (max)
+  - name: run_tasks
+    title: "Check consolidation overflow"
+    timeout: 10m
+    config:
+      tasks:
+        - name: run_shell
+          timeout: 5m
+          title: "Check targetValidator status is indeed at ceiling of MaxEB"
+          config:
+            envVars:
+              validator: "tasks.validator_2048_eth_post_consolidation_info.outputs.validator"
+            command: |
+              balance=$(echo "$validator" | jq -r '.balance')
+              if [ "$balance" -lt 2048000000000 ]; then
+                echo "Balance too low! expected: >= 2048.0 ETH, got: $balance Gwei"
+                exit 1
+              fi
+              
+              effective_balance=$(echo "$validator" | jq -r '.validator.effective_balance')
+              if [ "$effective_balance" != "2048000000000" ]; then
+                echo "Effective balance too low! expected: 2048 ETH, got: $effective_balance Gwei"
+                exit 1
+              fi
+              
+              withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
+              if [[ ! "$withdrawal_creds" == "0x02"* ]]; then
+                echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
+                exit 1
+              fi

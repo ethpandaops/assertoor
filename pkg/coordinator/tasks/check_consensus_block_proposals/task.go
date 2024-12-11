@@ -1,6 +1,7 @@
 package checkconsensusblockproposals
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
@@ -220,6 +222,21 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 		return false
 	}
 
+	// check deposit request count
+	if (t.config.MinDepositRequestCount > 0 || len(t.config.ExpectDepositRequests) > 0) && !t.checkBlockDepositRequests(block, blockData) {
+		return false
+	}
+
+	// check withdrawal request count
+	if (t.config.MinWithdrawalRequestCount > 0 || len(t.config.ExpectWithdrawalRequests) > 0) && !t.checkBlockWithdrawalRequests(block, blockData) {
+		return false
+	}
+
+	// check consolidation request count
+	if (t.config.MinConsolidationRequestCount > 0 || len(t.config.ExpectConsolidationRequests) > 0) && !t.checkBlockConsolidationRequests(block, blockData) {
+		return false
+	}
+
 	return true
 }
 
@@ -381,7 +398,7 @@ func (t *Task) checkBlockExits(block *consensus.Block, blockData *spec.Versioned
 }
 
 func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	attSlashings, err := blockData.AttesterSlashings()
+	attSlashingsVersioned, err := blockData.AttesterSlashings()
 	if err != nil {
 		t.logger.Warnf("could not get attester slashings for block %v [0x%x]: %v", block.Slot, block.Root, err)
 		return false
@@ -393,7 +410,7 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 		return false
 	}
 
-	slashingCount := len(attSlashings) + len(propSlashings)
+	slashingCount := len(attSlashingsVersioned) + len(propSlashings)
 	if slashingCount < t.config.MinSlashingCount {
 		t.logger.Infof("check failed for block %v [0x%x]: not enough slashings (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinSlashingCount, slashingCount)
 		return false
@@ -410,8 +427,22 @@ func (t *Task) checkBlockSlashings(block *consensus.Block, blockData *spec.Versi
 			found := false
 
 			if !found && (expectedSlashing.SlashingType == "" || expectedSlashing.SlashingType == "attester") {
-				for _, slashing := range attSlashings {
-					inter := intersect.Simple(slashing.Attestation1.AttestingIndices, slashing.Attestation2.AttestingIndices)
+				for _, slashing := range attSlashingsVersioned {
+					att1, err1 := slashing.Attestation1()
+					att2, err2 := slashing.Attestation2()
+
+					if err1 != nil || err2 != nil {
+						continue
+					}
+
+					att1indices, err1 := att1.AttestingIndices()
+					att2indices, err2 := att2.AttestingIndices()
+
+					if err1 != nil || err2 != nil {
+						continue
+					}
+
+					inter := intersect.Simple(att1indices, att2indices)
 					for _, j := range inter {
 						valIdx, ok := j.(uint64)
 						if !ok {
@@ -620,6 +651,167 @@ func (t *Task) checkBlockBlobs(block *consensus.Block, blockData *spec.Versioned
 	if len(blobs) < t.config.MinBlobCount {
 		t.logger.Infof("check failed for block %v [0x%x]: not enough blobs (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinBlobCount, len(blobs))
 		return false
+	}
+
+	return true
+}
+
+func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
+	executionRequests, err := blockData.ExecutionRequests()
+	if err != nil {
+		t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		return false
+	}
+
+	depositRequests := executionRequests.Deposits
+	if len(depositRequests) < t.config.MinDepositRequestCount {
+		t.logger.Infof("check failed for block %v [0x%x]: not enough deposit requests (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinDepositRequestCount, len(depositRequests))
+		return false
+	}
+
+	if len(t.config.ExpectDepositRequests) > 0 {
+		for _, expectedDepositRequest := range t.config.ExpectDepositRequests {
+			found := false
+
+			var expectedWithdrawalCreds []byte
+
+			if expectedDepositRequest.WithdrawalCredentials != "" {
+				expectedWithdrawalCreds = common.FromHex(expectedDepositRequest.WithdrawalCredentials)
+			}
+
+			for _, depositRequest := range depositRequests {
+				if expectedDepositRequest.PublicKey == "" || depositRequest.Pubkey.String() == expectedDepositRequest.PublicKey {
+					depositAmount := big.NewInt(int64(depositRequest.Amount))
+
+					switch {
+					case expectedDepositRequest.WithdrawalCredentials != "" && !bytes.Equal(expectedWithdrawalCreds, depositRequest.WithdrawalCredentials):
+						t.logger.Warnf("check failed: deposit request found, but withdrawal credentials do not match (have: 0x%x, want: 0x%x)", depositRequest.WithdrawalCredentials, expectedWithdrawalCreds)
+					case expectedDepositRequest.Amount.Cmp(big.NewInt(0)) > 0 && expectedDepositRequest.Amount.Cmp(depositAmount) != 0:
+						t.logger.Warnf("check failed: deposit request found, but amount does not match (have: %v, want: %v)", depositAmount, expectedDepositRequest.Amount.String())
+					default:
+						found = true
+					}
+
+					break
+				}
+			}
+
+			if !found {
+				t.logger.Infof("check failed for block %v [0x%x]: expected deposit request not found (pubkey: %v)", block.Slot, block.Root, expectedDepositRequest.PublicKey)
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
+	executionRequests, err := blockData.ExecutionRequests()
+	if err != nil {
+		t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		return false
+	}
+
+	withdrawalRequests := executionRequests.Withdrawals
+	if len(withdrawalRequests) < t.config.MinWithdrawalRequestCount {
+		t.logger.Infof("check failed for block %v [0x%x]: not enough withdrawal requests (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinWithdrawalRequestCount, len(withdrawalRequests))
+		return false
+	}
+
+	if len(t.config.ExpectWithdrawalRequests) > 0 {
+		for _, expectedWithdrawalRequest := range t.config.ExpectWithdrawalRequests {
+			found := false
+
+			var expectedAddress, expectedPubKey []byte
+
+			if expectedWithdrawalRequest.SourceAddress != "" {
+				expectedAddress = common.FromHex(expectedWithdrawalRequest.SourceAddress)
+			}
+
+			if expectedWithdrawalRequest.ValidatorPubkey != "" {
+				expectedPubKey = common.FromHex(expectedWithdrawalRequest.ValidatorPubkey)
+			}
+
+			for _, withdrawalRequest := range withdrawalRequests {
+				if expectedWithdrawalRequest.ValidatorPubkey == "" || bytes.Equal(withdrawalRequest.ValidatorPubkey[:], expectedPubKey) {
+					withdrawalAmount := big.NewInt(int64(withdrawalRequest.Amount))
+
+					switch {
+					case expectedWithdrawalRequest.SourceAddress != "" && !bytes.Equal(expectedAddress, withdrawalRequest.SourceAddress[:]):
+						t.logger.Warnf("check failed: withdrawal request found, but source address does not match (have: 0x%x, want: 0x%x)", withdrawalRequest.SourceAddress, expectedAddress)
+					case expectedWithdrawalRequest.Amount != nil && expectedWithdrawalRequest.Amount.Cmp(withdrawalAmount) != 0:
+						t.logger.Warnf("check failed: deposit request found, but amount does not match (have: %v, want: %v)", withdrawalAmount, expectedWithdrawalRequest.Amount.String())
+					default:
+						found = true
+					}
+
+					break
+				}
+			}
+
+			if !found {
+				t.logger.Infof("check failed for block %v [0x%x]: expected withdrawal request not found (address: %v, pubkey: %v)", block.Slot, block.Root, expectedWithdrawalRequest.SourceAddress, expectedWithdrawalRequest.ValidatorPubkey)
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
+	executionRequests, err := blockData.ExecutionRequests()
+	if err != nil {
+		t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		return false
+	}
+
+	consolidationRequests := executionRequests.Consolidations
+	if len(consolidationRequests) < t.config.MinConsolidationRequestCount {
+		t.logger.Infof("check failed for block %v [0x%x]: not enough consolidation requests (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinConsolidationRequestCount, len(consolidationRequests))
+		return false
+	}
+
+	if len(t.config.ExpectConsolidationRequests) > 0 {
+		for _, expectedConsolidationRequest := range t.config.ExpectConsolidationRequests {
+			found := false
+
+			var expectedAddress, expectedSrcPubKey, expectedTgtPubKey []byte
+
+			if expectedConsolidationRequest.SourceAddress != "" {
+				expectedAddress = common.FromHex(expectedConsolidationRequest.SourceAddress)
+			}
+
+			if expectedConsolidationRequest.SourcePubkey != "" {
+				expectedSrcPubKey = common.FromHex(expectedConsolidationRequest.SourcePubkey)
+			}
+
+			if expectedConsolidationRequest.TargetPubkey != "" {
+				expectedTgtPubKey = common.FromHex(expectedConsolidationRequest.TargetPubkey)
+			}
+
+			for _, consolidationRequest := range consolidationRequests {
+				if expectedConsolidationRequest.SourcePubkey == "" || bytes.Equal(consolidationRequest.SourcePubkey[:], expectedSrcPubKey) {
+					switch {
+					case expectedConsolidationRequest.SourceAddress != "" && !bytes.Equal(expectedAddress, consolidationRequest.SourceAddress[:]):
+						t.logger.Warnf("check failed: consolidation request found, but source address does not match (have: 0x%x, want: 0x%x)", consolidationRequest.SourceAddress, expectedAddress)
+					case expectedConsolidationRequest.TargetPubkey != "" && !bytes.Equal(expectedTgtPubKey, consolidationRequest.TargetPubkey[:]):
+						t.logger.Warnf("check failed: consolidation request found, but target pubkey does not match (have: 0x%x, want: 0x%x)", consolidationRequest.SourceAddress, expectedAddress)
+
+					default:
+						found = true
+					}
+
+					break
+				}
+			}
+
+			if !found {
+				t.logger.Infof("check failed for block %v [0x%x]: expected consolidation request not found (address: %v, pubkey: %v)", block.Slot, block.Root, expectedConsolidationRequest.SourceAddress, expectedConsolidationRequest.SourcePubkey)
+				return false
+			}
+		}
 	}
 
 	return true

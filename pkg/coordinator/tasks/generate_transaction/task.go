@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
@@ -33,11 +34,12 @@ var (
 )
 
 type Task struct {
-	ctx     *types.TaskContext
-	options *types.TaskOptions
-	config  Config
-	logger  logrus.FieldLogger
-	wallet  *wallet.Wallet
+	ctx                  *types.TaskContext
+	options              *types.TaskOptions
+	config               Config
+	logger               logrus.FieldLogger
+	wallet               *wallet.Wallet
+	authorizationWallets []*wallet.Wallet
 
 	targetAddr      common.Address
 	transactionData []byte
@@ -91,6 +93,25 @@ func (t *Task) LoadConfig() error {
 		return fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
+	// load authorization wallets
+	if config.SetCodeTxType && len(config.Authorizations) > 0 {
+		t.authorizationWallets = make([]*wallet.Wallet, 0, len(config.Authorizations))
+
+		for _, authorization := range config.Authorizations {
+			privKey, err2 := crypto.HexToECDSA(authorization.SignerPrivkey)
+			if err2 != nil {
+				return err2
+			}
+
+			authWallet, err2 := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
+			if err2 != nil {
+				return fmt.Errorf("cannot initialize authorization wallet: %w", err2)
+			}
+
+			t.authorizationWallets = append(t.authorizationWallets, authWallet)
+		}
+	}
+
 	// parse target addr
 	if config.TargetAddress != "" {
 		err = t.targetAddr.UnmarshalText([]byte(config.TargetAddress))
@@ -116,6 +137,15 @@ func (t *Task) Execute(ctx context.Context) error {
 		return fmt.Errorf("cannot load wallet state: %w", err)
 	}
 
+	if t.config.SetCodeTxType {
+		for _, authWallet := range t.authorizationWallets {
+			err = authWallet.AwaitReady(ctx)
+			if err != nil {
+				return fmt.Errorf("cannot load authorization wallet state: %w", err)
+			}
+		}
+	}
+
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
 
 	tx, err := t.generateTransaction(ctx)
@@ -123,12 +153,25 @@ func (t *Task) Execute(ctx context.Context) error {
 		return err
 	}
 
+	if txData, err2 := vars.GeneralizeData(tx); err2 == nil {
+		t.ctx.Outputs.SetVar("transaction", txData)
+	} else {
+		t.logger.Warnf("Failed setting `transaction` output: %v", err2)
+	}
+
+	txBytes, err := tx.MarshalBinary()
+	if err != nil {
+		t.logger.Warnf("Failed setting `transactionHex` output: %v", err)
+	} else {
+		t.ctx.Outputs.SetVar("transactionHex", hexutil.Encode(txBytes))
+	}
+
 	var clients []*execution.Client
 
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
+		clients = clientPool.GetExecutionPool().GetReadyEndpoints(true)
 	} else {
 		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(poolClients) == 0 {
@@ -239,6 +282,11 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
+	for _, authorizationWallet := range t.authorizationWallets {
+		// resync nonces of authorization wallets (might be increased by more than one, so we need to resync)
+		authorizationWallet.ResyncState()
+	}
+
 	return nil
 }
 
@@ -267,6 +315,10 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 			if err == nil {
 				txAmount = n
 			}
+		}
+
+		if t.config.Nonce != nil {
+			nonce = *t.config.Nonce
 		}
 
 		txData := []byte{}
@@ -313,6 +365,43 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				BlobHashes: blobHashes,
 				Sidecar:    blobSidecar,
 			}
+		case t.config.SetCodeTxType:
+			authList := ethtypes.AuthorizationList{}
+
+			for idx, authorization := range t.config.Authorizations {
+				authEntry := &ethtypes.Authorization{
+					ChainID: authorization.ChainID,
+					Address: common.HexToAddress(authorization.CodeAddress),
+				}
+
+				authWallet := t.authorizationWallets[idx]
+
+				if authorization.Nonce != nil {
+					authEntry.Nonce = *authorization.Nonce
+				} else {
+					authEntry.Nonce = authWallet.UseNextNonce(!bytes.Equal(authEntry.Address.Bytes(), t.wallet.GetAddress().Bytes()))
+				}
+
+				authEntry, err := ethtypes.SignAuth(authEntry, authWallet.GetPrivateKey())
+				if err != nil {
+					return nil, err
+				}
+
+				authList = append(authList, authEntry)
+			}
+
+			txObj = &ethtypes.SetCodeTx{
+				ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID().Uint64(),
+				Nonce:     nonce,
+				GasTipCap: uint256.MustFromBig(&t.config.TipCap.Value),
+				GasFeeCap: uint256.MustFromBig(&t.config.FeeCap.Value),
+				Gas:       t.config.GasLimit,
+				To:        *toAddr,
+				Value:     uint256.MustFromBig(txAmount),
+				Data:      txData,
+				AuthList:  authList,
+			}
+
 		default:
 			txObj = &ethtypes.DynamicFeeTx{
 				ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),

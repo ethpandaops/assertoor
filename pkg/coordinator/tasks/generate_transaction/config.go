@@ -12,6 +12,7 @@ type Config struct {
 
 	LegacyTxType       bool           `yaml:"legacyTxType" json:"legacyTxType"`
 	BlobTxType         bool           `yaml:"blobTxType" json:"blobTxType"`
+	SetCodeTxType      bool           `yaml:"setCodeTxType" json:"setCodeTxType"`
 	BlobFeeCap         *helper.BigInt `yaml:"blobFeeCap" json:"blobFeeCap"`
 	FeeCap             *helper.BigInt `yaml:"feeCap" json:"feeCap"`
 	TipCap             *helper.BigInt `yaml:"tipCap" json:"tipCap"`
@@ -23,6 +24,13 @@ type Config struct {
 	BlobData           string         `yaml:"blobData" json:"blobData"`
 	RandomAmount       bool           `yaml:"randomAmount" json:"randomAmount"`
 	Amount             *helper.BigInt `yaml:"amount" json:"amount"`
+	Nonce              *uint64        `yaml:"nonce" json:"nonce"`
+	Authorizations     []struct {
+		ChainID       uint64  `yaml:"chainId" json:"chainId"`
+		Nonce         *uint64 `yaml:"nonce" json:"nonce"`
+		CodeAddress   string  `yaml:"codeAddress" json:"codeAddress"`
+		SignerPrivkey string  `yaml:"signerPrivkey" json:"signerPrivkey"`
+	} `yaml:"authorizations" json:"authorizations"`
 
 	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
 	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`

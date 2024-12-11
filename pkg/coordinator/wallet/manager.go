@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -66,6 +67,16 @@ func (manager *Manager) GetWalletByAddress(address common.Address) *Wallet {
 }
 
 func (manager *Manager) runBlockTransactionsLoop() {
+	defer func() {
+		if err := recover(); err != nil {
+			manager.logger.WithError(err.(error)).Panicf("uncaught panic in wallet.Manager.runBlockTransactionsLoop: %v, stack: %v", err, string(debug.Stack()))
+
+			time.Sleep(10 * time.Second)
+
+			go manager.runBlockTransactionsLoop()
+		}
+	}()
+
 	blockSubscription := manager.clientPool.GetBlockCache().SubscribeBlockEvent(10)
 	defer blockSubscription.Unsubscribe()
 
@@ -75,7 +86,7 @@ func (manager *Manager) runBlockTransactionsLoop() {
 }
 
 func (manager *Manager) processBlockTransactions(block *execution.Block) {
-	blockData := block.AwaitBlock(context.Background(), 2*time.Second)
+	blockData := block.AwaitBlock(context.Background(), 4*time.Second)
 	if blockData == nil {
 		return
 	}
@@ -83,23 +94,42 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 	manager.walletsMutex.Lock()
 
 	wallets := map[common.Address]*Wallet{}
+
 	for addr := range manager.walletsMap {
 		wallets[addr] = manager.walletsMap[addr]
 	}
 
 	manager.walletsMutex.Unlock()
 
+	manager.logger.Infof("processing block %v with %v transactions", block.Number, len(blockData.Transactions()))
+
+	var blockReceipts []*ethtypes.Receipt
+
+	receiptsLoaded := false
+
 	signer := ethtypes.LatestSignerForChainID(manager.clientPool.GetBlockCache().GetChainID())
+
 	for idx, tx := range blockData.Transactions() {
 		txFrom, err := ethtypes.Sender(signer, tx)
 		if err != nil {
-			manager.logger.Warnf("error decoding ts sender (block %v, tx %v): %v", block.Number, idx, err)
+			manager.logger.Warnf("error decoding tx sender (block %v, tx %v): %v", block.Number, idx, err)
 			continue
 		}
 
 		fromWallet := wallets[txFrom]
 		if fromWallet != nil {
-			fromWallet.processTransactionInclusion(block, tx)
+			if !receiptsLoaded {
+				blockReceipts = manager.loadBlockReceipts(block)
+				receiptsLoaded = true
+			}
+
+			var txReceipt *ethtypes.Receipt
+
+			if blockReceipts != nil && idx < len(blockReceipts) {
+				txReceipt = blockReceipts[idx]
+			}
+
+			fromWallet.processTransactionInclusion(block, tx, txReceipt)
 		}
 
 		toAddr := tx.To()
@@ -109,9 +139,66 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 				toWallet.processTransactionReceival(block, tx)
 			}
 		}
+
+		if tx.Type() == ethtypes.SetCodeTxType {
+			// in eip7702 transactions, the nonces of all authorities are increased by >= 1, so we need to resync all affected wallets
+			for _, authorization := range tx.AuthList() {
+				authority, err := authorization.Authority()
+				if err != nil {
+					manager.logger.Warnf("error decoding authority address (block %v, tx %v): %v", block.Number, idx, err)
+					continue
+				}
+
+				authorityWallet := wallets[authority]
+				if authorityWallet != nil {
+					authorityWallet.ResyncState()
+				}
+			}
+		}
 	}
 
 	for _, wallet := range wallets {
 		wallet.processStaleConfirmations(block)
+	}
+}
+
+func (manager *Manager) loadBlockReceipts(block *execution.Block) []*ethtypes.Receipt {
+	retryCount := uint64(0)
+	readyClients := manager.clientPool.GetReadyEndpoints(true)
+
+	for {
+		clients := block.GetSeenBy()
+		if len(clients) == 0 {
+			clients = readyClients
+		}
+
+		cliIdx := retryCount % uint64(len(clients))
+		client := clients[cliIdx]
+
+		reqCtx, reqCtxCancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+		//nolint:gocritic // ignore
+		defer reqCtxCancel()
+
+		receipts, err := client.GetRPCClient().GetBlockReceipts(reqCtx, block.Hash)
+		if err == nil {
+			return receipts
+		}
+
+		if retryCount > 2 {
+			manager.logger.WithFields(logrus.Fields{
+				"client": client.GetName(),
+				"block":  block.Number,
+				"hash":   block.Hash.Hex(),
+			}).Warnf("could not load block receipts: %v", err)
+		}
+
+		if retryCount < 5 {
+			time.Sleep(1 * time.Second)
+
+			retryCount++
+		} else {
+			return nil
+		}
 	}
 }

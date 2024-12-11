@@ -163,28 +163,35 @@ func (t *Task) Execute(ctx context.Context) error {
 		txIndex := t.txIndex
 		t.txIndex++
 
-		err := t.generateTransaction(ctx, txIndex, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt) {
+		if pendingChan != nil {
+			select {
+			case <-ctx.Done():
+				return nil
+			case pendingChan <- true:
+			}
+		}
+
+		err := t.generateTransaction(ctx, txIndex, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt, err error) {
 			if pendingChan != nil {
 				<-pendingChan
 			}
 
-			if receipt != nil {
-				t.logger.Infof("transaction %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
-			} else {
-				t.logger.Infof("transaction %v replaced (nonce: %v)", tx.Hash().Hex(), tx.Nonce())
+			switch {
+			case receipt != nil:
+				t.logger.Infof("blob %v confirmed in block %v (nonce: %v, status: %v)", tx.Hash().Hex(), receipt.BlockNumber, tx.Nonce(), receipt.Status)
+			case err != nil:
+				t.logger.Errorf("error awaiting blob transaction receipt: %v", err.Error())
+			default:
+				t.logger.Warnf("no receipt for blob transaction: %v", tx.Hash().Hex())
 			}
 		})
 		if err != nil {
 			t.logger.Errorf("error generating transaction: %v", err.Error())
-		} else {
-			if pendingChan != nil {
-				select {
-				case <-ctx.Done():
-					return nil
-				case pendingChan <- true:
-				}
-			}
 
+			if pendingChan != nil {
+				<-pendingChan
+			}
+		} else {
 			perBlockCount++
 			totalCount++
 		}
@@ -234,7 +241,7 @@ func (t *Task) ensureChildWalletFunding(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, confirmedFn func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt)) error {
+func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, confirmedFn wallet.TxConfirmFn) error {
 	txWallet := t.wallet
 	if t.wallet == nil {
 		txWallet = t.walletPool.GetNextChildWallet()
@@ -305,7 +312,7 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		clients = clientPool.GetExecutionPool().GetReadyEndpoints()
+		clients = clientPool.GetExecutionPool().GetReadyEndpoints(true)
 	} else {
 		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(poolClients) == 0 {
@@ -318,40 +325,33 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		}
 	}
 
-	err = nil
 	if len(clients) == 0 {
-		err = fmt.Errorf("no ready clients available")
-	} else {
-		for i := 0; i < len(clients); i++ {
-			client := clients[(transactionIdx+uint64(i))%uint64(len(clients))]
+		return fmt.Errorf("no ready clients available")
+	}
 
-			t.logger.WithFields(logrus.Fields{
-				"client": client.GetName(),
-			}).Infof("sending tx %v: %v", transactionIdx, tx.Hash().Hex())
-
-			err = client.GetRPCClient().SendTransaction(ctx, tx)
-			if err == nil {
-				break
+	return txWallet.SendTransaction(ctx, tx, &wallet.SendTransactionOptions{
+		Clients:            clients,
+		ClientsStartOffset: int(transactionIdx),
+		OnConfirm:          confirmedFn,
+		LogFn: func(client *execution.Client, retry int, rebroadcast int, err error) {
+			if err != nil {
+				t.logger.WithFields(logrus.Fields{
+					"client": client.GetName(),
+				}).Warnf("error sending tx %v: %v", transactionIdx, err)
+				return
 			}
 
-			t.logger.WithFields(logrus.Fields{
+			logEntry := t.logger.WithFields(logrus.Fields{
 				"client": client.GetName(),
-			}).Warnf("RPC error when sending tx %v: %v", transactionIdx, err)
-		}
-	}
+			})
 
-	if err != nil {
-		return err
-	}
+			if rebroadcast > 0 {
+				logEntry = logEntry.WithField("rebroadcast", rebroadcast)
+			}
 
-	go func() {
-		receipt, err := txWallet.AwaitTransaction(ctx, tx)
-		if err != nil {
-			t.logger.Warnf("failed waiting for tx receipt: %v", err)
-		}
-
-		confirmedFn(tx, receipt)
-	}()
-
-	return nil
+			logEntry.Infof("submitted blob transaction %v (nonce: %v, attempt: %v)", transactionIdx, tx.Nonce(), retry)
+		},
+		RebroadcastInterval: 30 * time.Second,
+		MaxRebroadcasts:     5,
+	})
 }
