@@ -822,7 +822,7 @@ tasks:
             - name: generate_transaction
               title: "Send partial withdrawal transaction for key 8"
               config:
-                targetAddress: "0x09Fc772D0857550724b07B850a4323f39112aAaA"
+                targetAddress: "0x0c15F14308530b7CDB8460094BbB9cC28b9AaaAA"
                 feeCap: 50000000000 # 50 gwei
                 gasLimit: 1000000
                 amount: "500000000000000000" # 0.5 ETH
@@ -884,7 +884,7 @@ tasks:
             - name: generate_transaction
               title: "Send exit transaction for key 0"
               config:
-                targetAddress: "0x09Fc772D0857550724b07B850a4323f39112aAaA"
+                targetAddress: "0x0c15F14308530b7CDB8460094BbB9cC28b9AaaAA"
                 feeCap: 50000000000 # 50 gwei
                 gasLimit: 1000000
                 amount: "500000000000000000" # 0.5 ETH
@@ -911,7 +911,7 @@ tasks:
             - name: generate_transaction
               title: "Send exit transaction for key 2"
               config:
-                targetAddress: "0x09Fc772D0857550724b07B850a4323f39112aAaA"
+                targetAddress: "0x0c15F14308530b7CDB8460094BbB9cC28b9AaaAA"
                 feeCap: 50000000000 # 50 gwei
                 gasLimit: 1000000
                 amount: "500000000000000000" # 0.5 ETH
@@ -938,7 +938,7 @@ tasks:
             - name: generate_transaction
               title: "Send exit transaction for key 9"
               config:
-                targetAddress: "0x09Fc772D0857550724b07B850a4323f39112aAaA"
+                targetAddress: "0x0c15F14308530b7CDB8460094BbB9cC28b9AaaAA"
                 feeCap: 50000000000 # 50 gwei
                 gasLimit: 1000000
                 amount: "500000000000000000" # 0.5 ETH
