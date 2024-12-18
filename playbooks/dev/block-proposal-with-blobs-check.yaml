@@ -24,4 +24,4 @@ tasks:
       title: "Wait for block proposal from ${validatorPairName}"
       configVars:
         validatorNamePattern: "validatorPairName"
-        minBlobCount: "${minBlobCount}"
+        minBlobCount: "minBlobCount"
