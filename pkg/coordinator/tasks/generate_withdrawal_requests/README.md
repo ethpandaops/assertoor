@@ -80,7 +80,7 @@ Default settings for the `generate_withdrawal_requests` task:
     sourceIndexCount: 0
     withdrawAmount: 0
     walletPrivkey: ""
-    withdrawalContract: 0x09Fc772D0857550724b07B850a4323f39112aAaA
+    withdrawalContract: 0x0c15F14308530b7CDB8460094BbB9cC28b9AaaAA
     txAmount: "500000000000000000"
     txFeeCap: "100000000000"
     txTipCap: "1000000000"

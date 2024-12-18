@@ -29,7 +29,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		WithdrawalContract: "0x09Fc772D0857550724b07B850a4323f39112aAaA",
+		WithdrawalContract: "0x0c15F14308530b7CDB8460094BbB9cC28b9AaaAA",
 		TxAmount:           big.NewInt(500000000000000000), // 0.5 ETH
 		TxFeeCap:           big.NewInt(100000000000),       // 100 Gwei
 		TxTipCap:           big.NewInt(1000000000),         // 1 Gwei
