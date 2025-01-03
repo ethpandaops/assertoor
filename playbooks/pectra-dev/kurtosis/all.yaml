@@ -74,12 +74,12 @@ tasks:
     config:
       minSlotNumber: 54
   - name: run_external_tasks
-    title: "Generate EL-triggered consolidation for validator 21"
+    title: "Withdrawal credential change for validator 25 to 0x02 creds via self consolidation"
     timeout: 30m
     config:
       testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/kurtosis/el-triggered-consolidation.yaml
       testConfig:
-        sourceValidatorIndex: 21
+        sourceValidatorIndex: 25
         targetValidatorIndex: 25
   - name: check_consensus_slot_range
     title: "Wait for slot >= 58"
@@ -87,13 +87,13 @@ tasks:
     config:
       minSlotNumber: 58
   - name: run_external_tasks
-    title: "Withdrawal credential change for validator 22 to 0x02 creds via self consolidation"
+    title: "Generate EL-triggered consolidation for validator 21"
     timeout: 30m
     config:
       testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/kurtosis/el-triggered-consolidation.yaml
       testConfig:
-        sourceValidatorIndex: 22
-        targetValidatorIndex: 22
+        sourceValidatorIndex: 21
+        targetValidatorIndex: 25
 
   # Final check
   - name: run_external_tasks
