@@ -13,7 +13,7 @@ tasks:
     title: "Generate BLS changes for validator 0-300"
     timeout: 30m
     config:
-      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/kurtosis/bls-changes.yaml
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/bls-changes.yaml
       testConfig:
         validatorCount: 300
   
@@ -27,7 +27,7 @@ tasks:
     title: "Generate massive deposit with 0x02 creds"
     timeout: 30m
     config:
-      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/kurtosis/massive-deposit-0x02.yaml
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/massive-deposit-0x02.yaml
 
   # EIP-2935
   - name: check_consensus_slot_range
@@ -39,7 +39,7 @@ tasks:
     title: "Deploy and test blockhash contract"
     timeout: 30m
     config:
-      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/kurtosis/blockhash-test.yaml
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/blockhash-test.yaml
   
   # EIP-7002
   - name: check_consensus_slot_range
@@ -51,7 +51,7 @@ tasks:
     title: "Generate voluntary exits for validator 0-10"
     timeout: 30m
     config:
-      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/kurtosis/voluntary-exits.yaml
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/voluntary-exits.yaml
       testConfig:
         validatorCount: 10
   - name: check_consensus_slot_range
@@ -63,7 +63,7 @@ tasks:
     title: "EL-triggered exit test for validator 20"
     timeout: 30m
     config:
-      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/kurtosis/el-triggered-exit.yaml
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/el-triggered-exit.yaml
       testConfig:
         validatorIndex: 20
 
@@ -77,7 +77,7 @@ tasks:
     title: "Withdrawal credential change for validator 25 to 0x02 creds via self consolidation"
     timeout: 30m
     config:
-      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/kurtosis/el-triggered-consolidation.yaml
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/el-triggered-consolidation.yaml
       testConfig:
         sourceValidatorIndex: 25
         targetValidatorIndex: 25
@@ -90,7 +90,7 @@ tasks:
     title: "Generate EL-triggered consolidation for validator 21"
     timeout: 30m
     config:
-      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/pectra-dev/kurtosis/el-triggered-consolidation.yaml
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/el-triggered-consolidation.yaml
       testConfig:
         sourceValidatorIndex: 21
         targetValidatorIndex: 25
@@ -100,4 +100,4 @@ tasks:
     title: "Final check"
     timeout: 60m
     config:
-      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/electra-support/playbooks/stable/block-proposal-check.yaml
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/stable/block-proposal-check.yaml
