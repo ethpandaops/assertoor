@@ -287,6 +287,10 @@ func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string
 			continue
 		}
 
+		if v, ok := val.(float64); ok {
+			val = NoScientificFloat64(v)
+		}
+
 		applyMap[cfgName] = val
 	}
 

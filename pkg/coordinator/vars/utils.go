@@ -20,3 +20,33 @@ func GeneralizeData(source interface{}) (interface{}, error) {
 
 	return target, nil
 }
+
+type NoScientificFloat64 float64
+
+func (n NoScientificFloat64) MarshalJSON() ([]byte, error) {
+	return []byte(n.getTrimmedFloat()), nil
+}
+
+func (n NoScientificFloat64) MarshalYAML() (interface{}, error) {
+	return n.getTrimmedFloat(), nil
+}
+
+func (n NoScientificFloat64) getTrimmedFloat() string {
+	str := fmt.Sprintf("%f", n)
+
+	// Trim trailing zeros
+	for i := len(str) - 1; i >= 0; i-- {
+		if str[i] == '0' {
+			str = str[:i]
+		} else {
+			break
+		}
+	}
+
+	// Trim trailing dot
+	if str[len(str)-1] == '.' {
+		str = str[:len(str)-1]
+	}
+
+	return str
+}
