@@ -7,6 +7,8 @@ config:
   withdrawalCount: 1000  # number of withdrawals to send
   withdrawalMaxIndex: 100 # number of wallets to send from
   withdrawalTxFee: 10000000000000000  # 0.01 ETH
+  throughputPerIndex: 20
+  maxPendingPerIndex: 40
   walletSeed: ""
 tasks:
 - name: check_clients_are_healthy
@@ -82,8 +84,6 @@ tasks:
               name: generate_withdrawal_requests
               title: "Generate withdrawals for key ${{worker.index}} (${{tasks.get_validator.outputs.pubkey}})"
               config:
-                limitPerSlot: 20
-                limitPending: 40
                 withdrawAmount: 1 # 1 ETH
                 sourceStartValidatorIndex: 0
                 targetValidatorIndex: 0
@@ -91,6 +91,8 @@ tasks:
                 failOnReject: true
               configVars:
                 limitTotal: "worker.withdrawalCount"
+                limitPerSlot: "throughputPerIndex"
+                limitPending: "maxPendingPerIndex"
                 walletPrivkey: "tasks.withdrawal_wallet.outputs.childWallet.privkey"
                 txAmount: "withdrawalTxFee"
 

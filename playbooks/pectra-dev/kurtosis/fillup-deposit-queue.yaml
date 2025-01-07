@@ -7,6 +7,8 @@ config:
   depositCount: 1010
   depositMaxIndex: 100
   depositContract: "0x4242424242424242424242424242424242424242"
+  throughputPerIndex: 20
+  maxPendingPerIndex: 40
   walletSeed: ""
 tasks:
 - name: check_clients_are_healthy
@@ -82,14 +84,14 @@ tasks:
               name: generate_deposits
               title: "Generate top up deposits for key ${{worker.index}} (${{tasks.get_validator.outputs.pubkey}})"
               config:
-                limitPerSlot: 20
-                limitPending: 40
                 depositAmount: 1
                 topUpDeposit: true
                 awaitReceipt: true
                 failOnReject: true
               configVars:
                 limitTotal: "worker.depositCount"
+                limitPerSlot: "throughputPerIndex"
+                limitPending: "maxPendingPerIndex"
                 walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
                 publicKey: "tasks.get_validator.outputs.pubkey"
                 depositContract: "depositContract"

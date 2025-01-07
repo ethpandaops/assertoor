@@ -7,6 +7,8 @@ config:
   consolidationCount: 1000  # number of consolidations to send
   consolidationMaxIndex: 100 # number of wallets to send from
   consolidationTxFee: 10000000000000000  # 0.01 ETH
+  throughputPerIndex: 20
+  maxPendingPerIndex: 40
   walletSeed: ""
 tasks:
 - name: check_clients_are_healthy
@@ -82,14 +84,14 @@ tasks:
               name: generate_consolidations
               title: "Generate consolidations for key ${{worker.index}} (${{tasks.get_validator.outputs.pubkey}})"
               config:
-                limitPerSlot: 20
-                limitPending: 40
                 sourceStartValidatorIndex: 0
                 targetValidatorIndex: 0
                 awaitReceipt: true
                 failOnReject: true
               configVars:
                 limitTotal: "worker.consolidationCount"
+                limitPerSlot: "throughputPerIndex"
+                limitPending: "maxPendingPerIndex"
                 walletPrivkey: "tasks.consolidationor_wallet.outputs.childWallet.privkey"
                 txAmount: "consolidationTxFee"
 
