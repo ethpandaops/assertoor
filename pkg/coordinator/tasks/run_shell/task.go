@@ -8,6 +8,7 @@ import (
 	"io"
 	"os/exec"
 	"regexp"
+	"syscall"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
@@ -150,6 +151,29 @@ func (t *Task) Execute(ctx context.Context) error {
 		<-stderrCloseChan
 
 		execErr = command.Wait()
+	}()
+
+	// add context kill handler
+	go func() {
+		select {
+		case <-ctx.Done():
+			cmdLogger.Warn("sending SIGINT due to context cancellation")
+
+			if err := command.Process.Signal(syscall.SIGINT); err != nil {
+				cmdLogger.Warnf("failed sending SIGINT: %v", err)
+			}
+
+			select {
+			case <-time.After(5 * time.Second):
+				cmdLogger.Warn("killing command due to context timeout")
+
+				if err := command.Process.Kill(); err != nil {
+					cmdLogger.Warnf("failed killing command: %v", err)
+				}
+			case <-waitChan:
+			}
+		case <-waitChan:
+		}
 	}()
 
 	// wait for output handler

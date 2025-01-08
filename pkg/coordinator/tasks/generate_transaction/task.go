@@ -366,10 +366,10 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				Sidecar:    blobSidecar,
 			}
 		case t.config.SetCodeTxType:
-			authList := ethtypes.AuthorizationList{}
+			authList := []ethtypes.SetCodeAuthorization{}
 
 			for idx, authorization := range t.config.Authorizations {
-				authEntry := &ethtypes.Authorization{
+				authEntry := ethtypes.SetCodeAuthorization{
 					ChainID: authorization.ChainID,
 					Address: common.HexToAddress(authorization.CodeAddress),
 				}
@@ -382,7 +382,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 					authEntry.Nonce = authWallet.UseNextNonce(!bytes.Equal(authEntry.Address.Bytes(), t.wallet.GetAddress().Bytes()))
 				}
 
-				authEntry, err := ethtypes.SignAuth(authEntry, authWallet.GetPrivateKey())
+				authEntry, err := ethtypes.SignSetCode(authWallet.GetPrivateKey(), authEntry)
 				if err != nil {
 					return nil, err
 				}
