@@ -10,6 +10,10 @@ config:
   seedPrivateKey: ""
   seedAmount: "1" # (In Wei). Amount used to seed child accounts for test execution. Can also use "1 ether" or "10000 gwei" as input
   extraFlags: ""
+  runSetup: true
+  runTests: true
+  specTestsPath: ""
+  cleanupTestsPath: true
   solcVersion: "0.8.24"
 tasks:
   - name: generate_child_wallet
@@ -22,8 +26,64 @@ tasks:
       prefundMinBalance: "seedAmount"
   
   - name: run_shell
-    title: "Execute tests: ${gitRepo}@${gitBranch} [${testPath}]"
+    title: "Clone and prepare execution spec tests: ${gitRepo}@${gitBranch}"
+    id: setup
+    if: runSetup
+    config:
+      shell: bash
+      shellArgs: [--login]
+      envVars:
+        GIT_REPO: gitRepo
+        GIT_BRANCH: gitBranch
+        SOLC_VERSION: "solcVersion"
+        SPEC_TESTS_PATH: specTestsPath
+      command: |
+        set -e
+
+        # Convert env vars. They are passed as RAW JSON values
+
+        GIT_REPO=$(echo $GIT_REPO | jq -r)
+        GIT_BRANCH=$(echo $GIT_BRANCH | jq -r)
+        SOLC_VERSION=$(echo $SOLC_VERSION | jq -r)
+        SPEC_TESTS_PATH=$(echo $SPEC_TESTS_PATH | jq -r)
+
+        # Check if pip (python package manager) is installed
+        if ! command -v pip &> /dev/null
+        then
+          echo "pip could not be found. Please install python3-pip"
+          exit 1
+        fi
+
+        # Create dir for temp files
+        if [ -z "$SPEC_TESTS_PATH" ]; then
+          tmp_dir=$(mktemp -d -t execution-spec-tests-XXXXXXXXXX)
+          
+          echo "============================"
+          echo "Temp dir created: ${tmp_dir}"
+          echo "============================"
+
+          echo "::set-var specTestsPath ${tmp_dir}"
+        fi
+
+        echo "============================"
+        echo "Clone git repo ${GIT_REPO} @ ${GIT_BRANCH}"
+        echo "============================"
+        git clone ${GIT_REPO} --branch ${GIT_BRANCH} --single-branch $SPEC_TESTS_PATH
+
+        cd $SPEC_TESTS_PATH
+        export HOME=$SPEC_TESTS_PATH
+
+        echo "============================"
+        echo "Installing dependencies"
+        echo "============================"
+        pip install uv
+        uv sync --all-extras
+        uv run solc-select use "${SOLC_VERSION}" --always-install
+        
+  - name: run_shell
+    title: "Execute tests: [${testPath}]"
     id: execute
+    if: runTests
     config:
       shell: bash
       shellArgs: [--login]
@@ -37,6 +97,8 @@ tasks:
         SEED_AMOUNT: seedAmount
         EXTRA_FLAGS: extraFlags
         SOLC_VERSION: "solcVersion"
+        SPEC_TESTS_PATH: specTestsPath
+        CLEANUP_TESTS_PATH: cleanupTestsPath
       command: |
         set -e
 
@@ -51,6 +113,8 @@ tasks:
         SEED_AMOUNT=$(echo $SEED_AMOUNT | jq -r)
         EXTRA_FLAGS=$(echo $EXTRA_FLAGS | jq -r)
         SOLC_VERSION=$(echo $SOLC_VERSION | jq -r)
+        SPEC_TESTS_PATH=$(echo $SPEC_TESTS_PATH | jq -r)
+        CLEANUP_TESTS_PATH=$(echo $CLEANUP_TESTS_PATH | jq -r)
 
         echo "RPC_ENDPOINT: ${RPC_ENDPOINT}"
         echo "CHAIN_ID: ${CHAIN_ID}"
@@ -73,34 +137,20 @@ tasks:
         fi
 
         # Create dir for temp files
-        tmp_dir=$(mktemp -d -t execution-spec-tests-XXXXXXXXXX)
-        cd $tmp_dir
-        export HOME=$tmp_dir
-        echo "============================"
-        echo "Temp dir created: ${tmp_dir}"
-        echo "============================"
+        cd $SPEC_TESTS_PATH
+        export HOME=$SPEC_TESTS_PATH
 
-        function cleanup {
-          rv=$?
-          rm -rf "$tmp_dir"
-          echo "tmpdir removed"
-          exit $rv
-        }
+        if [ "$CLEANUP_TESTS_PATH" == "true" ]; then
+          function cleanup {
+            rv=$?
+            rm -rf "$SPEC_TESTS_PATH"
+            echo "tmpdir removed"
+            exit $rv
+          }
 
-        trap cleanup EXIT # always remove tempdir on exit
+          trap cleanup EXIT # always remove tempdir on exit
+        fi
 
-        echo "============================"
-        echo "Clone git repo ${GIT_REPO} @ ${GIT_BRANCH}"
-        echo "============================"
-        git clone ${GIT_REPO} --branch ${GIT_BRANCH} --single-branch
-        cd execution-spec-tests
-
-        echo "============================"
-        echo "Installing dependencies"
-        echo "============================"
-        pip install uv
-        uv sync --all-extras
-        uv run solc-select use "${SOLC_VERSION}" --always-install
         source .venv/bin/activate
 
         echo "============================"
