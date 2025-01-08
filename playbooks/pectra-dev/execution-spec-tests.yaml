@@ -29,7 +29,6 @@ tasks:
   
   - name: run_external_tasks
     title: "Clone and prepare execution spec tests"
-    id: setup
     timeout: 10m
     config:
       testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
