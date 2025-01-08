@@ -4,38 +4,43 @@ timeout: 1h
 config:
   #walletPrivkey: ""
 tasks:
-  - name: run_shell
-    title: Install dependencies
+  # setup dependencies
+  - name: run_external_tasks
+    title: "Setup dependencies for execution spec tests"
+    timeout: 30m
     config:
-      shell: bash
-      command: |
-        dpkg --add-architecture amd64
-        apt-get update
-        apt-get install -y build-essential python3 python3-pip libc6:amd64
-        rm /usr/lib/python3*/EXTERNALLY-MANAGED
-
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-dependencies.yaml
+  
   - name: check_clients_are_healthy
     title: "Check if at least one client is ready"
     id: clientCheck
     timeout: 5m
     config:
       minClientCount: 1
-
+  
+  # wait for electra activation
   - name: get_consensus_specs
     id: consensusSpecs
+    title: "Get consensus chain specs"
+  - name: check_consensus_slot_range
+    title: "Wait for electra activation"
+    timeout: 1h
+    configVars:
+      minEpochNumber: "tasks.consensusSpecs.outputs.specs.ELECTRA_FORK_EPOCH"
 
+  # run execution spec tests
   - name: run_external_tasks
-    title: "Run execution spec tests: eip7702_set_code_tx"
-    timeout: 30m
+    title: "Run execution spec tests: tests/prague"
+    timeout: 1h
     config:
       testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
       testConfig:
         gitRepo: https://github.com/ethereum/execution-spec-tests.git
-        gitBranch: fill-execute-modes
-        testPath: ./tests/prague/eip7702_set_code_tx/test_set_code_txs.py::test_self_sponsored_set_code
+        gitBranch: main
+        testPath: ./tests/prague
         seedAmount: "100000000000000000000"
-        extraFlags: "--fork=Prague"
+        extraFlags: "--fork=Prague -n 16"
       testConfigVars:
         rpcEndpoint: "tasks.clientCheck.outputs.goodClients[0].elRpcUrl"
         chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
-        privateKey: "walletPrivkey"
+        seedPrivateKey: "walletPrivkey"
