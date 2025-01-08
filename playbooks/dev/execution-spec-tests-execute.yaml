@@ -175,6 +175,7 @@ tasks:
         echo "::set-output reportHTML ${REPORT_HTML}"
         echo "::set-output-json reportJSON ${REPORT_JSON}"
 
+        exit 0
   - name: run_task_matrix
     title: "Show test results"
     configVars:

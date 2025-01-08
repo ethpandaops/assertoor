@@ -3,6 +3,7 @@ name: "Run execution spec tests"
 timeout: 1h
 config:
   #walletPrivkey: ""
+  walletSeed: "spectests"
 tasks:
   # setup dependencies
   - name: run_external_tasks
@@ -10,13 +11,50 @@ tasks:
     timeout: 30m
     config:
       testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-dependencies.yaml
+
+  - name: run_shell
+    title: "Create temp dir for execution spec tests"
+    id: tempdir
+    config:
+      shell: bash
+      command: |
+        set -e
+        tmp_dir=$(mktemp -d -t execution-spec-tests-XXXXXXXXXX)
+        
+        echo "============================"
+        echo "Temp dir created: ${tmp_dir}"
+        echo "============================"
+
+        echo "::set-output path ${tmp_dir}"
   
+  - name: run_external_tasks
+    title: "Clone and prepare execution spec tests"
+    id: setup
+    timeout: 10m
+    config:
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
+      testConfig:
+        gitRepo: https://github.com/pk910/execution-spec-tests.git
+        gitBranch: pk910/devnet-execution-fixes
+        runTests: false
+      testConfigVars:
+        specTestsPath: "tasks.tempdir.outputs.path"
+
   - name: check_clients_are_healthy
     title: "Check if at least one client is ready"
     id: clientCheck
     timeout: 5m
     config:
       minClientCount: 1
+
+  - name: generate_child_wallet
+    id: specTestsWallet
+    title: "Generate main wallet for tests"
+    config:
+      prefundMinBalance: 10000000000000000000000 # ensure a balance of 10000 ETH
+    configVars:
+      privateKey: "walletPrivkey"
+      walletSeed: "walletSeed"
   
   # wait for electra activation
   - name: get_consensus_specs
@@ -29,18 +67,120 @@ tasks:
       minEpochNumber: "tasks.consensusSpecs.outputs.specs.ELECTRA_FORK_EPOCH"
 
   # run execution spec tests
-  - name: run_external_tasks
-    title: "Run execution spec tests: tests/prague"
-    timeout: 1h
+  
+  - name: run_tasks_concurrent
+    title: "Run execution spec tests"
+    id: tests
     config:
-      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
-      testConfig:
-        gitRepo: https://github.com/ethereum/execution-spec-tests.git
-        gitBranch: main
-        testPath: ./tests/prague
-        seedAmount: "100000000000000000000"
-        extraFlags: "--fork=Prague -n 16"
-      testConfigVars:
-        rpcEndpoint: "tasks.clientCheck.outputs.goodClients[0].elRpcUrl"
-        chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
-        seedPrivateKey: "walletPrivkey"
+      failTaskCount: 0
+      tasks:
+        - name: run_external_tasks
+          title: "Run execution spec tests: tests/prague/eip2537_bls_12_381_precompiles"
+          timeout: 2h
+          config:
+            testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
+            testConfig:
+              gitRepo: https://github.com/pk910/execution-spec-tests.git
+              gitBranch: pk910/devnet-execution-fixes
+              testPath: ./tests/prague/eip2537_bls_12_381_precompiles
+              seedAmount: "100000000000000000000" # 100 ETH
+              extraFlags: "--fork=Prague -n 16"
+              runSetup: false
+              cleanupTestsPath: false
+            testConfigVars:
+              rpcEndpoint: "tasks.clientCheck.outputs.goodClients[0].elRpcUrl"
+              chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
+              seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
+              specTestsPath: "tasks.tempdir.outputs.path"
+        
+        - name: run_external_tasks
+          title: "Run execution spec tests: tests/prague/eip7002_el_triggerable_withdrawals"
+          timeout: 2h
+          config:
+            testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
+            testConfig:
+              gitRepo: https://github.com/pk910/execution-spec-tests.git
+              gitBranch: pk910/devnet-execution-fixes
+              testPath: ./tests/prague/eip7002_el_triggerable_withdrawals
+              seedAmount: "100000000000000000000" # 100 ETH
+              extraFlags: "--fork=Prague -n 16"
+              runSetup: false
+              cleanupTestsPath: false
+            testConfigVars:
+              rpcEndpoint: "tasks.clientCheck.outputs.goodClients[0].elRpcUrl"
+              chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
+              seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
+              specTestsPath: "tasks.tempdir.outputs.path"
+        
+        - name: run_external_tasks
+          title: "Run execution spec tests: tests/prague/eip7251_consolidations"
+          timeout: 2h
+          config:
+            testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
+            testConfig:
+              gitRepo: https://github.com/pk910/execution-spec-tests.git
+              gitBranch: pk910/devnet-execution-fixes
+              testPath: ./tests/prague/eip7251_consolidations
+              seedAmount: "100000000000000000000" # 100 ETH
+              extraFlags: "--fork=Prague -n 16"
+              runSetup: false
+              cleanupTestsPath: false
+            testConfigVars:
+              rpcEndpoint: "tasks.clientCheck.outputs.goodClients[0].elRpcUrl"
+              chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
+              seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
+              specTestsPath: "tasks.tempdir.outputs.path"
+        
+        - name: run_external_tasks
+          title: "Run execution spec tests: tests/prague/eip7623_increase_calldata_cost"
+          timeout: 2h
+          config:
+            testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
+            testConfig:
+              gitRepo: https://github.com/pk910/execution-spec-tests.git
+              gitBranch: pk910/devnet-execution-fixes
+              testPath: ./tests/prague/eip7623_increase_calldata_cost
+              seedAmount: "100000000000000000000" # 100 ETH
+              extraFlags: "--fork=Prague -n 16"
+              runSetup: false
+              cleanupTestsPath: false
+            testConfigVars:
+              rpcEndpoint: "tasks.clientCheck.outputs.goodClients[0].elRpcUrl"
+              chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
+              seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
+              specTestsPath: "tasks.tempdir.outputs.path"
+        
+        - name: run_external_tasks
+          title: "Run execution spec tests: tests/prague/eip7702_set_code_tx"
+          timeout: 2h
+          config:
+            testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
+            testConfig:
+              gitRepo: https://github.com/pk910/execution-spec-tests.git
+              gitBranch: pk910/devnet-execution-fixes
+              testPath: ./tests/prague/eip7702_set_code_tx
+              seedAmount: "100000000000000000000" # 100 ETH
+              extraFlags: "--fork=Prague -n 16"
+              runSetup: false
+              cleanupTestsPath: false
+            testConfigVars:
+              rpcEndpoint: "tasks.clientCheck.outputs.goodClients[0].elRpcUrl"
+              chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
+              seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
+              specTestsPath: "tasks.tempdir.outputs.path"
+
+cleanupTasks:
+  - name: run_shell
+    title: "Cleanup temp dir for execution spec tests"
+    id: tempdir
+    config:
+      shell: bash
+      envVars:
+        SPEC_TESTS_PATH: specTestsPath
+      command: |
+        set -e
+        SPEC_TESTS_PATH=$(echo $SPEC_TESTS_PATH | jq -r)
+
+        if [ ! -z "$SPEC_TESTS_PATH" ]; then
+          rm -rf $SPEC_TESTS_PATH
+        fi
