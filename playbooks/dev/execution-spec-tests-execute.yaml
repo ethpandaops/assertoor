@@ -16,15 +16,6 @@ config:
   cleanupTestsPath: true
   solcVersion: "0.8.24"
 tasks:
-  - name: generate_child_wallet
-    id: testwallet
-    title: "Generate main wallet for tests"
-    config:
-      randomSeed: true
-    configVars:
-      privateKey: "seedPrivateKey"
-      prefundMinBalance: "seedAmount"
-  
   - name: run_shell
     title: "Clone and prepare execution spec tests: ${gitRepo}@${gitBranch}"
     id: setup
@@ -80,6 +71,16 @@ tasks:
         uv sync --all-extras
         uv run solc-select use "${SOLC_VERSION}" --always-install
         
+  - name: generate_child_wallet
+    id: testwallet
+    if: runTests
+    title: "Generate main wallet for tests"
+    config:
+      randomSeed: true
+    configVars:
+      privateKey: "seedPrivateKey"
+      prefundMinBalance: "seedAmount"
+
   - name: run_shell
     title: "Execute tests: [${testPath}]"
     id: execute
