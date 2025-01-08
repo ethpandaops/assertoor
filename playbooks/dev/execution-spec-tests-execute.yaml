@@ -12,6 +12,15 @@ config:
   extraFlags: ""
   solcVersion: "0.8.24"
 tasks:
+  - name: generate_child_wallet
+    id: testwallet
+    title: "Generate main wallet for tests"
+    config:
+      randomSeed: true
+    configVars:
+      privateKey: "seedPrivateKey"
+      prefundMinBalance: "seedAmount"
+  
   - name: run_shell
     title: "Execute tests: ${gitRepo}@${gitBranch} [${testPath}]"
     id: execute
@@ -24,7 +33,7 @@ tasks:
         TEST_PATH: testPath
         CHAIN_ID: chainID
         RPC_ENDPOINT: rpcEndpoint
-        PRIVATE_KEY: seedPrivateKey
+        PRIVATE_KEY: tasks.testwallet.outputs.childWallet.privkey
         SEED_AMOUNT: seedAmount
         EXTRA_FLAGS: extraFlags
         SOLC_VERSION: "solcVersion"
