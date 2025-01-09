@@ -67,7 +67,7 @@ tasks:
 
   # run execution spec tests
   
-  - name: run_tasks_concurrent
+  - name: run_tasks
     title: "Run execution spec tests"
     id: tests
     config:
