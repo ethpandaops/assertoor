@@ -87,30 +87,45 @@ func (t *Task) Execute(ctx context.Context) error {
 	totalMatches := 0
 	matchingBlocks := []*consensus.Block{}
 
+	checkBlockMatch := func(block *consensus.Block) bool {
+		matches := t.checkBlock(ctx, block)
+		if matches {
+			matchingBlocks = append(matchingBlocks, block)
+			t.logger.Infof("matching block %v [0x%x]", block.Slot, block.Root)
+
+			totalMatches++
+		}
+
+		if t.config.BlockCount > 0 {
+			if totalMatches >= t.config.BlockCount {
+				t.setMatchingBlocksOutput(matchingBlocks)
+				t.ctx.SetResult(types.TaskResultSuccess)
+
+				return true
+			}
+		} else {
+			if matches {
+				t.ctx.SetResult(types.TaskResultSuccess)
+			} else {
+				t.ctx.SetResult(types.TaskResultNone)
+			}
+		}
+
+		return false
+	}
+
+	// check current block
+	if blocks := consensusPool.GetBlockCache().GetCachedBlocks(); len(blocks) > 0 {
+		if checkBlockMatch(blocks[0]) {
+			return nil
+		}
+	}
+
 	for {
 		select {
 		case block := <-blockSubscription.Channel():
-			matches := t.checkBlock(ctx, block)
-			if matches {
-				matchingBlocks = append(matchingBlocks, block)
-				t.logger.Infof("matching block %v [0x%x]", block.Slot, block.Root)
-
-				totalMatches++
-			}
-
-			if t.config.BlockCount > 0 {
-				if totalMatches >= t.config.BlockCount {
-					t.setMatchingBlocksOutput(matchingBlocks)
-					t.ctx.SetResult(types.TaskResultSuccess)
-
-					return nil
-				}
-			} else {
-				if matches {
-					t.ctx.SetResult(types.TaskResultSuccess)
-				} else {
-					t.ctx.SetResult(types.TaskResultNone)
-				}
+			if checkBlockMatch(block) {
+				return nil
 			}
 		case <-ctx.Done():
 			return ctx.Err()

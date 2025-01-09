@@ -67,10 +67,10 @@ tasks:
   config:
     stopChildOnResult: false
     tasks:
-    # generate 22 deposits with 0x01 withdrawal credentials
+    # generate 22 deposits with 0x00 withdrawal credentials
     - name: generate_deposits
       id: deposits
-      title: "Generate 22 deposits with 32 ETH each and 0x01 withdrawal credentials"
+      title: "Generate 22 deposits with 32 ETH each and 0x00 withdrawal credentials"
       config:
         limitTotal: 22
         depositAmount: 32
@@ -144,15 +144,29 @@ tasks:
       config:
         onBackgroundComplete: failOrIgnore
         backgroundTask:
-          name: generate_bls_changes
-          title: "Send BLS changes for genesis validators"
+          name: run_tasks
+          title: "Generate BLS changes for genesis validators"
           config:
-            limitTotal: 21 # 1 will be skipped as we already have a BLS change for key 9
-            indexCount: 22
-          configVars:
-            mnemonic: "validatorMnemonic"
-            startIndex: "validatorStartIndex"
-            targetAddress: "tasks.main_wallet.outputs.childWallet.address"
+            stopChildOnResult: false
+            tasks:
+            - name: generate_bls_changes
+              title: "Send BLS changes for genesis validators"
+              config:
+                limitTotal: 9 # key 0-8
+                indexCount: 9
+              configVars:
+                mnemonic: "validatorMnemonic"
+                startIndex: "validatorStartIndex"
+                targetAddress: "tasks.main_wallet.outputs.childWallet.address"
+            - name: generate_bls_changes
+              title: "Send BLS changes for genesis validators"
+              config:
+                limitTotal: 12 # key 10-21
+                indexCount: 12
+              configVars:
+                mnemonic: "validatorMnemonic"
+                startIndex: "validatorStartIndex + 10"
+                targetAddress: "tasks.main_wallet.outputs.childWallet.address"
         foregroundTask:
           name: run_task_matrix
           title: "Wait for inclusion of all BLS changes"
@@ -349,7 +363,7 @@ tasks:
         - name: sleep
           title: "Wait 30 minutes"
           config:
-            duration: 1h
+            duration: 30m
 
         - name: check_consensus_validator_status
           title: "Check if key 2 is still active"
@@ -1015,7 +1029,7 @@ tasks:
             validatorStatus:
             - active_ongoing
           configVars:
-            validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[12]"
+            validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[13]"
 
     # Test8: Change withdrawal credentials of 2 validators to 0x02, then consolidate a 3rd validator with 0x01 credentials into the 2nd, afterwards consolidate the 2nd validator into the 1st. Assert the full balance arriving at the 1st validator
     # keys: 14, 15, 16
