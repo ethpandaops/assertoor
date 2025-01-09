@@ -640,7 +640,6 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 
 				if validator.Validator.PublicKey.String() == expectedWithdrawal.PublicKey {
 					withdrawalAmount := big.NewInt(int64(withdrawal.Amount))
-					withdrawalAmount = withdrawalAmount.Mul(withdrawalAmount, big.NewInt(1000000000))
 
 					switch {
 					case expectedWithdrawal.Address != "" && !strings.EqualFold(expectedWithdrawal.Address, withdrawal.Address.String()):

@@ -557,13 +557,13 @@ tasks:
               config:
                 minWithdrawalCount: 1
               configVars:
-                expectWithdrawals: "| [{publicKey: .tasks.all_pubkeys.outputs.pubkeys[1], address: .tasks.depositor_wallet.outputs.childWallet.address, minAmount: 900000000000000000}]"
+                expectWithdrawals: "| [{publicKey: .tasks.all_pubkeys.outputs.pubkeys[1], address: .tasks.depositor_wallet.outputs.childWallet.address, minAmount: 900000000}]"
             - name: check_consensus_block_proposals
               title: "Wait for partial withdrawal (>15.9 ETH) for key 4"
               config:
                 minWithdrawalCount: 1
               configVars:
-                expectWithdrawals: "| [{publicKey: .tasks.all_pubkeys.outputs.pubkeys[4], address: .tasks.depositor_wallet.outputs.childWallet.address, minAmount: 15900000000000000000}]"
+                expectWithdrawals: "| [{publicKey: .tasks.all_pubkeys.outputs.pubkeys[4], address: .tasks.depositor_wallet.outputs.childWallet.address, minAmount: 15900000000}]"
 
 # key status:
 # index 0: active  64 ETH (32 ETH EB), 0x00 withdrawal creds
@@ -846,7 +846,7 @@ tasks:
               config:
                 minWithdrawalCount: 1
               configVars:
-                expectWithdrawals: "| [{publicKey: .tasks.all_pubkeys.outputs.pubkeys[8], address: .tasks.depositor_wallet.outputs.childWallet.address, minAmount: 31900000000000000000}]"
+                expectWithdrawals: "| [{publicKey: .tasks.all_pubkeys.outputs.pubkeys[8], address: .tasks.depositor_wallet.outputs.childWallet.address, minAmount: 31900000000}]"
 
 # generate EL triggered exit
 - name: run_tasks
