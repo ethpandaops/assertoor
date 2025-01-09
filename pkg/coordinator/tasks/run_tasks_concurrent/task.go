@@ -207,7 +207,12 @@ func (t *Task) Execute(ctx context.Context) error {
 			if !taskComplete {
 				taskComplete = true
 
-				t.ctx.SetResult(types.TaskResultSuccess)
+				if t.config.FailOnUndecided {
+					t.ctx.SetResult(types.TaskResultFailure)
+				} else {
+					t.ctx.SetResult(types.TaskResultSuccess)
+				}
+
 				t.logger.Infof("all child tasks completed (%v success, %v failure)", successCount, failureCount)
 			}
 		}

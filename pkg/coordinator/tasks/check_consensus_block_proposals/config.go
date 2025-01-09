@@ -36,6 +36,7 @@ type Config struct {
 		PublicKey string   `yaml:"publicKey" json:"publicKey"`
 		Address   string   `yaml:"address" json:"address"`
 		MinAmount *big.Int `yaml:"minAmount" json:"minAmount"`
+		MaxAmount *big.Int `yaml:"maxAmount" json:"maxAmount"`
 	} `yaml:"expectWithdrawals" json:"expectWithdrawals"`
 	ExpectDepositRequests []struct {
 		PublicKey             string   `yaml:"publicKey" json:"publicKey"`

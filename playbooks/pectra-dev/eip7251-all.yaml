@@ -230,6 +230,7 @@ tasks:
   id: tests
   config:
     failTaskCount: 0
+    failOnUndecided: true
     tasks:
 
     # Test1: Change withdrawal credentials of a validator to 0x02 (via self-consolidation) and consolidate another validator with 0x01 credentials into it
@@ -1015,6 +1016,7 @@ tasks:
 
         - name: check_consensus_validator_status
           title: "Check if key 12 is slashed"
+          timeout: 30m
           config:
             validatorStatus:
             - active_slashed
@@ -1022,12 +1024,15 @@ tasks:
           configVars:
             validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[12]"
 
-        # check if key 13 is still active
+        # check if key 13 is exited
         - name: check_consensus_validator_status
-          title: "Check if key 13 is still active"
+          title: "Check if key 13 is exited"
+          timeout: 5m
           config:
             validatorStatus:
-            - active_ongoing
+            - exited_unslashed
+            - withdrawal_possible
+            - withdrawal_done
           configVars:
             validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[13]"
 

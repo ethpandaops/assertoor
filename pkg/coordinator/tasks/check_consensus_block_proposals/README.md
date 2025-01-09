@@ -71,8 +71,8 @@ The `check_consensus_block_proposals` task assesses consensus block proposals ag
   `{publicKey: "0x0000...", address: "0x00..."}`
 
 - **`expectWithdrawals`**:\
-  Specifies expected withdrawal operations, including public keys, destination addresses, and minimum withdrawal amounts.
-  `{publicKey: "0x0000...", address: "0x00...", minAmount: 0}`
+  Specifies expected withdrawal operations, including public keys, destination addresses, and minimum/maximum withdrawal amounts.
+  `{publicKey: "0x0000...", address: "0x00...", minAmount: 0, maxAmount: 0}`
 
 - **`expectDepositRequests`**:\
   Specifies expected deposit request operations, each object detailing the public key, withdrawal credentials, and deposit amount.

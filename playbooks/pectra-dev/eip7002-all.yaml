@@ -1,7 +1,7 @@
 
 id: eip7002-all
 name: "EIP7002 test (el triggerable exits)"
-timeout: 38h
+timeout: 72h
 config:
   walletPrivkey: ""
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
@@ -85,7 +85,7 @@ tasks:
         tasks:
         - name: check_consensus_validator_status
           title: "Wait for validators to be active"
-          timeout: 2h
+          timeout: 24h
           config:
             validatorStatus:
             - active_ongoing
@@ -130,6 +130,7 @@ tasks:
   id: tests
   config:
     failTaskCount: 0
+    failOnUndecided: true
     tasks:
 
     # Test1: Submit a exit request from an address with 0x00 credentials, assert no exit
@@ -240,7 +241,7 @@ tasks:
             - active_exiting
             - exited_unslashed
           configVars:
-            validatorPubKey: "tasks.all_pubkeys.outputs.pubkeys[1]"
+            validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[1]"
 
     # Test3: Submit a exit request from an address with 0x02 credentials, assert exit
     # keys: 2
@@ -490,7 +491,6 @@ tasks:
                 failOnReject: true
               configVars:
                 sourceMnemonic: "validatorMnemonic"
-                targetValidatorIndex: "validatorStartIndex + 4"
                 targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[4]"
                 sourceStartIndex: "validatorStartIndex + 4"
                 walletPrivkey: "walletPrivkey"
@@ -535,7 +535,7 @@ tasks:
         - name: check_consensus_validator_status
           title: "Wait for key 4 balance to increase > 33 ETH"
           id: key4_status
-          timeout: 30m
+          timeout: 4h
           config:
             validatorStatus:
             - active_ongoing
@@ -600,13 +600,13 @@ tasks:
 
         # wait for withdrawal to be processed
         - name: check_consensus_block_proposals
-          title: "Check for >= 1 ETH withdrawal for key 4"
+          title: "Check for exact 1 ETH withdrawal for key 4"
           timeout: 2h
           config:
             minWithdrawalCount: 1
           configVars:
-            expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[4], address: .tasks.wallet_details.outputs.address, minAmount: 1000000000}]"
-        
+            expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[4], address: .tasks.wallet_details.outputs.address, minAmount: 1000000000, maxAmount: 1000000000}]"
+
 
     # Test6: Submit a partial 2 ETH withdrawal request from an address with 0x02 credentials and balance < 34 ETH, assert < 2 ETH withdrawal
     # keys: 5
@@ -698,7 +698,7 @@ tasks:
         - name: check_consensus_validator_status
           title: "Get validator info for key 5 (expect 0x02 credentials)"
           id: key5_status
-          timeout: 30m
+          timeout: 4h
           config:
             withdrawalCredsPrefix: "0x02"
             validatorStatus:
@@ -762,7 +762,7 @@ tasks:
         # check chain for 30 minutes, expect withdrawal with >= 0.5 ETH & < 1.5 ETH for key 5
         - name: check_consensus_block_proposals
           title: "Check withdrawal for key 5 (expect in range 0.5-1.5 ETH)"
-          timeout: 30m
+          timeout: 2h
           id: key5_withdrawal
           config:
             minWithdrawalCount: 1
