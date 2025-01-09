@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -83,7 +84,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	// create new variable scope for test configuration
 	testVars := t.ctx.Vars.NewScope()
 	testVars.SetVar("scopeOwner", uint64(t.ctx.Index))
-	t.ctx.Outputs.SetSubScope("childScope", testVars)
+	t.ctx.Outputs.SetSubScope("childScope", vars.NewScopeFilter(testVars))
 
 	// add default config from external test to variable scope
 	for k, v := range testConfig.Config {
@@ -100,7 +101,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		testConfig.ConfigVars[k] = v
 	}
 
-	err = testVars.CopyVars(testVars, testConfig.ConfigVars)
+	err = testVars.CopyVars(t.ctx.Vars, testConfig.ConfigVars)
 	if err != nil {
 		return fmt.Errorf("error decoding external test configVars %v: %v", t.config.TestFile, err)
 	}

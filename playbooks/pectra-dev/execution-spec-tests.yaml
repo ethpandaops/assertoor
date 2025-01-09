@@ -171,7 +171,6 @@ tasks:
 cleanupTasks:
   - name: run_shell
     title: "Cleanup temp dir for execution spec tests"
-    id: tempdir
     config:
       shell: bash
       envVars:
