@@ -3,6 +3,7 @@ package checkconsensusblockproposals
 import "math/big"
 
 type Config struct {
+	CheckLookback                int    `yaml:"checkLookback" json:"checkLookback"`
 	BlockCount                   int    `yaml:"blockCount" json:"blockCount"`
 	GraffitiPattern              string `yaml:"graffitiPattern" json:"graffitiPattern"`
 	ValidatorNamePattern         string `yaml:"validatorNamePattern" json:"validatorNamePattern"`
@@ -55,7 +56,8 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		BlockCount: 1,
+		CheckLookback: 1,
+		BlockCount:    1,
 	}
 }
 

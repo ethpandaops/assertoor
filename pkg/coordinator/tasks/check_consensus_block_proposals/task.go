@@ -115,9 +115,33 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	// check current block
-	if blocks := consensusPool.GetBlockCache().GetCachedBlocks(); len(blocks) > 0 {
-		if checkBlockMatch(blocks[0]) {
-			return nil
+	if t.config.CheckLookback > 0 {
+		if blocks := consensusPool.GetBlockCache().GetCachedBlocks(); len(blocks) > 0 {
+			lookbackBlocks := []*consensus.Block{}
+			block := blocks[0]
+
+			for {
+				lookbackBlocks = append(lookbackBlocks, block)
+				if len(lookbackBlocks) >= t.config.CheckLookback {
+					break
+				}
+
+				parentRoot := block.GetParentRoot()
+				if parentRoot == nil {
+					break
+				}
+
+				block = consensusPool.GetBlockCache().GetCachedBlockByRoot(*parentRoot)
+				if block == nil {
+					break
+				}
+			}
+
+			for i := len(lookbackBlocks) - 1; i >= 0; i-- {
+				if checkBlockMatch(lookbackBlocks[i]) {
+					return nil
+				}
+			}
 		}
 	}
 

@@ -392,6 +392,18 @@ tasks:
               configVars:
                 expectBlsChanges: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[3], address: .tasks.wallet_details.outputs.address}]"
 
+        # wait for balance to be <= 32ETH (await withdrawal after bls change)
+        - name: check_consensus_validator_status
+          title: "Wait for key 3 balance to be <= 32.01 ETH"
+          id: key3_status
+          timeout: 30m
+          config:
+            validatorStatus:
+            - active_ongoing
+            maxValidatorBalance: 32010000000
+          configVars:
+            validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[3]"
+
         # generate withdrawal & wait for inclusion
         - name: run_task_background
           title: "Generate EL triggered partial withdrawal for key 3 & track inclusion"
@@ -421,13 +433,14 @@ tasks:
         - name: run_task_options
           title: "Monitor chain for 30min, expect no withdrawal with >= 0.1 ETH for key 3"
           config:
-            invertResult: true
+            expectFailure: true
             task:
               name: check_consensus_block_proposals
               title: "Check for >= 0.1 ETH withdrawal for key 3 (expect failure)"
               timeout: 30m
               config:
                 minWithdrawalCount: 1
+                checkLookback: 0
               configVars:
                 expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[3], address: .tasks.wallet_details.outputs.address, minAmount: 100000000}]"
 
