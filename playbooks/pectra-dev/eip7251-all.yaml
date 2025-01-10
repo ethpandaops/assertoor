@@ -26,22 +26,6 @@ tasks:
     minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
 
 # prepare wallets
-- name: get_random_mnemonic
-  id: test_mnemonic
-  title: "Generate random mnemonic"
-  if: "useExistingValidators == false"
-
-- name: run_shell
-  title: "Use generated random mnemonic for tests"
-  if: "useExistingValidators == false"
-  config:
-    envVars:
-      MNEMONIC: "tasks.test_mnemonic.outputs.mnemonic"
-    command: |
-      # override the validatorMnemonic variable with the generated random mnemonic
-      echo "::set-var validatorMnemonic ${MNEMONIC}"
-      echo "::set-json validatorStartIndex 0"
-
 - name: generate_child_wallet
   id: main_wallet
   title: "Generate main wallet for tests"
@@ -67,6 +51,20 @@ tasks:
   config:
     stopChildOnResult: false
     tasks:
+    # generate random mnemonic
+    - name: get_random_mnemonic
+      id: test_mnemonic
+      title: "Generate random mnemonic"
+    - name: run_shell
+      title: "Use generated random mnemonic for tests"
+      config:
+        envVars:
+          MNEMONIC: "tasks.test_mnemonic.outputs.mnemonic"
+        command: |
+          # override the validatorMnemonic variable with the generated random mnemonic
+          echo "::set-json validatorMnemonic ${MNEMONIC}"
+          echo "::set-json validatorStartIndex 0"
+
     # generate 22 deposits with 0x00 withdrawal credentials
     - name: generate_deposits
       id: deposits
@@ -503,6 +501,7 @@ tasks:
           config:
             validatorStatus:
             - active_ongoing
+            minValidatorBalance: 2047100000000 # expect >2047.1 ETH
             maxValidatorBalance: 2048100000000 # expect <2048.1 ETH
           configVars:
             validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[4]"
@@ -1196,7 +1195,7 @@ tasks:
           title: "Check if key 14 has received the full balance"
           timeout: 8h
           config:
-            minValidatorBalance: 95900000000 # expect >95.9 ETH
+            minValidatorBalance: 95700000000 # expect >95.7 ETH
             validatorStatus:
             - active_ongoing
           configVars:

@@ -115,9 +115,9 @@ tasks:
         depositContract: "depositContract"
         withdrawalCredentials: "| \"0x010000000000000000000000\" + (.tasks.depositor_wallet.outputs.childWallet.address | capture(\"(0x)?(?<addr>.+)\").addr)"
     
-    # 1 deposit, 24 ETH, 0x01 withdrawal creds (index 7)
+    # 1 deposit, 24 ETH, 0x02 withdrawal creds (index 7)
     - name: generate_deposits
-      title: "Generate 1 deposit with 24 ETH and 0x01 withdrawal creds (index 7)"
+      title: "Generate 1 deposit with 24 ETH and 0x02 withdrawal creds (index 7)"
       id: deposit_3
       config:
         limitTotal: 1
@@ -129,7 +129,7 @@ tasks:
         walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
         mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
         depositContract: "depositContract"
-        withdrawalCredentials: "| \"0x010000000000000000000000\" + (.tasks.depositor_wallet.outputs.childWallet.address | capture(\"(0x)?(?<addr>.+)\").addr)"
+        withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.depositor_wallet.outputs.childWallet.address | capture(\"(0x)?(?<addr>.+)\").addr)"
 
     # 2 deposits, 64 ETH each, 0x02 withdrawal creds (index 8-9)
     - name: generate_deposits
@@ -586,6 +586,34 @@ tasks:
   title: "Generate consolidations & track inclusion"
   config:
     tasks:
+
+    # generate self consolidation for key 5 & wait for inclusion
+    - name: run_task_background
+      title: "Generate self consolidation for key 5"
+      timeout: 10m
+      config:
+        onBackgroundComplete: failOrIgnore
+        backgroundTask:
+          name: generate_consolidations
+          title: "Generate 1 self consolidation (key 5)"
+          config:
+            limitTotal: 1
+            sourceStartIndex: 5
+            sourceIndexCount: 1
+            awaitReceipt: true
+            failOnReject: true
+          configVars:
+            sourceMnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+            targetPublicKey: "tasks.all_pubkeys.outputs.pubkeys[5]"
+            walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
+        
+        foregroundTask:
+          name: check_consensus_block_proposals
+          title: "Wait for inclusion of self consolidation request for key 5"
+          config:
+            minConsolidationRequestCount: 1
+          configVars:
+            expectConsolidationRequests: "| [{sourceAddress: .tasks.depositor_wallet.outputs.childWallet.address, sourcePubkey: .tasks.all_pubkeys.outputs.pubkeys[5]}]"
 
     - name: run_task_background
       title: "Generate consolidations & track inclusion"
