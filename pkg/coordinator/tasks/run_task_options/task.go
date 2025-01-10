@@ -119,6 +119,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			if taskErr != nil {
 				t.logger.Warnf("child task failed: %w", taskErr)
 			}
+
 			t.ctx.SetResult(types.TaskResultSuccess)
 		default:
 			if taskErr != nil {
