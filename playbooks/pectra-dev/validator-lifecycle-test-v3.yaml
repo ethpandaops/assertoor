@@ -1181,10 +1181,11 @@ tasks:
     - name: check_consensus_validator_status
       title: "Get validator #7 info"
       id: validator_info_7
-      timeout: 5m
+      timeout: 8h
       config:
         validatorStatus:
         - active_ongoing
+        minValidatorBalance: 143800000000
       configVars:
         validatorPubKey: "tasks.all_pubkeys.outputs.pubkeys[7]"
     - name: run_shell
@@ -1219,7 +1220,7 @@ tasks:
 # index 4: exited  0 ETH (0 ETH EB), 0x01 withdrawal creds (consolidated to 7)
 # index 5: exited  0 ETH (0 ETH EB), 0x02 withdrawal creds (consolidated to 7)
 # index 6: active  32 ETH (32 ETH EB), 0x01 withdrawal creds
-# index 7: active  125 ETH (125 ETH EB), 0x02 withdrawal creds
+# index 7: active  143.9 ETH (143 ETH EB), 0x02 withdrawal creds
 # index 8: active  32 ETH (32 ETH EB), 0x02 withdrawal creds
 # index 9: exited  0 ETH (0 ETH EB), 0x02 withdrawal creds
 
