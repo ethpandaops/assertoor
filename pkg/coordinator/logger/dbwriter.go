@@ -182,8 +182,15 @@ func (lh *logDBWriter) GetLogEntries(from, limit int) []*db.TaskLog {
 
 	if len(dbEntries) > 0 && dbEntries[len(dbEntries)-1].LogIndex >= bufEntries[0].LogIndex {
 		// remove overlapping entries
-		bufEntries = bufEntries[dbEntries[len(dbEntries)-1].LogIndex-bufEntries[0].LogIndex+1:]
+		lastDBIndex := dbEntries[len(dbEntries)-1].LogIndex
+		firstBufIndex := bufEntries[0].LogIndex
+		bufEntries = bufEntries[lastDBIndex-firstBufIndex+1:]
 	}
 
-	return append(bufEntries, dbEntries...)
+	combinedEntries := append(dbEntries, bufEntries...)
+	if len(combinedEntries) > limit {
+		return combinedEntries[:limit]
+	}
+
+	return combinedEntries
 }

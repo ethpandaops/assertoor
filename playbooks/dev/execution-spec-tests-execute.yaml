@@ -165,7 +165,7 @@ tasks:
           --json-report \
           --json-report-file=report.json \
           --html=report.html \
-          ${EXTRA_FLAGS[@]}
+          ${EXTRA_FLAGS[@]} || true
 
         echo "============================"
         echo "Exporting reports"
