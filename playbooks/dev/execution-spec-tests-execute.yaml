@@ -170,9 +170,8 @@ tasks:
         echo "============================"
         echo "Exporting reports"
         echo "============================"
-        REPORT_JSON=$(cat report.json)
-        REPORT_HTML=$(jq -Rs '.' report.html)
-        echo "::set-output reportHTML ${REPORT_HTML}"
+        REPORT_JSON=$(cat report.json | jq -c '[.tests[] |  {"nodeid": .nodeid, "outcome": .outcome, "setupDuration": .setup.duration, "callDuration": .call.duration, "teardownDuration": .teardown.duration}]')
+
         echo "::set-output-json reportJSON ${REPORT_JSON}"
 
         exit 0
