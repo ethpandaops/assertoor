@@ -178,7 +178,7 @@ tasks:
   - name: run_task_matrix
     title: "Show test results"
     configVars:
-      matrixValues: "tasks.execute.outputs.reportJSON.tests"
+      matrixValues: "tasks.execute.outputs.reportJSON"
     config:
       runConcurrent: true
       matrixVar: "testResult"

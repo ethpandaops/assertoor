@@ -1273,24 +1273,24 @@ tasks:
       config:
         validatorStatus:
         - active_ongoing
-        minValidatorBalance: 41900000000
+        minValidatorBalance: 31900000000
       configVars:
         validatorPubKey: "tasks.all_pubkeys.outputs.pubkeys[6]"
     - name: run_shell
-      title: "Check validator #6 status: 42 ETH (41 ETH EB), 0x00 withdrawal creds"
+      title: "Check validator #6 status: 31.9 ETH (32 ETH EB), 0x00 withdrawal creds"
       config:
         envVars: 
           validator: "tasks.validator_info_6_b.outputs.validator"
         command: |
           balance=$(echo "$validator" | jq -r '.balance')
-          if [ "$balance" -lt 41900000000 ]; then
-            echo "Balance too high! expected: > 41.9 ETH, got: $balance Gwei"
+          if [ "$balance" -lt 31900000000 ]; then
+            echo "Balance too high! expected: > 31.9 ETH, got: $balance Gwei"
             exit 1
           fi
 
           effective_balance=$(echo "$validator" | jq -r '.validator.effective_balance')
-          if [ "$effective_balance" != "41000000000" ]; then
-            echo "Effective balance too high! expected: 41 ETH, got: $effective_balance Gwei"
+          if [ "$effective_balance" != "32000000000" ]; then
+            echo "Effective balance too high! expected: 32 ETH, got: $effective_balance Gwei"
             exit 1
           fi
 
