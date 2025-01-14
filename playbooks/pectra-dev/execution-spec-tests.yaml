@@ -1,6 +1,6 @@
 id: pectra-execution-spec-tests
 name: "Run execution spec tests"
-timeout: 1h
+timeout: 4h
 config:
   #walletPrivkey: ""
   walletSeed: "spectests"
@@ -67,7 +67,7 @@ tasks:
 
   # run execution spec tests
   
-  - name: run_tasks
+  - name: run_tasks_concurrent
     title: "Run execution spec tests"
     id: tests
     config:
