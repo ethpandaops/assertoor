@@ -284,8 +284,11 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 				taskStatusVars := taskState.GetTaskStatusVars().GetVarsMap(nil, false)
 				if taskOutput, ok := taskStatusVars["outputs"]; ok {
 					if customRunTimeSecondsRaw, ok := taskOutput.(map[string]interface{})["customRunTimeSeconds"]; ok {
-						taskData.CustomRunTime = time.Duration(customRunTimeSecondsRaw.(float64) * float64(time.Second))
-						taskData.HasCustomRunTime = true
+						customRunTime, ok := customRunTimeSecondsRaw.(float64)
+						if ok {
+							taskData.CustomRunTime = time.Duration(customRunTime * float64(time.Second))
+							taskData.HasCustomRunTime = true
+						}
 					}
 				}
 

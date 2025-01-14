@@ -190,7 +190,7 @@ tasks:
           envVars:
             TEST_RESULT: testResult
           command: |
-            DURATION_SECONDS=$(echo $TEST_RESULT | jq -r '.setup.duration + .call.duration + .teardown.duration')
+            DURATION_SECONDS=$(echo $TEST_RESULT | jq -r '(.setup.duration // 0) + (.call.duration // 0) + (.teardown.duration // 0)')
             echo "::set-output-json customRunTimeSeconds ${DURATION_SECONDS}"
             echo "::set-output-json execTestResult ${TEST_RESULT}"
             if $(echo $TEST_RESULT | jq -e '.outcome == "passed"') ; then
