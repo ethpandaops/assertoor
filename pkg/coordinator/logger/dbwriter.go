@@ -187,10 +187,10 @@ func (lh *logDBWriter) GetLogEntries(from, limit int) []*db.TaskLog {
 		bufEntries = bufEntries[lastDBIndex-firstBufIndex+1:]
 	}
 
-	combinedEntries := append(dbEntries, bufEntries...)
-	if len(combinedEntries) > limit {
-		return combinedEntries[:limit]
+	dbEntries = append(dbEntries, bufEntries...)
+	if len(dbEntries) > limit {
+		return dbEntries[:limit]
 	}
 
-	return combinedEntries
+	return dbEntries
 }
