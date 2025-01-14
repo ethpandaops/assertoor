@@ -1274,6 +1274,7 @@ tasks:
         validatorStatus:
         - active_ongoing
         minValidatorBalance: 31900000000
+        withdrawalCredsPrefix: "0x02"
       configVars:
         validatorPubKey: "tasks.all_pubkeys.outputs.pubkeys[6]"
     - name: run_shell

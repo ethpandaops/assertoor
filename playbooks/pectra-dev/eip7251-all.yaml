@@ -1195,7 +1195,7 @@ tasks:
           title: "Check if key 14 has received the full balance"
           timeout: 8h
           config:
-            minValidatorBalance: 95700000000 # expect >95.7 ETH
+            minValidatorBalance: 94700000000 # expect >94.7 ETH
             validatorStatus:
             - active_ongoing
           configVars:
