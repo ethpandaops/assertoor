@@ -353,16 +353,18 @@ func (t *Task) storeTaskResults(summaryFile *resultFile, resultDir string) {
 		data, err3 := summaryFile.Cleanup()
 		if err3 != nil {
 			t.logger.Errorf("failed cleaning up summary file: %v", err3)
-		} else if err3 = database.UpsertTaskResult(tx, &db.TaskResult{
-			RunID:  int(t.ctx.Scheduler.GetTestRunID()),
-			TaskID: int(t.ctx.Index),
-			Type:   "summary",
-			Index:  0,
-			Name:   "",
-			Size:   len(data),
-			Data:   data,
-		}); err3 != nil {
-			t.logger.Errorf("failed storing summary file to db: %v", err3)
+		} else if len(data) > 0 {
+			if err3 = database.UpsertTaskResult(tx, &db.TaskResult{
+				RunID:  int(t.ctx.Scheduler.GetTestRunID()),
+				TaskID: int(t.ctx.Index),
+				Type:   "summary",
+				Index:  0,
+				Name:   "",
+				Size:   len(data),
+				Data:   data,
+			}); err3 != nil {
+				t.logger.Errorf("failed storing summary file to db: %v", err3)
+			}
 		}
 
 		// store result files
