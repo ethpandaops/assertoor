@@ -239,6 +239,11 @@
                     <li class="nav-item" role="presentation">
                       <button class="nav-link" id="task{{ $task.Index }}-result-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-result" type="button" role="tab" aria-controls="task{{ $task.Index }}-result" aria-selected="false">Result</button>
                     </li>
+                    {{ if $task.HaveResultFiles }}
+                    <li class="nav-item" role="presentation">
+                      <button class="nav-link" id="task{{ $task.Index }}-result-files-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-result-files" type="button" role="tab" aria-controls="task{{ $task.Index }}-result-files" aria-selected="false">Result Files</button>
+                    </li>
+                    {{ end }}
                   </ul>
                   <div class="card">
                     <div class="tab-content card-body" id="task{{ $task.Index }}-tabcontent">
@@ -284,9 +289,30 @@
                       <div class="tab-pane fade card-body" id="task{{ $task.Index }}-result" role="tabpanel" aria-labelledby="task{{ $task.Index }}-result-tab">
                         <pre style="text-wrap: pretty">{{ $task.ResultYaml }}</pre>
                       </div>
-                      <div class="tab-pane fade card-body" id="task{{ $task.Index }}-custom-html" role="tabpanel" aria-labelledby="task{{ $task.Index }}-custom-html-tab">
-                        <pre style="text-wrap: pretty">{{ $task.ResultYaml }}</pre>
+                      {{ if $task.HaveResultFiles }}
+                      <div class="tab-pane fade card-body" id="task{{ $task.Index }}-result-files" role="tabpanel" aria-labelledby="task{{ $task.Index }}-result-files-tab">
+                        <table class="table table-sm">
+                          <thead>
+                            <tr>
+                              <th>Type</th>
+                              <th>Name</th>
+                              <th>Index</th>
+                              <th>Size</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {{ range $result := $task.ResultFiles }}
+                            <tr>
+                              <td>{{ $result.Type }}</td>
+                              <td><a href="{{ $result.URL }}">{{ $result.Name }}</a></td>
+                              <td>{{ $result.Index }}</td>
+                              <td>{{ $result.Size }}</td>
+                            </tr>
+                            {{ end }}
+                          </tbody>
+                        </table>
                       </div>
+                      {{ end }}
                     </div>
                   </div>
                   {{ end }}

@@ -294,6 +294,75 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/test_run/{runId}/task/{taskIndex}/result/{resultType}/{fileId}": {
+            "get": {
+                "description": "Returns a specific result file from a task",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get task result file",
+                "operationId": "getTaskResult",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Index of the task",
+                        "name": "taskIndex",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Type of file to return (summary, result, ...)",
+                        "name": "resultType",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Index or name of the result file",
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/test_runs": {
             "get": {
                 "description": "Returns a list of all test runs.",
@@ -883,6 +952,12 @@ const docTemplate = `{
                 "result_error": {
                     "type": "string"
                 },
+                "result_files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.GetTestRunTaskResult"
+                    }
+                },
                 "runtime": {
                     "type": "integer"
                 },
@@ -902,6 +977,26 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunTaskResult": {
+            "type": "object",
+            "properties": {
+                "index": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "url": {
                     "type": "string"
                 }
             }

@@ -1,10 +1,12 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/gorilla/mux"
 )
@@ -20,19 +22,28 @@ type GetTestRunResponse struct {
 }
 
 type GetTestRunTask struct {
-	Index       uint64 `json:"index"`
-	ParentIndex uint64 `json:"parent_index"`
-	Name        string `json:"name"`
-	Title       string `json:"title"`
-	Started     bool   `json:"started"`
-	Completed   bool   `json:"completed"`
-	StartTime   int64  `json:"start_time"`
-	StopTime    int64  `json:"stop_time"`
-	Timeout     uint64 `json:"timeout"`
-	RunTime     uint64 `json:"runtime"`
-	Status      string `json:"status"`
-	Result      string `json:"result"`
-	ResultError string `json:"result_error"`
+	Index       uint64                 `json:"index"`
+	ParentIndex uint64                 `json:"parent_index"`
+	Name        string                 `json:"name"`
+	Title       string                 `json:"title"`
+	Started     bool                   `json:"started"`
+	Completed   bool                   `json:"completed"`
+	StartTime   int64                  `json:"start_time"`
+	StopTime    int64                  `json:"stop_time"`
+	Timeout     uint64                 `json:"timeout"`
+	RunTime     uint64                 `json:"runtime"`
+	Status      string                 `json:"status"`
+	Result      string                 `json:"result"`
+	ResultFiles []GetTestRunTaskResult `json:"result_files"`
+	ResultError string                 `json:"result_error"`
+}
+
+type GetTestRunTaskResult struct {
+	Type  string `json:"type"`
+	Index uint64 `json:"index"`
+	Name  string `json:"name"`
+	Size  uint64 `json:"size"`
+	URL   string `json:"url"`
 }
 
 // GetTestRun godoc
@@ -77,6 +88,19 @@ func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
 
 	if !testInstance.StopTime().IsZero() {
 		response.StopTime = testInstance.StopTime().Unix()
+	}
+
+	// get result headers
+	resultHeaderMap := map[uint64][]db.TaskResultHeader{}
+
+	resultHeaders, err := ah.coordinator.Database().GetAllTaskResultHeaders(int(runID))
+	if err != nil {
+		ah.sendErrorResponse(w, r.URL.String(), "failed to get result headers", http.StatusInternalServerError)
+		return
+	}
+
+	for _, header := range resultHeaders {
+		resultHeaderMap[uint64(header.TaskID)] = append(resultHeaderMap[uint64(header.TaskID)], header)
 	}
 
 	taskScheduler := testInstance.GetTaskScheduler()
@@ -124,6 +148,19 @@ func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
 
 			if taskStatus.Error != nil {
 				taskData.ResultError = taskStatus.Error.Error()
+			}
+
+			if len(resultHeaderMap[uint64(taskState.Index())]) > 0 {
+				taskData.ResultFiles = make([]GetTestRunTaskResult, len(resultHeaderMap[uint64(taskState.Index())]))
+				for i, header := range resultHeaderMap[uint64(taskState.Index())] {
+					taskData.ResultFiles[i] = GetTestRunTaskResult{
+						Type:  header.Type,
+						Index: uint64(header.Index),
+						Name:  header.Name,
+						Size:  uint64(header.Size),
+						URL:   fmt.Sprintf("/api/v1/test_run/%v/task/%v/result/%v/%v", runID, taskState.Index(), header.Type, header.Index),
+					}
+				}
 			}
 
 			response.Tasks = append(response.Tasks, taskData)

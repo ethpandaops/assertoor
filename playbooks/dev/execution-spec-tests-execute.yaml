@@ -170,6 +170,10 @@ tasks:
         echo "============================"
         echo "Exporting reports"
         echo "============================"
+
+        cp report.json ${ASSERTOOR_RESULT_DIR}/report.json
+        cp report.html ${ASSERTOOR_RESULT_DIR}/report.html
+
         REPORT_JSON=$(cat report.json | jq -c '[.tests[] |  {"nodeid": .nodeid, "outcome": .outcome, "setupDuration": .setup.duration, "callDuration": .call.duration, "teardownDuration": .teardown.duration}]')
 
         echo "::set-output-json reportJSON ${REPORT_JSON}"

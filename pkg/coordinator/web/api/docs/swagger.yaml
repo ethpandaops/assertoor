@@ -123,6 +123,10 @@ definitions:
         type: string
       result_error:
         type: string
+      result_files:
+        items:
+          $ref: '#/definitions/api.GetTestRunTaskResult'
+        type: array
       runtime:
         type: integer
       start_time:
@@ -136,6 +140,19 @@ definitions:
       timeout:
         type: integer
       title:
+        type: string
+    type: object
+  api.GetTestRunTaskResult:
+    properties:
+      index:
+        type: integer
+      name:
+        type: string
+      size:
+        type: integer
+      type:
+        type: string
+      url:
         type: string
     type: object
   api.GetTestRunsResponse:
@@ -512,6 +529,53 @@ paths:
           schema:
             $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
       summary: Get test run status by run ID
+      tags:
+      - TestRun
+  /api/v1/test_run/{runId}/task/{taskIndex}/result/{resultType}/{fileId}:
+    get:
+      description: Returns a specific result file from a task
+      operationId: getTaskResult
+      parameters:
+      - description: ID of the test run
+        in: path
+        name: runId
+        required: true
+        type: string
+      - description: Index of the task
+        in: path
+        name: taskIndex
+        required: true
+        type: string
+      - description: Type of file to return (summary, result, ...)
+        in: path
+        name: resultType
+        required: true
+        type: string
+      - description: Index or name of the result file
+        in: path
+        name: fileId
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Success
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Get task result file
       tags:
       - TestRun
   /api/v1/test_runs:

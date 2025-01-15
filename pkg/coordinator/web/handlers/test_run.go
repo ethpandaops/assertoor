@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -28,28 +29,38 @@ type TestRunPage struct {
 }
 
 type TestRunTask struct {
-	Index            uint64            `json:"index"`
-	ParentIndex      uint64            `json:"parent_index"`
-	GraphLevels      []uint64          `json:"graph_levels"`
-	HasChildren      bool              `json:"has_children"`
-	Name             string            `json:"name"`
-	Title            string            `json:"title"`
-	IsStarted        bool              `json:"started"`
-	IsCompleted      bool              `json:"completed"`
-	StartTime        time.Time         `json:"start_time"`
-	StopTime         time.Time         `json:"stop_time"`
-	Timeout          time.Duration     `json:"timeout"`
-	HasTimeout       bool              `json:"has_timeout"`
-	RunTime          time.Duration     `json:"runtime"`
-	HasRunTime       bool              `json:"has_runtime"`
-	CustomRunTime    time.Duration     `json:"custom_runtime"`
-	HasCustomRunTime bool              `json:"has_custom_runtime"`
-	Status           string            `json:"status"`
-	Result           string            `json:"result"`
-	ResultError      string            `json:"result_error"`
-	Log              []*TestRunTaskLog `json:"log"`
-	ConfigYaml       string            `json:"config_yaml"`
-	ResultYaml       string            `json:"result_yaml"`
+	Index            uint64               `json:"index"`
+	ParentIndex      uint64               `json:"parent_index"`
+	GraphLevels      []uint64             `json:"graph_levels"`
+	HasChildren      bool                 `json:"has_children"`
+	Name             string               `json:"name"`
+	Title            string               `json:"title"`
+	IsStarted        bool                 `json:"started"`
+	IsCompleted      bool                 `json:"completed"`
+	StartTime        time.Time            `json:"start_time"`
+	StopTime         time.Time            `json:"stop_time"`
+	Timeout          time.Duration        `json:"timeout"`
+	HasTimeout       bool                 `json:"has_timeout"`
+	RunTime          time.Duration        `json:"runtime"`
+	HasRunTime       bool                 `json:"has_runtime"`
+	CustomRunTime    time.Duration        `json:"custom_runtime"`
+	HasCustomRunTime bool                 `json:"has_custom_runtime"`
+	Status           string               `json:"status"`
+	Result           string               `json:"result"`
+	ResultError      string               `json:"result_error"`
+	Log              []*TestRunTaskLog    `json:"log"`
+	ConfigYaml       string               `json:"config_yaml"`
+	ResultYaml       string               `json:"result_yaml"`
+	ResultFiles      []*TestRunTaskResult `json:"result_files"`
+	HaveResultFiles  bool                 `json:"have_result_files"`
+}
+
+type TestRunTaskResult struct {
+	Type  string `json:"type"`
+	Index uint64 `json:"index"`
+	Name  string `json:"name"`
+	Size  uint64 `json:"size"`
+	URL   string `json:"url"`
 }
 
 type TestRunTaskLog struct {
@@ -157,6 +168,18 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 		pageData.IsCompleted = true
 	case types.TestStatusSkipped:
 	case types.TestStatusAborted:
+	}
+
+	// get result headers
+	resultHeaderMap := map[uint64][]db.TaskResultHeader{}
+
+	resultHeaders, err := fh.coordinator.Database().GetAllTaskResultHeaders(int(runID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get result headers: %v", err)
+	}
+
+	for _, header := range resultHeaders {
+		resultHeaderMap[uint64(header.TaskID)] = append(resultHeaderMap[uint64(header.TaskID)], header)
 	}
 
 	taskScheduler := test.GetTaskScheduler()
@@ -308,6 +331,26 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 					}
 
 					taskData.ResultYaml = fmt.Sprintf("\n%v%v\n", refComment, string(taskResult))
+				}
+
+				if len(resultHeaderMap[taskData.Index]) > 0 {
+					taskData.ResultFiles = make([]*TestRunTaskResult, len(resultHeaderMap[taskData.Index]))
+					taskData.HaveResultFiles = true
+
+					for i, header := range resultHeaderMap[taskData.Index] {
+						resName := header.Name
+						if resName == "" {
+							resName = fmt.Sprintf("%v-%v", header.Type, header.Index)
+						}
+
+						taskData.ResultFiles[i] = &TestRunTaskResult{
+							Type:  header.Type,
+							Index: uint64(header.Index),
+							Name:  resName,
+							Size:  uint64(header.Size),
+							URL:   fmt.Sprintf("/api/v1/test_run/%v/task/%v/result/%v/%v?view", runID, taskData.Index, header.Type, header.Index),
+						}
+					}
 				}
 			}
 

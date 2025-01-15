@@ -26,6 +26,8 @@ tasks:
         echo "============================"
 
         echo "::set-output path ${tmp_dir}"
+
+        echo "$tmp_dir" > $ASSERTOOR_SUMMARY
   
   - name: run_external_tasks
     title: "Clone and prepare execution spec tests"
