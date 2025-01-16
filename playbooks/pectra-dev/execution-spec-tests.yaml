@@ -35,8 +35,8 @@ tasks:
     config:
       testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
       testConfig:
-        gitRepo: https://github.com/pk910/execution-spec-tests.git
-        gitBranch: pk910/devnet-execution-fixes
+        gitRepo: https://github.com/ethereum/execution-spec-tests.git
+        gitBranch: main
         runTests: false
       testConfigVars:
         specTestsPath: "tasks.tempdir.outputs.path"
@@ -81,8 +81,8 @@ tasks:
           config:
             testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
             testConfig:
-              gitRepo: https://github.com/pk910/execution-spec-tests.git
-              gitBranch: pk910/devnet-execution-fixes
+              gitRepo: https://github.com/ethereum/execution-spec-tests.git
+              gitBranch: main
               testPath: ./tests/prague/eip2537_bls_12_381_precompiles
               seedAmount: "100000000000000000000" # 100 ETH
               extraFlags: "--fork=Prague -n 16"
@@ -100,8 +100,8 @@ tasks:
           config:
             testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
             testConfig:
-              gitRepo: https://github.com/pk910/execution-spec-tests.git
-              gitBranch: pk910/devnet-execution-fixes
+              gitRepo: https://github.com/ethereum/execution-spec-tests.git
+              gitBranch: main
               testPath: ./tests/prague/eip7002_el_triggerable_withdrawals
               seedAmount: "100000000000000000000" # 100 ETH
               extraFlags: "--fork=Prague -n 16"
@@ -119,8 +119,8 @@ tasks:
           config:
             testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
             testConfig:
-              gitRepo: https://github.com/pk910/execution-spec-tests.git
-              gitBranch: pk910/devnet-execution-fixes
+              gitRepo: https://github.com/ethereum/execution-spec-tests.git
+              gitBranch: main
               testPath: ./tests/prague/eip7251_consolidations
               seedAmount: "100000000000000000000" # 100 ETH
               extraFlags: "--fork=Prague -n 16"
@@ -138,8 +138,8 @@ tasks:
           config:
             testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
             testConfig:
-              gitRepo: https://github.com/pk910/execution-spec-tests.git
-              gitBranch: pk910/devnet-execution-fixes
+              gitRepo: https://github.com/ethereum/execution-spec-tests.git
+              gitBranch: main
               testPath: ./tests/prague/eip7623_increase_calldata_cost
               seedAmount: "100000000000000000000" # 100 ETH
               extraFlags: "--fork=Prague -n 16"
@@ -157,8 +157,8 @@ tasks:
           config:
             testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
             testConfig:
-              gitRepo: https://github.com/pk910/execution-spec-tests.git
-              gitBranch: pk910/devnet-execution-fixes
+              gitRepo: https://github.com/ethereum/execution-spec-tests.git
+              gitBranch: main
               testPath: ./tests/prague/eip7702_set_code_tx
               seedAmount: "100000000000000000000" # 100 ETH
               extraFlags: "--fork=Prague -n 16"
