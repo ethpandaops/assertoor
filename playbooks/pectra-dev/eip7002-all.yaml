@@ -769,8 +769,377 @@ tasks:
           configVars:
             expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[5], address: .tasks.wallet_details.outputs.address, minAmount: 50000000}]"
 
-    # Test7:
+    # Test7: Multiple withdrawal requests and exits for keys 6 & 7
+    # keys: 6, 7
+    - name: run_tasks
+      title: "Test7: Multiple withdrawal requests and exits for keys 6 & 7"
+      config:
+        tasks:
 
+        - name: run_tasks_concurrent
+          title: "Prepare keys 6 & 7"
+          config:
+            tasks:
+            - name: run_tasks
+              title: "Prepare key 6 (BLS change, self consolidation, top-up deposit)"
+              config:
+                tasks:
+                # generate BLS changes & wait for inclusion
+                - name: run_task_background
+                  title: "Generate BLS change for key 6 & track inclusion"
+                  timeout: 10m
+                  config:
+                    onBackgroundComplete: failOrIgnore
+                    backgroundTask:
+                      name: generate_bls_changes
+                      title: "Send BLS change for key 6 (0x02 credentials)"
+                      config:
+                        limitTotal: 1
+                        indexCount: 1
+                      configVars:
+                        mnemonic: "validatorMnemonic"
+                        targetAddress: "tasks.wallet_details.outputs.address"
+                        startIndex: "validatorStartIndex + 6"
+                    foregroundTask:
+                      name: check_consensus_block_proposals
+                      title: "Wait for inclusion of BLS change for key 6"
+                      config:
+                        minBlsChangeCount: 1
+                      configVars:
+                        expectBlsChanges: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[6], address: .tasks.wallet_details.outputs.address}]"
+
+                # generate self consolidation for key 6 & wait for inclusion
+                - name: run_task_background
+                  title: "Generate self consolidation for key 6 & track inclusion"
+                  timeout: 10m
+                  config:
+                    onBackgroundComplete: failOrIgnore
+                    backgroundTask:
+                      name: generate_consolidations
+                      title: "Generate 1 self consolidation (key 6)"
+                      config:
+                        limitTotal: 1
+                        sourceIndexCount: 1
+                        awaitReceipt: true
+                        failOnReject: true
+                      configVars:
+                        sourceMnemonic: "validatorMnemonic"
+                        targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[6]"
+                        sourceStartIndex: "validatorStartIndex + 6"
+                        walletPrivkey: "walletPrivkey"
+                    
+                    foregroundTask:
+                      name: check_consensus_block_proposals
+                      title: "Wait for inclusion of self consolidation request for key 6"
+                      config:
+                        minConsolidationRequestCount: 1
+                      configVars:
+                        expectConsolidationRequests: "| [{sourceAddress: .tasks.wallet_details.outputs.address, sourcePubkey: .tasks.validator_pubkeys.outputs.pubkeys[6]}]"
+
+                - name: run_task_background
+                  title: "Generate top-up deposit for key 6 & track inclusion"
+                  timeout: 10m
+                  config:
+                    onBackgroundComplete: failOrIgnore
+                    backgroundTask:
+                      name: generate_deposits
+                      title: "Generate top-up deposit for key 6"
+                      config:
+                        limitTotal: 1
+                        indexCount: 1
+                        depositAmount: 10
+                        awaitReceipt: true
+                        failOnReject: true
+                        topUpDeposit: true
+                      configVars:
+                        publicKey: "tasks.validator_pubkeys.outputs.pubkeys[6]"
+                        walletPrivkey: "walletPrivkey"
+                        depositContract: "depositContract"
+                    foregroundTask:
+                      name: check_consensus_block_proposals
+                      title: "Wait for inclusion of top-up deposit for key 6"
+                      config:
+                        minDepositRequestCount: 1
+                      configVars:
+                        expectDepositRequests: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[6], amount: 10000000000}]"
+            
+            - name: run_tasks
+              title: "Prepare key 7 (BLS change, self consolidation, top-up deposit)"
+              config:
+                tasks:
+                # generate BLS changes & wait for inclusion
+                - name: run_task_background
+                  title: "Generate BLS change for key 7 & track inclusion"
+                  timeout: 10m
+                  config:
+                    onBackgroundComplete: failOrIgnore
+                    backgroundTask:
+                      name: generate_bls_changes
+                      title: "Send BLS change for key 7 (0x02 credentials)"
+                      config:
+                        limitTotal: 1
+                        indexCount: 1
+                      configVars:
+                        mnemonic: "validatorMnemonic"
+                        targetAddress: "tasks.wallet_details.outputs.address"
+                        startIndex: "validatorStartIndex + 7"
+                    foregroundTask:
+                      name: check_consensus_block_proposals
+                      title: "Wait for inclusion of BLS change for key 7"
+                      config:
+                        minBlsChangeCount: 1
+                      configVars:
+                        expectBlsChanges: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[7], address: .tasks.wallet_details.outputs.address}]"
+
+                # generate self consolidation for key 7 & wait for inclusion
+                - name: run_task_background
+                  title: "Generate self consolidation for key 7 & track inclusion"
+                  timeout: 10m
+                  config:
+                    onBackgroundComplete: failOrIgnore
+                    backgroundTask:
+                      name: generate_consolidations
+                      title: "Generate 1 self consolidation (key 7)"
+                      config:
+                        limitTotal: 1
+                        sourceIndexCount: 1
+                        awaitReceipt: true
+                        failOnReject: true
+                      configVars:
+                        sourceMnemonic: "validatorMnemonic"
+                        targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[7]"
+                        sourceStartIndex: "validatorStartIndex + 7"
+                        walletPrivkey: "walletPrivkey"
+                    
+                    foregroundTask:
+                      name: check_consensus_block_proposals
+                      title: "Wait for inclusion of self consolidation request for key 7"
+                      config:
+                        minConsolidationRequestCount: 1
+                      configVars:
+                        expectConsolidationRequests: "| [{sourceAddress: .tasks.wallet_details.outputs.address, sourcePubkey: .tasks.validator_pubkeys.outputs.pubkeys[7]}]"
+
+                - name: run_task_background
+                  title: "Generate top-up deposit for key 7 & track inclusion"
+                  timeout: 10m
+                  config:
+                    onBackgroundComplete: failOrIgnore
+                    backgroundTask:
+                      name: generate_deposits
+                      title: "Generate top-up deposit for key 7"
+                      config:
+                        limitTotal: 1
+                        indexCount: 1
+                        depositAmount: 10
+                        awaitReceipt: true
+                        failOnReject: true
+                        topUpDeposit: true
+                      configVars:
+                        publicKey: "tasks.validator_pubkeys.outputs.pubkeys[7]"
+                        walletPrivkey: "walletPrivkey"
+                        depositContract: "depositContract"
+                    foregroundTask:
+                      name: check_consensus_block_proposals
+                      title: "Wait for inclusion of top-up deposit for key 7"
+                      config:
+                        minDepositRequestCount: 1
+                      configVars:
+                        expectDepositRequests: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[7], amount: 10000000000}]"
+        
+        # wait for topup deposit to be processed
+        - name: check_consensus_validator_status
+          title: "Wait for key 6 balance to increase > 41 ETH"
+          id: key6_status
+          timeout: 4h
+          config:
+            validatorStatus:
+            - active_ongoing
+            minValidatorBalance: 41000000000
+            withdrawalCredsPrefix: "0x02"
+          configVars:
+            validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[6]"
+
+        - name: check_consensus_validator_status
+          title: "Wait for key 7 balance to increase > 41 ETH"
+          id: key7_status
+          timeout: 4h
+          config:
+            validatorStatus:
+            - active_ongoing
+            minValidatorBalance: 41000000000
+            withdrawalCredsPrefix: "0x02"
+          configVars:
+            validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[7]"
+
+        # generate multiple withdrawal requests for key 6 & 7 for the same slot
+        - name: run_tasks_concurrent
+          title: "Generate multiple withdrawal requests for key 6 & 7 for the same slot"
+          config:
+            tasks:
+            - name: run_task_background
+              title: "Generate EL triggered partial withdrawal #1 for key 6 & track inclusion"
+              timeout: 10m
+              config:
+                onBackgroundComplete: failOrIgnore
+                backgroundTask:
+                  name: generate_withdrawal_requests
+                  title: "Send EL triggered withdrawal transaction for key 6"
+                  config:
+                    limitTotal: 1
+                    withdrawAmount: 1000000000 # 1 ETH
+                    awaitReceipt: true
+                    failOnReject: true
+                  configVars:
+                    sourcePubkey: "tasks.validator_pubkeys.outputs.pubkeys[6]"
+                    walletPrivkey: "walletPrivkey"
+                foregroundTask:
+                  name: check_consensus_block_proposals
+                  title: "Wait for inclusion of EL triggered withdrawal request for key 6"
+                  config:
+                    minWithdrawalRequestCount: 1
+                  configVars:
+                    expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[6], sourceAddress: .tasks.wallet_details.outputs.address, amount: 1000000000}]"
+            - name: run_task_background
+              title: "Generate EL triggered partial withdrawal #2 for key 6 & track inclusion"
+              timeout: 10m
+              config:
+                onBackgroundComplete: failOrIgnore
+                backgroundTask:
+                  name: generate_withdrawal_requests
+                  title: "Send EL triggered withdrawal transaction for key 6"
+                  config:
+                    limitTotal: 1
+                    withdrawAmount: 1100000000 # 1 ETH
+                    awaitReceipt: true
+                    failOnReject: true
+                  configVars:
+                    sourcePubkey: "tasks.validator_pubkeys.outputs.pubkeys[6]"
+                    walletPrivkey: "walletPrivkey"
+                foregroundTask:
+                  name: check_consensus_block_proposals
+                  title: "Wait for inclusion of EL triggered withdrawal request for key 6"
+                  config:
+                    minWithdrawalRequestCount: 1
+                  configVars:
+                    expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[6], sourceAddress: .tasks.wallet_details.outputs.address, amount: 1100000000}]"
+            - name: run_task_background
+              title: "Generate EL triggered partial withdrawal #1 for key 7 & track inclusion"
+              timeout: 10m
+              config:
+                onBackgroundComplete: failOrIgnore
+                backgroundTask:
+                  name: generate_withdrawal_requests
+                  title: "Send EL triggered withdrawal transaction for key 7"
+                  config:
+                    limitTotal: 1
+                    withdrawAmount: 1000000000 # 1 ETH
+                    awaitReceipt: true
+                    failOnReject: true
+                  configVars:
+                    sourcePubkey: "tasks.validator_pubkeys.outputs.pubkeys[7]"
+                    walletPrivkey: "walletPrivkey"
+                foregroundTask:
+                  name: check_consensus_block_proposals
+                  title: "Wait for inclusion of EL triggered withdrawal request for key 7"
+                  config:
+                    minWithdrawalRequestCount: 1
+                  configVars:
+                    expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[7], sourceAddress: .tasks.wallet_details.outputs.address, amount: 1000000000}]"
+            - name: run_task_background
+              title: "Generate EL triggered partial withdrawal #2 for key 7 & track inclusion"
+              timeout: 10m
+              config:
+                onBackgroundComplete: failOrIgnore
+                backgroundTask:
+                  name: generate_withdrawal_requests
+                  title: "Send EL triggered withdrawal transaction for key 7"
+                  config:
+                    limitTotal: 1
+                    withdrawAmount: 1100000000 # 1 ETH
+                    awaitReceipt: true
+                    failOnReject: true
+                  configVars:
+                    sourcePubkey: "tasks.validator_pubkeys.outputs.pubkeys[7]"
+                    walletPrivkey: "walletPrivkey"
+                foregroundTask:
+                  name: check_consensus_block_proposals
+                  title: "Wait for inclusion of EL triggered withdrawal request for key 7"
+                  config:
+                    minWithdrawalRequestCount: 1
+                  configVars:
+                    expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[7], sourceAddress: .tasks.wallet_details.outputs.address, amount: 1100000000}]"
+
+
+        # send exit request for key 6
+        - name: run_task_background
+          title: "Generate EL triggered exit for key 6 & track inclusion"
+          timeout: 10m
+          config:
+            onBackgroundComplete: failOrIgnore
+            backgroundTask:
+              name: generate_withdrawal_requests
+              title: "Send EL triggered exit transaction for key 6"
+              config:
+                limitTotal: 1
+                withdrawAmount: 0 # 0 ETH - exit
+                awaitReceipt: true
+                failOnReject: true
+              configVars:
+                sourcePubkey: "tasks.validator_pubkeys.outputs.pubkeys[6]"
+                walletPrivkey: "walletPrivkey"
+            foregroundTask:
+              name: check_consensus_block_proposals
+              title: "Wait for inclusion of EL triggered exit request for key 6"
+              config:
+                minWithdrawalRequestCount: 1
+              configVars:
+                expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[6], sourceAddress: .tasks.wallet_details.outputs.address, amount: 0}]"
+        
+        # send voluntary exit for key 7
+        - name: run_task_background
+          title: "Generate voluntary exit for key 7 & track inclusion"
+          timeout: 10m
+          config:
+            onBackgroundComplete: failOrIgnore
+            backgroundTask:
+              name: generate_exits
+              title: "Send voluntary exit transaction for key 7"
+              config:
+                limitTotal: 1
+                indexCount: 1
+              configVars:
+                mnemonic: "validatorMnemonic"
+                startIndex: "validatorStartIndex + 7"
+            foregroundTask:
+              name: check_consensus_block_proposals
+              title: "Wait for inclusion of voluntary exit request for key 7"
+              config:
+                minExitCount: 1
+              configVars:
+                expectExits: "| [.tasks.validator_pubkeys.outputs.pubkeys[7]]"
+
+        # wait for withdrawal for key 6 & exit for key 7
+        - name: run_tasks_concurrent
+          title: "Wait for withdrawal for key 6 & exit for key 7"
+          config:
+            tasks:
+            - name: check_consensus_block_proposals
+              title: "Check withdrawal for key 6 (expect 1-1.1 ETH)"
+              timeout: 2h
+              config:
+                minWithdrawalCount: 1
+              configVars:
+                expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[6], address: .tasks.wallet_details.outputs.address, minAmount: 1000000000, maxAmount: 1100000000}]"
+            - name: check_consensus_validator_status
+              title: "Wait for key 7 to exit"
+              timeout: 1h
+              config:
+                validatorStatus:
+                - active_exiting
+                - exited_unslashed
+              configVars:
+                validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[7]"
+    
     # Test8:
 
     # Test9:

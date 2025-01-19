@@ -95,6 +95,29 @@ tasks:
         sourceValidatorIndex: 21
         targetValidatorIndex: 25
 
+  # run long-running test
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= 64"
+    timeout: 2h
+    config:
+      minSlotNumber: 64
+  - name: run_external_tasks
+    title: "Run EIP7002-all test"
+    timeout: 4h
+    config:
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/eip7002-all.yaml
+      testConfig:
+        useExistingValidators: true
+        validatorStartIndex: 30
+  - name: run_external_tasks
+    title: "Run EIP7251-all test"
+    timeout: 4h
+    config:
+      testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/eip7251-all.yaml
+      testConfig:
+        useExistingValidators: true
+        validatorStartIndex: 60
+
   # Final check
   - name: run_external_tasks
     title: "Final check"

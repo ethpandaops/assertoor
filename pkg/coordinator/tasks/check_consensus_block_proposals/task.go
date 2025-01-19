@@ -719,6 +719,7 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 				expectedWithdrawalCreds = common.FromHex(expectedDepositRequest.WithdrawalCredentials)
 			}
 
+		requestLoop:
 			for _, depositRequest := range depositRequests {
 				if expectedDepositRequest.PublicKey == "" || depositRequest.Pubkey.String() == expectedDepositRequest.PublicKey {
 					depositAmount := big.NewInt(int64(depositRequest.Amount))
@@ -730,9 +731,8 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 						t.logger.Warnf("check failed: deposit request found, but amount does not match (have: %v, want: %v)", depositAmount, expectedDepositRequest.Amount.String())
 					default:
 						found = true
+						break requestLoop
 					}
-
-					break
 				}
 			}
 
@@ -773,6 +773,7 @@ func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *s
 				expectedPubKey = common.FromHex(expectedWithdrawalRequest.ValidatorPubkey)
 			}
 
+		requestLoop:
 			for _, withdrawalRequest := range withdrawalRequests {
 				if expectedWithdrawalRequest.ValidatorPubkey == "" || bytes.Equal(withdrawalRequest.ValidatorPubkey[:], expectedPubKey) {
 					withdrawalAmount := big.NewInt(int64(withdrawalRequest.Amount))
@@ -784,9 +785,8 @@ func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *s
 						t.logger.Warnf("check failed: deposit request found, but amount does not match (have: %v, want: %v)", withdrawalAmount, expectedWithdrawalRequest.Amount.String())
 					default:
 						found = true
+						break requestLoop
 					}
-
-					break
 				}
 			}
 
@@ -831,6 +831,7 @@ func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData
 				expectedTgtPubKey = common.FromHex(expectedConsolidationRequest.TargetPubkey)
 			}
 
+		requestLoop:
 			for _, consolidationRequest := range consolidationRequests {
 				if expectedConsolidationRequest.SourcePubkey == "" || bytes.Equal(consolidationRequest.SourcePubkey[:], expectedSrcPubKey) {
 					switch {
@@ -841,9 +842,8 @@ func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData
 
 					default:
 						found = true
+						break requestLoop
 					}
-
-					break
 				}
 			}
 
