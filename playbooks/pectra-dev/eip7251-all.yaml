@@ -1026,7 +1026,7 @@ tasks:
         # check if key 13 is exited
         - name: check_consensus_validator_status
           title: "Check if key 13 is exited"
-          timeout: 5m
+          timeout: 4h
           config:
             validatorStatus:
             - exited_unslashed

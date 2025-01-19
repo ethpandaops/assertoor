@@ -615,6 +615,27 @@ tasks:
           configVars:
             expectConsolidationRequests: "| [{sourceAddress: .tasks.depositor_wallet.outputs.childWallet.address, sourcePubkey: .tasks.all_pubkeys.outputs.pubkeys[5]}]"
 
+    # wait for exitability
+    - name: run_tasks
+      title: "Wait for validators to be exitable (${{ tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD }} epochs)"
+      config:
+        stopChildOnResult: true
+        tasks:
+        - name: check_consensus_validator_status
+          title: "Get validator info for last key"
+          id: last_validator_info
+          timeout: 1m
+          config:
+            validatorStatus:
+            - active_ongoing
+          configVars:
+            validatorPubKey: "tasks.all_pubkeys.outputs.pubkeys[-1]"
+        - name: check_consensus_slot_range
+          title: "Wait for validators to be exitable (epoch >= ${{ |(.tasks.last_validator_info.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber) }})"
+          timeout: 28h  # 256 epochs = ~27.3h
+          configVars:
+            minEpochNumber: "|(.tasks.last_validator_info.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber)"
+
     - name: run_task_background
       title: "Generate consolidations & track inclusion"
       config:
@@ -796,19 +817,6 @@ tasks:
 # index 7: active  48 ETH (48 ETH EB), 0x02 withdrawal creds
 # index 8: active  64 ETH (64 ETH EB), 0x02 withdrawal creds
 # index 9: active  64 ETH (64 ETH EB), 0x02 withdrawal creds
-
-# wait for withdrawability
-- name: run_tasks
-  title: "Wait for validators to be withdrawable (${{ tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD }} epochs)"
-  config:
-    stopChildOnResult: true
-    tasks:
-    - name: check_consensus_slot_range
-      title: "Wait for validators to be withdrawable (epoch >= ${{ |(.tasks.validator_info_7.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber) }})"
-      timeout: 28h  # 256 epochs = ~27.3h
-      configVars:
-        minEpochNumber: "|(.tasks.validator_info_7.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber)"
-
 
 ##
 ## STEP 4: generate el triggered withdrawals & wait for inclusion
