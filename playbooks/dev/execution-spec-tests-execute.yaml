@@ -63,6 +63,7 @@ tasks:
 
         cd $SPEC_TESTS_PATH
         export HOME=$SPEC_TESTS_PATH
+        export PATH=$PATH:$HOME/.local/bin
 
         echo "============================"
         echo "Installing dependencies"
@@ -140,6 +141,7 @@ tasks:
         # Create dir for temp files
         cd $SPEC_TESTS_PATH
         export HOME=$SPEC_TESTS_PATH
+        export PATH=$PATH:$HOME/.local/bin
 
         if [ "$CLEANUP_TESTS_PATH" == "true" ]; then
           function cleanup {
