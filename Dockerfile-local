@@ -19,8 +19,17 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
   make \
   sudo \
   && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /src/bin/assertoor /assertoor
+  && rm -rf /var/lib/apt/lists/* \
+  && update-ca-certificates
+ARG userid=10001
+ARG groupid=10001
+RUN groupadd -g ${groupid} assertoor && useradd -m -u ${userid} -g assertoor assertoor
+RUN echo "assertoor ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/assertoor
+WORKDIR /app
+COPY --from=builder /src/bin/* /app/
+RUN chown -R assertoor:assertoor /app/*
 RUN mkdir /workspace
+USER assertoor
 WORKDIR /workspace
-ENTRYPOINT ["/assertoor"]
+EXPOSE 8080
+ENTRYPOINT ["/app/assertoor"]
