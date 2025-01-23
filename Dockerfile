@@ -22,7 +22,7 @@ RUN groupadd -g 10001 assertoor && useradd -m -u 10001 -g assertoor assertoor
 RUN echo "assertoor ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/assertoor
 WORKDIR /app
 COPY --from=builder /src/bin/* /app/
-RUN chown -R assertoor:assertoor /app/*
+RUN chown -R assertoor:assertoor /app
 USER assertoor
 ENTRYPOINT ["/app/assertoor"]
 
