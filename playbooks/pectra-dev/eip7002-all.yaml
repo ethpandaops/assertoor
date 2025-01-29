@@ -1096,12 +1096,11 @@ tasks:
                 expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[6], sourceAddress: .tasks.wallet_details.outputs.address, amount: 0}]"
         
         # send voluntary exit for key 7
-        - name: run_task_background
-          title: "Generate voluntary exit for key 7 & track inclusion"
-          timeout: 10m
+        - name: run_task_options
+          title: "Expect failure for voluntary exit for key 7"
           config:
-            onBackgroundComplete: failOrIgnore
-            backgroundTask:
+            expectFailure: true
+            task:
               name: generate_exits
               title: "Send voluntary exit transaction for key 7"
               config:
@@ -1110,35 +1109,40 @@ tasks:
               configVars:
                 mnemonic: "validatorMnemonic"
                 startIndex: "validatorStartIndex + 7"
-            foregroundTask:
-              name: check_consensus_block_proposals
-              title: "Wait for inclusion of voluntary exit request for key 7"
-              config:
-                minExitCount: 1
-              configVars:
-                expectExits: "| [.tasks.validator_pubkeys.outputs.pubkeys[7]]"
 
-        # wait for withdrawal for key 6 & exit for key 7
+        # wait for withdrawal for key 6 & 7
         - name: run_tasks_concurrent
-          title: "Wait for withdrawal for key 6 & exit for key 7"
+          title: "Wait for all withdrawals for key 6 & 7"
           config:
             tasks:
             - name: check_consensus_block_proposals
-              title: "Check withdrawal for key 6 (expect 1-1.1 ETH)"
+              title: "Check withdrawal for key 6 (expect 1 ETH)"
               timeout: 2h
               config:
                 minWithdrawalCount: 1
               configVars:
-                expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[6], address: .tasks.wallet_details.outputs.address, minAmount: 1000000000, maxAmount: 1100000000}]"
-            - name: check_consensus_validator_status
-              title: "Wait for key 7 to exit"
-              timeout: 1h
+                expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[6], address: .tasks.wallet_details.outputs.address, minAmount: 1000000000, maxAmount: 1000000000}]"
+            - name: check_consensus_block_proposals
+              title: "Check withdrawal for key 6 (expect 1.1 ETH)"
+              timeout: 2h
               config:
-                validatorStatus:
-                - active_exiting
-                - exited_unslashed
+                minWithdrawalCount: 1
               configVars:
-                validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[7]"
+                expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[6], address: .tasks.wallet_details.outputs.address, minAmount: 1100000000, maxAmount: 1100000000}]"
+            - name: check_consensus_block_proposals
+              title: "Check withdrawal for key 7 (expect 1 ETH)"
+              timeout: 2h
+              config:
+                minWithdrawalCount: 1
+              configVars:
+                expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[7], address: .tasks.wallet_details.outputs.address, minAmount: 1000000000, maxAmount: 1000000000}]"
+            - name: check_consensus_block_proposals
+              title: "Check withdrawal for key 7 (expect 1.1 ETH)"
+              timeout: 2h
+              config:
+                minWithdrawalCount: 1
+              configVars:
+                expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[7], address: .tasks.wallet_details.outputs.address, minAmount: 1100000000, maxAmount: 1100000000}]"
     
     # Test8:
 
