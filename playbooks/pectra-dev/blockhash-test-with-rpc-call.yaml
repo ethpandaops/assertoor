@@ -35,7 +35,7 @@ tasks:
     title: "Check EIP-2935 contract result"
     timeout: 5m
     config:
-      callAddress: "0x0aae40965e6800cd9b1f4b05ff21581047e3f91e"
+      callAddress: "0x0000F90827F1C53a10cb7A02335B175320002935"
       ignoreResults:
         - "0x0000000000000000000000000000000000000000000000000000000000000000"
       failOnMismatch: true
