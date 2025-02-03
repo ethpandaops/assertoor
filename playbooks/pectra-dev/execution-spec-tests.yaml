@@ -4,6 +4,7 @@ timeout: 4h
 config:
   #walletPrivkey: ""
   walletSeed: "spectests"
+  specTestsBranch: "main"
 tasks:
   # setup dependencies
   - name: run_external_tasks
@@ -36,10 +37,10 @@ tasks:
       testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
       testConfig:
         gitRepo: https://github.com/ethereum/execution-spec-tests.git
-        gitBranch: main
         runTests: false
       testConfigVars:
         specTestsPath: "tasks.tempdir.outputs.path"
+        gitBranch: "specTestsBranch"
 
   - name: check_clients_are_healthy
     title: "Check if at least one client is ready"
@@ -74,6 +75,7 @@ tasks:
     id: tests
     config:
       failTaskCount: 0
+      failOnUndecided: true
       tasks:
         - name: run_external_tasks
           title: "Run execution spec tests: tests/prague/eip2537_bls_12_381_precompiles"
@@ -82,7 +84,6 @@ tasks:
             testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
             testConfig:
               gitRepo: https://github.com/ethereum/execution-spec-tests.git
-              gitBranch: main
               testPath: ./tests/prague/eip2537_bls_12_381_precompiles
               seedAmount: "100000000000000000000" # 100 ETH
               extraFlags: "--fork=Prague -n 16"
@@ -93,6 +94,7 @@ tasks:
               chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
               seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
               specTestsPath: "tasks.tempdir.outputs.path"
+              gitBranch: "specTestsBranch"
         
         - name: run_external_tasks
           title: "Run execution spec tests: tests/prague/eip7002_el_triggerable_withdrawals"
@@ -101,7 +103,6 @@ tasks:
             testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
             testConfig:
               gitRepo: https://github.com/ethereum/execution-spec-tests.git
-              gitBranch: main
               testPath: ./tests/prague/eip7002_el_triggerable_withdrawals
               seedAmount: "100000000000000000000" # 100 ETH
               extraFlags: "--fork=Prague -n 16"
@@ -112,6 +113,7 @@ tasks:
               chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
               seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
               specTestsPath: "tasks.tempdir.outputs.path"
+              gitBranch: "specTestsBranch"
         
         - name: run_external_tasks
           title: "Run execution spec tests: tests/prague/eip7251_consolidations"
@@ -120,7 +122,6 @@ tasks:
             testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
             testConfig:
               gitRepo: https://github.com/ethereum/execution-spec-tests.git
-              gitBranch: main
               testPath: ./tests/prague/eip7251_consolidations
               seedAmount: "100000000000000000000" # 100 ETH
               extraFlags: "--fork=Prague -n 16"
@@ -131,6 +132,7 @@ tasks:
               chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
               seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
               specTestsPath: "tasks.tempdir.outputs.path"
+              gitBranch: "specTestsBranch"
         
         - name: run_external_tasks
           title: "Run execution spec tests: tests/prague/eip7623_increase_calldata_cost"
@@ -139,7 +141,6 @@ tasks:
             testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
             testConfig:
               gitRepo: https://github.com/ethereum/execution-spec-tests.git
-              gitBranch: main
               testPath: ./tests/prague/eip7623_increase_calldata_cost
               seedAmount: "100000000000000000000" # 100 ETH
               extraFlags: "--fork=Prague -n 16"
@@ -150,6 +151,7 @@ tasks:
               chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
               seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
               specTestsPath: "tasks.tempdir.outputs.path"
+              gitBranch: "specTestsBranch"
         
         - name: run_external_tasks
           title: "Run execution spec tests: tests/prague/eip7702_set_code_tx"
@@ -158,7 +160,6 @@ tasks:
             testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/master/playbooks/dev/execution-spec-tests-execute.yaml
             testConfig:
               gitRepo: https://github.com/ethereum/execution-spec-tests.git
-              gitBranch: main
               testPath: ./tests/prague/eip7702_set_code_tx
               seedAmount: "100000000000000000000" # 100 ETH
               extraFlags: "--fork=Prague -n 16"
@@ -169,6 +170,7 @@ tasks:
               chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
               seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
               specTestsPath: "tasks.tempdir.outputs.path"
+              gitBranch: "specTestsBranch"
 
 cleanupTasks:
   - name: run_shell
