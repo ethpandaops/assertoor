@@ -229,7 +229,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			if !taskComplete {
 				taskComplete = true
 
-				if t.config.FailOnUndecided {
+				if t.config.FailOnUndecided && len(t.tasks) > 0 {
 					t.ctx.SetResult(types.TaskResultFailure)
 				} else {
 					t.ctx.SetResult(types.TaskResultSuccess)
