@@ -1123,26 +1123,12 @@ tasks:
               configVars:
                 expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[6], address: .tasks.wallet_details.outputs.address, minAmount: 1000000000, maxAmount: 1000000000}]"
             - name: check_consensus_block_proposals
-              title: "Check withdrawal for key 6 (expect 1.1 ETH)"
-              timeout: 2h
-              config:
-                minWithdrawalCount: 1
-              configVars:
-                expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[6], address: .tasks.wallet_details.outputs.address, minAmount: 1100000000, maxAmount: 1100000000}]"
-            - name: check_consensus_block_proposals
               title: "Check withdrawal for key 7 (expect 1 ETH)"
               timeout: 2h
               config:
                 minWithdrawalCount: 1
               configVars:
                 expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[7], address: .tasks.wallet_details.outputs.address, minAmount: 1000000000, maxAmount: 1000000000}]"
-            - name: check_consensus_block_proposals
-              title: "Check withdrawal for key 7 (expect 1.1 ETH)"
-              timeout: 2h
-              config:
-                minWithdrawalCount: 1
-              configVars:
-                expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[7], address: .tasks.wallet_details.outputs.address, minAmount: 1100000000, maxAmount: 1100000000}]"
     
     # Test8:
 

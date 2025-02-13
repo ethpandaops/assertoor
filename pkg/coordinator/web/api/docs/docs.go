@@ -315,8 +315,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Index of the task",
-                        "name": "taskIndex",
+                        "description": "ID of the task",
+                        "name": "taskId",
                         "in": "path",
                         "required": true
                     },

@@ -541,9 +541,9 @@ paths:
         name: runId
         required: true
         type: string
-      - description: Index of the task
+      - description: ID of the task
         in: path
-        name: taskIndex
+        name: taskId
         required: true
         type: string
       - description: Type of file to return (summary, result, ...)
