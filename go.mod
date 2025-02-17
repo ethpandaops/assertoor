@@ -10,7 +10,7 @@ require (
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/gorilla/mux v1.8.1
-	github.com/herumi/bls-eth-go-binary v1.36.1
+	github.com/herumi/bls-eth-go-binary v1.36.2
 	github.com/holiman/uint256 v1.3.2
 	github.com/itchyny/gojq v0.12.17
 	github.com/jmoiron/sqlx v1.4.0
@@ -24,7 +24,7 @@ require (
 	github.com/prysmaticlabs/go-bitfield v0.0.0-20240618144021-706c95b2dd15
 	github.com/rs/zerolog v1.33.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/cobra v1.8.1
+	github.com/spf13/cobra v1.9.1
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/swaggo/swag v1.16.4
 	github.com/tdewolff/minify v2.3.6+incompatible
@@ -90,7 +90,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/supranational/blst v0.3.13 // indirect
 	github.com/swaggo/files v1.0.1 // indirect
 	github.com/tdewolff/parse v2.3.4+incompatible // indirect
