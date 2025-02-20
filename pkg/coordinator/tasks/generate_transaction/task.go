@@ -370,7 +370,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 
 			for idx, authorization := range t.config.Authorizations {
 				authEntry := ethtypes.SetCodeAuthorization{
-					ChainID: authorization.ChainID,
+					ChainID: *uint256.NewInt(authorization.ChainID),
 					Address: common.HexToAddress(authorization.CodeAddress),
 				}
 
@@ -391,7 +391,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 			}
 
 			txObj = &ethtypes.SetCodeTx{
-				ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID().Uint64(),
+				ChainID:   uint256.MustFromBig(t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID()),
 				Nonce:     nonce,
 				GasTipCap: uint256.MustFromBig(&t.config.TipCap.Value),
 				GasFeeCap: uint256.MustFromBig(&t.config.FeeCap.Value),
