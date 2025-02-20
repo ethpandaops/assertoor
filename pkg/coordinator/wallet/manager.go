@@ -142,8 +142,9 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 
 		if tx.Type() == ethtypes.SetCodeTxType {
 			// in eip7702 transactions, the nonces of all authorities are increased by >= 1, so we need to resync all affected wallets
-			for _, authorization := range tx.SetCodeAuthorizations() {
-				authority, err := authorization.Authority()
+			authorizations := tx.SetCodeAuthorizations()
+			for i := 0; i < len(authorizations); i++ {
+				authority, err := authorizations[i].Authority()
 				if err != nil {
 					manager.logger.Warnf("error decoding authority address (block %v, tx %v): %v", block.Number, idx, err)
 					continue
