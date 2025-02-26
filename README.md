@@ -31,18 +31,18 @@ Assertoor is a robust and versatile tool designed for comprehensive testing of t
 - **Web API**:\
   An API interface provides real-time test and task status, logs, and results for easy programmatic access. \
   This feature enables simple integration with other systems and facilitates automated monitoring and analysis workflows.\
-  eg. for running [scheduled tests with github workflows](https://github.com/ethpandaops/assertoor-test)
+  eg. for running [scheduled tests with github workflows](https://github.com/noku-team/assertoor-test)
 
 ## Getting Started
 
 1. **Clone the repository & build the tool**:
     ```
-    git clone https://github.com/ethpandaops/assertoor.git
+    git clone https://github.com/noku-team/assertoor.git
     cd assertoor
     make build
     ```
 2. **Configure Your Tests**:\
-   Prepare tests in a YAML file. See example configurations [here](https://github.com/ethpandaops/assertoor/tree/master/example/config). \
+   Prepare tests in a YAML file. See example configurations [here](https://github.com/noku-team/assertoor/tree/master/example/config). \
   Provide RPC URLs for at least one Client Pair (consensus & execution).
 3. **Run Assertoor**:\
    Launch the tool to execute defined tests.
@@ -54,8 +54,8 @@ Assertoor is a robust and versatile tool designed for comprehensive testing of t
 
 ## Documentation and Examples
 
-Refer to our [documentation](https://github.com/ethpandaops/assertoor/wiki) for installation, configuration, and usage guidelines. \
-Example tests are available [here](https://github.com/ethpandaops/assertoor/tree/master/example/tests).
+Refer to our [documentation](https://github.com/noku-team/assertoor/wiki) for installation, configuration, and usage guidelines. \
+Example tests are available [here](https://github.com/noku-team/assertoor/tree/master/example/tests).
 
 ## Contributing
 

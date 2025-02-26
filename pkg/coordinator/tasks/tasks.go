@@ -38,6 +38,7 @@ import (
 	runtaskoptions "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_task_options"
 	runtasks "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_tasks"
 	runtasksconcurrent "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/run_tasks_concurrent"
+	txpoolcheck "github.com/noku-team/assertoor/pkg/coordinator/tasks/tx_pool_check"
 	sleep "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/sleep"
 )
 

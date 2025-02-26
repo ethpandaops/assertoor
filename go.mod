@@ -1,4 +1,4 @@
-module github.com/ethpandaops/assertoor
+module github.com/noku-team/assertoor
 
 go 1.22.0
 

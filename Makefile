@@ -1,7 +1,7 @@
 # assertoor
 VERSION := $(shell git rev-parse --short HEAD)
-GOLDFLAGS += -X 'github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.BuildVersion="$(VERSION)"'
-GOLDFLAGS += -X 'github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.BuildRelease="$(RELEASE)"'
+GOLDFLAGS += -X 'github.com/noku-team/assertoor/pkg/coordinator/buildinfo.BuildVersion="$(VERSION)"'
+GOLDFLAGS += -X 'github.com/noku-team/assertoor/pkg/coordinator/buildinfo.BuildRelease="$(RELEASE)"'
 CURRENT_UID := $(shell id -u)
 CURRENT_GID := $(shell id -g)
 
