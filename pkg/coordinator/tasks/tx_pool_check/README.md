@@ -6,6 +6,9 @@ The `tx_pool_check` task evaluates the throughput and latency of transaction pro
 
 ### Configuration Parameters
 
+- **`privateKey`**:
+  The private key of the account to use for sending transactions.
+
 - **`txCount`**:
   The total number of transactions to send.
 
@@ -37,10 +40,12 @@ The `tx_pool_check` task evaluates the throughput and latency of transaction pro
 ```yaml
 - name: tx_pool_check
   config:
-    txCount: 1000
-    measureInterval: 100
+    txCount: 15000
+    measureInterval: 1000
     expectedLatency: 500
     failOnHighLatency: false
     clientPattern: ""
     excludeClientPattern: ""
+  configVars:
+    privateKey: "walletPrivkey"
 ```
