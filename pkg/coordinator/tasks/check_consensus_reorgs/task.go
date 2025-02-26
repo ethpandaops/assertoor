@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 

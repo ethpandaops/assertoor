@@ -4,7 +4,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
+	"github.com/noku-team/assertoor/pkg/coordinator/db"
 	"github.com/sirupsen/logrus"
 )
 

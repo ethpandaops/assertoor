@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/sirupsen/logrus"
 )
 

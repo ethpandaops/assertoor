@@ -1,6 +1,6 @@
 package handlers
 
-import "github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
+import "github.com/noku-team/assertoor/pkg/coordinator/buildinfo"
 
 type SidebarData struct {
 	ClientCount      uint64         `json:"client_count"`

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/itchyny/gojq"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"gopkg.in/yaml.v3"
 )
 

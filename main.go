@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ethpandaops/assertoor/cmd"
+	"github.com/noku-team/assertoor/cmd"
 )
 
 func main() {

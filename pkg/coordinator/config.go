@@ -3,12 +3,12 @@ package coordinator
 import (
 	"os"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/helper"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/names"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	web_types "github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients"
+	"github.com/noku-team/assertoor/pkg/coordinator/db"
+	"github.com/noku-team/assertoor/pkg/coordinator/helper"
+	"github.com/noku-team/assertoor/pkg/coordinator/names"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	web_types "github.com/noku-team/assertoor/pkg/coordinator/web/types"
 	"gopkg.in/yaml.v3"
 )
 

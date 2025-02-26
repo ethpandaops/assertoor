@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
 	util "github.com/wealdtech/go-eth2-util"

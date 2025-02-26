@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/gorilla/mux"
+	"github.com/noku-team/assertoor/pkg/coordinator/db"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )

@@ -1,6 +1,6 @@
 package logger
 
-import "github.com/ethpandaops/assertoor/pkg/coordinator/db"
+import "github.com/noku-team/assertoor/pkg/coordinator/db"
 
 type LogReader interface {
 	GetLogEntries(from, limit int) []*db.TaskLog

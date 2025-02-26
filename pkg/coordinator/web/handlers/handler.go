@@ -11,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web/static"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web/templates"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web/utils"
+	"github.com/noku-team/assertoor/pkg/coordinator/buildinfo"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/web/static"
+	"github.com/noku-team/assertoor/pkg/coordinator/web/templates"
+	"github.com/noku-team/assertoor/pkg/coordinator/web/utils"
 	"github.com/sirupsen/logrus"
 )
 

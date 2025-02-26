@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/jmoiron/sqlx"
+	"github.com/noku-team/assertoor/pkg/coordinator/db"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 

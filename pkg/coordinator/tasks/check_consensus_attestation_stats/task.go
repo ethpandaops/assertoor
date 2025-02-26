@@ -8,8 +8,8 @@ import (
 
 	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/prysmaticlabs/go-bitfield"
 	"github.com/sirupsen/logrus"
 )

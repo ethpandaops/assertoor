@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 

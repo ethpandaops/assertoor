@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/test"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/gorhill/cronexpr"
+	"github.com/noku-team/assertoor/pkg/coordinator/test"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 )
 
 type TestRunner struct {

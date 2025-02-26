@@ -7,17 +7,17 @@ import (
 	"net/http"
 	"strings"
 
-	coordinator_types "github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web/api"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web/handlers"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web/types"
 	"github.com/gorilla/mux"
+	coordinator_types "github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/web/api"
+	"github.com/noku-team/assertoor/pkg/coordinator/web/handlers"
+	"github.com/noku-team/assertoor/pkg/coordinator/web/types"
 	"github.com/sirupsen/logrus"
 	httpSwagger "github.com/swaggo/http-swagger"
 	"github.com/urfave/negroni"
 
 	// import swagger docs
-	_ "github.com/ethpandaops/assertoor/pkg/coordinator/web/api/docs"
+	_ "github.com/noku-team/assertoor/pkg/coordinator/web/api/docs"
 
 	// import pprof
 	//nolint:gosec // ignore

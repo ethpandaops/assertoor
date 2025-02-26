@@ -1,7 +1,7 @@
 package vars
 
 import (
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 )
 
 type ScopeFilter struct {

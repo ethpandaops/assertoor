@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/execution"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -23,10 +23,10 @@ var (
 )
 
 type Task struct {
-	ctx      *types.TaskContext
-	options  *types.TaskOptions
-	config   Config
-	logger   logrus.FieldLogger
+	ctx     *types.TaskContext
+	options *types.TaskOptions
+	config  Config
+	logger  logrus.FieldLogger
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {

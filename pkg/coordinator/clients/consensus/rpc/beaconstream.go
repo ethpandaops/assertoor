@@ -12,7 +12,7 @@ import (
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/donovanhide/eventsource"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/clients/consensus/rpc/eventstream"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus/rpc/eventstream"
 )
 
 const (
