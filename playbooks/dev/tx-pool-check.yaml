@@ -3,6 +3,7 @@ name: "Check transaction pool"
 timeout: 30m
 disable: false
 config:
+  walletPrivkey: ""
   # validatorPairNames: []
   # minBlobCount: 3
 tasks:
@@ -14,3 +15,5 @@ tasks:
     failOnHighLatency: true
     clientPattern: ""
     excludeClientPattern: ""
+  configVars:
+    privateKey: "walletPrivkey"

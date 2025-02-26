@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"math/big"
 	"time"
+	"crypto/ecdsa"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sirupsen/logrus"
 )
 
@@ -81,12 +83,33 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	startTime := time.Now()
 	sentTxCount := 0
+	// get chain ID from execution client
+	chainID, err := executionClients[0].GetRPCClient().GetEthClient().ChainID(ctx)
+	if err != nil {
+		t.logger.Errorf("Failed to fetch chain ID: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+
+	privKey, err := crypto.HexToECDSA(t.config.PrivateKey)
+	if err != nil {
+		t.logger.Errorf("Failed to generate private key: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
 
 	for i := 0; i < t.config.TxCount; i++ {
 		client := executionClients[i%len(executionClients)]
 
-		tx := createDummyTransaction(uint64(i))
-		err := client.GetRPCClient().SendTransaction(ctx, tx)
+		// generate and sign tx
+		tx, err := createDummyTransaction(uint64(i), chainID, privKey)
+		if err != nil {
+			t.logger.Errorf("Failed to create transaction: %v", err)
+			t.ctx.SetResult(types.TaskResultFailure)
+			return nil
+		}
+
+		err = client.GetRPCClient().SendTransaction(ctx, tx)
 
 		if err != nil {
 			t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
@@ -118,14 +141,23 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func createDummyTransaction(nonce uint64) *ethtypes.Transaction {
+func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.PrivateKey) (*ethtypes.Transaction, error) {
+	toAddress := common.HexToAddress("0x0000000000000000000000000000000000000000")
+
 	tx := ethtypes.NewTransaction(
 		nonce,
-		common.HexToAddress("0x0000000000000000000000000000000000000000"),
+		toAddress,
 		big.NewInt(100),
 		21000,
 		big.NewInt(1),
 		nil,
 	)
-	return tx
+
+	signer := ethtypes.LatestSignerForChainID(chainID)
+	signedTx, err := ethtypes.SignTx(tx, signer, privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return signedTx, nil
 }
