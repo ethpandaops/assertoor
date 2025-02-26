@@ -132,7 +132,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		if sentTxCount%t.config.MeasureInterval == 0 {
 			elapsed := time.Since(startTime)
-			t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
+			t.logger.WithField("client", client.GetName()).Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
 		}
 	}
 
