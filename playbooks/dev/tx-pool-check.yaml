@@ -10,7 +10,7 @@ tasks:
 - name: tx_pool_check
   config:
     txCount: 15000
-    measureInterval: 1000
+    measureInterval: 500
     expectedLatency: 500
     failOnHighLatency: true
     clientPattern: ""

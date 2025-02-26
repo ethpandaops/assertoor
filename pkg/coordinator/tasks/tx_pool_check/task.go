@@ -7,7 +7,6 @@ import (
 	"time"
 	"crypto/ecdsa"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -91,6 +90,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
+	t.logger.Infof("Chain ID: %d", chainID)
+
 	privKey, err := crypto.HexToECDSA(t.config.PrivateKey)
 	if err != nil {
 		t.logger.Errorf("Failed to generate private key: %v", err)
@@ -105,6 +106,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
+
+	t.logger.Infof("Starting nonce: %d", nonce)
 
 	for i := 0; i < t.config.TxCount; i++ {
 		client := executionClients[i%len(executionClients)]
@@ -150,7 +153,8 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.PrivateKey) (*ethtypes.Transaction, error) {
-	toAddress := common.HexToAddress("0x0000000000000000000000000000000000000000")
+	// create a dummy transaction, we don't care about the actual data
+	toAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
 
 	tx := ethtypes.NewTransaction(
 		nonce,
