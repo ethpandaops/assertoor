@@ -78,6 +78,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	runtaskoptions.TaskDescriptor,
 	runtasks.TaskDescriptor,
 	runtasksconcurrent.TaskDescriptor,
+	txpoolcheck.TaskDescriptor,
 	sleep.TaskDescriptor,
 }
 
