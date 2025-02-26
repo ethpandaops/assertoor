@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -118,12 +118,14 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func createDummyTransaction(nonce uint64) *execution.Transaction {
-	return &execution.Transaction{
-		Nonce:    nonce,
-		GasPrice: big.NewInt(1),
-		GasLimit: 21000,
-		To:       &common.Address{},
-		Value:    big.NewInt(100),
-	}
+func createDummyTransaction(nonce uint64) *ethtypes.Transaction {
+	tx := ethtypes.NewTransaction(
+		nonce,
+		common.HexToAddress("0x0000000000000000000000000000000000000000"),
+		big.NewInt(100),
+		21000,
+		big.NewInt(1),
+		nil,
+	)
+	return tx
 }
