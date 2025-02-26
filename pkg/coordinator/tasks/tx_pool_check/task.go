@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"time"
 	"crypto/ecdsa"
+	"math/rand"
 
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -108,10 +109,12 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	t.logger.Infof("Starting nonce: %d", nonce)
+	
+	// select random client
+	client := executionClients[rand.Intn(len(executionClients))]
+	t.logger.Infof("Using client: %s", client.GetName())
 
 	for i := 0; i < t.config.TxCount; i++ {
-		client := executionClients[i%len(executionClients)]
-
 		// generate and sign tx
 		tx, err := createDummyTransaction(uint64(i) + nonce, chainID, privKey)
 		if err != nil {
@@ -132,7 +135,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		if sentTxCount%t.config.MeasureInterval == 0 {
 			elapsed := time.Since(startTime)
-			t.logger.WithField("client", client.GetName()).Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
+			t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
 		}
 	}
 
