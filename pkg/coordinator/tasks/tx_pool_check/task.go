@@ -107,6 +107,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
+	nonce++
 	t.logger.Infof("Starting nonce: %d", nonce)
 
 	for i := 0; i < t.config.TxCount; i++ {
