@@ -160,6 +160,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
+	// todo: change, cause the average latency isn't measured that way. It's a test only for the future percentiles measurement
 	avgLatency := totalLatency / time.Duration(t.config.TxCount)
 	t.logger.Infof("Average transaction latency: %dms", avgLatency.Milliseconds())
 
@@ -171,6 +172,63 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
 		t.ctx.Outputs.SetVar("avg_latency_ms", avgLatency.Milliseconds())
 	}
+
+	// select random client
+	client = executionClients[rand.Intn(len(executionClients))]
+	t.logger.Infof("Using second random client: %s", client.GetName())
+
+	startTime := time.Now()
+	sentTxCount := 0
+
+	for i := 0; i < t.config.TxCount; i++ {
+		// generate and sign tx
+		tx, err := createDummyTransaction(uint64(i) + nonce, chainID, privKey)
+		if err != nil {
+			t.logger.Errorf("Failed to create transaction: %v", err)
+			t.ctx.SetResult(types.TaskResultFailure)
+			return nil
+		}
+
+		err = client.GetRPCClient().SendTransaction(ctx, tx)
+
+		if err != nil {
+			t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
+			t.ctx.SetResult(types.TaskResultFailure)
+			return nil
+		}
+
+		sentTxCount++
+
+		if sentTxCount%t.config.MeasureInterval == 0 {
+			elapsed := time.Since(startTime)
+			t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
+		}
+	}
+
+	confirmed := false
+		timeout := time.After(10 * time.Second)
+		for !confirmed {
+			select {
+			case <-timeout:
+				t.logger.Errorf("Timeout waiting for tx confirmation for tx: %s", tx.Hash().Hex())
+				t.ctx.SetResult(types.TaskResultFailure)
+				return fmt.Errorf("timeout waiting for tx confirmation")
+			default:
+				time.Sleep(50 * time.Millisecond)
+				fetchedTx, _, err := client.GetRPCClient().GetEthClient().TransactionByHash(ctx, tx.Hash())
+				if err != nil {
+					// retry on error
+					continue
+				}
+				if fetchedTx != nil {
+					confirmed = true
+				}
+			}
+		}
+
+	totalTime := time.Since(startTime)
+	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
+	t.ctx.Outputs.SetVar("total_time_ms", totalTime.Milliseconds())
 
 	return nil
 }
