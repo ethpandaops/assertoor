@@ -188,7 +188,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	for i := 0; i < t.config.TxCount; i++ {
 		// generate and sign tx
-		tx, err := createDummyTransaction(uint64(i)+nonce, chainID, privKey)
+		tx, err := createDummyTransaction(nonce, chainID, privKey)
 		if err != nil {
 			t.logger.Errorf("Failed to create transaction: %v", err)
 			t.ctx.SetResult(types.TaskResultFailure)
