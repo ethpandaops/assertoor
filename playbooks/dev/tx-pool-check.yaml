@@ -8,9 +8,32 @@ config:
   # minBlobCount: 3
 tasks:
 - name: tx_pool_check
+  title: "Check transaction pool with 1.000 transactions"
+  config:
+    txCount: 1000
+    measureInterval: 100
+    expectedLatency: 500
+    failOnHighLatency: true
+    clientPattern: ""
+    excludeClientPattern: ""
+  configVars:
+    privateKey: "walletPrivkey"
+- name: tx_pool_check
+  title: "Check transaction pool with 10.000 transactions"
+  config:
+    txCount: 10000
+    measureInterval: 300
+    expectedLatency: 500
+    failOnHighLatency: true
+    clientPattern: ""
+    excludeClientPattern: ""
+  configVars:
+    privateKey: "walletPrivkey"
+- name: tx_pool_check
+  title: "Check transaction pool with 15.000 transactions"
   config:
     txCount: 15000
-    measureInterval: 500
+    measureInterval: 300
     expectedLatency: 500
     failOnHighLatency: true
     clientPattern: ""
