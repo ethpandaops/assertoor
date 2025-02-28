@@ -2,15 +2,15 @@ package txpoolcheck
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"time"
-	"crypto/ecdsa"
 	"math/rand"
+	"time"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -105,6 +105,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
+	nonce++
+
 	t.logger.Infof("Starting nonce: %d", nonce)
 	clientIndex := rand.Intn(len(executionClients))
 	client := executionClients[clientIndex]
@@ -186,7 +188,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	for i := 0; i < t.config.TxCount; i++ {
 		// generate and sign tx
-		tx, err := createDummyTransaction(uint64(i) + nonce, chainID, privKey)
+		tx, err := createDummyTransaction(uint64(i)+nonce, chainID, privKey)
 		if err != nil {
 			t.logger.Errorf("Failed to create transaction: %v", err)
 			t.ctx.SetResult(types.TaskResultFailure)
@@ -244,14 +246,14 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	// create a dummy transaction, we don't care about the actual data
 	toAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
 
-	tx := ethtypes.NewTransaction(
-		nonce,
-		toAddress,
-		big.NewInt(100),
-		21000,
-		big.NewInt(1),
-		nil,
-	)
+	tx := ethtypes.NewTx(&ethtypes.LegacyTx{
+		Nonce:    nonce,
+		To:       &toAddress,
+		Value:    big.NewInt(100),
+		Gas:      21000,
+		GasPrice: big.NewInt(1),
+		Data:     nil,
+	})
 
 	signer := ethtypes.LatestSignerForChainID(chainID)
 	signedTx, err := ethtypes.SignTx(tx, signer, privateKey)
