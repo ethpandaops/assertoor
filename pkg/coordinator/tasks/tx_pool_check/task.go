@@ -150,6 +150,10 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.SetResult(types.TaskResultFailure)
 	} else {
 		t.ctx.SetResult(types.TaskResultSuccess)
+
+		t.ctx.Outputs.SetVar("tx_count", sentTxCount)
+		t.ctx.Outputs.SetVar("avg_latency_ms", avgLatency)
+		t.ctx.Outputs.SetVar("total_time_ms", totalTime.Milliseconds())
 	}
 
 	return nil
