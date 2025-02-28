@@ -106,14 +106,15 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	t.logger.Infof("Starting nonce: %d", nonce)
-	client := executionClients[rand.Intn(len(executionClients))]
+	clientIndex := rand.Intn(len(executionClients))
+	client := executionClients[clientIndex]
 
 	t.logger.Infof("Using client: %s", client.GetName())
 
 	var totalLatency time.Duration
 
 	for i := 0; i < t.config.TxCount; i++ {
-		tx, err := createDummyTransaction(uint64(i)+nonce, chainID, privKey)
+		tx, err := createDummyTransaction(nonce, chainID, privKey)
 		if err != nil {
 			t.logger.Errorf("Failed to create transaction: %v", err)
 			t.ctx.SetResult(types.TaskResultFailure)
@@ -128,6 +129,8 @@ func (t *Task) Execute(ctx context.Context) error {
 			t.ctx.SetResult(types.TaskResultFailure)
 			return nil
 		}
+
+		nonce = nonce + uint64(i)
 
 		// wait for tx to be confirmed
 		confirmed := false
@@ -173,12 +176,13 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.Outputs.SetVar("avg_latency_ms", avgLatency.Milliseconds())
 	}
 
-	// select random client
-	client = executionClients[rand.Intn(len(executionClients))]
+	// select random client, not the first
+	client = executionClients[(clientIndex+1)%len(executionClients)]
 	t.logger.Infof("Using second random client: %s", client.GetName())
 
 	startTime := time.Now()
 	sentTxCount := 0
+	tx := ethtypes.Transaction{}
 
 	for i := 0; i < t.config.TxCount; i++ {
 		// generate and sign tx
@@ -198,6 +202,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 
 		sentTxCount++
+		nonce = nonce + uint64(i)
 
 		if sentTxCount%t.config.MeasureInterval == 0 {
 			elapsed := time.Since(startTime)
@@ -206,25 +211,27 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	confirmed := false
-		timeout := time.After(10 * time.Second)
-		for !confirmed {
-			select {
-			case <-timeout:
-				t.logger.Errorf("Timeout waiting for tx confirmation for tx: %s", tx.Hash().Hex())
-				t.ctx.SetResult(types.TaskResultFailure)
-				return fmt.Errorf("timeout waiting for tx confirmation")
-			default:
-				time.Sleep(50 * time.Millisecond)
-				fetchedTx, _, err := client.GetRPCClient().GetEthClient().TransactionByHash(ctx, tx.Hash())
-				if err != nil {
-					// retry on error
-					continue
-				}
-				if fetchedTx != nil {
-					confirmed = true
-				}
+	timeout := time.After(10 * time.Second)
+
+	for !confirmed {
+		select {
+		case <-timeout:
+			t.logger.Errorf("Timeout waiting for tx confirmation for tx: %s", tx.Hash().Hex())
+			t.ctx.SetResult(types.TaskResultFailure)
+			return fmt.Errorf("timeout waiting for tx confirmation")
+		// only the last transaction is checked, when the loop is done
+		default:
+			time.Sleep(50 * time.Millisecond)
+			fetchedTx, _, err := client.GetRPCClient().GetEthClient().TransactionByHash(ctx, tx.Hash())
+			if err != nil {
+				// retry on error
+				continue
+			}
+			if fetchedTx != nil {
+				confirmed = true
 			}
 		}
+	}
 
 	totalTime := time.Since(startTime)
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
