@@ -1,0 +1,21 @@
+id: tx-pool-check
+name: "Check transaction pool"
+timeout: 30m
+disable: false
+config:
+  walletPrivkey: ""
+  # validatorPairNames: []
+  # minBlobCount: 3
+tasks:
+- name: tx_pool_check
+  title: "Check transaction pool with 1.000 transactions"
+  config:
+    nonce: 0
+    txCount: 1000
+    measureInterval: 100
+    expectedLatency: 500
+    failOnHighLatency: true
+    clientPattern: ""
+    excludeClientPattern: ""
+  configVars:
+    privateKey: "walletPrivkey"
