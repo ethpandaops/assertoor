@@ -11,6 +11,7 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/wallet"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,6 +30,7 @@ type Task struct {
 	options *types.TaskOptions
 	config  Config
 	logger  logrus.FieldLogger
+	wallet  *wallet.Wallet
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -97,15 +99,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	// get last nonce
-	nonce, err := executionClients[0].GetRPCClient().GetEthClient().PendingNonceAt(ctx, crypto.PubkeyToAddress(privKey.PublicKey))
-	if err != nil {
-		t.logger.Errorf("Failed to fetch nonce: %v", err)
-		t.ctx.SetResult(types.TaskResultFailure)
-		return nil
-	}
-
-	nonce++
+	t.logger.Infof("Wallet: %s", t.wallet.GetSummary().Address)
+	nonce := t.wallet.GetNonce()
 
 	t.logger.Infof("Starting nonce: %d", nonce)
 	clientIndex := rand.Intn(len(executionClients))
@@ -132,8 +127,6 @@ func (t *Task) Execute(ctx context.Context) error {
 			return nil
 		}
 
-		nonce = nonce + uint64(i)
-
 		// wait for tx to be confirmed
 		confirmed := false
 		timeout := time.After(10 * time.Second)
@@ -155,6 +148,8 @@ func (t *Task) Execute(ctx context.Context) error {
 				}
 			}
 		}
+		
+		nonce++
 
 		latency := time.Since(startTx)
 		totalLatency += latency
@@ -204,7 +199,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 
 		sentTxCount++
-		nonce = nonce + uint64(i)
+		nonce++
 
 		if sentTxCount%t.config.MeasureInterval == 0 {
 			elapsed := time.Since(startTime)
@@ -247,12 +242,13 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	toAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
 
 	tx := ethtypes.NewTx(&ethtypes.LegacyTx{
-		Nonce:    nonce,
+		// Nonce:    nonce,
 		To:       &toAddress,
 		Value:    big.NewInt(100),
 		Gas:      21000,
 		GasPrice: big.NewInt(1),
-		Data:     nil,
+		// random data + nonce to hex
+		Data: 		[]byte(fmt.Sprintf("0xdeadbeef%v", nonce)),
 	})
 
 	signer := ethtypes.LatestSignerForChainID(chainID)
