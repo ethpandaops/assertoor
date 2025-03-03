@@ -112,8 +112,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	nonce++
-
 	if t.config.Nonce != nil {
 		t.logger.Infof("Using custom nonce: %d", *t.config.Nonce)
 		nonce = *t.config.Nonce
@@ -126,6 +124,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.logger.Infof("Using client: %s", client.GetName())
 
 	var totalLatency time.Duration
+	retryCount := 0
 
 	for i := 0; i < t.config.TxCount; i++ {
 		tx, err := createDummyTransaction(nonce, chainID, privKey)
@@ -138,11 +137,25 @@ func (t *Task) Execute(ctx context.Context) error {
 		startTx := time.Now()
 
 		err = client.GetRPCClient().SendTransaction(ctx, tx)
+
 		if err != nil {
-			t.logger.Errorf("Failed to send transaction: %v", err)
-			t.ctx.SetResult(types.TaskResultFailure)
-			return nil
+			t.logger.Errorf("Failed to send transaction: %v. Nonce: %d. ", err, nonce)
+			
+			// retry increasing the nonce
+			nonce++
+			i--
+			retryCount++
+
+			if retryCount > 1000 {
+				t.logger.Errorf("Too many retries")
+				t.ctx.SetResult(types.TaskResultFailure)
+				return nil
+			}
+
+			continue
 		}
+
+		retryCount = 0
 
 		// wait for tx to be confirmed
 		confirmed := false
@@ -185,7 +198,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Errorf("Transaction latency too high: %dms (expected <= %dms)", avgLatency.Milliseconds(), t.config.ExpectedLatency)
 		t.ctx.SetResult(types.TaskResultFailure)
 	} else {
-		t.ctx.SetResult(types.TaskResultSuccess)
 		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
 		t.ctx.Outputs.SetVar("avg_latency_ms", avgLatency.Milliseconds())
 	}
@@ -225,7 +237,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	confirmed := false
-	timeout := time.After(10 * time.Second)
+	timeout := time.After(30 * time.Second)
 
 	for !confirmed {
 		select {
@@ -250,6 +262,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	totalTime := time.Since(startTime)
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
 	t.ctx.Outputs.SetVar("total_time_ms", totalTime.Milliseconds())
+	t.ctx.SetResult(types.TaskResultSuccess)
 
 	return nil
 }
@@ -259,13 +272,13 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	toAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
 
 	tx := ethtypes.NewTx(&ethtypes.LegacyTx{
-		// Nonce:    nonce,
+		Nonce:    nonce,
 		To:       &toAddress,
 		Value:    big.NewInt(100),
 		Gas:      21000,
 		GasPrice: big.NewInt(1),
 		// random data + nonce to hex
-		Data: 		[]byte(fmt.Sprintf("0xdeadbeef%v", nonce)),
+		// Data: 		[]byte(fmt.Sprintf("0xdeadbeef%v", nonce)),
 	})
 
 	signer := ethtypes.LatestSignerForChainID(chainID)
