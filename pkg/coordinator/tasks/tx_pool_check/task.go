@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"net"
+	"net/url"
+	"sync/atomic"
 	"time"
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -122,6 +125,19 @@ func (t *Task) Execute(ctx context.Context) error {
 	client := executionClients[clientIndex]
 
 	t.logger.Infof("Using client: %s", client.GetName())
+
+	// Extract hostname from client URL, removing protocol and port
+	clientURL := client.GetEndpointConfig().URL
+	if parsedURL, err := url.Parse(clientURL); err == nil {
+		hostname := parsedURL.Hostname()
+		listenAddr := fmt.Sprintf("%s:30303", hostname)
+		t.logger.Infof("Listening on: %s", listenAddr)
+		go ListenAndServe(listenAddr, t.logger)
+	} else {
+		t.logger.Errorf("Failed to parse client URL: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
 
 	var totalLatency time.Duration
 	retryCount := 0
@@ -302,4 +318,53 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	}
 
 	return signedTx, nil
+}
+
+// Global counter for transaction type messages
+var transactionCounter int64
+
+// incrementTransactionCounter atomically increments the counter
+func incrementTransactionCounter() {
+	atomic.AddInt64(&transactionCounter, 1)
+}
+
+// handleUDPConnection manages the UDP connection and reads messages.
+// Assumes that each message starts with a byte representing the message ID.
+// In a real environment, it might be necessary to handle a framing protocol (e.g., RLPx).
+func handleUDPConnection(conn *net.UDPConn, logger logrus.FieldLogger) {
+	buf := make([]byte, 1024)
+	for {
+		n, _, err := conn.ReadFromUDP(buf)
+		if err != nil {
+			logger.Errorf("Error reading from UDP connection: %v", err)
+			continue
+		}
+		if n > 0 {
+			messageID := buf[0]
+			// If MessageId is 20, increment the counter
+			if messageID == 20 {
+				incrementTransactionCounter()
+				logger.Infof("Transaction message received. Total counter: %d", atomic.LoadInt64(&transactionCounter))
+			}
+		}
+	}
+}
+
+// ListenAndServe opens a UDP port and accepts incoming connections
+func ListenAndServe(address string, logger logrus.FieldLogger) {
+	udpAddr, err := net.ResolveUDPAddr("udp", address)
+	if err != nil {
+		logger.Errorf("Error resolving UDP address %s: %v", address, err)
+		return
+	}
+
+	conn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		logger.Errorf("Error opening UDP port %s: %v", address, err)
+		return
+	}
+	defer conn.Close()
+	logger.Infof("Listening on UDP port %s", address)
+
+	handleUDPConnection(conn, logger)
 }
