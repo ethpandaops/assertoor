@@ -140,7 +140,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		if err != nil {
 			t.logger.Errorf("Failed to send transaction: %v. Nonce: %d. ", err, nonce)
-			
+
 			// retry increasing the nonce
 			nonce++
 			i--
@@ -178,7 +178,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				}
 			}
 		}
-		
+
 		nonce++
 
 		latency := time.Since(startTx)
@@ -208,7 +208,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	startTime := time.Now()
 	sentTxCount := 0
-	tx := ethtypes.Transaction{}
+
+	var lastTransaction *ethtypes.Transaction
 
 	for i := 0; i < t.config.TxCount; i++ {
 		// generate and sign tx
@@ -234,23 +235,36 @@ func (t *Task) Execute(ctx context.Context) error {
 			elapsed := time.Since(startTime)
 			t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
 		}
+
+		if i == t.config.TxCount-1 {
+			lastTransaction = tx
+		}
 	}
 
 	confirmed := false
 	timeout := time.After(30 * time.Second)
+	count := 0
+
+	t.logger.Infof("Waiting for tx confirmation for the last tx: %s", lastTransaction.Hash().Hex())
 
 	for !confirmed {
 		select {
 		case <-timeout:
-			t.logger.Errorf("Timeout waiting for tx confirmation for tx: %s", tx.Hash().Hex())
+			t.logger.Errorf("Timeout waiting for tx confirmation for tx: %s", lastTransaction.Hash().Hex())
 			t.ctx.SetResult(types.TaskResultFailure)
 			return fmt.Errorf("timeout waiting for tx confirmation")
 		// only the last transaction is checked, when the loop is done
 		default:
+			if count >= 100 {
+				t.logger.Infof("Time elapsed: %v", time.Since(startTime))
+				count = 0
+			}
+
 			time.Sleep(50 * time.Millisecond)
-			fetchedTx, _, err := client.GetRPCClient().GetEthClient().TransactionByHash(ctx, tx.Hash())
+			fetchedTx, _, err := client.GetRPCClient().GetEthClient().TransactionByHash(ctx, lastTransaction.Hash())
 			if err != nil {
 				// retry on error
+				t.logger.Errorf("Error fetching tx: %v", err)
 				continue
 			}
 			if fetchedTx != nil {
