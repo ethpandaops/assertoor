@@ -11,7 +11,6 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/wallet"
 	"github.com/sirupsen/logrus"
 )
 
@@ -30,7 +29,6 @@ type Task struct {
 	options *types.TaskOptions
 	config  Config
 	logger  logrus.FieldLogger
-	wallet  *wallet.Wallet
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -99,8 +97,27 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	t.logger.Infof("Wallet: %s", t.wallet.GetSummary().Address)
-	nonce := t.wallet.GetNonce()
+	// get last nonce
+	latestBlock, err := executionClients[0].GetRPCClient().GetLatestBlock(ctx)
+	if err != nil {
+		t.logger.Errorf("Failed to fetch latest block: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+
+	nonce, err := executionClients[0].GetRPCClient().GetEthClient().NonceAt(ctx, crypto.PubkeyToAddress(privKey.PublicKey), latestBlock.Number())
+	if err != nil {
+		t.logger.Errorf("Failed to fetch nonce: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+
+	nonce++
+
+	if t.config.Nonce != nil {
+		t.logger.Infof("Using custom nonce: %d", *t.config.Nonce)
+		nonce = *t.config.Nonce
+	}
 
 	t.logger.Infof("Starting nonce: %d", nonce)
 	clientIndex := rand.Intn(len(executionClients))
