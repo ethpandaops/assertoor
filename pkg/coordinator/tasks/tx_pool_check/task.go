@@ -132,7 +132,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		hostname := parsedURL.Hostname()
 		listenAddr := fmt.Sprintf("%s:30303", hostname)
 		t.logger.Infof("Listening on: %s", listenAddr)
-		go ListenAndServe(listenAddr, t.logger)
+		go ConnectAndServe(listenAddr, t.logger)
 	} else {
 		t.logger.Errorf("Failed to parse client URL: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
@@ -320,51 +320,52 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	return signedTx, nil
 }
 
-// Global counter for transaction type messages
+// Contatore globale per i messaggi di tipo transaction
 var transactionCounter int64
 
-// incrementTransactionCounter atomically increments the counter
+// incrementTransactionCounter incrementa in maniera atomica il contatore
 func incrementTransactionCounter() {
 	atomic.AddInt64(&transactionCounter, 1)
 }
 
-// handleUDPConnection manages the UDP connection and reads messages.
-// Assumes that each message starts with a byte representing the message ID.
-// In a real environment, it might be necessary to handle a framing protocol (e.g., RLPx).
+// handleUDPConnection gestisce la connessione UDP connessa e legge i messaggi.
+// Si assume che ogni messaggio inizi con un byte che rappresenta il MessageID.
 func handleUDPConnection(conn *net.UDPConn, logger logrus.FieldLogger) {
 	buf := make([]byte, 1024)
 	for {
-		n, _, err := conn.ReadFromUDP(buf)
+		n, err := conn.Read(buf)
 		if err != nil {
-			logger.Errorf("Error reading from UDP connection: %v", err)
+			logger.Errorf("Errore nella lettura dal UDP: %v", err)
 			continue
 		}
 		if n > 0 {
 			messageID := buf[0]
-			// If MessageId is 20, increment the counter
+			// Se il MessageID è 20, incrementa il contatore
 			if messageID == 20 {
 				incrementTransactionCounter()
-				logger.Infof("Transaction message received. Total counter: %d", atomic.LoadInt64(&transactionCounter))
+				logger.Infof("Messaggio transaction ricevuto. Totale counter: %d", atomic.LoadInt64(&transactionCounter))
+			} else {
+				logger.Infof("Messaggio sconosciuto ricevuto: %d", messageID)
 			}
 		}
 	}
 }
 
-// ListenAndServe opens a UDP port and accepts incoming connections
-func ListenAndServe(address string, logger logrus.FieldLogger) {
-	udpAddr, err := net.ResolveUDPAddr("udp", address)
+// ConnectAndServe si collega come client UDP all'indirizzo specificato e gestisce i messaggi in arrivo
+func ConnectAndServe(remoteAddress string, logger logrus.FieldLogger) {
+	udpAddr, err := net.ResolveUDPAddr("udp", remoteAddress)
 	if err != nil {
-		logger.Errorf("Error resolving UDP address %s: %v", address, err)
+		logger.Errorf("Errore nel risolvere l'indirizzo UDP %s: %v", remoteAddress, err)
 		return
 	}
 
-	conn, err := net.ListenUDP("udp", udpAddr)
+	conn, err := net.DialUDP("udp", nil, udpAddr)
 	if err != nil {
-		logger.Errorf("Error opening UDP port %s: %v", address, err)
+		logger.Errorf("Errore nel collegarsi a UDP %s: %v", remoteAddress, err)
 		return
 	}
 	defer conn.Close()
-	logger.Infof("Listening on UDP port %s", address)
+	logger.Infof("Collegato a UDP %s", remoteAddress)
 
 	handleUDPConnection(conn, logger)
 }
