@@ -55,7 +55,7 @@ Assertoor is a robust and versatile tool designed for comprehensive testing of t
 ## Documentation and Examples
 
 Refer to our [documentation](https://github.com/ethpandaops/assertoor/wiki) for installation, configuration, and usage guidelines. \
-Example tests are available [here](https://github.com/ethpandaops/assertoor/tree/master/example/tests).
+Example tests are available [here](https://github.com/ethpandaops/assertoor/tree/master/example/config).
 
 ## Contributing
 
