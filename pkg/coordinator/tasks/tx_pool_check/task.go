@@ -3,16 +3,14 @@ package txpoolcheck
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"math/rand"
-	"net"
 	"net/url"
-	"sync/atomic"
 	"time"
 
-	proto_sentry "github.com/erigontech/erigon-lib/gointerfaces/sentryproto"
+	"github.com/erigontech/erigon-lib/gointerfaces/sentryproto"
+	"github.com/erigontech/erigon/tests/txpool/helper"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
@@ -128,12 +126,14 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.Infof("Using client: %s", client.GetName())
 
+	var gotTxCh <-chan helper.TxMessage = nil
+	var errCh <-chan error = nil
+
 	// Extract hostname from client URL, removing protocol and port
 	clientURL := client.GetEndpointConfig().URL
 	if parsedURL, err := url.Parse(clientURL); err == nil {
 		hostname := parsedURL.Hostname()
-		listenAddr := fmt.Sprintf("%s:30303", hostname)
-		go ConnectAndServe(listenAddr, t.logger)
+		gotTxCh, errCh = ConnectToP2p(hostname, t.logger)
 	} else {
 		t.logger.Errorf("Failed to parse client URL: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
@@ -175,24 +175,14 @@ func (t *Task) Execute(ctx context.Context) error {
 		retryCount = 0
 
 		// wait for tx to be confirmed
-		confirmed := false
-		timeout := time.After(10 * time.Second)
-		for !confirmed {
+		for stop := false; !stop; {
 			select {
-			case <-timeout:
-				t.logger.Errorf("Timeout waiting for tx confirmation for tx: %s", tx.Hash().Hex())
-				t.ctx.SetResult(types.TaskResultFailure)
-				return fmt.Errorf("timeout waiting for tx confirmation")
-			default:
-				time.Sleep(50 * time.Millisecond)
-				fetchedTx, _, err := client.GetRPCClient().GetEthClient().TransactionByHash(ctx, tx.Hash())
-				if err != nil {
-					// retry on error
-					continue
-				}
-				if fetchedTx != nil {
-					confirmed = true
-				}
+				case msg := <-gotTxCh:
+					if msg.MessageID == sentryproto.MessageId_TRANSACTIONS_66 {
+						stop = true
+					}
+				case err := <-errCh:
+					t.logger.Errorf("Error receiving tx: %v", err)
 			}
 		}
 
@@ -228,65 +218,62 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var lastTransaction *ethtypes.Transaction
 
-	for i := 0; i < t.config.TxCount; i++ {
-		// generate and sign tx
-		tx, err := createDummyTransaction(nonce, chainID, privKey)
-		if err != nil {
-			t.logger.Errorf("Failed to create transaction: %v", err)
-			t.ctx.SetResult(types.TaskResultFailure)
-			return nil
+	go func ()  {
+		for i := 0; i < t.config.TxCount; i++ {
+			// generate and sign tx
+			tx, err := createDummyTransaction(nonce, chainID, privKey)
+			if err != nil {
+				t.logger.Errorf("Failed to create transaction: %v", err)
+				t.ctx.SetResult(types.TaskResultFailure)
+				return
+			}
+
+			err = client.GetRPCClient().SendTransaction(ctx, tx)
+
+			if err != nil {
+				t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
+				t.ctx.SetResult(types.TaskResultFailure)
+				return
+			}
+
+			sentTxCount++
+			nonce++
+
+			if sentTxCount%t.config.MeasureInterval == 0 {
+				elapsed := time.Since(startTime)
+				t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
+			}
+
+			if i == t.config.TxCount-1 {
+				lastTransaction = tx
+			}
 		}
-
-		err = client.GetRPCClient().SendTransaction(ctx, tx)
-
-		if err != nil {
-			t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
-			t.ctx.SetResult(types.TaskResultFailure)
-			return nil
-		}
-
-		sentTxCount++
-		nonce++
-
-		if sentTxCount%t.config.MeasureInterval == 0 {
-			elapsed := time.Since(startTime)
-			t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
-		}
-
-		if i == t.config.TxCount-1 {
-			lastTransaction = tx
-		}
-	}
-
-	confirmed := false
-	timeout := time.After(30 * time.Second)
-	count := 0
+	}()
 
 	t.logger.Infof("Waiting for tx confirmation for the last tx: %s", lastTransaction.Hash().Hex())
 
-	for !confirmed {
-		select {
-		case <-timeout:
-			t.logger.Errorf("Timeout waiting for tx confirmation for tx: %s", lastTransaction.Hash().Hex())
-			t.ctx.SetResult(types.TaskResultFailure)
-			return fmt.Errorf("timeout waiting for tx confirmation")
-		// only the last transaction is checked, when the loop is done
-		default:
-			if count >= 100 {
-				t.logger.Infof("Time elapsed: %v", time.Since(startTime))
-				count = 0
-			}
+	lastMeasureTime := time.Now()
+	gotTx := 0
 
-			time.Sleep(50 * time.Millisecond)
-			fetchedTx, _, err := client.GetRPCClient().GetEthClient().TransactionByHash(ctx, lastTransaction.Hash())
-			if err != nil {
-				// retry on error
-				t.logger.Errorf("Error fetching tx: %v", err)
+	for gotTx < t.config.TxCount {
+		select {
+		case msg := <-gotTxCh:
+			if msg.MessageID != sentryproto.MessageId_TRANSACTIONS_66 {
 				continue
 			}
-			if fetchedTx != nil {
-				confirmed = true
+
+			gotTx += 1
+
+			if gotTx%t.config.MeasureInterval != 0 {
+				continue
 			}
+
+			t.logger.Infof("Got %d transactions", gotTx)
+			t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
+
+			lastMeasureTime = time.Now()
+		case err := <-errCh:
+			t.logger.Errorf("Error receiving tx: %v", err)
 		}
 	}
 
@@ -321,70 +308,16 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	return signedTx, nil
 }
 
-// Global counter for transaction messages
-var transactionCounter int64
+func ConnectToP2p(remoteAddress string, logger logrus.FieldLogger) (<-chan helper.TxMessage, <-chan error) {
+	p2p := helper.NewP2P(fmt.Sprintf("http://%s:8545/", remoteAddress))
+	gotTxCh, errCh, err := p2p.Connect()
 
-// incrementTransactionCounter atomically increments the counter
-func incrementTransactionCounter() {
-	atomic.AddInt64(&transactionCounter, 1)
-}
-
-// handleUDPConnection handles the connected UDP connection and reads messages.
-// It assumes each message starts with a byte representing the MessageID.
-func handleUDPConnection(conn *net.UDPConn, logger logrus.FieldLogger, msgChan chan *proto_sentry.InboundMessage) {
-	buf := make([]byte, 1024)
-	for {
-		n, err := conn.Read(buf)
-		if err != nil {
-			logger.Errorf("Error reading from UDP: %v", err)
-			continue
-		}
-		if n > 0 {
-			messageID := buf[0] // Assuming the message ID is the first byte
-			if messageID == 20 {
-				// Process the message and increment the counter for messageID 20
-				incrementTransactionCounter()
-				logger.Infof("Transaction message received. Total count: %d", atomic.LoadInt64(&transactionCounter))
-
-				// Send message to the channel for further processing
-				msgChan <- &proto_sentry.InboundMessage{
-					Id:   proto_sentry.MessageId(20), // Set the correct MessageID
-					Data: buf[:n],                    // Assuming the message data starts right after the messageID byte
-					// PeerId: "peerID", // Example, replace with actual peer ID
-				}
-			} else {
-				logger.Infof("Unknown message received: %d", messageID)
-			}
-		}
-	}
-}
-
-// ConnectAndServe connects as a UDP client to the specified address and handles incoming messages
-func ConnectAndServe(remoteAddress string, logger logrus.FieldLogger) {
-	udpAddr, err := net.ResolveUDPAddr("udp", remoteAddress)
 	if err != nil {
-		logger.Errorf("Error resolving UDP address %s: %v", remoteAddress, err)
-		return
+		logger.Errorf("Error connecting to %s: %v", remoteAddress, err)
+		return nil, nil
 	}
 
-	conn, err := net.DialUDP("udp", nil, udpAddr)
-	if err != nil {
-		logger.Errorf("Error connecting to UDP %s: %v", remoteAddress, err)
-		return
-	}
-	defer conn.Close()
-	logger.Infof("Connected to UDP %s", remoteAddress)
+	logger.Infof("Connected to %s", remoteAddress)
 
-	// Channel to handle incoming messages - use pointer to avoid copying mutex
-	msgChan := make(chan *proto_sentry.InboundMessage)
-
-	// Run a goroutine to handle the incoming UDP connection
-	go handleUDPConnection(conn, logger, msgChan)
-
-	// Here you can implement a separate process to listen for messages
-	// from msgChan and handle them accordingly
-	for msg := range msgChan {
-		// Process the message as needed
-		logger.Infof("Processing received message: %s", hex.EncodeToString(msg.Data))
-	}
+	return gotTxCh, errCh
 }
