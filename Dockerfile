@@ -2,7 +2,7 @@
 FROM golang:1.23 AS builder
 WORKDIR /src
 COPY go.sum go.mod ./
-COPY lib/go.sum lib/go.mod ./lib/
+COPY erigon-lib/go.sum erigon-lib/go.mod ./erigon-lib/
 RUN go mod download
 COPY . .
 RUN make build
