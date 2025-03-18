@@ -2,6 +2,7 @@ package txpoolcheck
 
 import (
 	"context"
+	"encoding/hex"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -330,7 +331,7 @@ func incrementTransactionCounter() {
 
 // handleUDPConnection handles the connected UDP connection and reads messages.
 // It assumes each message starts with a byte representing the MessageID.
-func handleUDPConnection(conn *net.UDPConn, logger logrus.FieldLogger, msgChan chan proto_sentry.InboundMessage) {
+func handleUDPConnection(conn *net.UDPConn, logger logrus.FieldLogger, msgChan chan *proto_sentry.InboundMessage) {
 	buf := make([]byte, 1024)
 	for {
 		n, err := conn.Read(buf)
@@ -346,10 +347,10 @@ func handleUDPConnection(conn *net.UDPConn, logger logrus.FieldLogger, msgChan c
 				logger.Infof("Transaction message received. Total count: %d", atomic.LoadInt64(&transactionCounter))
 				
 				// Send message to the channel for further processing
-				msgChan <- proto_sentry.InboundMessage{
+				msgChan <- &proto_sentry.InboundMessage{
 					Id:     proto_sentry.MessageId(20), // Set the correct MessageID
 					Data:   buf[:n], // Assuming the message data starts right after the messageID byte
-					PeerId: "peerID", // Example, replace with actual peer ID
+					// PeerId: "peerID", // Example, replace with actual peer ID
 				}
 			} else {
 				logger.Infof("Unknown message received: %d", messageID)
@@ -374,8 +375,8 @@ func ConnectAndServe(remoteAddress string, logger logrus.FieldLogger) {
 	defer conn.Close()
 	logger.Infof("Connected to UDP %s", remoteAddress)
 
-	// Channel to handle incoming messages
-	msgChan := make(chan proto_sentry.InboundMessage)
+	// Channel to handle incoming messages - use pointer to avoid copying mutex
+	msgChan := make(chan *proto_sentry.InboundMessage)
 
 	// Run a goroutine to handle the incoming UDP connection
 	go handleUDPConnection(conn, logger, msgChan)
