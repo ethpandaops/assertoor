@@ -30,41 +30,41 @@ jobs:
     needs: [build_binaries]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 100
-          ref: ${{ github.sha }}
-      - name: "Generate release changelog"
-        id: changelog
-        run: |
-          git fetch --tags
-          prev_tag=$(git tag --sort=-version:refname | grep -e "^v[0-9.]*$" | head -n 1)
-          echo "previous release: $prev_tag"
-          if [ "$prev_tag" ]; then
-            changelog=$(git log --oneline --no-decorate $prev_tag..HEAD)
-          else
-            changelog=$(git log --oneline --no-decorate)
-          fi
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo " - ${changelog//$'\n'/$'\n' - }" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      with:
+        fetch-depth: 100
+        ref: ${{ github.sha }}
+    - name: "Generate release changelog"
+      id: changelog
+      run: |
+        git fetch --tags
+        prev_tag=$(git tag --sort=-version:refname | grep -e "^v[0-9.]*$" | head -n 1)
+        echo "previous release: $prev_tag"
+        if [ "$prev_tag" ]; then
+          changelog=$(git log --oneline --no-decorate $prev_tag..HEAD)
+        else
+          changelog=$(git log --oneline --no-decorate)
+        fi
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo " - ${changelog//$'\n'/$'\n' - }" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
 
-      # download build artifacts
-      - name: "Download build artifacts"
-        uses: actions/download-artifact@v4
+    # download build artifacts
+    - name: "Download build artifacts"
+      uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4
 
-      # create draft release
-      - name: Create latest release
-        uses: actions/create-release@v1
-        id: create_release
-        with:
-          draft: true
-          prerelease: false
-          release_name: "v${{ inputs.version }}"
-          tag_name: "v${{ inputs.version }}"
-          body: |
-            ### Changes
-            ${{ steps.changelog.outputs.changelog }}
+    # create draft release
+    - name: Create latest release
+      uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
+      id: create_release
+      with:
+        draft: true
+        prerelease: false
+        release_name: "v${{ inputs.version }}"
+        tag_name: "v${{ inputs.version }}"
+        body: |
+          ### Changes
+          ${{ steps.changelog.outputs.changelog }}
 
             ### Release Artifacts
             Please read through the [wiki](https://github.com/noku-team/assertoor/wiki) for setup & configuration instructions.
@@ -75,76 +75,76 @@ jobs:
             | [assertoor_${{ inputs.version }}_linux_arm64.tar.gz](https://github.com/noku-team/assertoor/releases/download/v${{ inputs.version }}/assertoor_${{ inputs.version }}_linux_arm64.tar.gz) | assertoor executables for linux/arm64 |
             | [assertoor_${{ inputs.version }}_darwin_amd64.tar.gz](https://github.com/noku-team/assertoor/releases/download/v${{ inputs.version }}/assertoor_${{ inputs.version }}_darwin_amd64.tar.gz) | assertoor executable for macos/amd64 |
             | [assertoor_${{ inputs.version }}_darwin_arm64.tar.gz](https://github.com/noku-team/assertoor/releases/download/v${{ inputs.version }}/assertoor_${{ inputs.version }}_darwin_arm64.tar.gz) | assertoor executable for macos/arm64 |
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
 
-      # generate & upload release artifacts
-      - name: "Generate release package: assertoor_${{ inputs.version }}_windows_amd64.zip"
-        run: |
-          cd assertoor_windows_amd64
-          zip -r -q ../assertoor_${{ inputs.version }}_windows_amd64.zip .
-      - name: "Upload release artifact: assertoor_${{ inputs.version }}_windows_amd64.zip"
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./assertoor_${{ inputs.version }}_windows_amd64.zip
-          asset_name: assertoor_${{ inputs.version }}_windows_amd64.zip
-          asset_content_type: application/octet-stream
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+    # generate & upload release artifacts
+    - name: "Generate release package: assertoor_${{ inputs.version }}_windows_amd64.zip"
+      run: |
+        cd assertoor_windows_amd64
+        zip -r -q ../assertoor_${{ inputs.version }}_windows_amd64.zip .
+    - name: "Upload release artifact: assertoor_${{ inputs.version }}_windows_amd64.zip"
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./assertoor_${{ inputs.version }}_windows_amd64.zip
+        asset_name: assertoor_${{ inputs.version }}_windows_amd64.zip
+        asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    
+    - name: "Generate release package: assertoor_${{ inputs.version }}_linux_amd64.tar.gz"
+      run: |
+        cd assertoor_linux_amd64
+        tar -czf ../assertoor_${{ inputs.version }}_linux_amd64.tar.gz .
+    - name: "Upload release artifact: assertoor_${{ inputs.version }}_linux_amd64.tar.gz"
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./assertoor_${{ inputs.version }}_linux_amd64.tar.gz
+        asset_name: assertoor_${{ inputs.version }}_linux_amd64.tar.gz
+        asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    
+    - name: "Generate release package: assertoor_${{ inputs.version }}_linux_arm64.tar.gz"
+      run: |
+        cd assertoor_linux_arm64
+        tar -czf ../assertoor_${{ inputs.version }}_linux_arm64.tar.gz .
+    - name: "Upload release artifact: assertoor_${{ inputs.version }}_linux_arm64.tar.gz"
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./assertoor_${{ inputs.version }}_linux_arm64.tar.gz
+        asset_name: assertoor_${{ inputs.version }}_linux_arm64.tar.gz
+        asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    
+    - name: "Generate release package: assertoor_${{ inputs.version }}_darwin_amd64.tar.gz"
+      run: |
+        cd assertoor_darwin_amd64
+        tar -czf ../assertoor_${{ inputs.version }}_darwin_amd64.tar.gz .
+    - name: "Upload release artifact: assertoor_${{ inputs.version }}_darwin_amd64.tar.gz"
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./assertoor_${{ inputs.version }}_darwin_amd64.tar.gz
+        asset_name: assertoor_${{ inputs.version }}_darwin_amd64.tar.gz
+        asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
 
-      - name: "Generate release package: assertoor_${{ inputs.version }}_linux_amd64.tar.gz"
-        run: |
-          cd assertoor_linux_amd64
-          tar -czf ../assertoor_${{ inputs.version }}_linux_amd64.tar.gz .
-      - name: "Upload release artifact: assertoor_${{ inputs.version }}_linux_amd64.tar.gz"
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./assertoor_${{ inputs.version }}_linux_amd64.tar.gz
-          asset_name: assertoor_${{ inputs.version }}_linux_amd64.tar.gz
-          asset_content_type: application/octet-stream
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: "Generate release package: assertoor_${{ inputs.version }}_linux_arm64.tar.gz"
-        run: |
-          cd assertoor_linux_arm64
-          tar -czf ../assertoor_${{ inputs.version }}_linux_arm64.tar.gz .
-      - name: "Upload release artifact: assertoor_${{ inputs.version }}_linux_arm64.tar.gz"
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./assertoor_${{ inputs.version }}_linux_arm64.tar.gz
-          asset_name: assertoor_${{ inputs.version }}_linux_arm64.tar.gz
-          asset_content_type: application/octet-stream
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: "Generate release package: assertoor_${{ inputs.version }}_darwin_amd64.tar.gz"
-        run: |
-          cd assertoor_darwin_amd64
-          tar -czf ../assertoor_${{ inputs.version }}_darwin_amd64.tar.gz .
-      - name: "Upload release artifact: assertoor_${{ inputs.version }}_darwin_amd64.tar.gz"
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./assertoor_${{ inputs.version }}_darwin_amd64.tar.gz
-          asset_name: assertoor_${{ inputs.version }}_darwin_amd64.tar.gz
-          asset_content_type: application/octet-stream
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: "Generate release package: assertoor_${{ inputs.version }}_darwin_arm64.tar.gz"
-        run: |
-          cd assertoor_darwin_arm64
-          tar -czf ../assertoor_${{ inputs.version }}_darwin_arm64.tar.gz .
-      - name: "Upload release artifact: assertoor_${{ inputs.version }}_darwin_arm64.tar.gz"
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./assertoor_${{ inputs.version }}_darwin_arm64.tar.gz
-          asset_name: assertoor_${{ inputs.version }}_darwin_arm64.tar.gz
-          asset_content_type: application/octet-stream
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+    - name: "Generate release package: assertoor_${{ inputs.version }}_darwin_arm64.tar.gz"
+      run: |
+        cd assertoor_darwin_arm64
+        tar -czf ../assertoor_${{ inputs.version }}_darwin_arm64.tar.gz .
+    - name: "Upload release artifact: assertoor_${{ inputs.version }}_darwin_arm64.tar.gz"
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./assertoor_${{ inputs.version }}_darwin_arm64.tar.gz
+        asset_name: assertoor_${{ inputs.version }}_darwin_arm64.tar.gz
+        asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
