@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	proto_sentry "github.com/erigontech/erigon-lib/sentryproto"
+	proto_sentry "github.com/erigontech/erigon-lib/gointerfaces/sentryproto"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"

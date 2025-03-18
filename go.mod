@@ -9,6 +9,7 @@ toolchain go1.24.1
 require (
 	github.com/attestantio/go-eth2-client v0.24.0
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
+	github.com/erigontech/erigon-lib v0.0.0-00010101000000-000000000000
 	github.com/ethereum/go-ethereum v1.15.2
 	github.com/ethpandaops/ethwallclock v0.3.0
 	github.com/glebarez/go-sqlite v1.22.0
@@ -61,7 +62,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/dot v1.6.4 // indirect
 	github.com/erigontech/erigon v0.0.0-20250318045558-a92942331fbd // indirect
-	github.com/erigontech/erigon-lib v0.0.0-00010101000000-000000000000 // indirect
+	github.com/erigontech/interfaces v0.0.0-20250305132916-e79ba495d507 // indirect
 	github.com/erigontech/mdbx-go v0.38.10 // indirect
 	github.com/erigontech/secp256k1 v1.2.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.2 // indirect
