@@ -1,10 +1,10 @@
 module github.com/noku-team/assertoor
 
-go 1.22.0
+go 1.23.0
 
 replace github.com/noku-team/assertoor-lib => ./lib
 
-toolchain go1.22.4
+toolchain go1.24.1
 
 require (
 	github.com/attestantio/go-eth2-client v0.24.0
@@ -21,6 +21,7 @@ require (
 	github.com/juliangruber/go-intersect v1.1.0
 	github.com/lib/pq v1.10.9
 	github.com/mashingan/smapping v0.1.19
+	github.com/noku-team/assertoor-lib v0.0.0-00010101000000-000000000000
 	github.com/pressly/goose/v3 v3.24.1
 	github.com/prometheus/client_golang v1.20.5
 	github.com/protolambda/zrnt v0.33.1
@@ -104,6 +105,7 @@ require (
 	github.com/tklauser/numcpus v0.8.0 // indirect
 	github.com/wealdtech/go-bytesutil v1.2.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel v1.34.0 // indirect
 	go.opentelemetry.io/otel/metric v1.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
