@@ -2,8 +2,8 @@ package txpoolcheck
 
 import (
 	"context"
-	"encoding/hex"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	proto_sentry "github.com/noku-team/assertoor-lib/sentryproto"
+	proto_sentry "github.com/erigontech/erigon-lib/sentryproto"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
@@ -345,11 +345,11 @@ func handleUDPConnection(conn *net.UDPConn, logger logrus.FieldLogger, msgChan c
 				// Process the message and increment the counter for messageID 20
 				incrementTransactionCounter()
 				logger.Infof("Transaction message received. Total count: %d", atomic.LoadInt64(&transactionCounter))
-				
+
 				// Send message to the channel for further processing
 				msgChan <- &proto_sentry.InboundMessage{
-					Id:     proto_sentry.MessageId(20), // Set the correct MessageID
-					Data:   buf[:n], // Assuming the message data starts right after the messageID byte
+					Id:   proto_sentry.MessageId(20), // Set the correct MessageID
+					Data: buf[:n],                    // Assuming the message data starts right after the messageID byte
 					// PeerId: "peerID", // Example, replace with actual peer ID
 				}
 			} else {
