@@ -3,6 +3,7 @@ module github.com/noku-team/assertoor
 go 1.23.0
 
 replace github.com/erigontech/erigon-lib => ./erigon-lib
+replace github.com/holiman/bloomfilter/v2 => github.com/AskAlexSharov/bloomfilter/v2 v2.0.9
 
 toolchain go1.24.1
 
