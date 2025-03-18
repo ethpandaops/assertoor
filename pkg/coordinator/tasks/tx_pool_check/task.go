@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	proto_sentry "github.com/noku-team/assertoor-lib/sentryproto"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
@@ -329,7 +330,7 @@ func incrementTransactionCounter() {
 
 // handleUDPConnection handles the connected UDP connection and reads messages.
 // It assumes each message starts with a byte representing the MessageID.
-func handleUDPConnection(conn *net.UDPConn, logger logrus.FieldLogger) {
+func handleUDPConnection(conn *net.UDPConn, logger logrus.FieldLogger, msgChan chan proto_sentry.InboundMessage) {
 	buf := make([]byte, 1024)
 	for {
 		n, err := conn.Read(buf)
@@ -338,11 +339,18 @@ func handleUDPConnection(conn *net.UDPConn, logger logrus.FieldLogger) {
 			continue
 		}
 		if n > 0 {
-			messageID := buf[0]
-			// If MessageID is 20, increment the counter
+			messageID := buf[0] // Assuming the message ID is the first byte
 			if messageID == 20 {
+				// Process the message and increment the counter for messageID 20
 				incrementTransactionCounter()
 				logger.Infof("Transaction message received. Total count: %d", atomic.LoadInt64(&transactionCounter))
+				
+				// Send message to the channel for further processing
+				msgChan <- proto_sentry.InboundMessage{
+					Id:     proto_sentry.MessageId(20), // Set the correct MessageID
+					Data:   buf[:n], // Assuming the message data starts right after the messageID byte
+					PeerId: "peerID", // Example, replace with actual peer ID
+				}
 			} else {
 				logger.Infof("Unknown message received: %d", messageID)
 			}
@@ -366,5 +374,16 @@ func ConnectAndServe(remoteAddress string, logger logrus.FieldLogger) {
 	defer conn.Close()
 	logger.Infof("Connected to UDP %s", remoteAddress)
 
-	handleUDPConnection(conn, logger)
+	// Channel to handle incoming messages
+	msgChan := make(chan proto_sentry.InboundMessage)
+
+	// Run a goroutine to handle the incoming UDP connection
+	go handleUDPConnection(conn, logger, msgChan)
+
+	// Here you can implement a separate process to listen for messages
+	// from msgChan and handle them accordingly
+	for msg := range msgChan {
+		// Process the message as needed
+		logger.Infof("Processing received message: %s", hex.EncodeToString(msg.Data))
+	}
 }
