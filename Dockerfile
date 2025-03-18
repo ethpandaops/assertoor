@@ -2,6 +2,7 @@
 FROM golang:1.23 AS builder
 WORKDIR /src
 COPY go.sum go.mod ./
+COPY lib/go.sum lib/go.mod ./lib/
 RUN go mod download
 COPY . .
 RUN make build
