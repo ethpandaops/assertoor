@@ -1,6 +1,9 @@
 package txpoolcheck
 
 import (
+	"net"
+	"bytes"
+	"errors"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
@@ -9,9 +12,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/erigontech/erigon-lib/gointerfaces/sentryproto"
-	"github.com/erigontech/erigon/tests/txpool/helper"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/p2p/discover/v4wire"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
@@ -126,14 +129,11 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.Infof("Using client: %s", client.GetName())
 
-	var gotTxCh <-chan helper.TxMessage = nil
-	var errCh <-chan error = nil
-
 	// Extract hostname from client URL, removing protocol and port
 	clientURL := client.GetEndpointConfig().URL
 	if parsedURL, err := url.Parse(clientURL); err == nil {
 		hostname := parsedURL.Hostname()
-		gotTxCh, errCh = ConnectToP2p(hostname, t.logger)
+		BasicPing(hostname, t.logger)
 	} else {
 		t.logger.Errorf("Failed to parse client URL: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
@@ -175,16 +175,16 @@ func (t *Task) Execute(ctx context.Context) error {
 		retryCount = 0
 
 		// wait for tx to be confirmed
-		for stop := false; !stop; {
-			select {
-				case msg := <-gotTxCh:
-					if msg.MessageID == sentryproto.MessageId_TRANSACTIONS_66 {
-						stop = true
-					}
-				case err := <-errCh:
-					t.logger.Errorf("Error receiving tx: %v", err)
-			}
-		}
+		// for stop := false; !stop; {
+		// 	select {
+		// 		case msg := <-gotTxCh:
+		// 			if msg.MessageID == sentryproto.MessageId_TRANSACTIONS_66 {
+		// 				stop = true
+		// 			}
+		// 		case err := <-errCh:
+		// 			t.logger.Errorf("Error receiving tx: %v", err)
+		// 	}
+		// }
 
 		nonce++
 
@@ -252,30 +252,32 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.Infof("Waiting for tx confirmation for the last tx: %s", lastTransaction.Hash().Hex())
 
-	lastMeasureTime := time.Now()
-	gotTx := 0
+	
 
-	for gotTx < t.config.TxCount {
-		select {
-		case msg := <-gotTxCh:
-			if msg.MessageID != sentryproto.MessageId_TRANSACTIONS_66 {
-				continue
-			}
+	// lastMeasureTime := time.Now()
+	// gotTx := 0
 
-			gotTx += 1
+	// for gotTx < t.config.TxCount {
+	// 	select {
+	// 	case msg := <-gotTxCh:
+	// 		if msg.MessageID != sentryproto.MessageId_TRANSACTIONS_66 {
+	// 			continue
+	// 		}
 
-			if gotTx%t.config.MeasureInterval != 0 {
-				continue
-			}
+	// 		gotTx += 1
 
-			t.logger.Infof("Got %d transactions", gotTx)
-			t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
+	// 		if gotTx%t.config.MeasureInterval != 0 {
+	// 			continue
+	// 		}
 
-			lastMeasureTime = time.Now()
-		case err := <-errCh:
-			t.logger.Errorf("Error receiving tx: %v", err)
-		}
-	}
+	// 		t.logger.Infof("Got %d transactions", gotTx)
+	// 		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
+
+	// 		lastMeasureTime = time.Now()
+	// 	case err := <-errCh:
+	// 		t.logger.Errorf("Error receiving tx: %v", err)
+	// 	}
+	// }
 
 	totalTime := time.Since(startTime)
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
@@ -308,16 +310,161 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	return signedTx, nil
 }
 
-func ConnectToP2p(remoteAddress string, logger logrus.FieldLogger) (<-chan helper.TxMessage, <-chan error) {
-	p2p := helper.NewP2P(fmt.Sprintf("http://%s:8545/", remoteAddress))
-	gotTxCh, errCh, err := p2p.Connect()
+func BasicPing(remoteAddress string, logger logrus.FieldLogger) {
+	te := ConnectToP2p(remoteAddress, logger)
+	defer te.close()
 
+	pingHash := te.send(&v4wire.Ping{
+		Version:    4,
+		From:       te.localEndpoint(),
+		To:         te.remoteEndpoint(),
+		Expiration: uint64(time.Now().Add(20 * time.Second).Unix()),
+	})
+	if err := te.checkPingPong(pingHash); err != nil {
+		logger.Errorf("PingPong failed: %v", err)
+	}
+}
+
+type sentryenv struct {
+	endpoint   net.PacketConn
+	key        *ecdsa.PrivateKey
+	remote     *enode.Node
+	remoteAddr *net.UDPAddr
+}
+
+const waitTime = 300 * time.Millisecond
+
+func (te *sentryenv) localEndpoint() v4wire.Endpoint {
+	addr := te.endpoint.LocalAddr().(*net.UDPAddr)
+	return v4wire.Endpoint{
+		IP:  addr.IP.To4(),
+		UDP: uint16(addr.Port),
+		TCP: 0,
+	}
+}
+
+func (te *sentryenv) remoteEndpoint() v4wire.Endpoint {
+	return v4wire.NewEndpoint(te.remoteAddr.AddrPort(), 0)
+}
+
+func (env *sentryenv) close() {
+	env.endpoint.Close()
+}
+
+func (te *sentryenv) send(req v4wire.Packet) []byte {
+	packet, hash, err := v4wire.Encode(te.key, req)
 	if err != nil {
-		logger.Errorf("Error connecting to %s: %v", remoteAddress, err)
-		return nil, nil
+		panic(fmt.Errorf("can't encode %v packet: %v", req.Name(), err))
+	}
+	if _, err := te.endpoint.WriteTo(packet, te.remoteAddr); err != nil {
+		panic(fmt.Errorf("can't send %v: %v", req.Name(), err))
+	}
+	return hash
+}
+
+func (te *sentryenv) read() (v4wire.Packet, []byte, error) {
+	buf := make([]byte, 2048)
+	if err := te.endpoint.SetReadDeadline(time.Now().Add(waitTime)); err != nil {
+		return nil, nil, err
+	}
+	n, _, err := te.endpoint.ReadFrom(buf)
+	if err != nil {
+		return nil, nil, err
+	}
+	p, _, hash, err := v4wire.Decode(buf[:n])
+	return p, hash, err
+}
+
+
+// checkPingPong verifies that the remote side sends both a PONG with the
+// correct hash, and a PING.
+// The two packets do not have to be in any particular order.
+func (te *sentryenv) checkPingPong(pingHash []byte) error {
+	var (
+		pings int
+		pongs int
+	)
+	for i := 0; i < 2; i++ {
+		reply, _, err := te.read()
+		if err != nil {
+			return err
+		}
+		switch reply.Kind() {
+		case v4wire.PongPacket:
+			if err := te.checkPong(reply, pingHash); err != nil {
+				return err
+			}
+			pongs++
+		case v4wire.PingPacket:
+			pings++
+		default:
+			return fmt.Errorf("expected PING or PONG, got %v %v", reply.Name(), reply)
+		}
+	}
+	if pongs == 1 && pings == 1 {
+		return nil
+	}
+	return fmt.Errorf("expected 1 PING  (got %d) and 1 PONG (got %d)", pings, pongs)
+}
+
+// checkPong verifies that reply is a valid PONG matching the given ping hash,
+// and a PING. The two packets do not have to be in any particular order.
+func (te *sentryenv) checkPong(reply v4wire.Packet, pingHash []byte) error {
+	if reply == nil {
+		return errors.New("expected PONG reply, got nil")
+	}
+	if reply.Kind() != v4wire.PongPacket {
+		return fmt.Errorf("expected PONG reply, got %v %v", reply.Name(), reply)
+	}
+	pong := reply.(*v4wire.Pong)
+	if !bytes.Equal(pong.ReplyTok, pingHash) {
+		return fmt.Errorf("PONG reply token mismatch: got %x, want %x", pong.ReplyTok, pingHash)
+	}
+	if want := te.localEndpoint(); !want.IP.Equal(pong.To.IP) || want.UDP != pong.To.UDP {
+		return fmt.Errorf("PONG 'to' endpoint mismatch: got %+v, want %+v", pong.To, want)
+	}
+	if v4wire.Expired(pong.Expiration) {
+		return fmt.Errorf("PONG is expired (%v)", pong.Expiration)
+	}
+	return nil
+}
+
+func ConnectToP2p(remoteAddress string, logger logrus.FieldLogger) (*sentryenv) {
+	endpoint, err := net.ListenPacket("udp", fmt.Sprintf("%v:0", remoteAddress))
+	if err != nil {
+		logger.Errorf("Failed to listen: %v", err)
+		return nil
 	}
 
-	logger.Infof("Connected to %s", remoteAddress)
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		logger.Errorf("Failed to generate key: %v", err)
+		return nil
+	}
 
-	return gotTxCh, errCh
+	node, err := enode.Parse(enode.ValidSchemes, remoteAddress)
+	if err != nil {
+		logger.Errorf("Failed to parse node: %v", err)
+		return nil
+	}
+
+	if !node.IPAddr().IsValid() || node.UDP() == 0 {
+		var ip net.IP
+		var tcpPort, udpPort int
+		if node.IPAddr().IsValid() {
+			ip = node.IPAddr().AsSlice()
+		} else {
+			ip = net.ParseIP("127.0.0.1")
+		}
+		if tcpPort = node.TCP(); tcpPort == 0 {
+			tcpPort = 30303
+		}
+		if udpPort = node.UDP(); udpPort == 0 {
+			udpPort = 30303
+		}
+		node = enode.NewV4(node.Pubkey(), ip, tcpPort, udpPort)
+	}
+
+	addr := &net.UDPAddr{IP: node.IP(), Port: node.UDP()}
+	return &sentryenv{endpoint, key, node, addr}
 }
