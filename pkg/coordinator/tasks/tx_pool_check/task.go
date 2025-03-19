@@ -430,7 +430,7 @@ func (te *sentryenv) checkPong(reply v4wire.Packet, pingHash []byte) error {
 }
 
 func ConnectToP2p(remoteAddress string, logger logrus.FieldLogger) (*sentryenv) {
-	endpoint, err := net.ListenPacket("udp", fmt.Sprintf("%v:30303", remoteAddress))
+	endpoint, err := net.ListenPacket("udp", "0.0.0.0:0")
 	if err != nil {
 		logger.Errorf("Failed to listen: %v", err)
 		return nil
