@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
-	"net/url"
+	"net/http"
+	"encoding/json"
 	"time"
+	"strings"
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/p2p/discover/v4wire"
@@ -129,16 +131,38 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.Infof("Using client: %s", client.GetName())
 
-	// Extract hostname from client URL, removing protocol and port
-	clientURL := client.GetEndpointConfig().URL
-	if parsedURL, err := url.Parse(clientURL); err == nil {
-		hostname := parsedURL.Hostname()
-		BasicPing(hostname, t.logger)
-	} else {
-		t.logger.Errorf("Failed to parse client URL: %v", err)
+	r, err := http.Post(client.GetEndpointConfig().URL, "application/json", strings.NewReader(
+		`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}`,
+	))
+
+	if err != nil {
+		t.logger.Errorf("Failed to send request: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
+
+	defer r.Body.Close()
+
+	var resp struct {
+		Result struct {
+			Enode     string `json:"enode"`
+			Protocols struct {
+				Eth struct {
+					Genesis    string `json:"genesis"`
+					Network    int    `json:"network"`
+					Difficulty int    `json:"difficulty"`
+				} `json:"eth"`
+			} `json:"protocols"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
+		t.logger.Errorf("Failed to decode response: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+	
+	BasicPing(resp.Result.Enode, t.logger)
 
 	var totalLatency time.Duration
 	retryCount := 0
