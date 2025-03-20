@@ -446,7 +446,13 @@ func (te *sentryenv) checkPong(reply v4wire.Packet, pingHash []byte) error {
 	if !bytes.Equal(pong.ReplyTok, pingHash) {
 		return fmt.Errorf("PONG reply token mismatch: got %x, want %x", pong.ReplyTok, pingHash)
 	}
-	if want := te.localEndpoint(); !want.IP.Equal(pong.To.IP) || want.UDP != pong.To.UDP {
+
+	want := te.localEndpoint()
+	if want.IP == nil || want.IP.Equal(net.IPv4zero) {
+		want.IP = pong.To.IP
+	}
+
+	if !want.IP.Equal(pong.To.IP) || want.UDP != pong.To.UDP {
 		return fmt.Errorf("PONG 'to' endpoint mismatch: got %+v, want %+v", pong.To, want)
 	}
 	if v4wire.Expired(pong.Expiration) {
