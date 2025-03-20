@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout base code
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         path: code
     - name: Generate wiki from docs
@@ -82,11 +82,11 @@ jobs:
     steps:
     # download build artifacts
     - name: "Download build artifacts"
-      uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4
+      uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
 
     # (re)create snapshot binary release
     - name: Update snapshot tag & remove previous snapshot release
-      uses: actions/github-script@ffc2c79a5b2490bd33e0a41c1de74b877714d736 # v3
+      uses: actions/github-script@ffc2c79a5b2490bd33e0a41c1de74b877714d736 # v3.2.0
       with:
         github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
@@ -151,7 +151,7 @@ jobs:
             console.log(e)
           }
     - name: Create snapshot release
-      uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
+      uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1.1.4
       id: create_release
       with:
         draft: false
@@ -181,7 +181,7 @@ jobs:
         cd assertoor_windows_amd64
         zip -r -q ../assertoor_snapshot_windows_amd64.zip .
     - name: "Upload snapshot release artifact: assertoor_snapshot_windows_amd64.zip"
-      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assertoor_snapshot_windows_amd64.zip
@@ -195,7 +195,7 @@ jobs:
         cd assertoor_linux_amd64
         tar -czf ../assertoor_snapshot_linux_amd64.tar.gz .
     - name: "Upload snapshot release artifact: assertoor_snapshot_linux_amd64.tar.gz"
-      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assertoor_snapshot_linux_amd64.tar.gz
@@ -209,7 +209,7 @@ jobs:
         cd assertoor_linux_arm64
         tar -czf ../assertoor_snapshot_linux_arm64.tar.gz .
     - name: "Upload snapshot release artifact: assertoor_snapshot_linux_arm64.tar.gz"
-      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assertoor_snapshot_linux_arm64.tar.gz
@@ -223,7 +223,7 @@ jobs:
         cd assertoor_darwin_amd64
         tar -czf ../assertoor_snapshot_darwin_amd64.tar.gz .
     - name: "Upload snapshot release artifact: assertoor_snapshot_darwin_amd64.tar.gz"
-      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assertoor_snapshot_darwin_amd64.tar.gz
@@ -237,7 +237,7 @@ jobs:
         cd assertoor_darwin_arm64
         tar -czf ../assertoor_snapshot_darwin_arm64.tar.gz .
     - name: "Upload snapshot release artifact: assertoor_snapshot_darwin_arm64.tar.gz"
-      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assertoor_snapshot_darwin_arm64.tar.gz
