@@ -161,6 +161,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
+
+	t.logger.Infof("Enode: %s", resp.Result.Enode)
 	
 	BasicPing(resp.Result.Enode, t.logger)
 
