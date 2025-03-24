@@ -13,6 +13,7 @@ import (
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
@@ -126,40 +127,21 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.Infof("Using client: %s", client.GetName())
 
-	r, err := http.Post(client.GetEndpointConfig().URL, "application/json", strings.NewReader(
-		`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}`,
-	))
-
+	conn, err := getTcpConn(client)
 	if err != nil {
-		t.logger.Errorf("Failed to send request: %v", err)
+		t.logger.Errorf("Failed to get TCP connection: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
 
-	defer r.Body.Close()
-
-	var resp struct {
-		Result struct {
-			Enode     string `json:"enode"`
-			Protocols struct {
-				Eth struct {
-					Genesis    string `json:"genesis"`
-					Network    int    `json:"network"`
-					Difficulty int    `json:"difficulty"`
-				} `json:"eth"`
-			} `json:"protocols"`
-		} `json:"result"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
-		t.logger.Errorf("Failed to decode response: %v", err)
+	defer conn.Close()
+	// handshake
+	err = conn.peer(chainID, nil)
+	if err != nil {
+		t.logger.Errorf("Failed to peer: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
-
-	t.logger.Infof("Enode: %s", resp.Result.Enode)
-
-	// BasicPing(resp.Result.Enode, client.GetEndpointConfig().URL, t.logger)
 
 	var totalLatency time.Duration
 	retryCount := 0
@@ -195,17 +177,14 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		retryCount = 0
 
-		// wait for tx to be confirmed
-		// for stop := false; !stop; {
-		// 	select {
-		// 		case msg := <-gotTxCh:
-		// 			if msg.MessageID == sentryproto.MessageId_TRANSACTIONS_66 {
-		// 				stop = true
-		// 			}
-		// 		case err := <-errCh:
-		// 			t.logger.Errorf("Error receiving tx: %v", err)
-		// 	}
-		// }
+		msg, err := conn.readTransactionMessages()
+		if err != nil {
+			t.logger.Errorf("Failed to read transaction messages: %v", err)
+			t.ctx.SetResult(types.TaskResultFailure)
+			return nil
+		}
+
+		t.logger.Infof("Got transaction message: %v", msg)
 
 		nonce++
 
@@ -327,4 +306,35 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	}
 
 	return signedTx, nil
+}
+
+func getTcpConn(client *execution.Client) (*Conn, error) {
+	r, err := http.Post(client.GetEndpointConfig().URL, "application/json", strings.NewReader(
+		`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}`,
+	))
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer r.Body.Close()
+
+	var resp struct {
+		Result struct {
+			Enode     string `json:"enode"`
+			Protocols struct {
+				Eth struct {
+					Genesis    string `json:"genesis"`
+					Network    int    `json:"network"`
+					Difficulty int    `json:"difficulty"`
+				} `json:"eth"`
+			} `json:"protocols"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+
+	return dialAs(resp.Result.Enode)
 }
