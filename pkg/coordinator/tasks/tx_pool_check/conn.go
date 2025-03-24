@@ -4,8 +4,8 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
-	"reflect"
 	"strconv"
 	"time"
 
@@ -163,11 +163,11 @@ func (c *Conn) ReadEth() (any, error) {
 
 // peer performs both the protocol handshake and the status message
 // exchange with the node in order to peer with it.
-func (c *Conn) peer(chain *Chain, status *eth.StatusPacket) error {
+func (c *Conn) peer(chainId *big.Int, status *eth.StatusPacket) error {
 	if err := c.handshake(); err != nil {
 		return fmt.Errorf("handshake failed: %v", err)
 	}
-	if err := c.statusExchange(chain, status); err != nil {
+	if err := c.statusExchange(chainId, status); err != nil {
 		return fmt.Errorf("status exchange failed: %v", err)
 	}
 	return nil
@@ -236,7 +236,7 @@ func (c *Conn) negotiateEthProtocol(caps []p2p.Cap) {
 }
 
 // statusExchange performs a `Status` message exchange with the given node.
-func (c *Conn) statusExchange(chain *Chain, status *eth.StatusPacket) error {
+func (c *Conn) statusExchange(chainId *big.Int, status *eth.StatusPacket) error {
 loop:
 	for {
 		code, data, err := c.Read()
@@ -249,16 +249,10 @@ loop:
 			if err := rlp.DecodeBytes(data, &msg); err != nil {
 				return fmt.Errorf("error decoding status packet: %w", err)
 			}
-			if have, want := msg.Head, chain.blocks[chain.Len()-1].Hash(); have != want {
-				return fmt.Errorf("wrong head block in status, want:  %#x (block %d) have %#x",
-					want, chain.blocks[chain.Len()-1].NumberU64(), have)
-			}
-			if have, want := msg.ForkID, chain.ForkID(); !reflect.DeepEqual(have, want) {
-				return fmt.Errorf("wrong fork ID in status: have %v, want %v", have, want)
-			}
 			if have, want := msg.ProtocolVersion, c.ourHighestProtoVersion; have != uint32(want) {
 				return fmt.Errorf("wrong protocol version: have %v, want %v", have, want)
 			}
+			fmt.Println("status msg", msg)
 			break loop
 		case discMsg:
 			var msg []p2p.DiscReason
@@ -282,15 +276,28 @@ loop:
 		// default status message
 		status = &eth.StatusPacket{
 			ProtocolVersion: uint32(c.negotiatedProtoVersion),
-			NetworkID:       chain.config.ChainID.Uint64(),
-			TD:              chain.TD(),
-			Head:            chain.blocks[chain.Len()-1].Hash(),
-			Genesis:         chain.blocks[0].Hash(),
-			ForkID:          chain.ForkID(),
+			NetworkID:       chainId.Uint64(),
+			TD:              new(big.Int).SetUint64(0),
 		}
 	}
 	if err := c.Write(ethProto, eth.StatusMsg, status); err != nil {
 		return fmt.Errorf("write to connection failed: %v", err)
 	}
 	return nil
+}
+
+// readTransactionMessages reads transaction messages from the connection.
+func (conn *Conn) readTransactionMessages() (*eth.TransactionsPacket, error) {
+	for {
+		msg, err := conn.ReadEth()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read eth msg: %v", err)
+		}
+		switch msg := msg.(type) {
+		case *eth.TransactionsPacket:
+			return msg, nil
+		default:
+			fmt.Printf("Received unexpected message: %v\n", msg)
+		}
+	}
 }
