@@ -286,18 +286,27 @@ loop:
 	return nil
 }
 
-// readTransactionMessages reads transaction messages from the connection.
-func (conn *Conn) readTransactionMessages() (*eth.TransactionsPacket, error) {
+// readUntil reads eth protocol messages until a message of the target type is
+// received.  It returns an error if there is a disconnect, or if the context
+// is cancelled before a message of the desired type can be read.
+func readUntil[T any](conn *Conn) (*T, error) {
 	for {
-		msg, err := conn.ReadEth()
+		received, err := conn.ReadEth()
 		if err != nil {
-			return nil, fmt.Errorf("failed to read eth msg: %v", err)
+			if err == errDisc {
+				return nil, errDisc
+			}
+			continue
 		}
-		switch msg := msg.(type) {
-		case *eth.TransactionsPacket:
-			return msg, nil
-		default:
-			fmt.Printf("Received unexpected message: %v\n", msg)
+
+		switch res := received.(type) {
+		case *T:
+			return res, nil
 		}
 	}
+}
+
+// readTransactionMessages reads transaction messages from the connection.
+func (conn *Conn) readTransactionMessages() (*eth.TransactionsPacket, error) {
+	return readUntil[eth.TransactionsPacket](conn)
 }
