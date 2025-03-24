@@ -39,7 +39,7 @@ type Conn struct {
 	caps                       []p2p.Cap
 }
 
-// dialAs attempts to dial a given node and perform a handshake using the given
+// dialAs attempts to dial a given node and perform a handshake using the generated
 // private key.
 func dialAs(remoteAddress string) (*Conn, error) {
 	key, _ := crypto.GenerateKey()
