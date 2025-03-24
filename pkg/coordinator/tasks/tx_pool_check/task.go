@@ -177,14 +177,14 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		retryCount = 0
 
-		msg, err := conn.readTransactionMessages()
+		msgs, err := conn.readTransactionMessages()
 		if err != nil {
 			t.logger.Errorf("Failed to read transaction messages: %v", err)
 			t.ctx.SetResult(types.TaskResultFailure)
 			return nil
 		}
 
-		t.logger.Infof("Got transaction message: %v", msg)
+		t.logger.Infof("Got transaction messages: %v", msgs)
 
 		nonce++
 
@@ -217,6 +217,22 @@ func (t *Task) Execute(ctx context.Context) error {
 	sentTxCount := 0
 
 	var lastTransaction *ethtypes.Transaction
+
+	conn2, err := getTcpConn(client)
+	if err != nil {
+		t.logger.Errorf("Failed to get TCP connection: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+
+	defer conn2.Close()
+	// handshake
+	err = conn2.peer(chainID, nil)
+	if err != nil {
+		t.logger.Errorf("Failed to peer: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
 
 	go func() {
 		for i := 0; i < t.config.TxCount; i++ {
@@ -252,30 +268,29 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.Infof("Waiting for tx confirmation for the last tx: %s", lastTransaction.Hash().Hex())
 
-	// lastMeasureTime := time.Now()
-	// gotTx := 0
+	lastMeasureTime := time.Now()
+	gotTx := 0
 
-	// for gotTx < t.config.TxCount {
-	// 	select {
-	// 	case msg := <-gotTxCh:
-	// 		if msg.MessageID != sentryproto.MessageId_TRANSACTIONS_66 {
-	// 			continue
-	// 		}
+	for gotTx < t.config.TxCount {
+			msgs, err := conn2.readTransactionMessages()
+			if err != nil {
+				t.logger.Errorf("Failed to read transaction messages: %v", err)
+				t.ctx.SetResult(types.TaskResultFailure)
+				return nil
+			}
 
-	// 		gotTx += 1
+			// Access the transactions from TransactionsPacket
+			gotTx += len(*msgs)
 
-	// 		if gotTx%t.config.MeasureInterval != 0 {
-	// 			continue
-	// 		}
+			if gotTx%t.config.MeasureInterval != 0 {
+				continue
+			}
 
-	// 		t.logger.Infof("Got %d transactions", gotTx)
-	// 		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
+			t.logger.Infof("Got %d transactions", gotTx)
+			t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
 
-	// 		lastMeasureTime = time.Now()
-	// 	case err := <-errCh:
-	// 		t.logger.Errorf("Error receiving tx: %v", err)
-	// 	}
-	// }
+			lastMeasureTime = time.Now()
+	}
 
 	totalTime := time.Since(startTime)
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
