@@ -127,7 +127,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.Infof("Using client: %s", client.GetName())
 
-	conn, err := getTcpConn(client)
+	conn, err := getTcpConn(client, t.logger)
 	if err != nil {
 		t.logger.Errorf("Failed to get TCP connection: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
@@ -218,7 +218,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var lastTransaction *ethtypes.Transaction
 
-	conn2, err := getTcpConn(client)
+	conn2, err := getTcpConn(client, t.logger)
 	if err != nil {
 		t.logger.Errorf("Failed to get TCP connection: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
@@ -323,7 +323,7 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	return signedTx, nil
 }
 
-func getTcpConn(client *execution.Client) (*Conn, error) {
+func getTcpConn(client *execution.Client, logger logrus.FieldLogger) (*Conn, error) {
 	r, err := http.Post(client.GetEndpointConfig().URL, "application/json", strings.NewReader(
 		`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}`,
 	))
@@ -350,6 +350,8 @@ func getTcpConn(client *execution.Client) (*Conn, error) {
 	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
 		return nil, err
 	}
+
+	logger.Infof("Got enode info: %v", resp.Result.Enode)
 
 	return dialAs(resp.Result.Enode)
 }

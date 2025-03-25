@@ -196,6 +196,7 @@ func (c *Conn) handshake() error {
 		if err := rlp.DecodeBytes(data, &msg); err != nil {
 			return fmt.Errorf("error decoding handshake msg: %v", err)
 		}
+		fmt.Println("handshake msg", msg)
 		// Set snappy if version is at least 5.
 		if msg.Version >= 5 {
 			c.SetSnappy(true)
