@@ -253,7 +253,6 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	forkId = forkid.NewID(chainConfig, genesis, head.NumberU64(), head.Time())
-	t.logger.Infof("Fork ID: %v", forkId)
 
 	// handshake
 	err = conn2.Peer(chainID, genesis.Hash(), head.Hash(), forkId, nil)
@@ -301,15 +300,14 @@ func (t *Task) Execute(ctx context.Context) error {
 	gotTx := 0
 
 	for gotTx < t.config.TxCount {
-			msgs, err := conn2.ReadTransactionMessages()
+			_, err := conn2.ReadTransactionMessages()
 			if err != nil {
 				t.logger.Errorf("Failed to read transaction messages: %v", err)
 				t.ctx.SetResult(types.TaskResultFailure)
 				return nil
 			}
 
-			// Access the transactions from TransactionsPacket
-			gotTx += len(*msgs)
+			gotTx++
 
 			if gotTx%t.config.MeasureInterval != 0 {
 				continue
