@@ -24,7 +24,7 @@ tasks:
   config:
     nonce: 2000
     txCount: 10000
-    measureInterval: 300
+    measureInterval: 1000
     expectedLatency: 500
     failOnHighLatency: true
     clientPattern: ""
@@ -36,7 +36,7 @@ tasks:
   config:
     nonce: 22000
     txCount: 15000
-    measureInterval: 300
+    measureInterval: 1500
     expectedLatency: 500
     failOnHighLatency: true
     clientPattern: ""
