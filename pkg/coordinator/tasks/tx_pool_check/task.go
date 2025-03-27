@@ -77,6 +77,7 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
+	chainConfig := params.AllDevChainProtocolChanges;
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	executionClients := clientPool.GetExecutionPool().GetReadyEndpoints(true)
 
@@ -109,7 +110,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	chainConfig := params.AllDevChainProtocolChanges;
 	forkId := forkid.NewID(chainConfig, genesis, head.NumberU64(), head.Time())
 
 	t.logger.Infof("Chain ID: %d", chainID)
