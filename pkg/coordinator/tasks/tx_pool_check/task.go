@@ -262,6 +262,9 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
+	// wait 5 sec between a test and the other
+	time.Sleep(5 * time.Second)
+
 	go func() {
 		for i := 0; i < t.config.TxCount; i++ {
 			// generate and sign tx
@@ -318,6 +321,9 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			lastMeasureTime = time.Now()
 	}
+
+	// wait 2 sec before finishing
+	time.Sleep(2 * time.Second)
 
 	totalTime := time.Since(startTime)
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
