@@ -121,15 +121,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	// get last nonce
-	latestBlock, err := executionClients[0].GetRPCClient().GetLatestBlock(ctx)
-	if err != nil {
-		t.logger.Errorf("Failed to fetch latest block: %v", err)
-		t.ctx.SetResult(types.TaskResultFailure)
-		return nil
-	}
-
-	nonce, err := executionClients[0].GetRPCClient().GetEthClient().NonceAt(ctx, crypto.PubkeyToAddress(privKey.PublicKey), latestBlock.Number())
+	nonce, err := executionClients[0].GetRPCClient().GetEthClient().NonceAt(ctx, crypto.PubkeyToAddress(privKey.PublicKey), head.Number())
 	if err != nil {
 		t.logger.Errorf("Failed to fetch nonce: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
