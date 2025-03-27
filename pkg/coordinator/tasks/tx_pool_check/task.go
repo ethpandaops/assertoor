@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/utils/geth"
+	"github.com/noku-team/assertoor/pkg/coordinator/utils/sentry"
 	"github.com/sirupsen/logrus"
 )
 
@@ -352,7 +352,7 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	return signedTx, nil
 }
 
-func getTcpConn(client *execution.Client) (*geth.Conn, error) {
+func getTcpConn(client *execution.Client) (*sentry.Conn, error) {
 	r, err := http.Post(client.GetEndpointConfig().URL, "application/json", strings.NewReader(
 		`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}`,
 	))
@@ -380,5 +380,5 @@ func getTcpConn(client *execution.Client) (*geth.Conn, error) {
 		return nil, err
 	}
 
-	return geth.DialAs(resp.Result.Enode)
+	return sentry.DialAs(resp.Result.Enode)
 }
