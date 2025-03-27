@@ -1,4 +1,4 @@
-package txpoolcheck
+package geth
 
 import (
 	"bytes"

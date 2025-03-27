@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
-package txpoolcheck
+package geth
 
 import (
 	"github.com/ethereum/go-ethereum/p2p"

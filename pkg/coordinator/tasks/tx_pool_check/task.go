@@ -11,12 +11,13 @@ import (
 	"strings"
 	"time"
 
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/forkid"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/utils/geth"
 	"github.com/sirupsen/logrus"
 )
 
@@ -155,7 +156,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	defer conn.Close()
 	// handshake
-	err = conn.peer(chainID, genesis.Hash(), head.Hash(), forkId, nil)
+	err = conn.Peer(chainID, genesis.Hash(), head.Hash(), forkId, nil)
 	if err != nil {
 		t.logger.Errorf("Failed to peer: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
@@ -196,7 +197,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		retryCount = 0
 
-		msgs, err := conn.readTransactionMessages()
+		msgs, err := conn.ReadTransactionMessages()
 		if err != nil {
 			t.logger.Errorf("Failed to read transaction messages: %v", err)
 			t.ctx.SetResult(types.TaskResultFailure)
@@ -255,7 +256,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.logger.Infof("Fork ID: %v", forkId)
 
 	// handshake
-	err = conn2.peer(chainID, genesis.Hash(), head.Hash(), forkId, nil)
+	err = conn2.Peer(chainID, genesis.Hash(), head.Hash(), forkId, nil)
 	if err != nil {
 		t.logger.Errorf("Failed to peer: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
@@ -300,7 +301,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	gotTx := 0
 
 	for gotTx < t.config.TxCount {
-			msgs, err := conn2.readTransactionMessages()
+			msgs, err := conn2.ReadTransactionMessages()
 			if err != nil {
 				t.logger.Errorf("Failed to read transaction messages: %v", err)
 				t.ctx.SetResult(types.TaskResultFailure)
@@ -351,7 +352,7 @@ func createDummyTransaction(nonce uint64, chainID *big.Int, privateKey *ecdsa.Pr
 	return signedTx, nil
 }
 
-func getTcpConn(client *execution.Client) (*Conn, error) {
+func getTcpConn(client *execution.Client) (*geth.Conn, error) {
 	r, err := http.Post(client.GetEndpointConfig().URL, "application/json", strings.NewReader(
 		`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}`,
 	))
@@ -379,5 +380,5 @@ func getTcpConn(client *execution.Client) (*Conn, error) {
 		return nil, err
 	}
 
-	return dialAs(resp.Result.Enode)
+	return geth.DialAs(resp.Result.Enode)
 }

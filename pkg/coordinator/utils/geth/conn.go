@@ -1,4 +1,4 @@
-package txpoolcheck
+package geth
 
 import (
 	"crypto/ecdsa"
@@ -39,36 +39,6 @@ type Conn struct {
 	ourHighestProtoVersion     uint
 	ourHighestSnapProtoVersion uint
 	caps                       []p2p.Cap
-}
-
-// dialAs attempts to dial a given node and perform a handshake using the generated
-// private key.
-func dialAs(remoteAddress string) (*Conn, error) {
-	key, _ := crypto.GenerateKey()
-
-	node, err := enode.Parse(enode.ValidSchemes, remoteAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	fd, err := net.Dial("tcp", node.IPAddr().String()+":"+strconv.FormatInt(int64(node.TCP()), 10))
-	if err != nil {
-		return nil, err
-	}
-
-	conn := Conn{Conn: rlpx.NewConn(fd, node.Pubkey())}
-	conn.ourKey = key
-	_, err = conn.Handshake(conn.ourKey)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-	conn.caps = []p2p.Cap{
-		{Name: "eth", Version: 67},
-		{Name: "eth", Version: 68},
-	}
-	conn.ourHighestProtoVersion = 68
-	return &conn, nil
 }
 
 // Read reads a packet from the connection.
@@ -165,7 +135,7 @@ func (c *Conn) ReadEth() (any, error) {
 
 // peer performs both the protocol handshake and the status message
 // exchange with the node in order to peer with it.
-func (c *Conn) peer(chainId *big.Int, genesisHash common.Hash, headHash common.Hash, forkId forkid.ID, status *eth.StatusPacket) error {
+func (c *Conn) Peer(chainId *big.Int, genesisHash common.Hash, headHash common.Hash, forkId forkid.ID, status *eth.StatusPacket) error {
 	if err := c.handshake(); err != nil {
 		return fmt.Errorf("handshake failed: %v", err)
 	}
@@ -313,6 +283,36 @@ func readUntil[T any](conn *Conn) (*T, error) {
 }
 
 // readTransactionMessages reads transaction messages from the connection.
-func (conn *Conn) readTransactionMessages() (*eth.TransactionsPacket, error) {
+func (conn *Conn) ReadTransactionMessages() (*eth.TransactionsPacket, error) {
 	return readUntil[eth.TransactionsPacket](conn)
+}
+
+// dialAs attempts to dial a given node and perform a handshake using the generated
+// private key.
+func DialAs(remoteAddress string) (*Conn, error) {
+	key, _ := crypto.GenerateKey()
+
+	node, err := enode.Parse(enode.ValidSchemes, remoteAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	fd, err := net.Dial("tcp", node.IPAddr().String()+":"+strconv.FormatInt(int64(node.TCP()), 10))
+	if err != nil {
+		return nil, err
+	}
+
+	conn := Conn{Conn: rlpx.NewConn(fd, node.Pubkey())}
+	conn.ourKey = key
+	_, err = conn.Handshake(conn.ourKey)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	conn.caps = []p2p.Cap{
+		{Name: "eth", Version: 67},
+		{Name: "eth", Version: 68},
+	}
+	conn.ourHighestProtoVersion = 68
+	return &conn, nil
 }
