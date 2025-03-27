@@ -252,6 +252,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	forkId = forkid.NewID(chainConfig, genesis, head.NumberU64(), head.Time())
+	t.logger.Infof("Fork ID: %v", forkId)
 
 	// handshake
 	err = conn2.peer(chainID, genesis.Hash(), head.Hash(), forkId, nil)
