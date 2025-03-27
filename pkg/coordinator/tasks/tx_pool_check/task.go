@@ -197,7 +197,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		retryCount = 0
 
-		msgs, err := conn.ReadTransactionMessages()
+		_, err = conn.ReadTransactionMessages()
 		if err != nil {
 			t.logger.Errorf("Failed to read transaction messages: %v", err)
 			t.ctx.SetResult(types.TaskResultFailure)
@@ -211,7 +211,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		if (i+1)%t.config.MeasureInterval == 0 {
 			avgSoFar := totalLatency.Milliseconds() / int64(i+1)
-			t.logger.Infof("Processed %d transactions, current avg latency: %dms. Got transaction messages: %v", i+1, avgSoFar, msgs.Kind())
+			t.logger.Infof("Processed %d transactions, current avg latency: %dms.", i+1, avgSoFar)
 		}
 	}
 
