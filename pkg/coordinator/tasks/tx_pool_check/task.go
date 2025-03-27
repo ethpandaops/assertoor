@@ -203,8 +203,6 @@ func (t *Task) Execute(ctx context.Context) error {
 			return nil
 		}
 
-		t.logger.Infof("Got transaction messages: %v", msgs)
-
 		nonce++
 
 		latency := time.Since(startTx)
@@ -212,7 +210,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		if (i+1)%t.config.MeasureInterval == 0 {
 			avgSoFar := totalLatency.Milliseconds() / int64(i+1)
-			t.logger.Infof("Processed %d transactions, current avg latency: %dms", i+1, avgSoFar)
+			t.logger.Infof("Processed %d transactions, current avg latency: %dms. Got transaction messages: %v", i+1, avgSoFar, msgs.Name())
 		}
 	}
 
