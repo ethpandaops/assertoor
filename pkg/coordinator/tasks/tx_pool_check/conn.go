@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -163,11 +165,11 @@ func (c *Conn) ReadEth() (any, error) {
 
 // peer performs both the protocol handshake and the status message
 // exchange with the node in order to peer with it.
-func (c *Conn) peer(chainId *big.Int, status *eth.StatusPacket) error {
+func (c *Conn) peer(chainId *big.Int, genesisHash common.Hash, headHash common.Hash, forkId forkid.ID, status *eth.StatusPacket) error {
 	if err := c.handshake(); err != nil {
 		return fmt.Errorf("handshake failed: %v", err)
 	}
-	if err := c.statusExchange(chainId, status); err != nil {
+	if err := c.statusExchange(chainId, genesisHash, headHash, forkId, status); err != nil {
 		return fmt.Errorf("status exchange failed: %v", err)
 	}
 	return nil
@@ -237,7 +239,7 @@ func (c *Conn) negotiateEthProtocol(caps []p2p.Cap) {
 }
 
 // statusExchange performs a `Status` message exchange with the given node.
-func (c *Conn) statusExchange(chainId *big.Int, status *eth.StatusPacket) error {
+func (c *Conn) statusExchange(chainId *big.Int, genesisHash common.Hash, headHash common.Hash, forkId forkid.ID, status *eth.StatusPacket) error {
 loop:
 	for {
 		code, data, err := c.Read()
@@ -279,6 +281,9 @@ loop:
 			ProtocolVersion: uint32(c.negotiatedProtoVersion),
 			NetworkID:       chainId.Uint64(),
 			TD:              new(big.Int).SetUint64(0),
+			Head:            headHash,
+			Genesis:         genesisHash,
+			ForkID:          forkId,
 		}
 	}
 	if err := c.Write(ethProto, eth.StatusMsg, status); err != nil {

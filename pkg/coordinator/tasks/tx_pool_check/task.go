@@ -12,7 +12,9 @@ import (
 	"time"
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
@@ -92,6 +94,23 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
+	genesis, err := executionClients[0].GetRPCClient().GetEthClient().BlockByNumber(ctx, new(big.Int).SetUint64(0))
+	if err != nil {
+		t.logger.Errorf("Failed to fetch genesis block: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+
+	head, err := executionClients[0].GetRPCClient().GetLatestBlock(ctx);
+	if err != nil {
+		t.logger.Errorf("Failed to fetch head block: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+
+	chainConfig := params.AllDevChainProtocolChanges;
+	forkId := forkid.NewID(chainConfig, genesis, head.NumberU64(), head.Time())
+
 	t.logger.Infof("Chain ID: %d", chainID)
 
 	privKey, err := crypto.HexToECDSA(t.config.PrivateKey)
@@ -136,7 +155,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	defer conn.Close()
 	// handshake
-	err = conn.peer(chainID, nil)
+	err = conn.peer(chainID, genesis.Hash(), head.Hash(), forkId, nil)
 	if err != nil {
 		t.logger.Errorf("Failed to peer: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
@@ -226,8 +245,18 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	defer conn2.Close()
+
+	head, err = client.GetRPCClient().GetLatestBlock(ctx);
+	if err != nil {
+		t.logger.Errorf("Failed to fetch head block: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+
+	forkId = forkid.NewID(chainConfig, genesis, head.NumberU64(), head.Time())
+
 	// handshake
-	err = conn2.peer(chainID, nil)
+	err = conn2.peer(chainID, genesis.Hash(), head.Hash(), forkId, nil)
 	if err != nil {
 		t.logger.Errorf("Failed to peer: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
