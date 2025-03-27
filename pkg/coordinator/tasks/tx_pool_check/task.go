@@ -293,9 +293,9 @@ func (t *Task) Execute(ctx context.Context) error {
 				lastTransaction = tx
 			}
 		}
-	}()
 
-	t.logger.Infof("Waiting for tx confirmation for the last tx: %s", lastTransaction.Hash().Hex())
+		t.logger.Infof("Waiting for tx confirmation for the last tx: %s", lastTransaction.Hash().Hex())
+	}()
 
 	lastMeasureTime := time.Now()
 	gotTx := 0
