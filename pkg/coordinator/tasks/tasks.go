@@ -39,6 +39,7 @@ import (
 	runtasks "github.com/noku-team/assertoor/pkg/coordinator/tasks/run_tasks"
 	runtasksconcurrent "github.com/noku-team/assertoor/pkg/coordinator/tasks/run_tasks_concurrent"
 	txpoolcheck "github.com/noku-team/assertoor/pkg/coordinator/tasks/tx_pool_check"
+	txpoolclean "github.com/noku-team/assertoor/pkg/coordinator/tasks/tx_pool_clean"
 	sleep "github.com/noku-team/assertoor/pkg/coordinator/tasks/sleep"
 )
 
@@ -79,6 +80,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	runtasks.TaskDescriptor,
 	runtasksconcurrent.TaskDescriptor,
 	txpoolcheck.TaskDescriptor,
+	txpoolclean.TaskDescriptor,
 	sleep.TaskDescriptor,
 }
 
