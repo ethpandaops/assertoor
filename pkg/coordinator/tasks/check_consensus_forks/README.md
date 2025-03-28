@@ -13,7 +13,7 @@ The `check_consensus_forks` task is designed to check for forks in the consensus
   The distance is measured by the number of blocks between the heads of the forked chains.
 
 - **`maxForkCount`**:\
-  The maximum number of forks that are acceptable. If the number of forks exceeds this limit, the task will coplete with a failure result.
+  The maximum number of forks that are acceptable. If the number of forks exceeds this limit, the task will complete with a failure result.
 
 ### Defaults
 
