@@ -15,7 +15,5 @@ tasks:
     measureInterval: 100
     expectedLatency: 500
     failOnHighLatency: true
-    clientPattern: ""
-    excludeClientPattern: ""
   configVars:
     privateKey: "walletPrivkey"
