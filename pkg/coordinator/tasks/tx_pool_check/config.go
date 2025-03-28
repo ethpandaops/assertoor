@@ -8,8 +8,6 @@ type Config struct {
 	MeasureInterval    int      `yaml:"measureInterval" json:"measureInterval"`
 	ExpectedLatency    int64    `yaml:"expectedLatency" json:"expectedLatency"`
 	FailOnHighLatency  bool     `yaml:"failOnHighLatency" json:"failOnHighLatency"`
-	ClientPattern      string   `yaml:"clientPattern" json:"clientPattern"`
-	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
 }
 
 func DefaultConfig() Config {
