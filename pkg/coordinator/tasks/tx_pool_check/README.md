@@ -21,19 +21,16 @@ The `tx_pool_check` task evaluates the throughput and latency of transaction pro
 - **`failOnHighLatency`**:
   Whether the task should fail if the measured latency exceeds `expectedLatency`.
 
-- **`clientPattern`**:
-  Regex pattern to select specific client endpoints.
-
-- **`excludeClientPattern`**:
-  Regex pattern to exclude certain clients.
-
 ### Outputs
 
-- **`avgLatency`**:
-  The measured average transaction latency in milliseconds.
+- **`tx_count`**:
+  The total number of transactions sent.
 
-- **`totalTime`**:
-  The total time taken to send all transactions.
+- **`avg_latency_ms`**:
+  The average latency of the transactions in milliseconds.
+
+- **`total_time_ms`**:
+  The total time taken to send the transactions in milliseconds.
 
 ### Defaults
 
@@ -44,8 +41,6 @@ The `tx_pool_check` task evaluates the throughput and latency of transaction pro
     measureInterval: 1000
     expectedLatency: 500
     failOnHighLatency: false
-    clientPattern: ""
-    excludeClientPattern: ""
   configVars:
     privateKey: "walletPrivkey"
 ```
