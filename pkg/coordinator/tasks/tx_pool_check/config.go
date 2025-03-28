@@ -15,6 +15,7 @@ func DefaultConfig() Config {
 		TxCount:         1000,
 		MeasureInterval: 100,
 		ExpectedLatency: 500, // in milliseconds
+		FailOnHighLatency: true,
 	}
 }
 
