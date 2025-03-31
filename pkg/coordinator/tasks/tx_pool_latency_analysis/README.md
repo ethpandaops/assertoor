@@ -1,13 +1,16 @@
-## `tx_pool_check` Task
+## `tx_pool_latency_analysis` Task
 
 ### Description
 
-The `tx_pool_check` task evaluates the throughput and latency of transaction processing within an Ethereum execution client’s transaction pool.
+The `tx_pool_latency_analysis` task evaluates latency of transaction processing within an Ethereum execution client’s transaction pool.
 
 ### Configuration Parameters
 
 - **`privateKey`**:
   The private key of the account to use for sending transactions.
+
+- **`nonce`**:
+  The nonce to use for the transactions. If not provided, the task will fetch the current nonce from the Ethereum node.
 
 - **`txCount`**:
   The total number of transactions to send.
@@ -29,18 +32,16 @@ The `tx_pool_check` task evaluates the throughput and latency of transaction pro
 - **`avg_latency_ms`**:
   The average latency of the transactions in milliseconds.
 
-- **`total_time_ms`**:
-  The total time taken to send the transactions in milliseconds.
-
 ### Defaults
 
 ```yaml
-- name: tx_pool_check
+- name: tx_pool_latency_analysis
   config:
+    nonce: 0
     txCount: 15000
     measureInterval: 1000
     expectedLatency: 500
     failOnHighLatency: false
   configVars:
-    privateKey: "walletPrivkey"
+    privateKey: "tx_pool_latency_analysis"
 ```
