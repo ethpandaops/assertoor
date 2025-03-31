@@ -2,11 +2,14 @@ package sentry
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"net"
+	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -18,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/rlpx"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 )
 
 var (
@@ -289,7 +293,7 @@ func (conn *Conn) ReadTransactionMessages() (*eth.TransactionsPacket, error) {
 
 // dialAs attempts to dial a given node and perform a handshake using the generated
 // private key.
-func DialAs(remoteAddress string) (*Conn, error) {
+func dialAs(remoteAddress string) (*Conn, error) {
 	key, _ := crypto.GenerateKey()
 
 	node, err := enode.Parse(enode.ValidSchemes, remoteAddress)
@@ -315,4 +319,37 @@ func DialAs(remoteAddress string) (*Conn, error) {
 	}
 	conn.ourHighestProtoVersion = 68
 	return &conn, nil
+}
+
+// GetTcpConn dials the TCP wire eth connection to the given client retrieving the
+// node information using the `admin_nodeInfo` method.
+func GetTcpConn(client *execution.Client) (*Conn, error) {
+	r, err := http.Post(client.GetEndpointConfig().URL, "application/json", strings.NewReader(
+		`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}`,
+	))
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer r.Body.Close()
+
+	var resp struct {
+		Result struct {
+			Enode     string `json:"enode"`
+			Protocols struct {
+				Eth struct {
+					Genesis    string `json:"genesis"`
+					Network    int    `json:"network"`
+					Difficulty int    `json:"difficulty"`
+				} `json:"eth"`
+			} `json:"protocols"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+
+	return dialAs(resp.Result.Enode)
 }
