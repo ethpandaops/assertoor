@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/forkid"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
@@ -102,7 +101,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	var lastTransaction *ethtypes.Transaction
 	startTime := time.Now()
 	sentTxCount := 0
 
@@ -131,13 +129,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				elapsed := time.Since(startTime)
 				t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
 			}
-
-			if i == t.config.TxCount-1 {
-				lastTransaction = tx
-			}
 		}
-
-		t.logger.Infof("Waiting for tx confirmation for the last tx: %s", lastTransaction.Hash().Hex())
 	}()
 
 	lastMeasureTime := time.Now()
