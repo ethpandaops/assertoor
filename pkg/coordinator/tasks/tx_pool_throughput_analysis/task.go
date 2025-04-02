@@ -155,9 +155,6 @@ func (t *Task) Execute(ctx context.Context) error {
 			lastMeasureTime = time.Now()
 	}
 
-	// wait 2 sec before finishing
-	time.Sleep(2 * time.Second)
-
 	totalTime := time.Since(startTime)
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
 	t.ctx.Outputs.SetVar("total_time_ms", totalTime.Milliseconds())
