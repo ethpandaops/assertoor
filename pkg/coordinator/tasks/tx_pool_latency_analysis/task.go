@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/noku-team/assertoor/pkg/coordinator/utils/sentry"
 	txpool "github.com/noku-team/assertoor/pkg/coordinator/utils/tx_pool"
@@ -83,7 +84,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	conn, err := t.getTcpConn(ctx)
+	conn, err := t.getTcpConn(ctx, client)
 	if err != nil {
 		t.logger.Errorf("Failed to get wire eth TCP connection: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
@@ -185,17 +186,13 @@ func (t *Task) getNonce(ctx context.Context, privKey *ecdsa.PrivateKey) (uint64,
 	return nonce, nil
 }
 
-func (t *Task) getTcpConn(ctx context.Context) (*sentry.Conn, error) {
+func (t *Task) getTcpConn(ctx context.Context, client *execution.Client) (*sentry.Conn, error) {
 	chainConfig := params.AllDevChainProtocolChanges;
 	executionClients := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetReadyEndpoints(true)
 
 	if len(executionClients) == 0 {
 		return nil, fmt.Errorf("no execution clients available")
 	}
-
-	// select random client, not the first
-	clientIndex := rand.Intn(len(executionClients))
-	client := executionClients[clientIndex]
 
 	head, err := executionClients[0].GetRPCClient().GetLatestBlock(ctx);
 	if err != nil {

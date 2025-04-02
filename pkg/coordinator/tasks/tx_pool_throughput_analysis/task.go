@@ -8,10 +8,10 @@ import (
 	"math/rand"
 	"time"
 
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/noku-team/assertoor/pkg/coordinator/utils/sentry"
 	txpool "github.com/noku-team/assertoor/pkg/coordinator/utils/tx_pool"
@@ -84,7 +84,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	client := executionClients[rand.Intn(len(executionClients))]
 
-	conn, err := t.getTcpConn(ctx)
+	conn, err := t.getTcpConn(ctx, client)
 	if err != nil {
 		t.logger.Errorf("Failed to get wire eth TCP connection: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
@@ -101,7 +101,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	var lastTransaction *ethtypes.Transaction
 	startTime := time.Now()
 	sentTxCount := 0
 
@@ -130,13 +129,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				elapsed := time.Since(startTime)
 				t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
 			}
-
-			if i == t.config.TxCount-1 {
-				lastTransaction = tx
-			}
 		}
-
-		t.logger.Infof("Waiting for tx confirmation for the last tx: %s", lastTransaction.Hash().Hex())
 	}()
 
 	lastMeasureTime := time.Now()
@@ -161,9 +154,6 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			lastMeasureTime = time.Now()
 	}
-
-	// wait 2 sec before finishing
-	time.Sleep(2 * time.Second)
 
 	totalTime := time.Since(startTime)
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
@@ -191,17 +181,13 @@ func (t *Task) getNonce(ctx context.Context, privKey *ecdsa.PrivateKey) (uint64,
 	return nonce, nil
 }
 
-func (t *Task) getTcpConn(ctx context.Context) (*sentry.Conn, error) {
+func (t *Task) getTcpConn(ctx context.Context, client *execution.Client) (*sentry.Conn, error) {
 	chainConfig := params.AllDevChainProtocolChanges;
 	executionClients := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetReadyEndpoints(true)
 
 	if len(executionClients) == 0 {
 		return nil, fmt.Errorf("no execution clients available")
 	}
-
-	// select random client, not the first
-	clientIndex := rand.Intn(len(executionClients))
-	client := executionClients[clientIndex]
 
 	head, err := executionClients[0].GetRPCClient().GetLatestBlock(ctx);
 	if err != nil {
@@ -237,6 +223,8 @@ func (t *Task) getTcpConn(ctx context.Context) (*sentry.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	t.logger.Infof("Connected to %s", client.GetName())
 
 	return conn, nil
 }

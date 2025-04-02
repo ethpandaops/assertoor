@@ -1,14 +1,14 @@
 package txpoolclean
 
-import "time"
+// import "time"
 
 type Config struct {
-	WaitTime           time.Duration      `yaml:"waitTime" json:"waitTime"`
+	// WaitTime           time.Duration      `yaml:"waitTime" json:"waitTime"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		WaitTime: 5, // in seconds
+		// WaitTime: time.Duration(5), // in seconds
 	}
 }
 
