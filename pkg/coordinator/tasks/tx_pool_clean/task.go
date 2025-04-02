@@ -98,7 +98,7 @@ func (t *Task) cleanRecursive(client *execution.Client) error {
 	}
 
 	// wait for a while before checking again
-	time.Sleep(t.config.WaitTime * time.Second)
+	time.Sleep(5 * time.Second)
 	t.logger.Infof("TxPool is not clean for client %s, checking again...", client.GetEndpointConfig().URL)
 	return t.cleanRecursive(client)
 }
