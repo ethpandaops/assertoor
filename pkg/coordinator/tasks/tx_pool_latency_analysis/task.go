@@ -150,20 +150,20 @@ func (t *Task) Execute(ctx context.Context) error {
 		totalLatency += latency
 
 		if (i+1)%t.config.MeasureInterval == 0 {
-			avgSoFar := totalLatency.Milliseconds() / int64(i+1)
+			avgSoFar := totalLatency.Microseconds() / int64(i+1)
 			t.logger.Infof("Processed %d transactions, current avg latency: %dms.", i+1, avgSoFar)
 		}
 	}
 
 	avgLatency := totalLatency / time.Duration(t.config.TxCount)
-	t.logger.Infof("Average transaction latency: %dms", avgLatency.Milliseconds())
+	t.logger.Infof("Average transaction latency: %dms", avgLatency.Microseconds())
 
-	if t.config.FailOnHighLatency && avgLatency.Milliseconds() > t.config.ExpectedLatency {
-		t.logger.Errorf("Transaction latency too high: %dms (expected <= %dms)", avgLatency.Milliseconds(), t.config.ExpectedLatency)
+	if t.config.FailOnHighLatency && avgLatency.Microseconds() > t.config.ExpectedLatency {
+		t.logger.Errorf("Transaction latency too high: %dms (expected <= %dms)", avgLatency.Microseconds(), t.config.ExpectedLatency)
 		t.ctx.SetResult(types.TaskResultFailure)
 	} else {
 		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
-		t.ctx.Outputs.SetVar("avg_latency_ms", avgLatency.Milliseconds())
+		t.ctx.Outputs.SetVar("avg_latency_mus", avgLatency.Microseconds())
 		t.ctx.Outputs.SetVar("detailed_latencies", latencies)
 		t.ctx.SetResult(types.TaskResultSuccess)
 	}
