@@ -108,6 +108,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	defer conn.Close()
 
+	var txs []*ethtypes.Transaction
+
 	startTime := time.Now()
 	sentTxCount := 0
 
@@ -135,6 +137,8 @@ func (t *Task) Execute(ctx context.Context) error {
 					t.ctx.SetResult(types.TaskResultFailure)
 					return
 				}
+
+				txs = append(txs, tx)
 			}()
 
 			// wait for 1/TxCount second: if 100 tx, than wait 10ms per cycle
@@ -163,6 +167,17 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
 
 		lastMeasureTime = time.Now()
+	}
+
+	// send to other clients, for speeding up tx mining
+	for _, tx := range txs {
+		for _, otherClient := range executionClients {
+			if otherClient.GetName() == client.GetName() {
+				continue
+			}
+
+			client.GetRPCClient().SendTransaction(ctx, tx)
+		}
 	}
 
 	totalTime := time.Since(startTime)

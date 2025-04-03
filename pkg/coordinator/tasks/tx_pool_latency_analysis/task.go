@@ -110,6 +110,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var totalLatency time.Duration
 	var latencies []time.Duration
+
+	var txs []*ethtypes.Transaction
 	retryCount := 0
 
 	for i := 0; i < t.config.TxCount; i++ {
@@ -139,6 +141,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			continue
 		}
 
+		txs = append(txs, tx)
 		retryCount = 0
 
 		_, err = conn.ReadTransactionMessages()
@@ -160,6 +163,17 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	avgLatency := totalLatency / time.Duration(t.config.TxCount)
 	t.logger.Infof("Average transaction latency: %dms", avgLatency.Microseconds())
+
+	// send to other clients, for speeding up tx mining
+	for _, tx := range txs {
+		for _, otherClient := range executionClients {
+			if otherClient.GetName() == client.GetName() {
+				continue
+			}
+
+			client.GetRPCClient().SendTransaction(ctx, tx)
+		}
+	}
 
 	if t.config.FailOnHighLatency && avgLatency.Microseconds() > t.config.ExpectedLatency {
 		t.logger.Errorf("Transaction latency too high: %dms (expected <= %dms)", avgLatency.Microseconds(), t.config.ExpectedLatency)
