@@ -3,7 +3,6 @@ package txpoollatencyanalysis
 type Config struct {
 	PrivateKey string `yaml:"privateKey" json:"privateKey"`
 
-	Nonce							 *uint64	`yaml:"nonce" json:"nonce"`
 	TxCount            int      `yaml:"txCount" json:"txCount"`
 	MeasureInterval    int      `yaml:"measureInterval" json:"measureInterval"`
 	ExpectedLatency    int64    `yaml:"expectedLatency" json:"expectedLatency"`
