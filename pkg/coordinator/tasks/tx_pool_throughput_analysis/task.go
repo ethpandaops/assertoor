@@ -107,28 +107,33 @@ func (t *Task) Execute(ctx context.Context) error {
 	go func() {
 		for i := 0; i < t.config.TxCount; i++ {
 			// generate and sign tx
-			tx, err := txpool.CreateDummyTransaction(nonce, chainID, privKey)
-			if err != nil {
-				t.logger.Errorf("Failed to create transaction: %v", err)
-				t.ctx.SetResult(types.TaskResultFailure)
-				return
-			}
+			go func() {
+					tx, err := txpool.CreateDummyTransaction(nonce, chainID, privKey)
+					if err != nil {
+						t.logger.Errorf("Failed to create transaction: %v", err)
+						t.ctx.SetResult(types.TaskResultFailure)
+						return
+					}
 
-			err = client.GetRPCClient().SendTransaction(ctx, tx)
+					sentTxCount++
+					nonce++
 
-			if err != nil {
-				t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
-				t.ctx.SetResult(types.TaskResultFailure)
-				return
-			}
+					err = client.GetRPCClient().SendTransaction(ctx, tx)
 
-			sentTxCount++
-			nonce++
+					if err != nil {
+						t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
+						t.ctx.SetResult(types.TaskResultFailure)
+						return
+					}
 
-			if sentTxCount%t.config.MeasureInterval == 0 {
-				elapsed := time.Since(startTime)
-				t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
-			}
+					if sentTxCount%t.config.MeasureInterval == 0 {
+						elapsed := time.Since(startTime)
+						t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
+					}
+			}()
+
+			// wait for 1/TxCount second: if 100 tx, than wait 10ms per cycle
+			time.Sleep(time.Second / time.Duration(t.config.TxCount))
 		}
 	}()
 
