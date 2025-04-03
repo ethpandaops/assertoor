@@ -102,6 +102,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	var totalLatency time.Duration
+	var latencies []time.Duration
 	retryCount := 0
 
 	for i := 0; i < t.config.TxCount; i++ {
@@ -145,6 +146,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		nonce++
 
 		latency := time.Since(startTx)
+		latencies = append(latencies, latency)
 		totalLatency += latency
 
 		if (i+1)%t.config.MeasureInterval == 0 {
@@ -153,7 +155,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	// todo: change, cause the average latency isn't measured that way. It's a test only for the future percentiles measurement
 	avgLatency := totalLatency / time.Duration(t.config.TxCount)
 	t.logger.Infof("Average transaction latency: %dms", avgLatency.Milliseconds())
 
@@ -163,6 +164,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	} else {
 		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
 		t.ctx.Outputs.SetVar("avg_latency_ms", avgLatency.Milliseconds())
+		t.ctx.Outputs.SetVar("detailed_latencies", latencies)
+		t.ctx.SetResult(types.TaskResultSuccess)
 	}
 
 	return nil
