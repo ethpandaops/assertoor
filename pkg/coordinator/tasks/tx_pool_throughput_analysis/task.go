@@ -108,7 +108,6 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	defer conn.Close()
 
-	var tx *ethtypes.Transaction
 	startTime := time.Now()
 	sentTxCount := 0
 
@@ -116,7 +115,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		for i := 0; i < t.config.TxCount; i++ {
 			// generate and sign tx
 			go func() {
-				tx, err = t.generateTransaction(ctx)
+				tx, err := t.generateTransaction(ctx)
 				if err != nil {
 					t.logger.Errorf("Failed to create transaction: %v", err)
 					t.ctx.SetResult(types.TaskResultFailure)
@@ -168,21 +167,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	totalTime := time.Since(startTime)
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
+
 	t.ctx.Outputs.SetVar("total_time_ms", totalTime.Milliseconds())
-
-	t.logger.Infof("Waiting for last tx %s to be mined...", tx.Hash().Hex())
-
-	receipt, err := t.wallet.AwaitTransaction(ctx, tx)
-	if err != nil {
-		t.logger.Warnf("failed waiting for tx receipt: %v", err)
-		return fmt.Errorf("failed waiting for tx receipt: %v", err)
-	}
-
-	if receipt == nil {
-		return fmt.Errorf("tx receipt not found")
-	}
-
-	t.logger.Infof("last transaction %v confirmed (nonce: %v, status: %v)", tx.Hash().Hex(), tx.Nonce(), receipt.Status)
 	t.ctx.SetResult(types.TaskResultSuccess)
 
 	return nil
