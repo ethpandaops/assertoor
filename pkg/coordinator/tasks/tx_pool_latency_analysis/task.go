@@ -191,26 +191,21 @@ func (t *Task) getNonce(ctx context.Context, privKey *ecdsa.PrivateKey) (uint64,
 
 func (t *Task) getTcpConn(ctx context.Context, client *execution.Client) (*sentry.Conn, error) {
 	chainConfig := params.AllDevChainProtocolChanges;
-	executionClients := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetReadyEndpoints(true)
 
-	if len(executionClients) == 0 {
-		return nil, fmt.Errorf("no execution clients available")
-	}
-
-	head, err := executionClients[0].GetRPCClient().GetLatestBlock(ctx);
+	head, err := client.GetRPCClient().GetLatestBlock(ctx);
 	if err != nil {
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil, err
 	}
 
-	chainID, err := executionClients[0].GetRPCClient().GetEthClient().ChainID(ctx)
+	chainID, err := client.GetRPCClient().GetEthClient().ChainID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	chainConfig.ChainID = chainID
 
-	genesis, err := executionClients[0].GetRPCClient().GetEthClient().BlockByNumber(ctx, new(big.Int).SetUint64(0))
+	genesis, err := client.GetRPCClient().GetEthClient().BlockByNumber(ctx, new(big.Int).SetUint64(0))
 	if err != nil {
 		t.logger.Errorf("Failed to fetch genesis block: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
