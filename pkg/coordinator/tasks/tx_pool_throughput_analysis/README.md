@@ -9,9 +9,6 @@ The `tx_pool_throughput_analysis` task evaluates the throughput of transaction p
 - **`privateKey`**:
   The private key of the account to use for sending transactions.
 
-- **`nonce`**:
-  The nonce to use for the transactions. If not provided, the task will fetch the current nonce from the Ethereum node.
-
 - **`txCount`**:
   The total number of transactions to send.
 
