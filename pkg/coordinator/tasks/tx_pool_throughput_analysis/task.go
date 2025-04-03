@@ -34,7 +34,7 @@ var (
 type Task struct {
 	ctx     *types.TaskContext
 	options *types.TaskOptions
-	wallet	*wallet.Wallet
+	wallet  *wallet.Wallet
 	config  Config
 	logger  logrus.FieldLogger
 }
@@ -88,7 +88,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("cannot load wallet state: %w", err)
 	}
-	
+
 	executionClients := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetReadyEndpoints(true)
 
 	if len(executionClients) == 0 {
@@ -105,7 +105,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
-	
+
 	defer conn.Close()
 
 	var tx *ethtypes.Transaction
@@ -116,26 +116,26 @@ func (t *Task) Execute(ctx context.Context) error {
 		for i := 0; i < t.config.TxCount; i++ {
 			// generate and sign tx
 			go func() {
-					tx, err = t.generateTransaction(ctx)
-					if err != nil {
-						t.logger.Errorf("Failed to create transaction: %v", err)
-						t.ctx.SetResult(types.TaskResultFailure)
-						return
-					}
+				tx, err = t.generateTransaction(ctx)
+				if err != nil {
+					t.logger.Errorf("Failed to create transaction: %v", err)
+					t.ctx.SetResult(types.TaskResultFailure)
+					return
+				}
 
-					sentTxCount++
+				sentTxCount++
 
-					if sentTxCount%t.config.MeasureInterval == 0 {
-						elapsed := time.Since(startTime)
-						t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
-					}
+				if sentTxCount%t.config.MeasureInterval == 0 {
+					elapsed := time.Since(startTime)
+					t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
+				}
 
-					err = client.GetRPCClient().SendTransaction(ctx, tx)
-					if err != nil {
-						t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
-						t.ctx.SetResult(types.TaskResultFailure)
-						return
-					}
+				err = client.GetRPCClient().SendTransaction(ctx, tx)
+				if err != nil {
+					t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
+					t.ctx.SetResult(types.TaskResultFailure)
+					return
+				}
 			}()
 
 			// wait for 1/TxCount second: if 100 tx, than wait 10ms per cycle
@@ -147,23 +147,23 @@ func (t *Task) Execute(ctx context.Context) error {
 	gotTx := 0
 
 	for gotTx < t.config.TxCount {
-			_, err := conn.ReadTransactionMessages()
-			if err != nil {
-				t.logger.Errorf("Failed to read transaction messages: %v", err)
-				t.ctx.SetResult(types.TaskResultFailure)
-				return nil
-			}
+		_, err := conn.ReadTransactionMessages()
+		if err != nil {
+			t.logger.Errorf("Failed to read transaction messages: %v", err)
+			t.ctx.SetResult(types.TaskResultFailure)
+			return nil
+		}
 
-			gotTx++
+		gotTx++
 
-			if gotTx%t.config.MeasureInterval != 0 {
-				continue
-			}
+		if gotTx%t.config.MeasureInterval != 0 {
+			continue
+		}
 
-			t.logger.Infof("Got %d transactions", gotTx)
-			t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
+		t.logger.Infof("Got %d transactions", gotTx)
+		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
 
-			lastMeasureTime = time.Now()
+		lastMeasureTime = time.Now()
 	}
 
 	totalTime := time.Since(startTime)
@@ -189,9 +189,9 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) getTcpConn(ctx context.Context, client *execution.Client) (*sentry.Conn, error) {
-	chainConfig := params.AllDevChainProtocolChanges;
+	chainConfig := params.AllDevChainProtocolChanges
 
-	head, err := client.GetRPCClient().GetLatestBlock(ctx);
+	head, err := client.GetRPCClient().GetLatestBlock(ctx)
 	if err != nil {
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil, err
@@ -236,7 +236,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 		addr := t.wallet.GetAddress()
 		toAddr := &addr
 
-		txAmount, _ := crand.Int(crand.Reader, big.NewInt(0).SetUint64(10 * 1e18))
+		txAmount, _ := crand.Int(crand.Reader, big.NewInt(0).SetUint64(10*1e18))
 
 		feeCap := &helper.BigInt{Value: *big.NewInt(100000000000)} // 100 Gwei
 		tipCap := &helper.BigInt{Value: *big.NewInt(1000000000)}   // 1 Gwei
