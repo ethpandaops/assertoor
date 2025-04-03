@@ -212,6 +212,8 @@ func (t *Task) getTcpConn(ctx context.Context, client *execution.Client) (*sentr
 		return nil, err
 	}
 
+	t.logger.Infof("Connected to %s", client.GetName())
+
 	return conn, nil
 }
 
