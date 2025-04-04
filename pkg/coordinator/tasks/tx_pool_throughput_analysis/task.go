@@ -155,14 +155,14 @@ func (t *Task) Execute(ctx context.Context) error {
 	gotTx := 0
 
 	for gotTx < t.config.TxCount {
-		_, err := conn.ReadTransactionMessages()
+		txs, err := conn.ReadTransactionMessages()
 		if err != nil {
 			t.logger.Errorf("Failed to read transaction messages: %v", err)
 			t.ctx.SetResult(types.TaskResultFailure)
 			return nil
 		}
 
-		gotTx++
+		gotTx += len(*txs)
 
 		if gotTx%t.config.MeasureInterval != 0 || gotTx >= 9900 {
 			continue
