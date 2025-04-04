@@ -9,9 +9,6 @@ The `tx_pool_latency_analysis` task evaluates latency of transaction processing 
 - **`privateKey`**:
   The private key of the account to use for sending transactions.
 
-- **`nonce`**:
-  The nonce to use for the transactions. If not provided, the task will fetch the current nonce from the Ethereum node.
-
 - **`txCount`**:
   The total number of transactions to send.
 
@@ -23,6 +20,9 @@ The `tx_pool_latency_analysis` task evaluates latency of transaction processing 
 
 - **`failOnHighLatency`**:
   Whether the task should fail if the measured latency exceeds `expectedLatency`.
+
+- **`secondsBeforeRunning`**:
+  The number of seconds to wait before starting the transaction sending process.
 
 ### Outputs
 

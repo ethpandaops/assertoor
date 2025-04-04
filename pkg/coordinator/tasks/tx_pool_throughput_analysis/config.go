@@ -3,15 +3,16 @@ package txpoolcheck
 type Config struct {
 	PrivateKey string `yaml:"privateKey" json:"privateKey"`
 
-	Nonce							 *uint64	`yaml:"nonce" json:"nonce"`
-	TxCount            int      `yaml:"txCount" json:"txCount"`
-	MeasureInterval    int      `yaml:"measureInterval" json:"measureInterval"`
+	TxCount              int `yaml:"txCount" json:"txCount"`
+	MeasureInterval      int `yaml:"measureInterval" json:"measureInterval"`
+	SecondsBeforeRunning int `yaml:"secondsBeforeRunning" json:"secondsBeforeRunning"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		TxCount:         1000,
-		MeasureInterval: 100,
+		TxCount:            1000,
+		MeasureInterval:    100,
+		SecondsBeforeRunning: 0,
 	}
 }
 

@@ -2,19 +2,22 @@ package txpoolcheck
 
 import (
 	"context"
-	"crypto/ecdsa"
+	crand "crypto/rand"
 	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/forkid"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
+	"github.com/noku-team/assertoor/pkg/coordinator/helper"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/noku-team/assertoor/pkg/coordinator/utils/sentry"
-	txpool "github.com/noku-team/assertoor/pkg/coordinator/utils/tx_pool"
+	"github.com/noku-team/assertoor/pkg/coordinator/wallet"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,6 +34,7 @@ var (
 type Task struct {
 	ctx     *types.TaskContext
 	options *types.TaskOptions
+	wallet  *wallet.Wallet
 	config  Config
 	logger  logrus.FieldLogger
 }
@@ -69,20 +73,36 @@ func (t *Task) LoadConfig() error {
 		return err
 	}
 
+	privKey, _ := crypto.HexToECDSA(config.PrivateKey)
+	t.wallet, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
+	if err != nil {
+		return fmt.Errorf("cannot initialize wallet: %w", err)
+	}
+
 	t.config = config
 	return nil
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	executionClients := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetReadyEndpoints(true)
-	chainID, err := executionClients[0].GetRPCClient().GetEthClient().ChainID(ctx)
+	err := t.wallet.AwaitReady(ctx)
 	if err != nil {
-		t.logger.Errorf("Failed to fetch chain ID: %v", err)
+		return fmt.Errorf("cannot load wallet state: %w", err)
+	}
+
+	executionClients := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetReadyEndpoints(true)
+
+	if len(executionClients) == 0 {
+		t.logger.Errorf("No execution clients available")
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
 
 	client := executionClients[rand.Intn(len(executionClients))]
+
+	if (t.config.SecondsBeforeRunning > 0) && (t.config.SecondsBeforeRunning < 60) {
+		t.logger.Infof("Waiting %d seconds before starting the task", t.config.SecondsBeforeRunning)
+		time.Sleep(time.Duration(t.config.SecondsBeforeRunning) * time.Second)
+	}
 
 	conn, err := t.getTcpConn(ctx, client)
 	if err != nil {
@@ -90,16 +110,10 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
-	
+
 	defer conn.Close()
 
-	privKey, _ := crypto.HexToECDSA(t.config.PrivateKey)
-	nonce, err := t.getNonce(ctx, privKey)
-	if err != nil {
-		t.logger.Errorf("Failed to fetch nonce: %v", err)
-		t.ctx.SetResult(types.TaskResultFailure)
-		return nil
-	}
+	var txs []*ethtypes.Transaction
 
 	startTime := time.Now()
 	sentTxCount := 0
@@ -108,28 +122,28 @@ func (t *Task) Execute(ctx context.Context) error {
 		for i := 0; i < t.config.TxCount; i++ {
 			// generate and sign tx
 			go func() {
-					tx, err := txpool.CreateDummyTransaction(nonce, chainID, privKey)
-					if err != nil {
-						t.logger.Errorf("Failed to create transaction: %v", err)
-						t.ctx.SetResult(types.TaskResultFailure)
-						return
-					}
+				tx, err := t.generateTransaction(ctx)
+				if err != nil {
+					t.logger.Errorf("Failed to create transaction: %v", err)
+					t.ctx.SetResult(types.TaskResultFailure)
+					return
+				}
 
-					sentTxCount++
-					nonce++
+				sentTxCount++
 
-					err = client.GetRPCClient().SendTransaction(ctx, tx)
+				if sentTxCount%t.config.MeasureInterval == 0 {
+					elapsed := time.Since(startTime)
+					t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
+				}
 
-					if err != nil {
-						t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
-						t.ctx.SetResult(types.TaskResultFailure)
-						return
-					}
+				err = client.GetRPCClient().SendTransaction(ctx, tx)
+				if err != nil {
+					t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
+					t.ctx.SetResult(types.TaskResultFailure)
+					return
+				}
 
-					if sentTxCount%t.config.MeasureInterval == 0 {
-						elapsed := time.Since(startTime)
-						t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
-					}
+				txs = append(txs, tx)
 			}()
 
 			// wait for 1/TxCount second: if 100 tx, than wait 10ms per cycle
@@ -141,55 +155,49 @@ func (t *Task) Execute(ctx context.Context) error {
 	gotTx := 0
 
 	for gotTx < t.config.TxCount {
-			_, err := conn.ReadTransactionMessages()
-			if err != nil {
-				t.logger.Errorf("Failed to read transaction messages: %v", err)
-				t.ctx.SetResult(types.TaskResultFailure)
-				return nil
-			}
+		txs, err := conn.ReadTransactionMessages()
+		if err != nil {
+			t.logger.Errorf("Failed to read transaction messages: %v", err)
+			t.ctx.SetResult(types.TaskResultFailure)
+			return nil
+		}
 
-			gotTx++
+		gotTx += len(*txs)
 
-			if gotTx%t.config.MeasureInterval != 0 {
+		if gotTx%t.config.MeasureInterval != 0 || gotTx >= 9900 {
+			continue
+		}
+
+		t.logger.Infof("Got %d transactions", gotTx)
+		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
+
+		lastMeasureTime = time.Now()
+	}
+
+	// send to other clients, for speeding up tx mining
+	for _, tx := range txs {
+		for _, otherClient := range executionClients {
+			if otherClient.GetName() == client.GetName() {
 				continue
 			}
 
-			t.logger.Infof("Got %d transactions", gotTx)
-			t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
-
-			lastMeasureTime = time.Now()
+			client.GetRPCClient().SendTransaction(ctx, tx)
+		}
 	}
 
 	totalTime := time.Since(startTime)
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
-	t.ctx.Outputs.SetVar("total_time_ms", totalTime.Milliseconds())
+
+	t.ctx.Outputs.SetVar("total_time_mus", totalTime.Milliseconds())
 	t.ctx.SetResult(types.TaskResultSuccess)
 
 	return nil
 }
 
-func (t *Task) getNonce(ctx context.Context, privKey *ecdsa.PrivateKey) (uint64, error) {
-	executionClients := t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetReadyEndpoints(true)
-
-	head, err := executionClients[0].GetRPCClient().GetLatestBlock(ctx);
-	if err != nil {
-		return 0, err
-	}
-
-	nonce, err := executionClients[0].GetRPCClient().GetEthClient().NonceAt(ctx, crypto.PubkeyToAddress(privKey.PublicKey), head.Number())
-
-	if t.config.Nonce != nil {
-		t.logger.Infof("Using custom nonce: %d", *t.config.Nonce)
-		nonce = *t.config.Nonce
-	}
-
-	return nonce, nil
-}
-
 func (t *Task) getTcpConn(ctx context.Context, client *execution.Client) (*sentry.Conn, error) {
-	chainConfig := params.AllDevChainProtocolChanges;
+	chainConfig := params.AllDevChainProtocolChanges
 
-	head, err := client.GetRPCClient().GetLatestBlock(ctx);
+	head, err := client.GetRPCClient().GetLatestBlock(ctx)
 	if err != nil {
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil, err
@@ -227,4 +235,37 @@ func (t *Task) getTcpConn(ctx context.Context, client *execution.Client) (*sentr
 	t.logger.Infof("Connected to %s", client.GetName())
 
 	return conn, nil
+}
+
+func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, error) {
+	tx, err := t.wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
+		addr := t.wallet.GetAddress()
+		toAddr := &addr
+
+		txAmount, _ := crand.Int(crand.Reader, big.NewInt(0).SetUint64(10*1e18))
+
+		feeCap := &helper.BigInt{Value: *big.NewInt(100000000000)} // 100 Gwei
+		tipCap := &helper.BigInt{Value: *big.NewInt(1000000000)}   // 1 Gwei
+
+		var txObj ethtypes.TxData
+
+		txObj = &ethtypes.DynamicFeeTx{
+			ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
+			Nonce:     nonce,
+			GasTipCap: &tipCap.Value,
+			GasFeeCap: &feeCap.Value,
+			Gas:       50000,
+			To:        toAddr,
+			Value:     txAmount,
+			Data:      []byte{},
+		}
+
+		return ethtypes.NewTx(txObj), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }
