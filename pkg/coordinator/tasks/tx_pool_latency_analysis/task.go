@@ -99,6 +99,11 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	client := executionClients[rand.Intn(len(executionClients))]
 
+	if (t.config.SecondsBeforeRunning > 0) && (t.config.SecondsBeforeRunning < 60) {
+		t.logger.Infof("Waiting %d seconds before starting the task", t.config.SecondsBeforeRunning)
+		time.Sleep(time.Duration(t.config.SecondsBeforeRunning) * time.Second)
+	}
+
 	conn, err := t.getTcpConn(ctx, client)
 	if err != nil {
 		t.logger.Errorf("Failed to get wire eth TCP connection: %v", err)

@@ -15,6 +15,9 @@ The `tx_pool_throughput_analysis` task evaluates the throughput of transaction p
 - **`measureInterval`**:
   The interval at which the script logs progress (e.g., every 100 transactions).
 
+- **`secondsBeforeRunning`**:
+  The number of seconds to wait before starting the transaction sending process.
+
 ### Outputs
 
 - **`total_time_ms`**:
