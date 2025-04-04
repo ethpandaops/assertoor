@@ -174,6 +174,9 @@ func (t *Task) Execute(ctx context.Context) error {
 		lastMeasureTime = time.Now()
 	}
 
+	totalTime := time.Since(startTime)
+	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
+
 	// send to other clients, for speeding up tx mining
 	for _, tx := range txs {
 		for _, otherClient := range executionClients {
@@ -184,9 +187,6 @@ func (t *Task) Execute(ctx context.Context) error {
 			client.GetRPCClient().SendTransaction(ctx, tx)
 		}
 	}
-
-	totalTime := time.Since(startTime)
-	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
 
 	t.ctx.Outputs.SetVar("total_time_mus", totalTime.Milliseconds())
 	t.ctx.SetResult(types.TaskResultSuccess)
