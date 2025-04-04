@@ -40,7 +40,7 @@ The `tx_pool_latency_analysis` task evaluates latency of transaction processing 
     nonce: 0
     txCount: 15000
     measureInterval: 1000
-    expectedLatency: 500
+    expectedLatency: 5000
     failOnHighLatency: false
   configVars:
     privateKey: "tx_pool_latency_analysis"

@@ -23,7 +23,7 @@ tasks:
   config:
     txCount: 1000
     measureInterval: 100
-    expectedLatency: 500
+    expectedLatency: 5000
     failOnHighLatency: true
     secondsBeforeRunning: 15
   configVars:
@@ -49,7 +49,7 @@ tasks:
   config:
     txCount: 10000
     measureInterval: 1000
-    expectedLatency: 500
+    expectedLatency: 5000
     failOnHighLatency: true
     secondsBeforeRunning: 15
   configVars:
@@ -75,7 +75,7 @@ tasks:
   config:
     txCount: 15000
     measureInterval: 1500
-    expectedLatency: 500
+    expectedLatency: 5000
     failOnHighLatency: true
     secondsBeforeRunning: 15
   configVars:

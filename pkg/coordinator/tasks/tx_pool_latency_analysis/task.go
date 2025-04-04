@@ -162,12 +162,12 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		if (i+1)%t.config.MeasureInterval == 0 {
 			avgSoFar := totalLatency.Microseconds() / int64(i+1)
-			t.logger.Infof("Processed %d transactions, current avg latency: %dms.", i+1, avgSoFar)
+			t.logger.Infof("Processed %d transactions, current avg latency: %dmus.", i+1, avgSoFar)
 		}
 	}
 
 	avgLatency := totalLatency / time.Duration(t.config.TxCount)
-	t.logger.Infof("Average transaction latency: %dms", avgLatency.Microseconds())
+	t.logger.Infof("Average transaction latency: %dmus", avgLatency.Microseconds())
 
 	// send to other clients, for speeding up tx mining
 	for _, tx := range txs {
@@ -181,7 +181,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	if t.config.FailOnHighLatency && avgLatency.Microseconds() > t.config.ExpectedLatency {
-		t.logger.Errorf("Transaction latency too high: %dms (expected <= %dms)", avgLatency.Microseconds(), t.config.ExpectedLatency)
+		t.logger.Errorf("Transaction latency too high: %dmus (expected <= %dmus)", avgLatency.Microseconds(), t.config.ExpectedLatency)
 		t.ctx.SetResult(types.TaskResultFailure)
 	} else {
 		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
