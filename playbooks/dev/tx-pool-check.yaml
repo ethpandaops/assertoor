@@ -27,6 +27,7 @@ tasks:
     measureInterval: 100
     expectedLatency: 500
     failOnHighLatency: true
+    secondsBeforeRunning: 15
   configVars:
     privateKey: "walletPrivkey"
 - name: tx_pool_clean
@@ -39,6 +40,7 @@ tasks:
     nonce: 2000
     txCount: 10000
     measureInterval: 1000
+    secondsBeforeRunning: 15
   configVars:
     privateKey: "walletPrivkey"
 - name: tx_pool_clean
@@ -53,6 +55,7 @@ tasks:
     measureInterval: 1000
     expectedLatency: 500
     failOnHighLatency: true
+    secondsBeforeRunning: 15
   configVars:
     privateKey: "walletPrivkey"
 - name: tx_pool_clean
@@ -65,6 +68,7 @@ tasks:
     nonce: 22000
     txCount: 15000
     measureInterval: 1500
+    secondsBeforeRunning: 15
   configVars:
     privateKey: "walletPrivkey"
 - name: tx_pool_clean
@@ -79,5 +83,6 @@ tasks:
     measureInterval: 1500
     expectedLatency: 500
     failOnHighLatency: true
+    secondsBeforeRunning: 15
   configVars:
     privateKey: "walletPrivkey"
