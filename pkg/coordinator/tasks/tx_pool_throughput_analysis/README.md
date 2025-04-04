@@ -20,8 +20,8 @@ The `tx_pool_throughput_analysis` task evaluates the throughput of transaction p
 
 ### Outputs
 
-- **`total_time_ms`**:
-  The total time taken to send the transactions in milliseconds.
+- **`total_time_mus`**:
+  The total time taken to send the transactions in microseconds.
 
 ### Defaults
 

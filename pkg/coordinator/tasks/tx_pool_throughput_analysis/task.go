@@ -188,7 +188,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	totalTime := time.Since(startTime)
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
 
-	t.ctx.Outputs.SetVar("total_time_ms", totalTime.Milliseconds())
+	t.ctx.Outputs.SetVar("total_time_mus", totalTime.Milliseconds())
 	t.ctx.SetResult(types.TaskResultSuccess)
 
 	return nil
