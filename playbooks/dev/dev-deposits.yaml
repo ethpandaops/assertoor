@@ -27,16 +27,21 @@ tasks:
   configVars:
     minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
 
-- name: generate_deposits
-  title: "Generate deposit with 2 ETH"
+- name: run_tasks
+  title: "Generate deposits"
   config:
-    limitPerSlot: 10
-    limitPending: 10
-    awaitReceipt: true
-    failOnReject: true
-  configVars:
-    walletPrivkey: "walletPrivkey"
-    mnemonic: "validatorMnemonic"
-    depositContract: "depositContract"
-    depositAmount: "depositAmount"
-    limitTotal: "depositCount"
+    stopChildOnResult: false
+    tasks:
+    - name: generate_deposits
+      title: "Generate deposits"
+      config:
+        limitPerSlot: 10
+        limitPending: 10
+        awaitReceipt: true
+        failOnReject: true
+      configVars:
+        walletPrivkey: "walletPrivkey"
+        mnemonic: "validatorMnemonic"
+        depositContract: "depositContract"
+        depositAmount: "depositAmount"
+        limitTotal: "depositCount"
