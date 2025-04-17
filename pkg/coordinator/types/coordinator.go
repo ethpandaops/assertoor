@@ -24,7 +24,7 @@ type Coordinator interface {
 	GetTestByRunID(runID uint64) Test
 	GetTestQueue() []Test
 	GetTestHistory(testID string, firstRunID uint64, offset uint64, limit uint64) ([]Test, uint64)
-	ScheduleTest(descriptor TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (TestRunner, error)
+	ScheduleTest(descriptor TestDescriptor, configOverrides map[string]any, allowDuplicate bool, skipQueue bool) (TestRunner, error)
 	DeleteTestRun(runID uint64) error
 }
 

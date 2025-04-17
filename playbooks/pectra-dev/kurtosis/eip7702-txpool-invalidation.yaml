@@ -138,7 +138,7 @@ tasks:
   config:
     tasks:
 
-    # delpoy eip7701 test contract & test delegate
+    # deploy eip7701 test contract & test delegate
     - name: run_tasks_concurrent
       title: "Prepare eip7702 invalidation test contracts"
       config:

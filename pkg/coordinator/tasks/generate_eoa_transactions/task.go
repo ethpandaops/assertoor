@@ -249,7 +249,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Infof("set task result to failed, %v transactions reverted unexpectedly (FailOnReject)", revertCount)
 		t.ctx.SetResult(types.TaskResultFailure)
 	case totalCount == 0:
-		t.logger.Infof("set task result to failed, no tansactions sent")
+		t.logger.Infof("set task result to failed, no transactions sent")
 		t.ctx.SetResult(types.TaskResultFailure)
 	}
 
