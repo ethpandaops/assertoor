@@ -16,7 +16,7 @@ Assertoor provides distribution-specific executables for Windows, Linux, and mac
 
 ## Build from Source
 
-If you prefer to build Assertoor from source, ensure you have [Go](https://go.dev/) `>= 1.22` and Make installed on your machine. Assertoor is tested on Debian, but it should work on other operating systems as well.
+If you prefer to build Assertoor from source, ensure you have [Go](https://go.dev/) `>= 1.24` and Make installed on your machine. Assertoor is tested on Debian, but it should work on other operating systems as well.
 
 1. **Clone the Repository**:\
 	Use the following commands to clone the Assertoor repository and navigate to its directory:

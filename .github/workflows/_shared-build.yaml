@@ -54,7 +54,7 @@ jobs:
     - name: Set up go
       uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
       with:
-        go-version: 1.22.x
+        go-version: 1.24.x
     
     # setup project dependencies
     - name: Get dependencies
@@ -88,7 +88,7 @@ jobs:
     - name: Set up go
       uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
       with:
-        go-version: 1.22.x
+        go-version: 1.24.x
 
     # setup cross build libs
     - name: Get cross build dependencies
@@ -128,7 +128,7 @@ jobs:
     - name: Set up go
       uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
       with:
-        go-version: 1.22.x
+        go-version: 1.24.x
 
     # setup project dependencies
     - name: Get dependencies
@@ -162,7 +162,7 @@ jobs:
     - name: Set up go
       uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
       with:
-        go-version: 1.22.x
+        go-version: 1.24.x
 
     # setup project dependencies
     - name: Get dependencies
@@ -196,7 +196,7 @@ jobs:
     - name: Set up go
       uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
       with:
-        go-version: 1.22.x
+        go-version: 1.24.x
 
     # setup project dependencies
     - name: Get dependencies
