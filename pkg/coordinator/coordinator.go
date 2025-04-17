@@ -191,7 +191,10 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	// start per epoch GC routine
 	go c.runEpochGC(ctx)
 
-	// run tests
+	// start off queue test execution loop
+	go c.runner.RunOffQueueTestExecutionLoop(ctx)
+
+	// run test execution loop for queued tests
 	c.runner.RunTestExecutionLoop(ctx, c.Config.Coordinator.MaxConcurrentTests)
 
 	return nil
@@ -289,8 +292,8 @@ func (c *Coordinator) DeleteTestRun(runID uint64) error {
 	return err
 }
 
-func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.TestRunner, error) {
-	return c.runner.ScheduleTest(descriptor, configOverrides, allowDuplicate)
+func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate, skipQueue bool) (types.TestRunner, error) {
+	return c.runner.ScheduleTest(descriptor, configOverrides, allowDuplicate, skipQueue)
 }
 
 func (c *Coordinator) startMetrics() error {
