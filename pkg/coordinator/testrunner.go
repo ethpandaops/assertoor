@@ -76,7 +76,7 @@ func (c *TestRunner) RemoveTestFromQueue(runID uint64) bool {
 	return false
 }
 
-func (c *TestRunner) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool, skipQueue bool) (types.TestRunner, error) {
+func (c *TestRunner) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate, skipQueue bool) (types.TestRunner, error) {
 	if descriptor.Err() != nil {
 		return nil, fmt.Errorf("cannot create test from failed test descriptor: %w", descriptor.Err())
 	}
@@ -98,7 +98,7 @@ func (c *TestRunner) ScheduleTest(descriptor types.TestDescriptor, configOverrid
 	return testRef, nil
 }
 
-func (c *TestRunner) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool, skipQueue bool) (types.TestRunner, error) {
+func (c *TestRunner) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate, skipQueue bool) (types.TestRunner, error) {
 	c.testSchedulerMutex.Lock()
 	defer c.testSchedulerMutex.Unlock()
 
@@ -122,6 +122,7 @@ func (c *TestRunner) createTestRun(descriptor types.TestDescriptor, configOverri
 	if !skipQueue {
 		c.testQueue = append(c.testQueue, testRef)
 	}
+
 	c.testRunMap[runID] = testRef
 	c.testRegistryMutex.Unlock()
 
@@ -211,6 +212,7 @@ func (c *TestRunner) RunTestScheduler(ctx context.Context) {
 	// startup scheduler
 	for _, testDescr := range c.getStartupTests() {
 		testConfig := testDescr.Config()
+
 		_, err := c.ScheduleTest(testDescr, nil, false, testConfig.Schedule.SkipQueue)
 		if err != nil {
 			c.coordinator.Logger().Errorf("could not schedule startup test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
@@ -234,6 +236,7 @@ func (c *TestRunner) RunTestScheduler(ctx context.Context) {
 
 		for _, testDescr := range c.getCronTests(cronTime) {
 			testConfig := testDescr.Config()
+
 			_, err := c.ScheduleTest(testDescr, nil, false, testConfig.Schedule.SkipQueue)
 			if err != nil {
 				c.coordinator.Logger().Errorf("could not schedule cron test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)

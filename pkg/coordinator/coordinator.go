@@ -292,7 +292,7 @@ func (c *Coordinator) DeleteTestRun(runID uint64) error {
 	return err
 }
 
-func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool, skipQueue bool) (types.TestRunner, error) {
+func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate, skipQueue bool) (types.TestRunner, error) {
 	return c.runner.ScheduleTest(descriptor, configOverrides, allowDuplicate, skipQueue)
 }
 
