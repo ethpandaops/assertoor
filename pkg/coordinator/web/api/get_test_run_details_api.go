@@ -118,12 +118,12 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 			case taskStatus.IsRunning:
 				taskData.Status = "running"
 				taskData.StartTime = taskStatus.StartTime.Unix()
-				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // no overflow possible
 			default:
 				taskData.Status = "complete"
 				taskData.StartTime = taskStatus.StartTime.Unix()
 				taskData.StopTime = taskStatus.StopTime.Unix()
-				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // no overflow possible
 			}
 
 			switch taskStatus.Result {
@@ -140,8 +140,8 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 			}
 
 			logCount := taskStatus.Logger.GetLogEntryCount()
-			logStart := 0
-			logLimit := 100
+			logStart := uint64(0)
+			logLimit := uint64(100)
 
 			if logCount > logLimit {
 				logStart = logCount - logLimit

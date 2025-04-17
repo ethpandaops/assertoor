@@ -89,11 +89,11 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.StartIndex > 0 {
-		t.nextIndex = uint64(t.config.StartIndex)
+		t.nextIndex = uint64(t.config.StartIndex) //nolint:gosec // no overflow possible
 	}
 
 	if t.config.IndexCount > 0 {
-		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount)
+		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount) //nolint:gosec // no overflow possible
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
@@ -216,7 +216,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	}
 
 	if t.config.ExitEpoch >= 0 {
-		operation.Epoch = phase0.Epoch(t.config.ExitEpoch)
+		operation.Epoch = phase0.Epoch(t.config.ExitEpoch) //nolint:gosec // no overflow possible
 	} else {
 		currentSlot, _ := client.GetLastHead()
 		operation.Epoch = phase0.Epoch(currentSlot / phase0.Slot(specs.SlotsPerEpoch))

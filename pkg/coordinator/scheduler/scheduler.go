@@ -144,12 +144,12 @@ func (ts *TaskScheduler) GetAllTasks() []types.TaskIndex {
 	return taskList
 }
 
-func (ts *TaskScheduler) GetTaskCount() int {
+func (ts *TaskScheduler) GetTaskCount() uint64 {
 	if ts == nil {
 		return 0
 	}
 
-	return len(ts.allTasks)
+	return uint64(len(ts.allTasks))
 }
 
 func (ts *TaskScheduler) GetRootTasks() []types.TaskIndex {

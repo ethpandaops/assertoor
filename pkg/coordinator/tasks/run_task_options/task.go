@@ -112,9 +112,9 @@ func (t *Task) Execute(ctx context.Context) error {
 			if taskErr == nil {
 				t.ctx.SetResult(types.TaskResultFailure)
 				return fmt.Errorf("child task succeeded, but should have failed")
-			} else {
-				t.ctx.SetResult(types.TaskResultSuccess)
 			}
+
+			t.ctx.SetResult(types.TaskResultSuccess)
 		case t.config.IgnoreFailure:
 			if taskErr != nil {
 				t.logger.Warnf("child task failed: %w", taskErr)

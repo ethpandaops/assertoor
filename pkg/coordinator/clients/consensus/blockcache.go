@@ -19,7 +19,7 @@ import (
 )
 
 type BlockCache struct {
-	followDistance uint64
+	followDistance uint32
 
 	specMutex sync.RWMutex
 	specs     *ChainSpec
@@ -50,7 +50,7 @@ type BlockCache struct {
 	wallclockSlotDispatcher  Dispatcher[*ethwallclock.Slot]
 }
 
-func NewBlockCache(ctx context.Context, logger logrus.FieldLogger, followDistance uint64) (*BlockCache, error) {
+func NewBlockCache(ctx context.Context, logger logrus.FieldLogger, followDistance uint32) (*BlockCache, error) {
 	if followDistance == 0 {
 		return nil, fmt.Errorf("cannot initialize block cache without follow distance")
 	}
@@ -64,7 +64,12 @@ func NewBlockCache(ctx context.Context, logger logrus.FieldLogger, followDistanc
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				logger.WithError(err.(error)).Errorf("uncaught panic in BlockCache.runCacheCleanup subroutine: %v, stack: %v", err, string(debug.Stack()))
+				var err2 error
+				if errval, errok := err.(error); errok {
+					err2 = errval
+				}
+
+				logger.WithError(err2).Errorf("uncaught panic in BlockCache.runCacheCleanup subroutine: %v, stack: %v", err, string(debug.Stack()))
 			}
 		}()
 		cache.runCacheCleanup(ctx)
@@ -94,8 +99,14 @@ func (cache *BlockCache) notifyBlockReady(block *Block) {
 }
 
 func (cache *BlockCache) SetMinFollowDistance(followDistance uint64) {
-	if followDistance > cache.followDistance {
-		cache.followDistance = followDistance
+	if followDistance > 10000 {
+		followDistance = 10000
+	}
+
+	followDistance32 := uint32(followDistance) //nolint:gosec // no overflow possible
+
+	if followDistance32 > cache.followDistance {
+		cache.followDistance = followDistance32
 	}
 }
 
@@ -248,7 +259,7 @@ func (cache *BlockCache) AddBlock(root phase0.Root, slot phase0.Slot) (*Block, b
 		return cache.blockRootMap[root], false
 	}
 
-	if int64(slot) < cache.maxSlotIdx-int64(cache.followDistance) {
+	if cutOffSlot := cache.maxSlotIdx - int64(cache.followDistance); cutOffSlot > 0 && slot < phase0.Slot(cutOffSlot) {
 		return nil, false
 	}
 
@@ -267,8 +278,8 @@ func (cache *BlockCache) AddBlock(root phase0.Root, slot phase0.Slot) (*Block, b
 		cache.blockSlotMap[slot] = append(cache.blockSlotMap[slot], cacheBlock)
 	}
 
-	if int64(slot) > cache.maxSlotIdx {
-		cache.maxSlotIdx = int64(slot)
+	if cache.maxSlotIdx < 0 || slot > phase0.Slot(cache.maxSlotIdx) {
+		cache.maxSlotIdx = int64(slot) //nolint:gosec // no overflow possible
 	}
 
 	return cacheBlock, true

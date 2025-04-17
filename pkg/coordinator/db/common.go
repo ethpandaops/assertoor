@@ -243,12 +243,12 @@ func (db *Database) ApplySchema(version int64) error {
 		return err
 	}
 
-	switch {
-	case version == -2:
+	switch version {
+	case -2:
 		if err := goose.Up(db.writer.DB, schemaDirectory, goose.WithAllowMissing()); err != nil {
 			return err
 		}
-	case version == -1:
+	case -1:
 		if err := goose.UpByOne(db.writer.DB, schemaDirectory, goose.WithAllowMissing()); err != nil {
 			return err
 		}

@@ -160,8 +160,9 @@ func (fh *FrontendHandler) getRegistryPageData(pageArgs *RegistryPageArgs) (*Reg
 	}
 
 	for idx, test := range testDescriptors[pageOffset:pageLimit] {
+		idx64 := uint64(idx) //nolint:gosec // no overflow possible
 		runStats := runStatsMap[test.ID()]
-		pageData.Tests = append(pageData.Tests, fh.getTestRegistryData(idx, test, runStats))
+		pageData.Tests = append(pageData.Tests, fh.getTestRegistryData(idx64, test, runStats))
 	}
 
 	pageData.TotalTests = uint64(len(testDescriptors))
@@ -183,9 +184,9 @@ func (fh *FrontendHandler) getRegistryPageData(pageArgs *RegistryPageArgs) (*Reg
 	return pageData, nil
 }
 
-func (fh *FrontendHandler) getTestRegistryData(idx int, test types.TestDescriptor, runStats *db.TestRunStats) *TestRegistryData {
+func (fh *FrontendHandler) getTestRegistryData(idx uint64, test types.TestDescriptor, runStats *db.TestRunStats) *TestRegistryData {
 	testData := &TestRegistryData{
-		Index:  uint64(idx),
+		Index:  idx,
 		TestID: test.ID(),
 		Source: test.Source(),
 		Config: "null",
@@ -210,7 +211,7 @@ func (fh *FrontendHandler) getTestRegistryData(idx int, test types.TestDescripto
 		testData.RunCount = runStats.Count
 
 		if runStats.LastRun > 0 {
-			lastRun := time.UnixMilli(int64(runStats.LastRun))
+			lastRun := time.UnixMilli(int64(runStats.LastRun)) //nolint:gosec // no overflow possible
 			testData.LastRun = &lastRun
 		}
 	}

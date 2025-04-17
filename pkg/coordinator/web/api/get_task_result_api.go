@@ -78,12 +78,12 @@ func (ah *APIHandler) GetTaskResult(w http.ResponseWriter, r *http.Request) {
 	// Find the requested result file
 	var resultFile *db.TaskResult
 
-	if fileIndex, err := strconv.ParseUint(fileID, 10, 64); err == nil {
+	if fileIndex, err := strconv.ParseInt(fileID, 10, 32); err == nil {
 		// Search by index
-		resultFile, _ = ah.coordinator.Database().GetTaskResultByIndex(int(runID), int(taskState.Index()), resultType, int(fileIndex))
+		resultFile, _ = ah.coordinator.Database().GetTaskResultByIndex(runID, uint64(taskState.Index()), resultType, int(fileIndex))
 	} else {
 		// Search by name
-		resultFile, _ = ah.coordinator.Database().GetTaskResultByName(int(runID), int(taskState.Index()), resultType, fileID)
+		resultFile, _ = ah.coordinator.Database().GetTaskResultByName(runID, uint64(taskState.Index()), resultType, fileID)
 	}
 
 	if resultFile == nil {
