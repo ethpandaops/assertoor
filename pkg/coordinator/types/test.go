@@ -61,8 +61,9 @@ type ExternalTestConfig struct {
 }
 
 type TestSchedule struct {
-	Startup bool     `yaml:"startup" json:"startup"`
-	Cron    []string `yaml:"cron" json:"cron"`
+	Startup   bool     `yaml:"startup" json:"startup"`
+	Cron      []string `yaml:"cron" json:"cron"`
+	SkipQueue bool     `yaml:"skipQueue" json:"skipQueue"`
 }
 
 type TestDescriptor interface {

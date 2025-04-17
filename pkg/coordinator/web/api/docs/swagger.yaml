@@ -222,6 +222,8 @@ definitions:
       config:
         additionalProperties: {}
         type: object
+      skip_queue:
+        type: boolean
       test_id:
         type: string
     type: object
@@ -333,6 +335,8 @@ definitions:
         items:
           type: string
         type: array
+      skipQueue:
+        type: boolean
       startup:
         type: boolean
     type: object

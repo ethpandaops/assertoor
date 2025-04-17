@@ -1104,6 +1104,9 @@ const docTemplate = `{
                     "type": "object",
                     "additionalProperties": {}
                 },
+                "skip_queue": {
+                    "type": "boolean"
+                },
                 "test_id": {
                     "type": "string"
                 }
@@ -1271,6 +1274,9 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "skipQueue": {
+                    "type": "boolean"
                 },
                 "startup": {
                     "type": "boolean"
