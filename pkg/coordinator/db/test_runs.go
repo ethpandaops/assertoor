@@ -8,7 +8,7 @@ import (
 )
 
 type TestRun struct {
-	RunID     int    `db:"run_id"`
+	RunID     uint64 `db:"run_id"`
 	TestID    string `db:"test_id"`
 	Name      string `db:"name"`
 	Source    string `db:"source"`
@@ -62,7 +62,7 @@ func (db *Database) UpdateTestRunStatus(tx *sqlx.Tx, run *TestRun) error {
 }
 
 // GetTestRunByRunID returns a test run by run ID.
-func (db *Database) GetTestRunByRunID(runID int) (*TestRun, error) {
+func (db *Database) GetTestRunByRunID(runID uint64) (*TestRun, error) {
 	var run TestRun
 
 	err := db.reader.Get(&run, `
@@ -77,7 +77,7 @@ func (db *Database) GetTestRunByRunID(runID int) (*TestRun, error) {
 }
 
 // GetTestRunRange returns a range of test runs.
-func (db *Database) GetTestRunRange(testID string, firstRunID, offset, limit int) ([]*TestRun, int, error) {
+func (db *Database) GetTestRunRange(testID string, firstRunID, offset, limit uint64) ([]*TestRun, uint64, error) {
 	var runs []*TestRun
 
 	var sql strings.Builder
@@ -141,7 +141,7 @@ func (db *Database) GetTestRunRange(testID string, firstRunID, offset, limit int
 }
 
 // DeleteTestRun deletes a test run and all associated task states and logs.
-func (db *Database) DeleteTestRun(tx *sqlx.Tx, runID int) error {
+func (db *Database) DeleteTestRun(tx *sqlx.Tx, runID uint64) error {
 	_, err := tx.Exec(`
 		DELETE FROM test_runs
 		WHERE run_id = $1`,

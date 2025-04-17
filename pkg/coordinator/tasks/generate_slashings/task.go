@@ -91,11 +91,11 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.StartIndex > 0 {
-		t.nextIndex = uint64(t.config.StartIndex)
+		t.nextIndex = uint64(t.config.StartIndex) //nolint:gosec // no overflow possible
 	}
 
 	if t.config.IndexCount > 0 {
-		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount)
+		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount) //nolint:gosec // no overflow possible
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
@@ -297,7 +297,7 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 		Root:  phase0.Root(ethcommon.FromHex("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")),
 	}
 
-	committeeIndex := 0
+	committeeIndex := uint64(0)
 	dom := common.ComputeDomain(common.DOMAIN_BEACON_ATTESTER, common.Version(forkState.CurrentVersion), tree.Root(genesis.GenesisValidatorsRoot))
 
 	var secKey hbls.SecretKey

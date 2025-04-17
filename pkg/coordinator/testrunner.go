@@ -189,7 +189,12 @@ func (c *TestRunner) runTest(ctx context.Context, testRef types.TestRunner) {
 func (c *TestRunner) RunTestScheduler(ctx context.Context) {
 	defer func() {
 		if err := recover(); err != nil {
-			c.coordinator.Logger().WithError(err.(error)).Panicf("uncaught panic in TestRunner.RunTestScheduler: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			c.coordinator.Logger().WithError(err2).Panicf("uncaught panic in TestRunner.RunTestScheduler: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 
@@ -284,7 +289,12 @@ func (c *TestRunner) getCronTests(cronTime time.Time) []types.TestDescriptor {
 func (c *TestRunner) RunTestCleanup(ctx context.Context, retentionTime time.Duration) {
 	defer func() {
 		if err := recover(); err != nil {
-			c.coordinator.Logger().WithError(err.(error)).Panicf("uncaught panic in TestRunner.runTestCleanup: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			c.coordinator.Logger().WithError(err2).Panicf("uncaught panic in TestRunner.runTestCleanup: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 

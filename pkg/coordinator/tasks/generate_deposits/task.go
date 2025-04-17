@@ -115,11 +115,11 @@ func (t *Task) LoadConfig() error {
 //nolint:gocyclo // ignore
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.StartIndex > 0 {
-		t.nextIndex = uint64(t.config.StartIndex)
+		t.nextIndex = uint64(t.config.StartIndex) //nolint:gosec // no overflow possible
 	}
 
 	if t.config.IndexCount > 0 {
-		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount)
+		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount) //nolint:gosec // no overflow possible
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
@@ -419,13 +419,13 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", txWallet.GetAddress().Hex(), txWallet.GetNonce(), txWallet.GetReadableBalance(18, 0, 4, false, false))
 
 	tx, err := txWallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
-		amount := big.NewInt(int64(data.Amount))
+		amount := big.NewInt(0).SetUint64(uint64(data.Amount))
 
 		amount.Mul(amount, big.NewInt(1000000000))
 
 		return depositContract.Deposit(&bind.TransactOpts{
 			From:      txWallet.GetAddress(),
-			Nonce:     big.NewInt(int64(nonce)),
+			Nonce:     big.NewInt(0).SetUint64(nonce),
 			Value:     amount,
 			GasLimit:  200000,
 			GasFeeCap: big.NewInt(t.config.DepositTxFeeCap),
@@ -441,7 +441,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 	err = txWallet.SendTransaction(ctx, tx, &wallet.SendTransactionOptions{
 		Clients:   clients,
 		OnConfirm: onConfirm,
-		LogFn: func(client *execution.Client, retry int, rebroadcast int, err error) {
+		LogFn: func(client *execution.Client, retry uint64, rebroadcast uint64, err error) {
 			if err != nil {
 				return
 			}

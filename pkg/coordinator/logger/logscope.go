@@ -90,7 +90,7 @@ func (ls *LogScope) Flush() {
 	}
 }
 
-func (ls *LogScope) GetLogEntryCount() int {
+func (ls *LogScope) GetLogEntryCount() uint64 {
 	if ls.memBuffer != nil {
 		return ls.memBuffer.GetLogEntryCount()
 	}
@@ -102,7 +102,7 @@ func (ls *LogScope) GetLogEntryCount() int {
 	return 0
 }
 
-func (ls *LogScope) GetLogEntries(from, limit int) []*db.TaskLog {
+func (ls *LogScope) GetLogEntries(from, limit uint64) []*db.TaskLog {
 	if ls.memBuffer != nil {
 		return ls.memBuffer.GetLogEntries(from, limit)
 	}

@@ -30,12 +30,15 @@ var rootCmd = &cobra.Command{
 			config.Coordinator.MaxConcurrentTests = maxConcurrentTests
 		}
 
-		if logFormat == "json" {
+		switch logFormat {
+		case "json":
 			logr.SetFormatter(&logrus.JSONFormatter{})
 			logr.Info("Log format set to json")
-		} else if logFormat == "text" {
+		case "text":
 			logr.SetFormatter(&logrus.TextFormatter{})
 			logr.Info("Log format set to text")
+		default:
+			logr.Fatalf("Invalid log format: %s", logFormat)
 		}
 		if verbose {
 			logr.SetLevel(logrus.DebugLevel)

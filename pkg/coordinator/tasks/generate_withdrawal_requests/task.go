@@ -106,7 +106,7 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.SourceStartIndex > 0 {
-		t.nextIndex = uint64(t.config.SourceStartIndex)
+		t.nextIndex = uint64(t.config.SourceStartIndex) //nolint:gosec // no overflow possible
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
@@ -268,7 +268,7 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConf
 		var sourceValidator *v1.Validator
 
 		if t.config.SourceIndexCount > 0 {
-			accountIdx %= uint64(t.config.SourceIndexCount)
+			accountIdx %= uint64(t.config.SourceIndexCount) //nolint:gosec // no overflow possible
 		}
 
 		validatorSet := clientPool.GetConsensusPool().GetValidatorSet()
@@ -369,7 +369,7 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConf
 		Clients:            clients,
 		ClientsStartOffset: 0,
 		OnConfirm:          onConfirm,
-		LogFn: func(client *execution.Client, retry int, rebroadcast int, err error) {
+		LogFn: func(client *execution.Client, retry uint64, rebroadcast uint64, err error) {
 			if err != nil {
 				t.logger.WithFields(logrus.Fields{
 					"client": client.GetName(),

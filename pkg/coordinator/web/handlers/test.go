@@ -171,10 +171,11 @@ func (fh *FrontendHandler) getTestPageData(testID string, pageArgs *TestPageArgs
 	testInstances, totalTests := fh.coordinator.GetTestHistory(testID, 0, pageOffset, pageArgs.PageSize)
 
 	for idx, test := range testInstances {
-		pageData.Tests = append(pageData.Tests, fh.getTestRunData(idx, test))
+		idx64 := uint64(idx) //nolint:gosec // no overflow possible
+		pageData.Tests = append(pageData.Tests, fh.getTestRunData(idx64, test))
 	}
 
-	pageData.TotalTests = uint64(totalTests)
+	pageData.TotalTests = totalTests
 	pageData.TotalPages = uint64(math.Ceil(float64(totalTests) / float64(pageArgs.PageSize)))
 	pageData.CurrentPageIndex = pageArgs.Page
 	pageData.PageSize = pageArgs.PageSize

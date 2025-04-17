@@ -57,7 +57,7 @@ func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.Fie
 	}
 
 	test.dbTestRun = &db.TestRun{
-		RunID:   int(runID),
+		RunID:   runID,
 		TestID:  descriptor.ID(),
 		Name:    test.config.Name,
 		Source:  descriptor.Source(),

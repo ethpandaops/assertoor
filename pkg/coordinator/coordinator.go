@@ -61,7 +61,12 @@ func NewCoordinator(config *Config, log logrus.FieldLogger, metricsPort int) *Co
 func (c *Coordinator) Run(ctx context.Context) error {
 	defer func() {
 		if err := recover(); err != nil {
-			c.log.GetLogger().WithError(err.(error)).Errorf("uncaught panic in coordinator.Run: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			c.log.GetLogger().WithError(err2).Errorf("uncaught panic in coordinator.Run: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 
@@ -239,7 +244,7 @@ func (c *Coordinator) GetTestByRunID(runID uint64) types.Test {
 		return nil
 	}
 
-	testRef, err := test.LoadTestFromDB(c.database, int(runID))
+	testRef, err := test.LoadTestFromDB(c.database, runID)
 	if err != nil {
 		return nil
 	}
@@ -251,8 +256,8 @@ func (c *Coordinator) GetTestQueue() []types.Test {
 	return c.runner.GetTestQueue()
 }
 
-func (c *Coordinator) GetTestHistory(testID string, firstRunID, offset, limit uint64) (tests []types.Test, totalTests int) {
-	dbTests, totalTests, err := c.database.GetTestRunRange(testID, int(firstRunID), int(offset), int(limit))
+func (c *Coordinator) GetTestHistory(testID string, firstRunID, offset, limit uint64) (tests []types.Test, totalTests uint64) {
+	dbTests, totalTests, err := c.database.GetTestRunRange(testID, firstRunID, offset, limit)
 	if err != nil {
 		return nil, 0
 	}
@@ -260,7 +265,7 @@ func (c *Coordinator) GetTestHistory(testID string, firstRunID, offset, limit ui
 	tests = make([]types.Test, len(dbTests))
 
 	for idx, dbTest := range dbTests {
-		if testRef := c.runner.GetTestByRunID(uint64(dbTest.RunID)); testRef != nil {
+		if testRef := c.runner.GetTestByRunID(dbTest.RunID); testRef != nil {
 			tests[idx] = testRef
 		} else {
 			tests[idx] = test.WrapDBTestRun(c.database, dbTest)
@@ -283,7 +288,7 @@ func (c *Coordinator) DeleteTestRun(runID uint64) error {
 	}
 
 	err := c.database.RunTransaction(func(tx *sqlx.Tx) error {
-		return c.database.DeleteTestRun(tx, int(runID))
+		return c.database.DeleteTestRun(tx, runID)
 	})
 
 	return err
@@ -308,7 +313,12 @@ func (c *Coordinator) startMetrics() error {
 func (c *Coordinator) runEpochGC(ctx context.Context) {
 	defer func() {
 		if err := recover(); err != nil {
-			c.log.GetLogger().WithError(err.(error)).Panicf("uncaught panic in coordinator.runEpochGC: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			c.log.GetLogger().WithError(err2).Panicf("uncaught panic in coordinator.runEpochGC: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 
@@ -327,7 +337,7 @@ func (c *Coordinator) runEpochGC(ctx context.Context) {
 		if networkTime < 0 {
 			sleepTime = networkTime.Abs()
 		} else {
-			currentSlot := uint64(networkTime / specs.SecondsPerSlot)
+			currentSlot := uint64(networkTime / specs.SecondsPerSlot) //nolint:gosec // no overflow possible
 			currentEpoch := currentSlot / specs.SlotsPerEpoch
 			currentSlotIndex := currentSlot % specs.SlotsPerEpoch
 			nextGcSlot := uint64(0)
@@ -346,7 +356,7 @@ func (c *Coordinator) runEpochGC(ctx context.Context) {
 				case <-time.After(specs.SecondsPerSlot / 2):
 				}
 
-				nextEpochDuration := time.Until(genesis.GenesisTime.Add(time.Duration((currentEpoch+1)*specs.SlotsPerEpoch) * specs.SecondsPerSlot))
+				nextEpochDuration := time.Until(genesis.GenesisTime.Add(time.Duration((currentEpoch+1)*specs.SlotsPerEpoch) * specs.SecondsPerSlot)) //nolint:gosec // no overflow possible
 
 				c.log.GetLogger().Infof("run GC (slot %v, %v sec before epoch %v)", currentSlot, nextEpochDuration.Seconds(), currentEpoch+1)
 				runtime.GC()
@@ -360,7 +370,7 @@ func (c *Coordinator) runEpochGC(ctx context.Context) {
 				}
 			}
 
-			nextRunTime := genesis.GenesisTime.Add(time.Duration(nextGcSlot) * specs.SecondsPerSlot)
+			nextRunTime := genesis.GenesisTime.Add(time.Duration(nextGcSlot) * specs.SecondsPerSlot) //nolint:gosec // no overflow possible
 			sleepTime = time.Until(nextRunTime)
 		}
 

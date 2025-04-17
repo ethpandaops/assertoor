@@ -93,14 +93,14 @@ func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
 	// get result headers
 	resultHeaderMap := map[uint64][]db.TaskResultHeader{}
 
-	resultHeaders, err := ah.coordinator.Database().GetAllTaskResultHeaders(int(runID))
+	resultHeaders, err := ah.coordinator.Database().GetAllTaskResultHeaders(runID)
 	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), "failed to get result headers", http.StatusInternalServerError)
 		return
 	}
 
 	for _, header := range resultHeaders {
-		resultHeaderMap[uint64(header.TaskID)] = append(resultHeaderMap[uint64(header.TaskID)], header)
+		resultHeaderMap[header.TaskID] = append(resultHeaderMap[header.TaskID], header)
 	}
 
 	taskScheduler := testInstance.GetTaskScheduler()
@@ -129,12 +129,12 @@ func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
 			case taskStatus.IsRunning:
 				taskData.Status = "running"
 				taskData.StartTime = taskStatus.StartTime.Unix()
-				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // no overflow possible
 			default:
 				taskData.Status = "complete"
 				taskData.StartTime = taskStatus.StartTime.Unix()
 				taskData.StopTime = taskStatus.StopTime.Unix()
-				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // no overflow possible
 			}
 
 			switch taskStatus.Result {
@@ -155,9 +155,9 @@ func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
 				for i, header := range resultHeaderMap[uint64(taskState.Index())] {
 					taskData.ResultFiles[i] = GetTestRunTaskResult{
 						Type:  header.Type,
-						Index: uint64(header.Index),
+						Index: header.Index,
 						Name:  header.Name,
-						Size:  uint64(header.Size),
+						Size:  header.Size,
 						URL:   fmt.Sprintf("/api/v1/test_run/%v/task/%v/result/%v/%v", runID, taskState.Index(), header.Type, header.Index),
 					}
 				}

@@ -3,21 +3,21 @@ package db
 import "github.com/jmoiron/sqlx"
 
 type TaskResult struct {
-	RunID  int    `db:"run_id"`
-	TaskID int    `db:"task_id"`
+	RunID  uint64 `db:"run_id"`
+	TaskID uint64 `db:"task_id"`
 	Type   string `db:"result_type"`
-	Index  int    `db:"result_index"`
+	Index  uint64 `db:"result_index"`
 	Name   string `db:"name"`
-	Size   int    `db:"size"`
+	Size   uint64 `db:"size"`
 	Data   []byte `db:"data"`
 }
 
 type TaskResultHeader struct {
-	TaskID int    `db:"task_id"`
+	TaskID uint64 `db:"task_id"`
 	Type   string `db:"result_type"`
-	Index  int    `db:"result_index"`
+	Index  uint64 `db:"result_index"`
 	Name   string `db:"name"`
-	Size   int    `db:"size"`
+	Size   uint64 `db:"size"`
 }
 
 func (db *Database) UpsertTaskResult(tx *sqlx.Tx, result *TaskResult) error {
@@ -39,7 +39,7 @@ func (db *Database) UpsertTaskResult(tx *sqlx.Tx, result *TaskResult) error {
 	return err
 }
 
-func (db *Database) GetTaskResultByIndex(runID, taskID int, resultType string, index int) (*TaskResult, error) {
+func (db *Database) GetTaskResultByIndex(runID, taskID uint64, resultType string, index int) (*TaskResult, error) {
 	var result TaskResult
 	err := db.reader.Get(&result, `
 		SELECT * FROM task_results
@@ -53,7 +53,7 @@ func (db *Database) GetTaskResultByIndex(runID, taskID int, resultType string, i
 	return &result, nil
 }
 
-func (db *Database) GetTaskResultByName(runID, taskID int, resultType, name string) (*TaskResult, error) {
+func (db *Database) GetTaskResultByName(runID, taskID uint64, resultType, name string) (*TaskResult, error) {
 	var result TaskResult
 	err := db.reader.Get(&result, `
 		SELECT * FROM task_results
@@ -67,7 +67,7 @@ func (db *Database) GetTaskResultByName(runID, taskID int, resultType, name stri
 	return &result, nil
 }
 
-func (db *Database) GetTaskResults(runID, taskID int, summaryType string) ([]TaskResult, error) {
+func (db *Database) GetTaskResults(runID, taskID uint64, summaryType string) ([]TaskResult, error) {
 	var results []TaskResult
 	err := db.reader.Select(&results, `
 		SELECT * FROM task_results
@@ -77,7 +77,7 @@ func (db *Database) GetTaskResults(runID, taskID int, summaryType string) ([]Tas
 	return results, err
 }
 
-func (db *Database) GetAllTaskResultHeaders(runID int) ([]TaskResultHeader, error) {
+func (db *Database) GetAllTaskResultHeaders(runID uint64) ([]TaskResultHeader, error) {
 	var headers []TaskResultHeader
 	err := db.reader.Select(&headers, `
 		SELECT task_id, result_type, result_index, name, size FROM task_results

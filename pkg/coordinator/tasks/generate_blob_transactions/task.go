@@ -253,7 +253,7 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 	}
 
 	blobRefs := []string{}
-	for i := 0; i < int(t.config.BlobSidecars); i++ {
+	for i := uint64(0); i < t.config.BlobSidecars; i++ {
 		blobRefs = append(blobRefs, blobRef)
 	}
 
@@ -331,9 +331,9 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 
 	return txWallet.SendTransaction(ctx, tx, &wallet.SendTransactionOptions{
 		Clients:            clients,
-		ClientsStartOffset: int(transactionIdx),
+		ClientsStartOffset: transactionIdx,
 		OnConfirm:          confirmedFn,
-		LogFn: func(client *execution.Client, retry int, rebroadcast int, err error) {
+		LogFn: func(client *execution.Client, retry uint64, rebroadcast uint64, err error) {
 			if err != nil {
 				t.logger.WithFields(logrus.Fields{
 					"client": client.GetName(),

@@ -4,12 +4,12 @@ import "github.com/ethpandaops/assertoor/pkg/coordinator/db"
 
 type logDBReader struct {
 	database  *db.Database
-	testRunID int
-	taskID    int
-	lastIdx   *int
+	testRunID uint64
+	taskID    uint64
+	lastIdx   *uint64
 }
 
-func NewLogDBReader(database *db.Database, testRunID, taskID int) LogReader {
+func NewLogDBReader(database *db.Database, testRunID, taskID uint64) LogReader {
 	return &logDBReader{
 		database:  database,
 		testRunID: testRunID,
@@ -17,7 +17,7 @@ func NewLogDBReader(database *db.Database, testRunID, taskID int) LogReader {
 	}
 }
 
-func (ls *logDBReader) GetLogEntryCount() int {
+func (ls *logDBReader) GetLogEntryCount() uint64 {
 	if ls.lastIdx == nil {
 		lastIdx, err := ls.database.GetLastLogIndex(ls.testRunID, ls.taskID)
 		if err != nil {
@@ -34,7 +34,7 @@ func (ls *logDBReader) GetLogEntryCount() int {
 	return *ls.lastIdx
 }
 
-func (ls *logDBReader) GetLogEntries(from, limit int) []*db.TaskLog {
+func (ls *logDBReader) GetLogEntries(from, limit uint64) []*db.TaskLog {
 	dbEntries, err := ls.database.GetTaskLogs(ls.testRunID, ls.taskID, from, limit)
 	if err != nil {
 		return nil

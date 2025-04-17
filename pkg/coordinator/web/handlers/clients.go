@@ -18,7 +18,7 @@ type ClientsPageClient struct {
 	Index         int       `json:"index"`
 	Name          string    `json:"name"`
 	CLVersion     string    `json:"cl_version"`
-	CLType        uint64    `json:"cl_type"`
+	CLType        int64     `json:"cl_type"`
 	CLHeadSlot    uint64    `json:"cl_head_slot"`
 	CLHeadRoot    []byte    `json:"cl_head_root"`
 	CLStatus      string    `json:"cl_status"`
@@ -26,7 +26,7 @@ type ClientsPageClient struct {
 	CLLastError   string    `json:"cl_error"`
 	CLIsReady     bool      `json:"cl_ready"`
 	ELVersion     string    `json:"el_version"`
-	ELType        uint64    `json:"el_type"`
+	ELType        int64     `json:"el_type"`
 	ELHeadNumber  uint64    `json:"el_head_number"`
 	ELHeadHash    []byte    `json:"el_head_hash"`
 	ELStatus      string    `json:"el_status"`
@@ -85,13 +85,13 @@ func (fh *FrontendHandler) getClientsPageClientData(client *clients.PoolClient) 
 		Index:         int(client.ConsensusClient.GetIndex()),
 		Name:          client.ConsensusClient.GetName(),
 		CLVersion:     client.ConsensusClient.GetVersion(),
-		CLType:        uint64(client.ConsensusClient.GetClientType()),
+		CLType:        int64(client.ConsensusClient.GetClientType()),
 		CLHeadSlot:    uint64(headSlot),
 		CLHeadRoot:    headRoot[:],
 		CLLastRefresh: client.ConsensusClient.GetLastEventTime(),
 		CLIsReady:     clientPool.GetConsensusPool().GetCanonicalFork(2).IsClientReady(client.ConsensusClient),
 		ELVersion:     client.ExecutionClient.GetVersion(),
-		ELType:        uint64(client.ExecutionClient.GetClientType()),
+		ELType:        int64(client.ExecutionClient.GetClientType()),
 		ELHeadNumber:  blockNum,
 		ELHeadHash:    blockHash[:],
 		ELLastRefresh: client.ExecutionClient.GetLastEventTime(),

@@ -142,10 +142,11 @@ func (fh *FrontendHandler) getIndexPageData(pageArgs *IndexPageArgs) (*IndexPage
 	testInstances, totalTests := fh.coordinator.GetTestHistory("", 0, pageOffset, pageArgs.PageSize)
 
 	for idx, test := range testInstances {
-		pageData.Tests = append(pageData.Tests, fh.getTestRunData(idx, test))
+		idx64 := uint64(idx) //nolint:gosec // no overflow possible
+		pageData.Tests = append(pageData.Tests, fh.getTestRunData(idx64, test))
 	}
 
-	pageData.TotalTests = uint64(totalTests)
+	pageData.TotalTests = totalTests
 	pageData.TotalPages = uint64(math.Ceil(float64(totalTests) / float64(pageArgs.PageSize)))
 	pageData.CurrentPageIndex = pageArgs.Page
 	pageData.PageSize = pageArgs.PageSize
@@ -164,11 +165,11 @@ func (fh *FrontendHandler) getIndexPageData(pageArgs *IndexPageArgs) (*IndexPage
 	return pageData, nil
 }
 
-func (fh *FrontendHandler) getTestRunData(idx int, test types.Test) *TestRunData {
+func (fh *FrontendHandler) getTestRunData(idx uint64, test types.Test) *TestRunData {
 	testData := &TestRunData{
 		RunID:      test.RunID(),
 		TestID:     test.TestID(),
-		Index:      uint64(idx),
+		Index:      idx,
 		Name:       test.Name(),
 		StartTime:  test.StartTime(),
 		StopTime:   test.StopTime(),
@@ -200,7 +201,7 @@ func (fh *FrontendHandler) getTestRunData(idx int, test types.Test) *TestRunData
 	}
 
 	if taskScheduler := test.GetTaskScheduler(); taskScheduler != nil {
-		testData.TaskCount = uint64(taskScheduler.GetTaskCount())
+		testData.TaskCount = taskScheduler.GetTaskCount()
 	}
 
 	return testData

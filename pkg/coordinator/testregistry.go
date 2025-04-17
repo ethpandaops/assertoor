@@ -284,7 +284,7 @@ func (c *TestRegistry) externalTestCfgToDB(cfgExternalTest *types.ExternalTestCo
 	}
 
 	if cfgExternalTest.Timeout != nil {
-		dbTestCfg.Timeout = int(cfgExternalTest.Timeout.Duration.Seconds())
+		dbTestCfg.Timeout = int(cfgExternalTest.Timeout.Seconds())
 	}
 
 	if cfgExternalTest.Schedule != nil {
