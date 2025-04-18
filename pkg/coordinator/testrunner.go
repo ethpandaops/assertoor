@@ -210,15 +210,16 @@ func (c *TestRunner) RunTestScheduler(ctx context.Context) {
 				err2 = errval
 			}
 
-			c.coordinator.Logger().WithError(err2).Panicf("uncaught panic in TestRunner.RunTestScheduler: %v, stack: %v", err, string(debug.Stack()))
+			c.coordinator.Logger().Panicf("uncaught panic in TestRunner.RunTestScheduler: %v, stack: %v", err2, string(debug.Stack()))
 		}
 	}()
 
 	// startup scheduler
 	for _, testDescr := range c.getStartupTests() {
 		testConfig := testDescr.Config()
+		skipQueue := testConfig.Schedule != nil && testConfig.Schedule.SkipQueue
 
-		_, err := c.ScheduleTest(testDescr, nil, false, testConfig.Schedule.SkipQueue)
+		_, err := c.ScheduleTest(testDescr, nil, false, skipQueue)
 		if err != nil {
 			c.coordinator.Logger().Errorf("could not schedule startup test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
 		}
@@ -241,8 +242,9 @@ func (c *TestRunner) RunTestScheduler(ctx context.Context) {
 
 		for _, testDescr := range c.getCronTests(cronTime) {
 			testConfig := testDescr.Config()
+			skipQueue := testConfig.Schedule != nil && testConfig.Schedule.SkipQueue
 
-			_, err := c.ScheduleTest(testDescr, nil, false, testConfig.Schedule.SkipQueue)
+			_, err := c.ScheduleTest(testDescr, nil, false, skipQueue)
 			if err != nil {
 				c.coordinator.Logger().Errorf("could not schedule cron test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
 			}
