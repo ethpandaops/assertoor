@@ -91,7 +91,7 @@ func (fh *FrontendHandler) TestRun(w http.ResponseWriter, r *http.Request) {
 
 	var pageData *TestRunPage
 
-	runID, pageError := strconv.ParseInt(vars["runId"], 10, 64)
+	runID, pageError := strconv.ParseUint(vars["runId"], 10, 64)
 	if pageError == nil {
 		pageData, pageError = fh.getTestRunPageData(runID)
 		data.Data = pageData
@@ -117,7 +117,7 @@ func (fh *FrontendHandler) TestRunData(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
-	runID, pageError := strconv.ParseInt(vars["runId"], 10, 64)
+	runID, pageError := strconv.ParseUint(vars["runId"], 10, 64)
 	if pageError == nil {
 		pageData, pageError = fh.getTestRunPageData(runID)
 	}
@@ -139,14 +139,14 @@ func (fh *FrontendHandler) TestRunData(w http.ResponseWriter, r *http.Request) {
 }
 
 //nolint:gocyclo // ignore
-func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error) {
-	test := fh.coordinator.GetTestByRunID(uint64(runID))
+func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error) {
+	test := fh.coordinator.GetTestByRunID(runID)
 	if test == nil {
 		return nil, fmt.Errorf("test not found")
 	}
 
 	pageData := &TestRunPage{
-		RunID:        uint64(runID),
+		RunID:        runID,
 		TestID:       test.TestID(),
 		Name:         test.Name(),
 		StartTime:    test.StartTime(),
@@ -173,13 +173,13 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 	// get result headers
 	resultHeaderMap := map[uint64][]db.TaskResultHeader{}
 
-	resultHeaders, err := fh.coordinator.Database().GetAllTaskResultHeaders(int(runID))
+	resultHeaders, err := fh.coordinator.Database().GetAllTaskResultHeaders(runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get result headers: %v", err)
 	}
 
 	for _, header := range resultHeaders {
-		resultHeaderMap[uint64(header.TaskID)] = append(resultHeaderMap[uint64(header.TaskID)], header)
+		resultHeaderMap[header.TaskID] = append(resultHeaderMap[header.TaskID], header)
 	}
 
 	taskScheduler := test.GetTaskScheduler()
@@ -269,8 +269,8 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 
 			if !fh.securityTrimmed {
 				logCount := taskStatus.Logger.GetLogEntryCount()
-				logStart := 0
-				logLimit := 100
+				logStart := uint64(0)
+				logLimit := uint64(100)
 
 				if logCount > logLimit {
 					logStart = logCount - logLimit
@@ -306,11 +306,13 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 
 				taskStatusVars := taskState.GetTaskStatusVars().GetVarsMap(nil, false)
 				if taskOutput, ok := taskStatusVars["outputs"]; ok {
-					if customRunTimeSecondsRaw, ok := taskOutput.(map[string]interface{})["customRunTimeSeconds"]; ok {
-						customRunTime, ok := customRunTimeSecondsRaw.(float64)
-						if ok {
-							taskData.CustomRunTime = time.Duration(customRunTime * float64(time.Second))
-							taskData.HasCustomRunTime = true
+					if taskOutputMap, ok := taskOutput.(map[string]interface{}); ok {
+						if customRunTimeSecondsRaw, ok := taskOutputMap["customRunTimeSeconds"]; ok {
+							customRunTime, ok := customRunTimeSecondsRaw.(float64)
+							if ok {
+								taskData.CustomRunTime = time.Duration(customRunTime * float64(time.Second))
+								taskData.HasCustomRunTime = true
+							}
 						}
 					}
 				}
@@ -345,9 +347,9 @@ func (fh *FrontendHandler) getTestRunPageData(runID int64) (*TestRunPage, error)
 
 						taskData.ResultFiles[i] = &TestRunTaskResult{
 							Type:  header.Type,
-							Index: uint64(header.Index),
+							Index: header.Index,
 							Name:  resName,
-							Size:  uint64(header.Size),
+							Size:  header.Size,
 							URL:   fmt.Sprintf("/api/v1/test_run/%v/task/%v/result/%v/%v?view", runID, taskData.Index, header.Type, header.Index),
 						}
 					}

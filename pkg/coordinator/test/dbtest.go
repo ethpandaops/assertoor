@@ -17,14 +17,14 @@ import (
 type dbTest struct {
 	database *db.Database
 
-	runID   int
+	runID   uint64
 	testRun *db.TestRun
 
 	taskIndexMtx sync.Mutex
 	taskIndex    []*db.TaskStateIndex
 }
 
-func LoadTestFromDB(database *db.Database, runID int) (types.Test, error) {
+func LoadTestFromDB(database *db.Database, runID uint64) (types.Test, error) {
 	// load test from database
 	testRun, err := database.GetTestRunByRunID(runID)
 	if err != nil {
@@ -47,7 +47,7 @@ func WrapDBTestRun(database *db.Database, test *db.TestRun) types.Test {
 }
 
 func (dbt *dbTest) RunID() uint64 {
-	return uint64(dbt.runID)
+	return dbt.runID
 }
 
 func (dbt *dbTest) TestID() string {
@@ -80,9 +80,9 @@ func (dbt *dbTest) GetTaskScheduler() types.TaskScheduler {
 
 func (dbt *dbTest) AbortTest(_ bool) {}
 
-func (dbt *dbTest) GetTaskCount() int {
+func (dbt *dbTest) GetTaskCount() uint64 {
 	dbt.loadTaskIndex()
-	return len(dbt.taskIndex)
+	return uint64(len(dbt.taskIndex))
 }
 
 func (dbt *dbTest) loadTaskIndex() {
@@ -198,9 +198,9 @@ func (dbt *dbTest) sortTaskList(taskList []types.TaskIndex) {
 
 		for {
 			switch {
-			case taskStateA.ParentTask == int(taskList[b]):
+			case taskStateA.ParentTask == uint64(taskList[b]):
 				return false
-			case taskStateB.ParentTask == int(taskList[a]):
+			case taskStateB.ParentTask == uint64(taskList[a]):
 				return true
 			}
 
@@ -232,7 +232,7 @@ func (dbt *dbTest) sortTaskList(taskList []types.TaskIndex) {
 }
 
 func (dbt *dbTest) GetTaskState(taskIndex types.TaskIndex) types.TaskState {
-	task, err := dbt.database.GetTaskStateByTaskID(dbt.runID, int(taskIndex))
+	task, err := dbt.database.GetTaskStateByTaskID(dbt.runID, uint64(taskIndex))
 	if err != nil {
 		return nil
 	}
@@ -301,7 +301,7 @@ func (dtt *dbTestTask) GetTaskStatus() *types.TaskStatus {
 		IsSkipped:   dtt.taskState.RunFlags&db.TaskRunFlagSkipped != 0,
 		StartTime:   time.UnixMilli(dtt.taskState.StartTime),
 		StopTime:    time.UnixMilli(dtt.taskState.StopTime),
-		Result:      types.TaskResult(dtt.taskState.TaskResult),
+		Result:      types.TaskResult(dtt.taskState.TaskResult), //nolint:gosec // ignore
 		Logger:      logger.NewLogDBReader(dtt.database, dtt.taskState.RunID, dtt.taskState.TaskID),
 	}
 

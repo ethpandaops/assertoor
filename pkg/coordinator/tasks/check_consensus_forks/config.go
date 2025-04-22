@@ -2,7 +2,7 @@ package checkconsensusforks
 
 type Config struct {
 	MinCheckEpochCount uint64 `yaml:"minCheckEpochCount" json:"minCheckEpochCount"`
-	MaxForkDistance    uint64 `yaml:"maxForkDistance" json:"maxForkDistance"`
+	MaxForkDistance    int64  `yaml:"maxForkDistance" json:"maxForkDistance"`
 	MaxForkCount       uint64 `yaml:"maxForkCount" json:"maxForkCount"`
 }
 

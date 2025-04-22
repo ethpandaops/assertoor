@@ -55,7 +55,7 @@ Assertoor is a robust and versatile tool designed for comprehensive testing of t
 ## Documentation and Examples
 
 Refer to our [documentation](https://github.com/noku-team/assertoor/wiki) for installation, configuration, and usage guidelines. \
-Example tests are available [here](https://github.com/noku-team/assertoor/tree/master/example/tests).
+Example tests are available [here](https://github.com/noku-team/assertoor/tree/master/playbooks).
 
 ## Contributing
 

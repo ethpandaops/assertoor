@@ -97,11 +97,11 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.StartIndex > 0 {
-		t.nextIndex = uint64(t.config.StartIndex)
+		t.nextIndex = uint64(t.config.StartIndex) //nolint:gosec // no overflow possible
 	}
 
 	if t.config.IndexCount > 0 {
-		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount)
+		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount) //nolint:gosec // no overflow possible
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]

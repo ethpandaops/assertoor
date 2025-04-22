@@ -89,7 +89,7 @@ func (pool *Pool) GetHeadForks(forkDistance int64) []*HeadFork {
 				_, headDistance = pool.blockCache.GetBlockDistance(cHeadRoot, fork.Root)
 			}
 
-			if headDistance <= uint64(forkDistance) {
+			if forkDistance < 0 || headDistance <= uint64(forkDistance) {
 				fork.ReadyClients = append(fork.ReadyClients, client)
 			}
 		}

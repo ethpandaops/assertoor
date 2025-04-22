@@ -21,7 +21,7 @@ type TaskSchedulerRunner interface {
 
 type TaskScheduler interface {
 	GetTaskState(taskIndex TaskIndex) TaskState
-	GetTaskCount() int
+	GetTaskCount() uint64
 	GetAllTasks() []TaskIndex
 	GetRootTasks() []TaskIndex
 	GetAllCleanupTasks() []TaskIndex

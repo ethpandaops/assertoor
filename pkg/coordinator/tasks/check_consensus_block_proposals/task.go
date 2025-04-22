@@ -639,7 +639,7 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 				}
 
 				if validator.Validator.PublicKey.String() == expectedWithdrawal.PublicKey {
-					withdrawalAmount := big.NewInt(int64(withdrawal.Amount))
+					withdrawalAmount := big.NewInt(0).SetUint64(uint64(withdrawal.Amount))
 
 					switch {
 					case expectedWithdrawal.Address != "" && !strings.EqualFold(expectedWithdrawal.Address, withdrawal.Address.String()):
@@ -722,7 +722,7 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 		requestLoop:
 			for _, depositRequest := range depositRequests {
 				if expectedDepositRequest.PublicKey == "" || depositRequest.Pubkey.String() == expectedDepositRequest.PublicKey {
-					depositAmount := big.NewInt(int64(depositRequest.Amount))
+					depositAmount := big.NewInt(0).SetUint64(uint64(depositRequest.Amount))
 
 					switch {
 					case expectedDepositRequest.WithdrawalCredentials != "" && !bytes.Equal(expectedWithdrawalCreds, depositRequest.WithdrawalCredentials):
@@ -776,7 +776,7 @@ func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *s
 		requestLoop:
 			for _, withdrawalRequest := range withdrawalRequests {
 				if expectedWithdrawalRequest.ValidatorPubkey == "" || bytes.Equal(withdrawalRequest.ValidatorPubkey[:], expectedPubKey) {
-					withdrawalAmount := big.NewInt(int64(withdrawalRequest.Amount))
+					withdrawalAmount := big.NewInt(0).SetUint64(uint64(withdrawalRequest.Amount))
 
 					switch {
 					case expectedWithdrawalRequest.SourceAddress != "" && !bytes.Equal(expectedAddress, withdrawalRequest.SourceAddress[:]):

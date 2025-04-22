@@ -13,6 +13,7 @@ type PostTestRunsScheduleRequest struct {
 	TestID         string         `json:"test_id"`
 	Config         map[string]any `json:"config"`
 	AllowDuplicate bool           `json:"allow_duplicate"`
+	SkipQueue      bool           `json:"skip_queue"`
 }
 
 type PostTestRunsScheduleResponse struct {
@@ -77,7 +78,7 @@ func (ah *APIHandler) PostTestRunsSchedule(w http.ResponseWriter, r *http.Reques
 	}
 
 	// create test run
-	testInstance, err := ah.coordinator.ScheduleTest(testDescriptor, req.Config, req.AllowDuplicate)
+	testInstance, err := ah.coordinator.ScheduleTest(testDescriptor, req.Config, req.AllowDuplicate, req.SkipQueue)
 	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed creating test: %v", err), http.StatusInternalServerError)
 		return

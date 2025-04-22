@@ -69,7 +69,12 @@ func (manager *Manager) GetWalletByAddress(address common.Address) *Wallet {
 func (manager *Manager) runBlockTransactionsLoop() {
 	defer func() {
 		if err := recover(); err != nil {
-			manager.logger.WithError(err.(error)).Panicf("uncaught panic in wallet.Manager.runBlockTransactionsLoop: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			manager.logger.WithError(err2).Panicf("uncaught panic in wallet.Manager.runBlockTransactionsLoop: %v, stack: %v", err, string(debug.Stack()))
 
 			time.Sleep(10 * time.Second)
 

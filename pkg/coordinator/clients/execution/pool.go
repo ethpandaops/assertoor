@@ -17,8 +17,8 @@ var (
 )
 
 type PoolConfig struct {
-	FollowDistance uint64 `yaml:"followDistance" envconfig:"EXECUTION_POOL_FOLLOW_DISTANCE"`
-	ForkDistance   uint64 `yaml:"forkDistance" envconfig:"EXECUTION_POOL_FORK_DISTANCE"`
+	FollowDistance uint32 `yaml:"followDistance" envconfig:"EXECUTION_POOL_FOLLOW_DISTANCE"`
+	ForkDistance   uint32 `yaml:"forkDistance" envconfig:"EXECUTION_POOL_FORK_DISTANCE"`
 	SchedulerMode  string `yaml:"schedulerMode" envconfig:"EXECUTION_POOL_SCHEDULER_MODE"`
 }
 

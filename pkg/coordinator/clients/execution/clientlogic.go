@@ -14,7 +14,12 @@ import (
 func (client *Client) runClientLoop() {
 	defer func() {
 		if err := recover(); err != nil {
-			client.logger.WithError(err.(error)).Errorf("uncaught panic in executionClient.runClientLoop subroutine: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			client.logger.WithError(err2).Errorf("uncaught panic in executionClient.runClientLoop subroutine: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 
@@ -65,7 +70,7 @@ func (client *Client) checkClient() error {
 	client.versionStr = nodeVersion
 	client.parseClientVersion(nodeVersion)
 
-	// get & comare chain specs
+	// get & compare chain specs
 	specs, err := client.rpcClient.GetChainSpec(ctx)
 	if err != nil {
 		return fmt.Errorf("error while fetching specs: %v", err)

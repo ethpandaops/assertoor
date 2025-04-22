@@ -37,11 +37,11 @@ func (lmb *logMemBuffer) Fire(entry *logrus.Entry) error {
 	lmb.lastIdx = logIdx
 
 	taskLog := &db.TaskLog{
-		RunID:      int(lmb.logger.options.TestRunID),
-		TaskID:     int(lmb.logger.options.TaskID),
-		LogIndex:   int(logIdx),
+		RunID:      lmb.logger.options.TestRunID,
+		TaskID:     lmb.logger.options.TaskID,
+		LogIndex:   logIdx,
 		LogTime:    entry.Time.UnixMilli(),
-		LogLevel:   int(entry.Level),
+		LogLevel:   uint32(entry.Level),
 		LogMessage: entry.Message,
 	}
 
@@ -64,11 +64,11 @@ func (lmb *logMemBuffer) Fire(entry *logrus.Entry) error {
 	return nil
 }
 
-func (lmb *logMemBuffer) GetLogEntryCount() int {
-	return int(lmb.lastIdx)
+func (lmb *logMemBuffer) GetLogEntryCount() uint64 {
+	return lmb.lastIdx
 }
 
-func (lmb *logMemBuffer) GetLogEntries(from, limit int) []*db.TaskLog {
+func (lmb *logMemBuffer) GetLogEntries(from, limit uint64) []*db.TaskLog {
 	lmb.bufMtx.Lock()
 	defer lmb.bufMtx.Unlock()
 
@@ -91,14 +91,14 @@ func (lmb *logMemBuffer) GetLogEntries(from, limit int) []*db.TaskLog {
 
 	if entries[0].LogIndex < from {
 		indexDiff := from - entries[0].LogIndex
-		if indexDiff >= len(entries) {
+		if indexDiff >= uint64(len(entries)) {
 			return nil
 		}
 
 		entries = entries[indexDiff:]
 	}
 
-	if limit != 0 && len(entries) > limit {
+	if limit != 0 && uint64(len(entries)) > limit {
 		entries = entries[0:limit]
 	}
 

@@ -3,11 +3,11 @@ package db
 import "github.com/jmoiron/sqlx"
 
 type TaskLog struct {
-	RunID      int    `db:"run_id"`
-	TaskID     int    `db:"task_id"`
-	LogIndex   int    `db:"log_idx"`
+	RunID      uint64 `db:"run_id"`
+	TaskID     uint64 `db:"task_id"`
+	LogIndex   uint64 `db:"log_idx"`
 	LogTime    int64  `db:"log_time"`
-	LogLevel   int    `db:"log_level"`
+	LogLevel   uint32 `db:"log_level"`
 	LogFields  string `db:"log_fields"`
 	LogMessage string `db:"log_message"`
 }
@@ -36,7 +36,7 @@ func (db *Database) InsertTaskLog(tx *sqlx.Tx, log *TaskLog) error {
 	return nil
 }
 
-func (db *Database) GetTaskLogs(runID, taskID, fromIdx, limit int) ([]*TaskLog, error) {
+func (db *Database) GetTaskLogs(runID, taskID, fromIdx, limit uint64) ([]*TaskLog, error) {
 	var logs []*TaskLog
 
 	err := db.reader.Select(&logs, `
@@ -52,8 +52,8 @@ func (db *Database) GetTaskLogs(runID, taskID, fromIdx, limit int) ([]*TaskLog, 
 	return logs, nil
 }
 
-func (db *Database) GetLastLogIndex(runID, taskID int) (int, error) {
-	var logIdx int
+func (db *Database) GetLastLogIndex(runID, taskID uint64) (uint64, error) {
+	var logIdx uint64
 
 	err := db.reader.Get(&logIdx, `
 		SELECT COALESCE(MAX(log_idx), 0) FROM task_logs
