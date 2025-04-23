@@ -310,14 +310,14 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 	attestationData1 := &phase0.AttestationData{
 		Slot:            phase0.Slot(slot1),
 		Index:           phase0.CommitteeIndex(committeeIndex),
-		BeaconBlockRoot: phase0.Root(ethcommon.FromHex("0x4242424242424242424242424242424242424242424242424242424242424242")),
+		BeaconBlockRoot: phase0.Root(ethcommon.FromHex("0x00000000219ab540356cBB839Cbe05303d7705Fa424242424242424242424242")),
 		Source:          source1,
 		Target:          target1,
 	}
 	attestationData2 := &phase0.AttestationData{
 		Slot:            phase0.Slot(slot2),
 		Index:           phase0.CommitteeIndex(committeeIndex),
-		BeaconBlockRoot: phase0.Root(ethcommon.FromHex("0x4242424242424242424242424242424242424242424242424242424242424242")),
+		BeaconBlockRoot: phase0.Root(ethcommon.FromHex("0x00000000219ab540356cBB839Cbe05303d7705Fa424242424242424242424242")),
 		Source:          source2,
 		Target:          target2,
 	}

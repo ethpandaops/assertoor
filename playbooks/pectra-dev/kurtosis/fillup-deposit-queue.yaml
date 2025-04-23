@@ -6,7 +6,7 @@ config:
   walletPrivkey: ""
   depositCount: 1010
   depositMaxIndex: 100
-  depositContract: "0x4242424242424242424242424242424242424242"
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
   throughputPerIndex: 20
   maxPendingPerIndex: 40
   walletSeed: ""
@@ -71,7 +71,7 @@ tasks:
             walletSeed: "| \"fillup-deposit-queue-\" + .walletSeed + (.worker.index | tostring)"
             prefundMinBalance: "| (.worker.depositCount + 1) * 1000000000000000000"
             privateKey: "walletPrivkey"
-        
+
         - name: sleep
           title: "Sleep 10s to ensure propagation of last block with wallet fundings to all clients"
           config:

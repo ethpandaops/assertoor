@@ -3,7 +3,7 @@ name: "Validator Lifecycle Test (v2)"
 timeout: 672h
 config:
   walletPrivkey: ""
-  depositContract: "0x4242424242424242424242424242424242424242"
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
 
 tasks:
 - name: check_clients_are_healthy
@@ -449,7 +449,7 @@ tasks:
                     minWithdrawalCount: 1
                   configVars:
                     expectWithdrawals: "| [{publicKey: .validatorPubkeys[9], address: .depositorAddress, minAmount: 31500000000}]"
-              
+
 
 # all keys should be extied now.
 # slashed validators have a withdrawal delay of 2048 epochs, which is not tracked here. this affects key 2, 3, 6 & 7.
