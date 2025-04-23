@@ -107,7 +107,7 @@ tests:
     timeout: 5m
     config:
       minClientCount: 1
-  
+
   - name: run_tasks_concurrent
     title: "Generate deposits & Track inclusion"
     config:
@@ -119,7 +119,7 @@ tests:
           limitTotal: 100
           limitPerSlot: 5
           walletPrivkey: "94eb3102993b41ec55c241060f47daa0f6372e2e3ad7e91612ae36c364042e44"
-          depositContract: "0x4242424242424242424242424242424242424242"
+          depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
 
       - name: run_task_matrix
         title: "Check deposit inclusion with all client pairs"
@@ -145,7 +145,7 @@ tests:
     timeout: 5m
     config:
       minClientCount: 1
-  
+
   - name: run_tasks_concurrent
     title: "Generate exits & Track inclusion"
     config:

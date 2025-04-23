@@ -7,7 +7,7 @@ config:
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
   validatorStartIndex: 0
   useExistingValidators: false
-  depositContract: "0x4242424242424242424242424242424242424242"
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
 tasks:
 - name: check_clients_are_healthy
   title: "Check if at least one client is ready"
@@ -162,12 +162,12 @@ tasks:
                 minWithdrawalRequestCount: 1
               configVars:
                 expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[0], sourceAddress: .tasks.wallet_details.outputs.address, amount: 0}]"
-        
+
         - name: sleep
           title: "Wait for EL triggered exit to be processed"
           config:
             duration: 20m
-        
+
         - name: check_consensus_validator_status
           title: "Check if key 0 is still active"
           config:
@@ -231,7 +231,7 @@ tasks:
                 minWithdrawalRequestCount: 1
               configVars:
                 expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[1], sourceAddress: .tasks.wallet_details.outputs.address, amount: 0}]"
-        
+
         # wait for exit to be processed
         - name: check_consensus_validator_status
           title: "Wait for key 1 to exit"
@@ -293,7 +293,7 @@ tasks:
                 targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[2]"
                 sourceStartIndex: "validatorStartIndex + 2"
                 walletPrivkey: "walletPrivkey"
-            
+
             foregroundTask:
               name: check_consensus_block_proposals
               title: "Wait for inclusion of self consolidation request for key 2"
@@ -301,7 +301,7 @@ tasks:
                 minConsolidationRequestCount: 1
               configVars:
                 expectConsolidationRequests: "| [{sourceAddress: .tasks.wallet_details.outputs.address, sourcePubkey: .tasks.validator_pubkeys.outputs.pubkeys[2]}]"
-        
+
         # check if key 2 has 0x02 credentials
         - name: check_consensus_validator_status
           title: "Get validator info for key 2 (expect 0x02 credentials)"
@@ -316,7 +316,7 @@ tasks:
         - name: run_shell
           title: "Check if key 2 has 0x02 credentials"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.key2_status.outputs.validator"
             command: |
               withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
@@ -351,7 +351,7 @@ tasks:
                 minWithdrawalRequestCount: 1
               configVars:
                 expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[2], sourceAddress: .tasks.wallet_details.outputs.address, amount: 0}]"
-        
+
         # wait for exit to be processed
         - name: check_consensus_validator_status
           title: "Wait for key 2 to exit"
@@ -429,7 +429,7 @@ tasks:
                 minWithdrawalRequestCount: 1
               configVars:
                 expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[3], sourceAddress: .tasks.wallet_details.outputs.address, amount: 1000000000}]"
-        
+
         # check chain for 30 minutes, expect no withdrawal with >= 0.1 ETH for key 3
         - name: run_task_options
           title: "Monitor chain for 30min, expect no withdrawal with >= 0.1 ETH for key 3"
@@ -494,7 +494,7 @@ tasks:
                 targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[4]"
                 sourceStartIndex: "validatorStartIndex + 4"
                 walletPrivkey: "walletPrivkey"
-            
+
             foregroundTask:
               name: check_consensus_block_proposals
               title: "Wait for inclusion of self consolidation request for key 4"
@@ -548,7 +548,7 @@ tasks:
         - name: run_shell
           title: "Check if key 4 has 0x02 credentials"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.key4_status.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
@@ -657,7 +657,7 @@ tasks:
                 targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[5]"
                 sourceStartIndex: "validatorStartIndex + 5"
                 walletPrivkey: "walletPrivkey"
-            
+
             foregroundTask:
               name: check_consensus_block_proposals
               title: "Wait for inclusion of self consolidation request for key 5"
@@ -665,7 +665,7 @@ tasks:
                 minConsolidationRequestCount: 1
               configVars:
                 expectConsolidationRequests: "| [{sourceAddress: .tasks.wallet_details.outputs.address, sourcePubkey: .tasks.validator_pubkeys.outputs.pubkeys[5]}]"
-        
+
         # generate top-up deposit for key 5 (add 1 ETH) & wait for inclusion
         - name: run_task_background
           title: "Generate top-up deposit for key 5 & track inclusion"
@@ -709,7 +709,7 @@ tasks:
         - name: run_shell
           title: "Check if key 5 has 0x02 credentials"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.key5_status.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
@@ -827,7 +827,7 @@ tasks:
                         targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[6]"
                         sourceStartIndex: "validatorStartIndex + 6"
                         walletPrivkey: "walletPrivkey"
-                    
+
                     foregroundTask:
                       name: check_consensus_block_proposals
                       title: "Wait for inclusion of self consolidation request for key 6"
@@ -862,7 +862,7 @@ tasks:
                         minDepositRequestCount: 1
                       configVars:
                         expectDepositRequests: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[6], amount: 10000000000}]"
-            
+
             - name: run_tasks
               title: "Prepare key 7 (BLS change, self consolidation, top-up deposit)"
               config:
@@ -910,7 +910,7 @@ tasks:
                         targetPublicKey: "tasks.validator_pubkeys.outputs.pubkeys[7]"
                         sourceStartIndex: "validatorStartIndex + 7"
                         walletPrivkey: "walletPrivkey"
-                    
+
                     foregroundTask:
                       name: check_consensus_block_proposals
                       title: "Wait for inclusion of self consolidation request for key 7"
@@ -945,7 +945,7 @@ tasks:
                         minDepositRequestCount: 1
                       configVars:
                         expectDepositRequests: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[7], amount: 10000000000}]"
-        
+
         # wait for topup deposit to be processed
         - name: check_consensus_validator_status
           title: "Wait for key 6 balance to increase > 41 ETH"
@@ -1094,7 +1094,7 @@ tasks:
                 minWithdrawalRequestCount: 1
               configVars:
                 expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[6], sourceAddress: .tasks.wallet_details.outputs.address, amount: 0}]"
-        
+
         # send voluntary exit for key 7
         - name: run_task_options
           title: "Expect failure for voluntary exit for key 7"
@@ -1129,7 +1129,7 @@ tasks:
                 minWithdrawalCount: 1
               configVars:
                 expectWithdrawals: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[7], address: .tasks.wallet_details.outputs.address, minAmount: 1000000000, maxAmount: 1000000000}]"
-    
+
     # Test8:
 
     # Test9:

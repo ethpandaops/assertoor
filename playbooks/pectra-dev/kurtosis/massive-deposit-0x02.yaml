@@ -3,7 +3,7 @@ name: "Massive deposit with 0x02 creds"
 timeout: 672h
 config:
   #walletPrivkey: ""
-  depositContract: "0x4242424242424242424242424242424242424242"
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
   targetAddress: "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA"
 
 tasks:
