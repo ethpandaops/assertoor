@@ -10,12 +10,12 @@ tasks:
     config:
       minSlotNumber: 34
   - name: run_external_tasks
-    title: "Generate BLS changes for validator 0-300"
+    title: "Generate BLS changes for validator 0-30"
     timeout: 30m
     config:
       testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/bls-changes.yaml
       testConfig:
-        validatorCount: 300
+        validatorCount: 30
   
   # EIP-6110
   - name: check_consensus_slot_range

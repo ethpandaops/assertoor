@@ -652,7 +652,9 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 						found = true
 					}
 
-					break
+					if found {
+						break
+					}
 				}
 			}
 
