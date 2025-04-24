@@ -68,10 +68,10 @@ tasks:
         limitTotal: "keysPerRequestType"
         indexCount: "keysPerRequestType"
 
-#- name: sleep
-#  title: "Wait for BLS changes to be processed"
-#  config:
-#    duration: 2m
+- name: sleep
+  title: "Wait for BLS changes to be processed"
+  config:
+    duration: 13m
 
 # wait for electra activation
 - name: get_consensus_specs
