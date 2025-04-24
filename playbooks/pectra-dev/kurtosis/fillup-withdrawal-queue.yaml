@@ -12,6 +12,7 @@ config:
   walletSeed: ""
   sourceStartValidatorIndex: 0
   sourceValidatorCount: 0
+  withdrawAmount: 1 # 1 wei
 tasks:
 - name: check_clients_are_healthy
   title: "Check if at least one client is ready"
@@ -86,7 +87,6 @@ tasks:
               name: generate_withdrawal_requests
               title: "Generate withdrawals for key ${{worker.index}} (${{tasks.get_validator.outputs.pubkey}})"
               config:
-                withdrawAmount: 1 # 1 ETH
                 awaitReceipt: true
                 failOnReject: true
               configVars:
@@ -97,4 +97,5 @@ tasks:
                 txAmount: "withdrawalTxFee"
                 sourceStartValidatorIndex: "sourceStartValidatorIndex"
                 sourceIndexCount: "sourceValidatorCount"
+                withdrawAmount: "withdrawAmount"
 

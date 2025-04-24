@@ -20,18 +20,15 @@ tasks:
     minClientCount: 1
 
 # wait for electra activation
-- name: get_consensus_specs
-  id: get_specs
-  title: "Get consensus chain specs"
 - name: check_consensus_slot_range
-  title: "Wait for electra activation"
+  title: "Wait for first block"
   timeout: 1h
-  configVars:
-    minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
+  config:
+    minSlotNumber: 1
 
 # generate child wallets
 - name: generate_child_wallet
-  id: withdrawal_wallet
+  id: withdrawal_wallet2
   title: "Generate withdrawal wallet"
   config:
     prefundMinBalance: 1000000000000000000
@@ -39,7 +36,7 @@ tasks:
     walletSeed: "| \"fillup-withdrawal-queue-\" + .walletSeed + \"0\""
     privateKey: "walletPrivkey"
 - name: generate_child_wallet
-  id: consolidation_wallet
+  id: consolidation_wallet2
   title: "Generate consolidation wallet"
   config:
     prefundMinBalance: 1000000000000000000
@@ -59,17 +56,32 @@ tasks:
         startIndex: 0
       configVars:
         mnemonic: "validatorMnemonic"
-        targetAddress: "tasks.withdrawal_wallet.outputs.childWallet.address"
+        targetAddress: "tasks.withdrawal_wallet2.outputs.childWallet.address"
         limitTotal: "keysPerRequestType"
         indexCount: "keysPerRequestType"
     - name: generate_bls_changes
       title: "Send BLS changes for consolidation wallet"
       configVars:
         mnemonic: "validatorMnemonic"
-        targetAddress: "tasks.consolidation_wallet.outputs.childWallet.address"
+        targetAddress: "tasks.consolidation_wallet2.outputs.childWallet.address"
         startIndex: "keysPerRequestType"
         limitTotal: "keysPerRequestType"
         indexCount: "keysPerRequestType"
+
+#- name: sleep
+#  title: "Wait for BLS changes to be processed"
+#  config:
+#    duration: 2m
+
+# wait for electra activation
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+- name: check_consensus_slot_range
+  title: "Wait for electra activation"
+  timeout: 1h
+  configVars:
+    minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
 
 # fillup all EL request queues (deposit, withdrawal, consolidation)
 - name: run_tasks_concurrent
