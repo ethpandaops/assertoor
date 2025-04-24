@@ -99,7 +99,7 @@ tasks:
       config:
         testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/fillup-withdrawal-queue.yaml
       configVars:
-        testConfig: "| { \"withdrawalCount\": .requestCount, \"withdrawalMaxIndex\": 1, \"withdrawalTxFee\": .requestFeeAmount, \"throughputPerIndex\": .throughputPerWallet, \"maxPendingPerIndex\": .maxPendingPerWallet, \"walletSeed\": .walletSeed, \"sourceStartValidatorIndex\": 0, \"sourceValidatorCount\": .keysPerRequestType }"
+        testConfig: "| { \"withdrawalCount\": .requestCount, \"withdrawalMaxIndex\": 1, \"withdrawalTxFee\": .requestFeeAmount, \"throughputPerIndex\": .throughputPerWallet, \"maxPendingPerIndex\": .maxPendingPerWallet, \"walletSeed\": .walletSeed, \"sourceStartValidatorIndex\": 0, \"sourceValidatorCount\": .keysPerRequestType, \"targetValidatorIndex\": .keysPerRequestType, \"withdrawAmount\": 0 }"
     - name: run_external_tasks
       title: "Fillup consolidation request queue with ${{requestCount}} consolidation requests"
       config:
