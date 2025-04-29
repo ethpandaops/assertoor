@@ -197,6 +197,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	outputs := map[string]interface{}{
 		"total_time_mus": totalTime.Microseconds(),
+		"qps":            t.config.QPS,
 	}
 	outputsJSON, _ := json.Marshal(outputs)
 	t.logger.Infof("outputs_json: %s", string(outputsJSON))
