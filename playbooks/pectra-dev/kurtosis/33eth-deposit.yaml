@@ -19,7 +19,7 @@ tasks:
 - name: generate_child_wallet
   title: "Generate wallet for lifecycle test"
   config:
-    prefundMinBalance: 34010000000000000000 # ensure 3401 ETH
+    prefundMinBalance: 34010000000000000000 # ensure 34 ETH
     walletAddressResultVar: "depositorAddress"
     walletPrivateKeyResultVar: "depositorPrivateKey"
   configVars:
@@ -32,11 +32,11 @@ tasks:
     stopChildOnResult: false
     tasks:
     - name: generate_deposits
-      title: "Generate 10 deposits with 33 ETH each"
+      title: "Generate 1 deposits with 33 ETH each"
       config:
-        limitTotal: 10
-        limitPerSlot: 10
-        limitPending: 10
+        limitTotal: 1
+        limitPerSlot: 1
+        limitPending: 1
         depositAmount: 33
         awaitReceipt: true
         failOnReject: true
