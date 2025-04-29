@@ -3,7 +3,7 @@ name: "Validator Lifecycle Test (v3)"
 timeout: 672h
 config:
   walletPrivkey: ""
-  depositContract: "0x4242424242424242424242424242424242424242"
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
 
 tasks:
 - name: check_clients_are_healthy
@@ -58,7 +58,7 @@ tasks:
         walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
         mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
         depositContract: "depositContract"
-    
+
     # 1 deposit, 24 ETH, 0x00 withdrawal creds
     - name: generate_deposits
       title: "Generate 1 deposit with 24 ETH and 0x00 withdrawal creds (index 4)"
@@ -85,7 +85,7 @@ tasks:
         walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
         mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
         depositContract: "depositContract"
-    
+
     # 1 deposit, 1 ETH, 0x02 withdrawal creds
     - name: generate_deposits
       title: "Generate 1 deposit with 1 ETH and 0x02 withdrawal creds (index 1)"
@@ -99,7 +99,7 @@ tasks:
         mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
         depositContract: "depositContract"
         withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.depositor_wallet.outputs.childWallet.address | capture(\"(0x)?(?<addr>.+)\").addr)"
-    
+
     # 2 deposits, 32 ETH each, 0x01 withdrawal creds (index 5-6)
     - name: generate_deposits
       title: "Generate 2 deposits with 32 ETH each and 0x01 withdrawal creds (index 5-6)"
@@ -114,7 +114,7 @@ tasks:
         mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
         depositContract: "depositContract"
         withdrawalCredentials: "| \"0x010000000000000000000000\" + (.tasks.depositor_wallet.outputs.childWallet.address | capture(\"(0x)?(?<addr>.+)\").addr)"
-    
+
     # 1 deposit, 24 ETH, 0x02 withdrawal creds (index 7)
     - name: generate_deposits
       title: "Generate 1 deposit with 24 ETH and 0x02 withdrawal creds (index 7)"
@@ -161,7 +161,7 @@ tasks:
         mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
         depositContract: "depositContract"
         withdrawalCredentials: "| \"0x020000000000000000000000\" + (.tasks.depositor_wallet.outputs.childWallet.address | capture(\"(0x)?(?<addr>.+)\").addr)"
-    
+
     # 1 deposit, 24 ETH, 0x02 withdrawal creds (index 7)
     - name: generate_deposits
       title: "Generate 1 deposit with 24 ETH and 0x02 withdrawal creds (index 7)"
@@ -231,7 +231,7 @@ tasks:
         - name: run_shell
           title: "Check validator #0 status: 64 ETH (32 ETH EB), 0x00 withdrawal creds"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.validator_info_0.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
@@ -251,7 +251,7 @@ tasks:
                 echo "Invalid withdrawal credentials! expected: 0x00*, got: $withdrawal_creds"
                 exit 1
               fi
-        
+
         # validator #1: 33 ETH (32 ETH EB), 0x00 withdrawal creds
         - name: check_consensus_validator_status
           title: "Get validator #1 info"
@@ -265,7 +265,7 @@ tasks:
         - name: run_shell
           title: "Check validator #1 status: 33 ETH (32 ETH EB), 0x00 withdrawal creds"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.validator_info_1.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
@@ -285,7 +285,7 @@ tasks:
                 echo "Invalid withdrawal credentials! expected: 0x00*, got: $withdrawal_creds"
                 exit 1
               fi
-        
+
         # validator #4: 48 ETH (32 ETH EB), 0x00 withdrawal creds
         - name: check_consensus_validator_status
           title: "Get validator #4 info"
@@ -299,7 +299,7 @@ tasks:
         - name: run_shell
           title: "Check validator #4 status: 48 ETH (32 ETH EB), 0x00 withdrawal creds"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.validator_info_4.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
@@ -319,7 +319,7 @@ tasks:
                 echo "Invalid withdrawal credentials! expected: 0x00*, got: $withdrawal_creds"
                 exit 1
               fi
-        
+
         # validator #5: 32 ETH (32 ETH EB), 0x01 withdrawal creds
         - name: check_consensus_validator_status
           title: "Get validator #5 info"
@@ -333,7 +333,7 @@ tasks:
         - name: run_shell
           title: "Check validator #5 status: 32 ETH (32 ETH EB), 0x01 withdrawal creds"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.validator_info_5.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
@@ -367,7 +367,7 @@ tasks:
         - name: run_shell
           title: "Check validator #6 status: 32 ETH (32 ETH EB), 0x01 withdrawal creds"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.validator_info_6.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
@@ -387,7 +387,7 @@ tasks:
                 echo "Invalid withdrawal credentials! expected: 0x01*, got: $withdrawal_creds"
                 exit 1
               fi
-        
+
         # validator #7: 48 ETH (48 ETH EB), 0x02 withdrawal creds
         - name: check_consensus_validator_status
           title: "Get validator #7 info"
@@ -401,7 +401,7 @@ tasks:
         - name: run_shell
           title: "Check validator #7 status: 48 ETH (48 ETH EB), 0x02 withdrawal creds"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.validator_info_7.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
@@ -421,7 +421,7 @@ tasks:
                 echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
                 exit 1
               fi
-        
+
         # validator #8: 64 ETH (64 ETH EB), 0x02 withdrawal creds
         - name: check_consensus_validator_status
           title: "Get validator #8 info"
@@ -435,7 +435,7 @@ tasks:
         - name: run_shell
           title: "Check validator #8 status: 64 ETH (64 ETH EB), 0x02 withdrawal creds"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.validator_info_8.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
@@ -469,7 +469,7 @@ tasks:
         - name: run_shell
           title: "Check validator #9 status: 64 ETH (64 ETH EB), 0x02 withdrawal creds"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.validator_info_9.outputs.validator"
             command: |
               balance=$(echo "$validator" | jq -r '.balance')
@@ -531,7 +531,7 @@ tasks:
               configVars:
                 mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
                 targetAddress: "tasks.depositor_wallet.outputs.childWallet.address"
-        
+
         foregroundTask:
           name: run_tasks_concurrent
           title: "Wait for inclusion of all BLS changes & partial withdrawals"
@@ -606,7 +606,7 @@ tasks:
             sourceMnemonic: "tasks.test_mnemonic.outputs.mnemonic"
             targetPublicKey: "tasks.all_pubkeys.outputs.pubkeys[5]"
             walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
-        
+
         foregroundTask:
           name: check_consensus_block_proposals
           title: "Wait for inclusion of self consolidation request for key 5"
@@ -658,7 +658,7 @@ tasks:
                 sourceMnemonic: "tasks.test_mnemonic.outputs.mnemonic"
                 targetValidatorIndex: "tasks.validator_info_6.outputs.validator.index | tonumber"
                 walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
-            
+
             - name: generate_consolidations
               title: "Generate 1 consolidation (index 1 -> index 5)"
               config:
@@ -671,7 +671,7 @@ tasks:
                 sourceMnemonic: "tasks.test_mnemonic.outputs.mnemonic"
                 targetValidatorIndex: "tasks.validator_info_5.outputs.validator.index | tonumber"
                 walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
-            
+
             - name: generate_consolidations
               title: "Generate 1 consolidation (index 5 -> index 7)"
               config:
@@ -697,7 +697,7 @@ tasks:
                 sourceMnemonic: "tasks.test_mnemonic.outputs.mnemonic"
                 targetValidatorIndex: "tasks.validator_info_7.outputs.validator.index | tonumber"
                 walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
-        
+
         foregroundTask:
           name: run_tasks_concurrent
           title: "Wait for inclusion of all consolidations"
@@ -734,7 +734,7 @@ tasks:
                 minConsolidationRequestCount: 1
               configVars:
                 expectConsolidationRequests: "| [{sourceAddress: .tasks.depositor_wallet.outputs.childWallet.address, sourcePubkey: .tasks.all_pubkeys.outputs.pubkeys[4]}]"
-      
+
     # slash validator #3 before consolidation started
     - name: run_task_background
       title: "Generate slashing for key #3 & track inclusion"
@@ -775,7 +775,7 @@ tasks:
         - withdrawal_done
       configVars:
         validatorPubKey: "tasks.all_pubkeys.outputs.pubkeys[1]"
-      
+
     # check validator #0 still active (consolidation ignored due to 0x00 credentials)
     - name: check_consensus_validator_status
       title: "Check validator #0 is still active (consolidation ignored)"
@@ -1062,7 +1062,7 @@ tasks:
     - name: run_shell
       title: "Check validator #0 status: 64 ETH (32 ETH EB), 0x00 withdrawal creds"
       config:
-        envVars: 
+        envVars:
           validator: "tasks.validator_info_0.outputs.validator"
         command: |
           balance=$(echo "$validator" | jq -r '.balance')
@@ -1082,7 +1082,7 @@ tasks:
             echo "Invalid withdrawal credentials! expected: 0x00*, got: $withdrawal_creds"
             exit 1
           fi
-    
+
     # validator #1: 0 ETH (0 ETH EB), 0x01 withdrawal creds
     - name: check_consensus_validator_status
       title: "Get validator #1 info"
@@ -1096,7 +1096,7 @@ tasks:
     - name: run_shell
       title: "Check validator #1 status: 0 ETH (0 ETH EB), 0x00 withdrawal creds"
       config:
-        envVars: 
+        envVars:
           validator: "tasks.validator_info_1.outputs.validator"
         command: |
           balance=$(echo "$validator" | jq -r '.balance')
@@ -1116,7 +1116,7 @@ tasks:
             echo "Invalid withdrawal credentials! expected: 0x01*, got: $withdrawal_creds"
             exit 1
           fi
-    
+
     # validator #4: 0 ETH (0 ETH EB), 0x00 withdrawal creds
     - name: check_consensus_validator_status
       title: "Get validator #4 info"
@@ -1130,7 +1130,7 @@ tasks:
     - name: run_shell
       title: "Check validator #4 status: 0 ETH (0 ETH EB), 0x00 withdrawal creds"
       config:
-        envVars: 
+        envVars:
           validator: "tasks.validator_info_4.outputs.validator"
         command: |
           balance=$(echo "$validator" | jq -r '.balance')
@@ -1150,7 +1150,7 @@ tasks:
             echo "Invalid withdrawal credentials! expected: 0x01*, got: $withdrawal_creds"
             exit 1
           fi
-    
+
     # validator #5: 0 ETH (0 ETH EB), 0x02 withdrawal creds
     - name: check_consensus_validator_status
       title: "Get validator #5 info"
@@ -1164,7 +1164,7 @@ tasks:
     - name: run_shell
       title: "Check validator #5 status: 0 ETH (0 ETH EB), 0x01 withdrawal creds"
       config:
-        envVars: 
+        envVars:
           validator: "tasks.validator_info_5.outputs.validator"
         command: |
           balance=$(echo "$validator" | jq -r '.balance')
@@ -1184,7 +1184,7 @@ tasks:
             echo "Invalid withdrawal credentials! expected: 0x02*, got: $withdrawal_creds"
             exit 1
           fi
-    
+
     # validator #7: 111.9 ETH (111 ETH EB), 0x02 withdrawal creds
     - name: check_consensus_validator_status
       title: "Get validator #7 info"
@@ -1199,7 +1199,7 @@ tasks:
     - name: run_shell
       title: "Check validator #7 status: 111.9 ETH (111 ETH EB), 0x02 withdrawal creds"
       config:
-        envVars: 
+        envVars:
           validator: "tasks.validator_info_7.outputs.validator"
         command: |
           balance=$(echo "$validator" | jq -r '.balance')
@@ -1260,7 +1260,7 @@ tasks:
             sourceMnemonic: "tasks.test_mnemonic.outputs.mnemonic"
             targetValidatorIndex: "tasks.validator_info_6.outputs.validator.index | tonumber"
             walletPrivkey: "tasks.depositor_wallet.outputs.childWallet.privkey"
-        
+
         foregroundTask:
           name: run_tasks_concurrent
           title: "Wait for inclusion of self consolidation request"
@@ -1288,7 +1288,7 @@ tasks:
     - name: run_shell
       title: "Check validator #6 status: 31.9 ETH (32 ETH EB), 0x00 withdrawal creds"
       config:
-        envVars: 
+        envVars:
           validator: "tasks.validator_info_6_b.outputs.validator"
         command: |
           balance=$(echo "$validator" | jq -r '.balance')

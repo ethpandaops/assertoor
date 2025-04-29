@@ -10,6 +10,9 @@ config:
   throughputPerIndex: 20
   maxPendingPerIndex: 40
   walletSeed: ""
+  sourceStartValidatorIndex: 0
+  sourceValidatorCount: 0
+  targetValidatorIndex: 0
 tasks:
 - name: check_clients_are_healthy
   title: "Check if at least one client is ready"
@@ -84,8 +87,6 @@ tasks:
               name: generate_consolidations
               title: "Generate consolidations for key ${{worker.index}} (${{tasks.get_validator.outputs.pubkey}})"
               config:
-                sourceStartValidatorIndex: 0
-                targetValidatorIndex: 0
                 awaitReceipt: true
                 failOnReject: true
               configVars:
@@ -94,4 +95,7 @@ tasks:
                 limitPending: "maxPendingPerIndex"
                 walletPrivkey: "tasks.consolidationor_wallet.outputs.childWallet.privkey"
                 txAmount: "consolidationTxFee"
+                sourceStartValidatorIndex: "sourceStartValidatorIndex"
+                sourceIndexCount: "sourceValidatorCount"
+                targetValidatorIndex: "targetValidatorIndex"
 

@@ -6,7 +6,7 @@ config:
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
   validatorStartIndex: 0
   useExistingValidators: false
-  depositContract: "0x4242424242424242424242424242424242424242"
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
 
 tasks:
 - name: check_clients_are_healthy
@@ -791,7 +791,7 @@ tasks:
             validatorPubKey: "tasks.validator_pubkeys.outputs.pubkeys[9]"
 
     # Test6: Change withdrawal credentials of a validator to 0x02, consolidate another validator with 0x01 credentials into it, create a slashing for the second validator right after the consolidation request, assert no consolidation
-    # keys: 10, 11 
+    # keys: 10, 11
     - name: run_tasks
       title: "Test6: Change withdrawal credentials of a validator to 0x02, consolidate another validator with 0x01 credentials into it, create a slashing for the second validator right after the consolidation request, assert no consolidation"
       config:
