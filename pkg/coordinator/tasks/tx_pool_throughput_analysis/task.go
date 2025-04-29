@@ -112,6 +112,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	var txs []*ethtypes.Transaction
 
 	startTime := time.Now()
+	isFailed := false
 	sentTxCount := 0
 
 	go func() {
@@ -131,6 +132,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				if err != nil {
 					t.logger.Errorf("Failed to create transaction: %v", err)
 					t.ctx.SetResult(types.TaskResultFailure)
+					isFailed = true
 					return
 				}
 
@@ -179,6 +181,12 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
 
 		lastMeasureTime = time.Now()
+	}
+
+	if isFailed {
+		t.logger.Errorf("Failed to execute task %v", TaskName)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
 	}
 
 	totalTime := time.Since(startTime)
