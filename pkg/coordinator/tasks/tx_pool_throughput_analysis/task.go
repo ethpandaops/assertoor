@@ -3,6 +3,7 @@ package txpoolcheck
 import (
 	"context"
 	crand "crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -117,12 +118,12 @@ func (t *Task) Execute(ctx context.Context) error {
 		startExecTime := time.Now()
 		endTime := startExecTime.Add(time.Second)
 
-		for i := range t.config.TxCount {
+		for i := range t.config.QPS {
 			// Calculate how much time we have left
 			remainingTime := time.Until(endTime)
 
 			// Calculate sleep time to distribute remaining transactions evenly
-			sleepTime := remainingTime / time.Duration(t.config.TxCount-i)
+			sleepTime := remainingTime / time.Duration(t.config.QPS-i)
 
 			// generate and sign tx
 			go func() {
@@ -154,13 +155,13 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 
 		execTime := time.Since(startExecTime)
-		t.logger.Infof("Time to generate %d transactions: %v", t.config.TxCount, execTime)
+		t.logger.Infof("Time to generate %d transactions: %v", t.config.QPS, execTime)
 	}()
 
 	lastMeasureTime := time.Now()
 	gotTx := 0
 
-	for gotTx < t.config.TxCount {
+	for gotTx < t.config.QPS {
 		_txs, err := conn.ReadTransactionMessages()
 		if err != nil {
 			t.logger.Errorf("Failed to read transaction messages: %v", err)
@@ -193,6 +194,12 @@ func (t *Task) Execute(ctx context.Context) error {
 			client.GetRPCClient().SendTransaction(ctx, tx)
 		}
 	}
+
+	outputs := map[string]interface{}{
+		"total_time_mus": totalTime.Microseconds(),
+	}
+	outputsJSON, _ := json.Marshal(outputs)
+	t.logger.Infof("outputs_json: %s", string(outputsJSON))
 
 	t.ctx.Outputs.SetVar("total_time_mus", totalTime.Milliseconds())
 	t.ctx.SetResult(types.TaskResultSuccess)

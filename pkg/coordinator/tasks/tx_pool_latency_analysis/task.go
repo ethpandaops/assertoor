@@ -3,6 +3,7 @@ package txpoollatencyanalysis
 import (
 	"context"
 	crand "crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -175,13 +176,29 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	if t.config.FailOnHighLatency && avgLatency.Microseconds() > t.config.ExpectedLatency {
-		t.logger.Errorf("Transaction latency too high: %dmus (expected <= %dmus)", avgLatency.Microseconds(), t.config.ExpectedLatency)
+	if t.config.FailOnHighLatency && avgLatency.Microseconds() > t.config.HighLatency {
+		t.logger.Errorf("Transaction latency too high: %dmus (expected <= %dmus)", avgLatency.Microseconds(), t.config.HighLatency)
 		t.ctx.SetResult(types.TaskResultFailure)
 	} else {
+		latenciesJSON := make([]int64, len(latencies))
+
+		for i, latency := range latencies {
+			latenciesJSON[i] = latency.Microseconds()
+		}
+
+		outputs := map[string]interface{}{
+			"tx_count":           t.config.TxCount,
+			"avg_latency_mus":    avgLatency.Microseconds(),
+			"detailed_latencies": latenciesJSON,
+		}
+
+		outputsJSON, _ := json.Marshal(outputs)
+		t.logger.Infof("outputs_json: %s", string(outputsJSON))
+
 		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
 		t.ctx.Outputs.SetVar("avg_latency_mus", avgLatency.Microseconds())
 		t.ctx.Outputs.SetVar("detailed_latencies", latencies)
+
 		t.ctx.SetResult(types.TaskResultSuccess)
 	}
 

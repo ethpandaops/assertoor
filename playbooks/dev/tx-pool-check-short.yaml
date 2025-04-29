@@ -4,15 +4,12 @@ timeout: 30m
 disable: false
 config:
   walletPrivkey: ""
-  # validatorPairNames: []
-  # minBlobCount: 3
 tasks:
 - name: tx_pool_throughput_analysis
-  title: "Check transaction pool throughput with 1.000 transactions"
+  title: "Check transaction pool throughput with 20.000 transactions"
   config:
-    nonce: 0
-    txCount: 1000
-    measureInterval: 100
+    qps: 20000
+    measureInterval: 2000
   configVars:
     privateKey: "walletPrivkey"
 - name: tx_pool_clean
@@ -20,12 +17,11 @@ tasks:
   config:
     waitTime: 5
 - name: tx_pool_latency_analysis
-  title: "Check transaction pool latency with 1.000 transactions"
+  title: "Check transaction pool latency with 20.000 transactions"
   config:
-    nonce: 1000
-    txCount: 1000
-    measureInterval: 100
-    expectedLatency: 5000
+    txCount: 20000
+    measureInterval: 2000
+    highLatency: 5000
     failOnHighLatency: true
   configVars:
     privateKey: "walletPrivkey"

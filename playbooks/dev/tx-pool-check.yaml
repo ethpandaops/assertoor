@@ -1,16 +1,14 @@
 id: tx-pool-check
 name: "Check transaction pool"
-timeout: 2h
+timeout: 1h
 disable: false
 config:
   walletPrivkey: ""
-  # validatorPairNames: []
-  # minBlobCount: 3
 tasks:
 - name: tx_pool_throughput_analysis
   title: "Check transaction pool throughput with 1.000 transactions in one second"
   config:
-    txCount: 1000
+    qps: 1000
     measureInterval: 100
   configVars:
     privateKey: "walletPrivkey"
@@ -23,7 +21,7 @@ tasks:
   config:
     txCount: 1000
     measureInterval: 100
-    expectedLatency: 5000
+    highLatency: 5000
     failOnHighLatency: true
     secondsBeforeRunning: 15
   configVars:
@@ -35,7 +33,7 @@ tasks:
 - name: tx_pool_throughput_analysis
   title: "Check transaction pool throughput with 10.000 transactions in one second"
   config:
-    txCount: 10000
+    qps: 10000
     measureInterval: 1000
     secondsBeforeRunning: 15
   configVars:
@@ -49,7 +47,7 @@ tasks:
   config:
     txCount: 10000
     measureInterval: 1000
-    expectedLatency: 5000
+    highLatency: 5000
     failOnHighLatency: true
     secondsBeforeRunning: 15
   configVars:
@@ -61,7 +59,7 @@ tasks:
 - name: tx_pool_throughput_analysis
   title: "Check transaction pool throughput with 15.000 transactions in one second"
   config:
-    txCount: 15000
+    qps: 15000
     measureInterval: 1500
     secondsBeforeRunning: 15
   configVars:
@@ -75,7 +73,7 @@ tasks:
   config:
     txCount: 15000
     measureInterval: 1500
-    expectedLatency: 5000
+    highLatency: 5000
     failOnHighLatency: true
     secondsBeforeRunning: 15
   configVars:
