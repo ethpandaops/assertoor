@@ -99,11 +99,6 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	client := executionClients[rand.Intn(len(executionClients))]
 
-	if (t.config.SecondsBeforeRunning > 0) && (t.config.SecondsBeforeRunning < 60) {
-		t.logger.Infof("Waiting %d seconds before starting the task", t.config.SecondsBeforeRunning)
-		time.Sleep(time.Duration(t.config.SecondsBeforeRunning) * time.Second)
-	}
-
 	conn, err := t.getTcpConn(ctx, client)
 	if err != nil {
 		t.logger.Errorf("Failed to get wire eth TCP connection: %v", err)
@@ -119,7 +114,16 @@ func (t *Task) Execute(ctx context.Context) error {
 	sentTxCount := 0
 
 	go func() {
-		for i := 0; i < t.config.TxCount; i++ {
+		startExecTime := time.Now()
+		endTime := startExecTime.Add(time.Second)
+
+		for i := range t.config.TxCount {
+			// Calculate how much time we have left
+			remainingTime := time.Until(endTime)
+
+			// Calculate sleep time to distribute remaining transactions evenly
+			sleepTime := remainingTime / time.Duration(t.config.TxCount-i)
+
 			// generate and sign tx
 			go func() {
 				tx, err := t.generateTransaction(ctx)
@@ -146,9 +150,11 @@ func (t *Task) Execute(ctx context.Context) error {
 				txs = append(txs, tx)
 			}()
 
-			// wait for 1/TxCount second: if 100 tx, than wait 10ms per cycle
-			time.Sleep(time.Second / time.Duration(t.config.TxCount))
+			time.Sleep(sleepTime)
 		}
+
+		execTime := time.Since(startExecTime)
+		t.logger.Infof("Time to generate %d transactions: %v", t.config.TxCount, execTime)
 	}()
 
 	lastMeasureTime := time.Now()
