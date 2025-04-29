@@ -21,8 +21,6 @@ The `tx_pool_latency_analysis` task evaluates latency of transaction processing 
 - **`failOnHighLatency`**:
   Whether the task should fail if the measured latency exceeds `expectedLatency`.
 
-- **`secondsBeforeRunning`**:
-  The number of seconds to wait before starting the transaction sending process.
 
 ### Outputs
 
