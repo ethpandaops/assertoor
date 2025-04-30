@@ -21,9 +21,6 @@ jobs:
       docker_repository: "ethpandaops/assertoor"
       docker_tag_prefix: "v${{ inputs.version }}"
       additional_tags: "['v${{ inputs.version }}','latest']"
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   create_release:
     name: Create Release

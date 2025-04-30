@@ -29,9 +29,6 @@ jobs:
       docker_repository: "ethpandaops/assertoor"
       docker_tag_prefix: "master"
       additional_tags: "['master','master-latest']"
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   update_project_wiki:
     name: Generate project documentation

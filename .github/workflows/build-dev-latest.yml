@@ -28,6 +28,3 @@ jobs:
       docker_repository: "ethpandaops/assertoor"
       docker_tag_prefix: "master"
       additional_tags: "['master','master-latest','latest']"
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
