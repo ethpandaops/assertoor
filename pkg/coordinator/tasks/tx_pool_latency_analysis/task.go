@@ -17,6 +17,7 @@ import (
 	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/helper"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/utils/hdr"
 	"github.com/noku-team/assertoor/pkg/coordinator/utils/sentry"
 	"github.com/noku-team/assertoor/pkg/coordinator/wallet"
 	"github.com/sirupsen/logrus"
@@ -180,16 +181,24 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Errorf("Transaction latency too high: %dmus (expected <= %dmus)", avgLatency.Microseconds(), t.config.HighLatency)
 		t.ctx.SetResult(types.TaskResultFailure)
 	} else {
-		latenciesJSON := make([]int64, len(latencies))
+		latenciesMus := make([]int64, len(latencies))
 
 		for i, latency := range latencies {
-			latenciesJSON[i] = latency.Microseconds()
+			latenciesMus[i] = latency.Microseconds()
+		}
+
+		plot, err := hdr.HdrPlot(latenciesMus)
+		if err != nil {
+			t.logger.Errorf("Failed to generate HDR plot: %v", err)
+			t.ctx.SetResult(types.TaskResultFailure)
+			return nil
 		}
 
 		outputs := map[string]interface{}{
 			"tx_count":           t.config.TxCount,
 			"avg_latency_mus":    avgLatency.Microseconds(),
-			"detailed_latencies": latenciesJSON,
+			"tx_pool_latency_hdr_plot": plot,
+			"latencies": latenciesMus,
 		}
 
 		outputsJSON, _ := json.Marshal(outputs)
