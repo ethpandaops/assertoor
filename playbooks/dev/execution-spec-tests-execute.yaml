@@ -179,8 +179,26 @@ tasks:
         curl -o ${ASSERTOOR_RESULT_DIR}/assets/style.css https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/res/execution-spec-tests-styles.css
 
         REPORT_JSON=$(cat report.json | jq -c '[.tests[] |  {"nodeid": .nodeid, "outcome": .outcome, "setupDuration": .setup.duration, "callDuration": .call.duration, "teardownDuration": .teardown.duration}]')
+        TOTAL_TESTS=$(echo "$REPORT_JSON" | jq '. | length')
+        PASSED_TESTS=$(echo "$REPORT_JSON" | jq '[.[] | select(.outcome == "passed")] | length')
+        echo "Total tests: $TOTAL_TESTS"
+        echo "Passed tests: $PASSED_TESTS"
 
-        echo "::set-output-json reportJSON ${REPORT_JSON}"
+        # Check if tests passed
+        echo "::set-output passedTests ${PASSED_TESTS}"
+        echo "::set-output totalTests ${TOTAL_TESTS}"
 
         exit 0
 
+  - name: run_shell
+    title: "Check test results (${tasks.execute.outputs.passedTests} / ${tasks.execute.outputs.totalTests} passed)"
+    id: check
+    if: runTests
+    config:
+      shell: bash
+      command: |
+        set -e
+        if [ "${tasks.execute.outputs.passedTests}" -ne "${tasks.execute.outputs.totalTests}" ]; then
+          echo "Some tests failed, see report.html in the task above for details"
+          exit 1
+        fi
