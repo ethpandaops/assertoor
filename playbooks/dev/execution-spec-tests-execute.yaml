@@ -175,33 +175,12 @@ tasks:
 
         cp report.json ${ASSERTOOR_RESULT_DIR}/report.json
         cp report.html ${ASSERTOOR_RESULT_DIR}/report.html
+        mkdir -p ${ASSERTOOR_RESULT_DIR}/assets
+        wget -O ${ASSERTOOR_RESULT_DIR}/assets/style.css https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/res/execution-spec-tests-styles.css
 
         REPORT_JSON=$(cat report.json | jq -c '[.tests[] |  {"nodeid": .nodeid, "outcome": .outcome, "setupDuration": .setup.duration, "callDuration": .call.duration, "teardownDuration": .teardown.duration}]')
 
         echo "::set-output-json reportJSON ${REPORT_JSON}"
 
         exit 0
-  - name: run_task_matrix
-    title: "Show test results"
-    configVars:
-      matrixValues: "tasks.execute.outputs.reportJSON"
-    config:
-      runConcurrent: true
-      matrixVar: "testResult"
-      task:
-        name: run_shell
-        title: "${{testResult.nodeid}}"
-        config:
-          shell: bash
-          envVars:
-            TEST_RESULT: testResult
-          command: |
-            DURATION_SECONDS=$(echo $TEST_RESULT | jq -r '(.setup.duration // 0) + (.call.duration // 0) + (.teardown.duration // 0)')
-            echo "::set-output-json customRunTimeSeconds ${DURATION_SECONDS}"
-            echo "::set-output-json execTestResult ${TEST_RESULT}"
-            if $(echo $TEST_RESULT | jq -e '.outcome == "passed"') ; then
-              echo "Test passed"
-            else
-              echo "Test failed"
-              exit 1
-            fi
+
