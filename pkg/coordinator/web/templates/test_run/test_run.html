@@ -334,6 +334,7 @@ function TaskViewModel(data, allTasksMap, parentViewModel) {
         if (self.has_runtime()) {
             // Assuming runTime is in nanoseconds from Go
             var ms = self.runtime() / 1000000;
+            if (ms === 0) return "0.000s"; // Explicitly show 0 seconds
             return (ms / 1000).toFixed(3) + "s";
         } else {
             return "?";
@@ -344,11 +345,27 @@ function TaskViewModel(data, allTasksMap, parentViewModel) {
     self.isLoaded = ko.observable(false); // Track if children are processed
 
     // Helper to format duration (assuming nanoseconds input)
-    self.formatDuration = function(durationNs) {
-        if (!durationNs || durationNs() <= 0) return "-";
-        var ms = durationNs() / 1000000;
-        if (ms < 1000) return ms.toFixed(0) + "ms";
-        return (ms / 1000).toFixed(2) + "s";
+    self.formatDuration = function(durationNsObs) {
+        const durationNs = ko.unwrap(durationNsObs);
+        if (!durationNs || durationNs <= 0) return "-";
+        
+        const totalSeconds = durationNs / 1e9;
+        
+        if (totalSeconds < 60) {
+            // Less than a minute: show seconds with 3 decimal places
+            return totalSeconds.toFixed(3) + "s";
+        } else if (totalSeconds < 3600) {
+            // Less than an hour: show minutes and seconds
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
+        } else {
+            // One hour or more: show hours, minutes, and seconds
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            return `${hours}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+        }
     };
 
     // Computed for log data tooltip title
@@ -486,11 +503,27 @@ function TestRunViewModel(initialData) { // Accept initial data directly
             return ko.unwrap(dateTimeStr); // Fallback
         }
     };
-    self.formatDuration = function(durationNs) {
-        if (!durationNs || durationNs() <= 0) return "-";
-         var ms = durationNs() / 1000000;
-         if (ms < 1000) return ms.toFixed(0) + "ms";
-         return (ms / 1000).toFixed(2) + "s";
+    self.formatDuration = function(durationNsObs) {
+        const durationNs = ko.unwrap(durationNsObs);
+        if (!durationNs || durationNs <= 0) return "-";
+
+        const totalSeconds = durationNs / 1e9;
+
+        if (totalSeconds < 60) {
+            // Less than a minute: show seconds with 3 decimal places
+            return totalSeconds.toFixed(3) + "s";
+        } else if (totalSeconds < 3600) {
+            // Less than an hour: show minutes and seconds
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
+        } else {
+            // One hour or more: show hours, minutes, and seconds
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            return `${hours}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+        }
     };
 
     // --- Build Task Hierarchy & Initial State ---
