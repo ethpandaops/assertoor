@@ -124,7 +124,7 @@ tasks:
               gitRepo: https://github.com/ethereum/execution-spec-tests.git
               testPath: ./tests/prague/eip6110_deposits
               seedAmount: "100000000000000000000" # 100 ETH
-              extraFlags: "--fork=Prague -n 16 -m mainnet"
+              extraFlags: "--fork=Prague -n 2 -m mainnet"
               runSetup: false
               cleanupTestsPath: false
             testConfigVars:
