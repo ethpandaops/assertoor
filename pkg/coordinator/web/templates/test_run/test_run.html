@@ -232,7 +232,7 @@
                     {{ html "<!-- /ko -->" }}
                   </table>
 
-                  {{ html "<!-- ko if: !$parent.is_sec_trimmed() -->" }}
+                  {{ html "<!-- ko if: !$parent.is_sec_trimmed -->" }}
                   {{ html "<!-- ko if: $data.started -->" }}
                   <ul class="nav nav-tabs mt-2" role="tablist" data-bind="attr: { id: 'task' + $data.index() + '-tabs' }">
                     <li class="nav-item" role="presentation">
@@ -319,300 +319,609 @@
 {{ end }}
 {{ define "js" }}
 <script>
+
 // Knockout ViewModel and logic will go here
 function TaskViewModel(data, allTasksMap, parentViewModel) {
-    var self = this;
-    ko.mapping.fromJS(data, {}, self);
+  var self = this;
+  // Store parent reference
+  self.parentViewModel = parentViewModel;
 
-    // --- Observables for UI State ---
-    self.isExpanded = ko.observable(true); // Default expand state (will be adjusted)
-    self.isDetailsVisible = ko.observable(false);
-    self.isVisible = ko.observable(true); // Controlled by parent expansion
+  // Map initial data (subset of full details)
+  ko.mapping.fromJS(data, {}, self);
 
-    // --- Computed Observables for Display Logic ---
-    self.runTimeDisplay = ko.computed(function() {
-        if (self.has_runtime()) {
-            // Assuming runTime is in nanoseconds from Go
-            var ms = self.runtime() / 1000000;
-            if (ms === 0) return "0.000s"; // Explicitly show 0 seconds
-            return (ms / 1000).toFixed(3) + "s";
-        } else {
-            return "?";
+  // --- Observables for UI State ---
+  self.isExpanded = ko.observable(true); // Default expand state (will be adjusted)
+  self.isDetailsVisible = ko.observable(false);
+  self.isVisible = ko.observable(true); // Controlled by parent expansion
+
+  // --- Observables for Detailed Data (Lazy Loaded) ---
+  self.log = ko.observableArray([]);
+  self.config_yaml = ko.observable('');
+  self.result_yaml = ko.observable('');
+  self.areDetailsLoaded = ko.observable(false); // Flag to track if details fetched
+  self.isLoadingDetails = ko.observable(false); // Flag for loading indicator
+  self.graph_levels = ko.observableArray([]); // Will be calculated by parent
+  self.children = ko.observableArray([]); // Will be calculated by parent
+  self.isLoaded = ko.observable(false); // Flag to track if children resolved
+  self.expandInitialized = ko.observable(""); // track initial expand logic done
+
+  // --- Computed Observables for Display Logic ---
+  self.has_children = ko.computed(function() {
+    return self.children().length > 0;
+  });
+
+  self.has_timeout = ko.computed(function() {
+      // Ensure timeout is defined and greater than 0
+      const timeoutVal = ko.unwrap(self.timeout);
+      return typeof timeoutVal === 'number' && timeoutVal > 0;
+  });
+
+  self.has_runtime = ko.computed(function() {
+      // Check if runtime is a number (API sends integer, 0 is valid)
+      const runtimeVal = ko.unwrap(self.runtime);
+      return typeof runtimeVal === 'number';
+  });
+
+  self.runTimeDisplay = ko.computed(function() {
+    const status = self.status();
+
+    // LIVE runtime for running tasks
+    if (status === 'running') {
+      const startMs = ko.unwrap(self.start_time);
+      if (!isNaN(startMs)) {
+        const nowMs = self.parentViewModel.currentTime();
+        if (nowMs && nowMs > startMs) {
+          const deltaMs = nowMs - startMs;
+          return (deltaMs / 1000).toFixed(3) + 's';
         }
-    });
-
-    self.children = ko.observableArray([]); // Populated later
-    self.isLoaded = ko.observable(false); // Track if children are processed
-
-    // Helper to format duration (assuming nanoseconds input)
-    self.formatDuration = function(durationNsObs) {
-        const durationNs = ko.unwrap(durationNsObs);
-        if (!durationNs || durationNs <= 0) return "-";
-        
-        const totalSeconds = durationNs / 1e9;
-        
-        if (totalSeconds < 60) {
-            // Less than a minute: show seconds with 3 decimal places
-            return totalSeconds.toFixed(3) + "s";
-        } else if (totalSeconds < 3600) {
-            // Less than an hour: show minutes and seconds
-            const minutes = Math.floor(totalSeconds / 60);
-            const seconds = Math.floor(totalSeconds % 60);
-            return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
-        } else {
-            // One hour or more: show hours, minutes, and seconds
-            const hours = Math.floor(totalSeconds / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-            const seconds = Math.floor(totalSeconds % 60);
-            return `${hours}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
-        }
-    };
-
-    // Computed for log data tooltip title
-    self.logDataTitle = function(logEntry) {
-        let title = "";
-        const dataObj = ko.unwrap(logEntry.data);
-        if (dataObj) {
-             for (const key in dataObj) {
-                if (dataObj.hasOwnProperty(key)) {
-                     title += `${key}: ${dataObj[key]}<br>`;
-                }
-             }
-        }
-        return title || "No extra data";
-    };
-
-    // Find children (call this after all tasks are in the map)
-    self.findChildren = function() {
-        if (self.isLoaded()) return;
-        for (const taskId in allTasksMap) {
-            const task = allTasksMap[taskId];
-            if (ko.unwrap(task.parent_index) === ko.unwrap(self.index)) {
-                self.children.push(task);
-            }
-        }
-        self.isLoaded(true);
-    };
-
-    // --- UI Actions ---
-    self.toggleExpand = function() {
-        const newState = !self.isExpanded();
-        self.isExpanded(newState);
-        self.setChildVisibility(newState, true);
-    };
-
-    self.setChildVisibility = function(visible, recursive) {
-        ko.utils.arrayForEach(self.children(), function(child) {
-            // Only hide if parent is collapsing.
-            // If parent is expanding, child visibility depends on its own expand state.
-            if (!visible) {
-                 child.isVisible(false);
-            } else {
-                 // When expanding parent, make immediate children visible.
-                 // Their own children visibility depends on their expanded state.
-                 child.isVisible(true);
-                 // If the child itself is not expanded, its children should remain hidden.
-                 if (recursive && child.isExpanded()) {
-                      child.setChildVisibility(true, true);
-                 } else if (recursive && !child.isExpanded()) {
-                     child.setChildVisibility(false, true); // Ensure grandchildren hidden
-                 }
-            }
-
-            // // Old simpler logic:
-            // child.isVisible(visible);
-            // if (recursive) {
-            //     child.setChildVisibility(visible, true);
-            // }
-        });
-    };
-
-     self.toggleDetails = function() {
-        self.isDetailsVisible(!self.isDetailsVisible());
-        // Ensure bootstrap tooltips are re-initialized if shown
-        if (self.isDetailsVisible()) {
-            setTimeout(function() {
-                 const tooltipTriggerList = [].slice.call(document.querySelectorAll(`#task-details-${self.index()} [data-bs-toggle="tooltip"]`))
-                 tooltipTriggerList.map(function (tooltipTriggerEl) {
-                     return new bootstrap.Tooltip(tooltipTriggerEl)
-                 })
-            }, 100); // Small delay to ensure elements are in DOM
-        }
-    };
-
-    // Function to initialize expand state (call after hierarchy is built)
-    self.initializeExpandState = function(allTasksMap) {
-      self.isExpanded(true); // Keep UI state camelCase
-
-      // Logic uses mapped snake_case observables
-      if (self.status() === 'complete' && self.result() === 'success') {
-          let hasProblemDescendant = false;
-          let queue = [];
-          const directChildren = ko.unwrap(self.children);
-          ko.utils.arrayForEach(directChildren, function(child) {
-              queue.push(child);
-          });
-          // Use mapped snake_case index
-          let visited = new Set([self.index()]);
-
-          while (queue.length > 0) {
-              const currentTask = queue.shift();
-              // Use mapped snake_case index
-              if (visited.has(currentTask.index())) continue;
-              visited.add(currentTask.index());
-
-              // Check mapped snake_case status/result
-              if (currentTask.status() === 'running' || currentTask.result() === 'failure') {
-                 hasProblemDescendant = true;
-                 break;
-              }
-
-              if (currentTask.children) {
-                  const childrenOfCurrent = ko.unwrap(currentTask.children);
-                  ko.utils.arrayForEach(childrenOfCurrent, function(child) {
-                      // Use mapped snake_case index
-                      if (!visited.has(child.index())) {
-                          queue.push(child);
-                      }
-                  });
-              }
-          }
-
-          if (!hasProblemDescendant) {
-              self.isExpanded(false); // Keep UI state camelCase
-          }
       }
+    }
+    else if (status === 'pending') {
+      return '?';
+    }
+
+    // For completed tasks display stored runtime if available
+    if (self.has_runtime()) {
+      const ms = self.runtime(); // convert ns to ms
+      return (ms / 1000).toFixed(3) + 's';
+    }
+
+    // If runtime not provided but we have valid start & stop times, compute once
+    const startStr = ko.unwrap(self.start_time);
+    const stopStr = ko.unwrap(self.stop_time);
+    if (startStr && stopStr) {
+      const startMs = Date.parse(startStr);
+      const stopMs = Date.parse(stopStr);
+      if (!isNaN(startMs) && !isNaN(stopMs) && stopMs > startMs) {
+        const deltaMs = stopMs - startMs;
+        return (deltaMs / 1000).toFixed(3) + 's';
+      }
+    }
+
+    return '-';
+  });
+
+  self.have_result_files = ko.computed(function() {
+    const files = ko.unwrap(self.result_files);
+    return files && files.length > 0;
+  });
+
+  // Computed for log data tooltip title
+  self.logDataTitle = function(logEntry) {
+    let title = "";
+    const dataObj = ko.unwrap(logEntry.data);
+    if (dataObj) {
+      for (const key in dataObj) {
+        if (dataObj.hasOwnProperty(key)) {
+          title += `${key}: ${dataObj[key]}<br>`;
+        }
+      }
+    }
+    return title || "No extra data";
+  };
+
+  // Find children (call this after all tasks are in the map)
+  self.findChildren = function() {
+    if (self.isLoaded()) return;
+    for (const taskId in allTasksMap) {
+      const task = allTasksMap[taskId];
+      if (ko.unwrap(task.parent_index) === ko.unwrap(self.index)) {
+        self.children.push(task);
+      }
+    }
+    self.isLoaded(true);
+  };
+
+  // --- UI Actions ---
+  self.toggleExpand = function() {
+    const newState = !self.isExpanded();
+    self.isExpanded(newState);
+    self.setChildVisibility(newState, true);
+  };
+
+  self.setChildVisibility = function(visible, recursive) {
+    ko.utils.arrayForEach(self.children(), function(child) {
+      // Only hide if parent is collapsing.
+      // If parent is expanding, child visibility depends on its own expand state.
+      if (!visible) {
+        child.isVisible(false);
+      } else {
+        // When expanding parent, make immediate children visible.
+        // Their own children visibility depends on their expanded state.
+        child.isVisible(true);
+        // If the child itself is not expanded, its children should remain hidden.
+        if (recursive && child.isExpanded()) {
+          child.setChildVisibility(true, true);
+        } else if (recursive && !child.isExpanded()) {
+          child.setChildVisibility(false, true); // Ensure grandchildren hidden
+        }
+      }
+
+      // // Old simpler logic:
+      // child.isVisible(visible);
+      // if (recursive) {
+      //     child.setChildVisibility(visible, true);
+      // }
+    });
+  };
+
+  self.toggleDetails = function() {
+    const isVisible = !self.isDetailsVisible();
+    self.isDetailsVisible(isVisible);
+    if (isVisible) {
+      self.loadTaskDetailsIfNeeded(); // Load details when panel is opened
+      // Ensure bootstrap tooltips are re-initialized if shown
+      setTimeout(function() {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll(`#task-details-${self.index()} [data-bs-toggle="tooltip"]`))
+        tooltipTriggerList.map(function(tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+      }, 100); // Small delay to ensure elements are in DOM
+    }
+  };
+
+  // Function to load detailed task info (Logs, Config, Result YAML)
+  self.loadTaskDetailsIfNeeded = async function() {
+    if (self.areDetailsLoaded() || self.isLoadingDetails() || self.parentViewModel.is_sec_trimmed) {
+        return; // Already loaded, loading, or security trimmed
+    }
+
+    self.isLoadingDetails(true);
+    const runId = self.parentViewModel.runId();
+    const taskIndex = ko.unwrap(self.index);
+    const detailUrl = `/api/v1/test_run/${runId}/task/${taskIndex}/details`; // Assumed endpoint
+
+    console.log(`Fetching details for task ${taskIndex} from ${detailUrl}`);
+
+    try {
+        const response = await fetch(detailUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const detailDataWrapper = await response.json();
+
+        if (detailDataWrapper.status === "OK" && detailDataWrapper.data) {
+            const detailData = detailDataWrapper.data;
+            // Map the detailed data onto the existing observables
+            // We manually map here as ko.mapping might overwrite computeds/other state
+            if (detailData.log) {
+                // Process log timestamps
+                 const processedLogs = detailData.log.map(logEntry => {
+                     logEntry.time = new Date(logEntry.time); // Convert string to Date object if needed by formatter
+                     // Create observable properties within log entry for reactivity if needed
+                     return ko.mapping.fromJS(logEntry); // Make log entries observable
+                 });
+                 self.log(processedLogs); // Update the observable array
+            }
+            self.config_yaml(detailData.config_yaml || '');
+            self.result_yaml(detailData.result_yaml || '');
+            self.areDetailsLoaded(true);
+            console.log(`Details loaded for task ${taskIndex}`);
+        } else {
+            console.error(`Failed to get successful detail data for task ${taskIndex}:`, detailDataWrapper.status, detailDataWrapper.data);
+            self.config_yaml("Error loading config.");
+            self.result_yaml("Error loading result.");
+            // Optionally set log to an error message
+        }
+    } catch (error) {
+        console.error(`Error fetching details for task ${taskIndex}:`, error);
+        self.config_yaml("Error loading config.");
+        self.result_yaml("Error loading result.");
+        // Optionally set log to an error message
+    } finally {
+        self.isLoadingDetails(false);
+    }
+  };
+
+  // Function to initialize expand state (call after hierarchy is built)
+  self.initializeExpandState = function(allTasksMap) {
+    if (self.expandInitialized() === self.status()) {
+      return; // already processed, keep user state
+    }
+
+    self.isExpanded(true);
+
+    if (self.status() === 'complete' && self.result() === 'success') {
+      let hasProblemDescendant = false;
+      let queue = [];
+      const directChildren = ko.unwrap(self.children);
+      ko.utils.arrayForEach(directChildren, function(child) {
+        queue.push(child);
+      });
+      // Use mapped snake_case index
+      let visited = new Set([self.index()]);
+
+      while (queue.length > 0) {
+        const currentTask = queue.shift();
+        // Use mapped snake_case index
+        if (visited.has(currentTask.index())) continue;
+        visited.add(currentTask.index());
+
+        // Check mapped snake_case status/result
+        if (currentTask.status() === 'running' || currentTask.result() === 'failure') {
+          hasProblemDescendant = true;
+          break;
+        }
+
+        // Use computed has_children
+        if (currentTask.has_children()) { // Use computed
+          const childrenOfCurrent = ko.unwrap(currentTask.children);
+          ko.utils.arrayForEach(childrenOfCurrent, function(child) {
+            // Use mapped snake_case index
+            if (!visited.has(child.index())) {
+              queue.push(child);
+            }
+          });
+        }
+      }
+
+      if (!hasProblemDescendant) {
+        self.isExpanded(false); // Keep UI state camelCase
+      }
+    }
+
+    self.expandInitialized(self.status()); // mark done
   };
 }
 
 function TestRunViewModel(initialData) { // Accept initial data directly
-    var self = this;
-    self.allTasksMap = {}; // For quick lookup by index
+  var self = this;
+  self.currentTime = ko.observable(Date.now());
 
-    // Map the initial data using Knockout Mapping
-    ko.mapping.fromJS(initialData, {}, self);
+  // Update currentTime every second for live runtime display
+  setInterval(function(){ self.currentTime(Date.now()); }, 1000);
+  self.allTasksMap = {}; // For quick lookup by index
+  self.intervalId = null; // To store the refresh interval ID
+  self.runId = ko.observable(initialData.run_id || null); // Store runId
 
-    // --- Helper Functions (can stay the same) ---
-    self.formatDateTime = function(dateTimeStr) {
-        if (!dateTimeStr || !ko.unwrap(dateTimeStr)) return '-';
-        try {
-            const dt = new Date(ko.unwrap(dateTimeStr));
-            // Format as YYYY-MM-DD HH:MM:SS.ms
-            return dt.toISOString().replace('T', ' ').slice(0, -1);
-        } catch (e) {
-            return ko.unwrap(dateTimeStr); // Fallback
-        }
-    };
-    self.formatDuration = function(durationNsObs) {
-        const durationNs = ko.unwrap(durationNsObs);
-        if (!durationNs || durationNs <= 0) return "-";
+  // --- Mapping Options ---
+  // Define how the 'tasks' array should be handled during updates
+  var taskMappingOptions = {
+    key: function(data) {
+      return ko.utils.unwrapObservable(data.index);
+    },
+    create: function(options) {
+      // options.data is the raw data for the task from the API
+      // options.parent is the TestRunViewModel instance (self)
 
-        const totalSeconds = durationNs / 1e9;
+      // Check if task already exists in our map
+      let existingTask = self.allTasksMap[options.data.index];
+      if (existingTask) {
+        // Update existing TaskViewModel instance using the new data
+        ko.mapping.fromJS(options.data, {}, existingTask);
+        return existingTask; // Return the updated instance
+      } else {
+        // Create a new TaskViewModel instance for a new task
+        const newTaskViewModel = new TaskViewModel(options.data, self.allTasksMap, self);
+        self.allTasksMap[options.data.index] = newTaskViewModel;
+        // Hierarchy linking will be done *after* mapping is complete
+        return newTaskViewModel;
+      }
+    }
+  };
 
-        if (totalSeconds < 60) {
-            // Less than a minute: show seconds with 3 decimal places
-            return totalSeconds.toFixed(3) + "s";
-        } else if (totalSeconds < 3600) {
-            // Less than an hour: show minutes and seconds
-            const minutes = Math.floor(totalSeconds / 60);
-            const seconds = Math.floor(totalSeconds % 60);
-            return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
-        } else {
-            // One hour or more: show hours, minutes, and seconds
-            const hours = Math.floor(totalSeconds / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-            const seconds = Math.floor(totalSeconds % 60);
-            return `${hours}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
-        }
-    };
+  var mappingOptions = {
+    'tasks': taskMappingOptions,
+    // Ignore these during mapping as they are managed internally
+    'ignore': ["allTasksMap", "intervalId", "isComplete", "is_sec_trimmed"]
+  };
 
-    // --- Build Task Hierarchy & Initial State ---
-    const taskMap = {};
+
+  // Map the initial data using Knockout Mapping
+  ko.mapping.fromJS(initialData, mappingOptions, self);
+
+  // --- Computed for Completion Status ---
+  self.isComplete = ko.computed(function() {
+    const status = self.status();
+    return status === 'success' || status === 'failure' || status === 'aborted';
+  });
+
+
+  // --- Helper Functions (can stay the same) ---
+  self.formatDateTime = function(dateTimeStr) {
+    if (!dateTimeStr || !ko.unwrap(dateTimeStr)) return '-';
+    try {
+      const dt = new Date(ko.unwrap(dateTimeStr));
+      // Format as YYYY-MM-DD HH:MM:SS.ms
+      return dt.toISOString().replace('T', ' ').slice(0, -1);
+    } catch (e) {
+      return ko.unwrap(dateTimeStr); // Fallback
+    }
+  };
+  self.formatDuration = function(durationMsObs) {
+    const durationMs = ko.unwrap(durationMsObs);
+    if (!durationMs || durationMs <= 0) return "-";
+
+    const totalSeconds = durationMs / 1000;
+
+    if (totalSeconds < 60) {
+      // Less than a minute: show seconds with 3 decimal places
+      return totalSeconds.toFixed(3) + "s";
+    } else if (totalSeconds < 3600) {
+      // Less than an hour: show minutes and seconds
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
+    } else {
+      // One hour or more: show hours, minutes, and seconds
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      return `${hours}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+    }
+  };
+
+  // --- Build Initial Task Hierarchy & State ---
+  // This logic now needs to run initially AND after updates
+  self.buildAndInitializeHierarchy = function() {
+    const taskViewModels = self.tasks(); // Get the current list of TaskViewModels
     const rootTasks = [];
-    const flatTaskList = []; // Keep the flat list for KO foreach binding
 
-    // Initial pass to create TaskViewModel instances and map them
-    ko.utils.arrayForEach(initialData.tasks || [], function(taskData) {
-        const taskViewModel = new TaskViewModel(taskData, self.allTasksMap, self);
-        taskMap[taskData.index] = taskViewModel;
-        self.allTasksMap[taskData.index] = taskViewModel;
-        flatTaskList.push(taskViewModel); // Add to flat list immediately
+    // Clear existing children arrays before rebuilding
+    ko.utils.arrayForEach(taskViewModels, function(taskViewModel) {
+      taskViewModel.children([]); // Reset children
+      taskViewModel.isLoaded(false); // Reset loaded flag
+    });
+    self.allTasksMap = {}; // Reset map
+    ko.utils.arrayForEach(taskViewModels, function(taskViewModel) {
+      self.allTasksMap[ko.unwrap(taskViewModel.index)] = taskViewModel; // Rebuild map
     });
 
-    // Second pass to build hierarchy (link children)
-    ko.utils.arrayForEach(flatTaskList, function(taskViewModel) {
-        const parentIndex = ko.unwrap(taskViewModel.parent_index);
-        if (parentIndex === 0) {
+
+    // Build hierarchy (link children)
+    ko.utils.arrayForEach(taskViewModels, function(taskViewModel) {
+      const parentIndex = ko.unwrap(taskViewModel.parent_index);
+      if (parentIndex === 0) {
+        rootTasks.push(taskViewModel);
+      } else {
+        const parentViewModel = self.allTasksMap[parentIndex];
+        if (parentViewModel) {
+          // Ensure the parent knows about this child
+          if (!parentViewModel.children().includes(taskViewModel)) {
+            parentViewModel.children.push(taskViewModel);
+          }
+        } else {
+          console.warn("Parent task not found for task index:", ko.unwrap(taskViewModel.index));
+          // Consider adding as root if parent consistently missing after updates
+          if (!rootTasks.includes(taskViewModel)) {
             rootTasks.push(taskViewModel);
-        } else {
-            const parentViewModel = self.allTasksMap[parentIndex];
-            if (parentViewModel) {
-                parentViewModel.children.push(taskViewModel);
-            } else {
-                console.warn("Parent task not found for task index:", ko.unwrap(taskViewModel.index));
-                rootTasks.push(taskViewModel); // Add as root if parent missing
-            }
+          }
         }
+      }
+      taskViewModel.isLoaded(true); // Mark as processed for hierarchy
     });
 
-    // Third pass: Initial collapse/expand state after hierarchy is built
-     ko.utils.arrayForEach(flatTaskList, function(taskViewModel) {
-         taskViewModel.initializeExpandState(self.allTasksMap);
+    // Initial collapse/expand state (run this AFTER hierarchy is built)
+    ko.utils.arrayForEach(taskViewModels, function(taskViewModel) {
+      // Check if initializeExpandState exists - might not if mapping failed?
+      if (typeof taskViewModel.initializeExpandState === 'function') {
+        taskViewModel.initializeExpandState(self.allTasksMap);
+      }
     });
 
-    // Re-assign the tasks observable with the processed ViewModels (already done by ko.mapping? Check this)
-    // If ko.mapping didn't automatically use TaskViewModel, we need to replace self.tasks()
-    // It's safer to explicitly build the final array.
-    self.tasks(flatTaskList);
+    // Calculate Graph Levels
+    self.calculateGraphLevels();
 
-     // Apply initial visibility based on default expansion state
-    ko.utils.arrayForEach(self.tasks(), function(task) {
-        if (task.parent_index && task.parent_index() !== 0) {
-            const parent = self.allTasksMap[task.parent_index()];
-            if (parent && !parent.isExpanded()) {
-                task.isVisible(false);
-                task.setChildVisibility(false, true);
-            }
+    // Apply visibility based on expansion state
+    ko.utils.arrayForEach(taskViewModels, function(task) {
+      const parentIndex = ko.unwrap(task.parent_index);
+      if (parentIndex && parentIndex !== 0) {
+        const parent = self.allTasksMap[parentIndex];
+        // If parent exists and is NOT expanded, hide this task and its children recursively
+        if (parent && !parent.isExpanded()) {
+          task.isVisible(false);
+          // Need to ensure setChildVisibility is robust
+          if (typeof task.setChildVisibility === 'function') {
+            task.setChildVisibility(false, true); // Hide children recursively
+          }
+        } else if (parent && parent.isExpanded()) {
+          // If parent IS expanded, this task should be visible
+          task.isVisible(true);
+          // Visibility of its own children depends on its own expanded state
+          if (typeof task.setChildVisibility === 'function') {
+            task.setChildVisibility(task.isExpanded(), true);
+          }
+        } else if (!parent) {
+          // If parent doesn't exist (e.g., orphan), treat as root, make visible
+          task.isVisible(true);
+          if (typeof task.setChildVisibility === 'function') {
+            task.setChildVisibility(task.isExpanded(), true); // Apply to children
+          }
         }
+      } else {
+        // Root tasks are always visible initially
+        task.isVisible(true);
+        if (typeof task.setChildVisibility === 'function') {
+          task.setChildVisibility(task.isExpanded(), true); // Apply to children
+        }
+      }
     });
 
-    // Initialize bootstrap tooltips after rendering
+    // Re-Initialize bootstrap tooltips after potential DOM updates
     setTimeout(function() {
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl)
-        })
-    }, 200); // Delay slightly
-
-
-    // Helper for log data title (remains the same)
-    self.createLogDataTitle = function(dataObj) {
-        let title = "";
-        if (dataObj) {
-            for (const key in dataObj) {
-                if (dataObj.hasOwnProperty(key)) {
-                    title += `${key}: ${dataObj[key]}<br>`;
-                }
-            }
+      // Dispose existing tooltips first to prevent duplicates
+      const existingTooltips = bootstrap.Tooltip.getInstance(document.body); // Get tooltips attached to body (or specific container)
+      if (existingTooltips) {
+        // This might not be the correct way to dispose all; need per-element disposal if possible
+        // For now, let's just re-initialize, Bootstrap might handle duplicates?
+      }
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+      tooltipTriggerList.map(function(tooltipTriggerEl) {
+        // Ensure we don't create multiple tooltips on the same element
+        if (!bootstrap.Tooltip.getInstance(tooltipTriggerEl)) {
+          return new bootstrap.Tooltip(tooltipTriggerEl)
         }
-        return title || "No extra data";
-    };
+        return bootstrap.Tooltip.getInstance(tooltipTriggerEl); // Return existing if found
+      })
+    }, 300); // Delay slightly more
 
-    self.handleRowClick = function(task, event) {
-        // Find the closest TD ancestor of the clicked element
-        let targetTd = $(event.target).closest('td');
+  };
 
-        // Check if the click was on the graph cell (first td)
-        if (targetTd.length && targetTd.hasClass('task-graph')) {
-             // Only toggle expand if the task actually has children
-             if (task.has_children()) {
-                 task.toggleExpand();
-             }
-        } else {
-            // Otherwise, toggle the details panel
-            task.toggleDetails();
+  // Calculate Graph Levels
+  self.calculateGraphLevels = function() {
+    const taskViewModels = self.tasks();
+    const indentationMap = {};
+
+    for (let idx = 0; idx < taskViewModels.length; idx++) {
+      const taskVM = taskViewModels[idx];
+      const index = ko.unwrap(taskVM.index);
+      const parentIndex = ko.unwrap(taskVM.parent_index);
+
+      let indentation = 0;
+      if (parentIndex > 0) {
+        indentation = (indentationMap[parentIndex] || 0) + 1;
+      }
+      indentationMap[index] = indentation;
+
+      // Prepare graph levels array
+      let levels = [];
+
+      if (indentation > 0) {
+        // Fill with 0s
+        for (let i = 0; i < indentation; i++) levels.push(0);
+
+        // Assume current task is last (3) until proven otherwise
+        levels[indentation - 1] = 3;
+
+        // Walk backwards through previous tasks to adjust lines
+        for (let i = idx - 1; i >= 0; i--) {
+          const prev = taskViewModels[i];
+
+          // Case 1: reached direct parent – mark parent.has_children implicitly and stop
+          if (ko.unwrap(prev.index) === parentIndex) {
+            break;
+          }
+
+          // If previous task is shallower than current indentation, stop
+          if (prev.graph_levels().length < indentation) {
+            break;
+          }
+
+          // Case 2: older sibling (same parent)
+          if (ko.unwrap(prev.parent_index) === parentIndex) {
+            const prevLevels = prev.graph_levels().slice();
+            prevLevels[indentation - 1] = 2; // not last sibling any more
+            prev.graph_levels(prevLevels);
+            break;
+          }
+
+          // Case 3: task in‐between – keep vertical line running
+          const betweenLevels = prev.graph_levels().slice();
+          betweenLevels[indentation - 1] = 1;
+          prev.graph_levels(betweenLevels);
         }
-    };
+      }
+
+      // Set current graph levels
+      taskVM.graph_levels(levels);
+    }
+  };
+
+  // Run initial hierarchy build
+  self.buildAndInitializeHierarchy();
+
+  // --- Data Refresh Logic ---
+  self.refreshData = async function() {
+    if (!self.runId()) {
+      console.warn("No runId available for refresh.");
+      return;
+    }
+    if (self.isComplete()) { // Check if already complete
+      console.log("Test run is complete, stopping refresh.");
+      if (self.intervalId) {
+        clearInterval(self.intervalId);
+        self.intervalId = null;
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/v1/test_run/${self.runId()}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const newData = await response.json();
+
+      if (newData.status === "OK" && newData.data) {
+        // Apply the update using knockout mapping
+        ko.mapping.fromJS(newData.data, mappingOptions, self);
+
+        // Rebuild hierarchy and update UI state after mapping
+        self.buildAndInitializeHierarchy();
+
+        // Check again if the *new* status indicates completion
+        if (self.isComplete()) {
+          console.log("Test run completed after refresh, stopping timer.");
+          if (self.intervalId) {
+            clearInterval(self.intervalId);
+            self.intervalId = null;
+          }
+        }
+
+      } else {
+        console.error("Failed to get successful data:", newData.status, newData.data);
+        // Optionally stop refresh on API error status? Or keep trying?
+        // For now, keep trying. Could implement backoff later.
+      }
+    } catch (error) {
+      console.error("Error fetching test run update:", error);
+      // Optionally stop refresh on network error?
+      // if (self.intervalId) {
+      //     clearInterval(self.intervalId);
+      //     self.intervalId = null;
+      // }
+    }
+  };
+
+
+  // --- Helper for log data title (remains the same) ---
+  self.createLogDataTitle = function(dataObj) {
+    let title = "";
+    if (dataObj) {
+      for (const key in dataObj) {
+        if (dataObj.hasOwnProperty(key)) {
+          title += `${key}: ${dataObj[key]}<br>`;
+        }
+      }
+    }
+    return title || "No extra data";
+  };
+
+  self.handleRowClick = function(task, event) {
+    // Find the closest TD ancestor of the clicked element
+    let targetTd = $(event.target).closest('td');
+
+    // Check if the click was on the graph cell (first td)
+    if (targetTd.length && targetTd.hasClass('task-graph')) {
+      // Only toggle expand if the task actually has children (use computed)
+      if (task.has_children()) { // Use computed property
+        task.toggleExpand();
+      }
+    } else {
+      // Otherwise, toggle the details panel
+      task.toggleDetails();
+    }
+  };
 
 };
 
@@ -635,8 +944,21 @@ document.addEventListener('DOMContentLoaded', function() {
     return; // Stop execution if data parsing fails
   }
 
-  var viewModel = new TestRunViewModel(initialData);
+  // Ensure initialData has a 'data' property if the API response wraps it
+  const viewModelData = initialData.data || initialData;
+
+
+  var viewModel = new TestRunViewModel(viewModelData); // Pass the actual data object
   ko.applyBindings(viewModel, document.getElementById('ko-root'));
+
+  // Start periodic refresh only if the test is not already completed
+  if (!viewModel.isComplete() && viewModel.runId()) {
+    console.log("Starting periodic refresh for run ID:", viewModel.runId());
+    // Refresh every 5 seconds (adjust as needed)
+    viewModel.intervalId = setInterval(viewModel.refreshData, 10000);
+  } else {
+    console.log("Test run already complete or runId missing, not starting refresh.");
+  }
 });
 
 </script>
@@ -702,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', function() {
   visibility: hidden;
 }
 
-.task-graph .graph-container .graph-button.expanded .graph-expand-line {
+.task-graph .graph-button.expanded .graph-expand-line {
   visibility: visible;
 }
 

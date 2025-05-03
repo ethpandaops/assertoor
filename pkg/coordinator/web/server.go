@@ -96,6 +96,7 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 			ws.router.HandleFunc("/api/v1/test_runs/delete", apiHandler.PostTestRunsDelete).Methods("POST")
 			ws.router.HandleFunc("/api/v1/test_run/{runId}/cancel", apiHandler.PostTestRunCancel).Methods("POST")
 			ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
+			ws.router.HandleFunc("/api/v1/test_run/{runId}/task/{taskIndex}/details", apiHandler.GetTestRunTaskDetails).Methods("GET")
 			ws.router.HandleFunc("/api/v1/test_run/{runId}/task/{taskId}/result/{resultType}/{fileId:.*}", apiHandler.GetTaskResult).Methods("GET")
 		}
 	}

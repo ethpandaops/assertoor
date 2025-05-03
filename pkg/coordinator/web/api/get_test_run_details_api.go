@@ -109,7 +109,7 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 				Title:       taskState.Title(),
 				Started:     taskStatus.IsStarted,
 				Completed:   taskStatus.IsStarted && !taskStatus.IsRunning,
-				Timeout:     uint64(taskState.Timeout().Seconds()),
+				Timeout:     uint64(taskState.Timeout().Milliseconds()),
 			}
 
 			switch {
@@ -117,12 +117,12 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 				taskData.Status = "pending"
 			case taskStatus.IsRunning:
 				taskData.Status = "running"
-				taskData.StartTime = taskStatus.StartTime.Unix()
+				taskData.StartTime = taskStatus.StartTime.UnixMilli()
 				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // no overflow possible
 			default:
 				taskData.Status = "complete"
-				taskData.StartTime = taskStatus.StartTime.Unix()
-				taskData.StopTime = taskStatus.StopTime.Unix()
+				taskData.StartTime = taskStatus.StartTime.UnixMilli()
+				taskData.StopTime = taskStatus.StopTime.UnixMilli()
 				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // no overflow possible
 			}
 
