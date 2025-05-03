@@ -191,14 +191,17 @@ tasks:
         exit 0
 
   - name: run_shell
-    title: "Check test results (${tasks.execute.outputs.passedTests} / ${tasks.execute.outputs.totalTests} passed)"
+    title: "Check test results (${{tasks.execute.outputs.passedTests}} / ${{tasks.execute.outputs.totalTests}} passed)"
     id: check
     if: runTests
     config:
       shell: bash
+      envVars:
+        passedTests: "tasks.execute.outputs.passedTests"
+        totalTests: "tasks.execute.outputs.totalTests"
       command: |
         set -e
-        if [ "${tasks.execute.outputs.passedTests}" -ne "${tasks.execute.outputs.totalTests}" ]; then
+        if [ "${passedTests}" -ne "${totalTests}" ]; then
           echo "Some tests failed, see report.html in the task above for details"
           exit 1
         fi
