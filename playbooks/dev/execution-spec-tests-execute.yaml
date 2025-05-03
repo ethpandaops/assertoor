@@ -201,7 +201,7 @@ tasks:
         totalTests: "tasks.execute.outputs.totalTests"
       command: |
         set -e
-        if [ "${passedTests}" -ne "${totalTests}" ]; then
+        if [ "${passedTests}" != "${totalTests}" ]; then
           echo "Some tests failed, see report.html in the task above for details"
           exit 1
         fi
