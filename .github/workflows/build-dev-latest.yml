@@ -1,3 +1,4 @@
+
 name: Build latest image
 
 on:
@@ -11,6 +12,7 @@ permissions:
   contents: write
 
 jobs:
+
   check_source:
     name: "Run code checks"
     uses: ./.github/workflows/_shared-check.yaml
@@ -23,6 +25,9 @@ jobs:
       ref: ${{ github.sha }}
       release: "snapshot"
       docker: true
-      docker_repository: "ghcr.io/noku-team/assertoor"
+      docker_repository: "ethpandaops/assertoor"
       docker_tag_prefix: "master"
       additional_tags: "['master','master-latest','latest']"
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
