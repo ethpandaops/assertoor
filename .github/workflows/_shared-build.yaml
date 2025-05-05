@@ -1,44 +1,36 @@
-
 name: Reusable build workflow
 on:
   workflow_call:
     inputs:
       ref:
-        description: 'The branch, tag or SHA to build'
+        description: "The branch, tag or SHA to build"
         required: true
         type: string
       release:
-        description: 'Release version tag for this build'
-        default: ''
+        description: "Release version tag for this build"
+        default: ""
         required: false
         type: string
       docker:
-        description: 'Build docker images'
+        description: "Build docker images"
         default: false
         required: true
         type: boolean
       docker_repository:
-        description: 'Docker Hub Repository'
-        default: ''
+        description: "Docker Image Repository"
+        default: "ghcr.io/noku-team/assertoor"
         required: false
         type: string
       docker_tag_prefix:
-        description: 'Docker Image Tag Prefix'
-        default: ''
+        description: "Docker Image Tag Prefix"
+        default: ""
         required: false
         type: string
       additional_tags:
-        description: 'Additional Docker Image Tags (JSON)'
-        default: ''
+        description: "Additional Docker Image Tags (JSON)"
+        default: ""
         required: false
         type: string
-    secrets:
-      DOCKERHUB_USERNAME:
-        description: 'Docker Hub Username'
-        required: false
-      DOCKERHUB_TOKEN:
-        description: 'Docker Hub Token'
-        required: false
 
 # shared build jobs
 jobs:
@@ -46,177 +38,177 @@ jobs:
     name: Build linux/amd64 binary
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        ref: ${{ inputs.ref }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref }}
 
-    # setup global dependencies
-    - name: Set up go
-      uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-      with:
-        go-version: 1.24.x
-    
-    # setup project dependencies
-    - name: Get dependencies
-      run: |
-        go get -v -t -d ./...
+      # setup global dependencies
+      - name: Set up go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: 1.24.x
 
-    # build binaries
-    - name: Build linux amd64 binary
-      run: |
-        make docs
-        make build
-      env:
-        RELEASE: ${{ inputs.release }}
+      # setup project dependencies
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
 
-    # upload artifacts
-    - name: "Upload artifact: assertoor_linux_amd64"
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-      with:
-        path: ./bin/*
-        name: assertoor_linux_amd64
-  
+      # build binaries
+      - name: Build linux amd64 binary
+        run: |
+          make docs
+          make build
+        env:
+          RELEASE: ${{ inputs.release }}
+
+      # upload artifacts
+      - name: "Upload artifact: assertoor_linux_amd64"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          path: ./bin/*
+          name: assertoor_linux_amd64
+
   build_linux_arm64_binary:
     name: Build linux/arm64 binary
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        ref: ${{ inputs.ref }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref }}
 
-    # setup global dependencies
-    - name: Set up go
-      uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-      with:
-        go-version: 1.24.x
+      # setup global dependencies
+      - name: Set up go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: 1.24.x
 
-    # setup cross build libs
-    - name: Get cross build dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get -y install gcc-aarch64-linux-gnu libstdc++-11-dev-arm64-cross libstdc++-12-dev-arm64-cross
-    
-    # setup project dependencies
-    - name: Get dependencies
-      run: |
-        go get -v -t -d ./...
+      # setup cross build libs
+      - name: Get cross build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install gcc-aarch64-linux-gnu libstdc++-11-dev-arm64-cross libstdc++-12-dev-arm64-cross
 
-    # build binaries
-    - name: Build linux arm64 binary
-      run: |
-        make docs
-        make build GOARCH=arm64 CC=/usr/bin/aarch64-linux-gnu-gcc
-      env:
-        RELEASE: ${{ inputs.release }}
+      # setup project dependencies
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
 
-    # upload artifacts
-    - name: "Upload artifact: assertoor_linux_arm64"
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-      with:
-        path: ./bin/*
-        name: assertoor_linux_arm64
+      # build binaries
+      - name: Build linux arm64 binary
+        run: |
+          make docs
+          make build GOARCH=arm64 CC=/usr/bin/aarch64-linux-gnu-gcc
+        env:
+          RELEASE: ${{ inputs.release }}
+
+      # upload artifacts
+      - name: "Upload artifact: assertoor_linux_arm64"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          path: ./bin/*
+          name: assertoor_linux_arm64
 
   build_windows_binary:
     name: Build windows/amd64 binary
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        ref: ${{ inputs.ref }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref }}
 
-    # setup global dependencies
-    - name: Set up go
-      uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-      with:
-        go-version: 1.24.x
+      # setup global dependencies
+      - name: Set up go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: 1.24.x
 
-    # setup project dependencies
-    - name: Get dependencies
-      run: |
-        go get -v -t -d ./...
+      # setup project dependencies
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
 
-    # build binaries
-    - name: Build windows binary
-      run: |
-        make docs
-        make build
-      env:
-        RELEASE: ${{ inputs.release }}
+      # build binaries
+      - name: Build windows binary
+        run: |
+          make docs
+          make build
+        env:
+          RELEASE: ${{ inputs.release }}
 
-    # upload artifacts
-    - name: "Upload artifact: assertoor_windows_amd64"
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-      with:
-        path: ./bin/*
-        name: assertoor_windows_amd64
+      # upload artifacts
+      - name: "Upload artifact: assertoor_windows_amd64"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          path: ./bin/*
+          name: assertoor_windows_amd64
 
   build_darwin_amd64_binary:
     name: Build macos/amd64 binary
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        ref: ${{ inputs.ref }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref }}
 
-    # setup global dependencies
-    - name: Set up go
-      uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-      with:
-        go-version: 1.24.x
+      # setup global dependencies
+      - name: Set up go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: 1.24.x
 
-    # setup project dependencies
-    - name: Get dependencies
-      run: |
-        go get -v -t -d ./...
+      # setup project dependencies
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
 
-    # build binaries
-    - name: Build macos amd64 binary
-      run: |
-        make docs
-        make build
-      env:
-        RELEASE: ${{ inputs.release }}
+      # build binaries
+      - name: Build macos amd64 binary
+        run: |
+          make docs
+          make build
+        env:
+          RELEASE: ${{ inputs.release }}
 
-    # upload artifacts
-    - name: "Upload artifact: assertoor_darwin_amd64"
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-      with:
-        path: ./bin/*
-        name: assertoor_darwin_amd64
+      # upload artifacts
+      - name: "Upload artifact: assertoor_darwin_amd64"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          path: ./bin/*
+          name: assertoor_darwin_amd64
 
   build_darwin_arm64_binary:
     name: Build macos/arm64 binary
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        ref: ${{ inputs.ref }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref }}
 
-    # setup global dependencies
-    - name: Set up go
-      uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-      with:
-        go-version: 1.24.x
+      # setup global dependencies
+      - name: Set up go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: 1.24.x
 
-    # setup project dependencies
-    - name: Get dependencies
-      run: |
-        go get -v -t -d ./...
+      # setup project dependencies
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
 
-    # build binaries
-    - name: Build macos arm64 binary
-      run: |
-        make docs
-        make build GOARCH=arm64
-      env:
-        RELEASE: ${{ inputs.release }}
+      # build binaries
+      - name: Build macos arm64 binary
+        run: |
+          make docs
+          make build GOARCH=arm64
+        env:
+          RELEASE: ${{ inputs.release }}
 
-    # upload artifacts
-    - name: "Upload artifact: assertoor_darwin_arm64"
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-      with:
-        path: ./bin/*
-        name: assertoor_darwin_arm64
+      # upload artifacts
+      - name: "Upload artifact: assertoor_darwin_arm64"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          path: ./bin/*
+          name: assertoor_darwin_arm64
 
   build_amd64_docker_image:
     name: Build amd64 docker image
@@ -224,96 +216,98 @@ jobs:
     if: ${{ inputs.docker }}
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        ref: ${{ inputs.ref }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref }}
 
-    - name: Get build version
-      id: vars
-      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Get build version
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-    # prepare docker
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-    - name: Login to Docker Hub
-      uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # prepare docker
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
-    # download build artifacts
-    - name: Download build artifacts
-      uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
-      with:
-        name: assertoor_linux_amd64
-        path: ./bin
+      # download build artifacts
+      - name: Download build artifacts
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: assertoor_linux_amd64
+          path: ./bin
 
-    # prepare environment
-    - name: Prepare build environment
-      run: |
-        chmod +x ./bin/*
-        ls -lach ./bin
-    
-    # build amd64 image
-    - name: Build amd64 docker image
-      run: |
-        docker build . --file Dockerfile-stub \
-          --tag ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-amd64 \
-          --tag ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64 \
-          --platform=linux/amd64
-    - name: Push amd64 docker images
-      run: |
-        docker push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-amd64
-        docker push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64
-  
+      # prepare environment
+      - name: Prepare build environment
+        run: |
+          chmod +x ./bin/*
+          ls -lach ./bin
+
+      # build amd64 image
+      - name: Build amd64 docker image
+        run: |
+          docker build . --file Dockerfile-stub \
+            --tag ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-amd64 \
+            --tag ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64 \
+            --platform=linux/amd64
+      - name: Push amd64 docker images
+        run: |
+          docker push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-amd64
+          docker push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64
+
   build_arm64_docker_image:
     name: Build arm64 docker image
     needs: [build_linux_arm64_binary]
     if: ${{ inputs.docker }}
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        ref: ${{ inputs.ref }}
-    - name: Get build version
-      id: vars
-      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Get build version
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-    # prepare docker
-    - name: Set up Docker QEMU
-      uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-    - name: Login to Docker Hub
-      uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # prepare docker
+      - name: Set up Docker QEMU
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
-    # download build artifacts
-    - name: Download build artifacts
-      uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
-      with:
-        name: assertoor_linux_arm64
-        path: ./bin
+      # download build artifacts
+      - name: Download build artifacts
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: assertoor_linux_arm64
+          path: ./bin
 
-    # prepare environment
-    - name: Prepare build environment
-      run: |
-        chmod +x ./bin/*
-        ls -lach ./bin
-    
-    # build arm64 image
-    - name: Build arm64 docker image
-      run: |
-        docker build . --file Dockerfile-stub \
-          --tag ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-arm64 \
-          --tag ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-arm64 \
-          --platform=linux/arm64
-    - name: Push arm64 docker image
-      run: |
-        docker push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-arm64
-        docker push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-arm64
+      # prepare environment
+      - name: Prepare build environment
+        run: |
+          chmod +x ./bin/*
+          ls -lach ./bin
+
+      # build arm64 image
+      - name: Build arm64 docker image
+        run: |
+          docker build . --file Dockerfile-stub \
+            --tag ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-arm64 \
+            --tag ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-arm64 \
+            --platform=linux/arm64
+      - name: Push arm64 docker image
+        run: |
+          docker push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-arm64
+          docker push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-arm64
 
   build_multiarch_image:
     name: Build multiarch docker image
@@ -321,31 +315,32 @@ jobs:
     if: ${{ inputs.docker }}
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        ref: ${{ inputs.ref }}
-    - name: Get build version
-      id: vars
-      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Get build version
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-    # prepare docker
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-    - name: Login to Docker Hub
-      uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    
-    # build multiarch image
-    - name: Build multiarch docker manifest
-      run: |
-        docker manifest create ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }} \
-        --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64 \
-        --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-arm64
-    - name: Push multiarch docker manifest
-      run: |
-        docker manifest push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}
+      # prepare docker
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      # build multiarch image
+      - name: Build multiarch docker manifest
+        run: |
+          docker manifest create ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }} \
+          --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64 \
+          --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-arm64
+      - name: Push multiarch docker manifest
+        run: |
+          docker manifest push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}
 
   build_extra_image:
     name: Build additional docker manifests
@@ -356,37 +351,38 @@ jobs:
       matrix:
         tag: ${{ fromJSON(inputs.additional_tags) }}
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        ref: ${{ inputs.ref }}
-    - name: Get build version
-      id: vars
-      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Get build version
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-    # prepare docker
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-    - name: Login to Docker Hub
-      uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    
-    # build multiarch image
-    - name: "Build additional docker manifest: ${{ matrix.tag }}"
-      run: |
-        docker manifest create ${{ inputs.docker_repository }}:${{ matrix.tag }}-amd64 \
-        --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64
+      # prepare docker
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
-        docker manifest create ${{ inputs.docker_repository }}:${{ matrix.tag }}-arm64 \
-        --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-arm64
+      # build multiarch image
+      - name: "Build additional docker manifest: ${{ matrix.tag }}"
+        run: |
+          docker manifest create ${{ inputs.docker_repository }}:${{ matrix.tag }}-amd64 \
+          --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64
 
-        docker manifest create ${{ inputs.docker_repository }}:${{ matrix.tag }} \
-        --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64 \
-        --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-arm64
+          docker manifest create ${{ inputs.docker_repository }}:${{ matrix.tag }}-arm64 \
+          --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-arm64
 
-    - name: "Push additional docker manifest: ${{ matrix.tag }}"
-      run: |
-        docker manifest push ${{ inputs.docker_repository }}:${{ matrix.tag }}-amd64
-        docker manifest push ${{ inputs.docker_repository }}:${{ matrix.tag }}-arm64
-        docker manifest push ${{ inputs.docker_repository }}:${{ matrix.tag }}
+          docker manifest create ${{ inputs.docker_repository }}:${{ matrix.tag }} \
+          --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64 \
+          --amend ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-arm64
+
+      - name: "Push additional docker manifest: ${{ matrix.tag }}"
+        run: |
+          docker manifest push ${{ inputs.docker_repository }}:${{ matrix.tag }}-amd64
+          docker manifest push ${{ inputs.docker_repository }}:${{ matrix.tag }}-arm64
+          docker manifest push ${{ inputs.docker_repository }}:${{ matrix.tag }}

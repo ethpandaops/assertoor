@@ -1,4 +1,3 @@
-
 name: Build PR
 
 on:
@@ -24,41 +23,41 @@ jobs:
       build_docker: ${{ steps.loadinfo.outputs.build_docker }}
       docker_tag: ${{ steps.loadinfo.outputs.docker_tag }}
     steps:
-    - name: "Load PR info"
-      id: loadinfo
-      run: |
-        has_docker_image_label="${{ contains(github.event.pull_request.labels.*.name, 'build-docker-image') }}"
-        run_builds="$has_docker_image_label"
-        echo "docker image label: $has_docker_image_label"
+      - name: "Load PR info"
+        id: loadinfo
+        run: |
+          has_docker_image_label="${{ contains(github.event.pull_request.labels.*.name, 'build-docker-image') }}"
+          run_builds="$has_docker_image_label"
+          echo "docker image label: $has_docker_image_label"
 
-        branch_name="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
-        echo "branch name: $branch_name"
+          branch_name="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          echo "branch name: $branch_name"
 
-        commit_repo="$GITHUB_REPOSITORY"
-        commit_ref="${{ github.event.pull_request.head.sha }}"
-        if [[ -z "$commit_ref" ]]; then
-          commit_ref="${{ github.sha }}"
-        fi
-        
-        echo "repository: $commit_repo"
-        echo "commit: $commit_ref"
-        
-        manual_tag="${{ inputs.docker_tag }}"
-        if [[ ! -z "$manual_tag" ]]; then
-          has_docker_image_label="true"
-          branch_name="$manual_tag"
-          run_builds="true"
-        fi
+          commit_repo="$GITHUB_REPOSITORY"
+          commit_ref="${{ github.event.pull_request.head.sha }}"
+          if [[ -z "$commit_ref" ]]; then
+            commit_ref="${{ github.sha }}"
+          fi
 
-        if [[ "$branch_name" == "master" ]] || [[ "$branch_name" =~ ^v[0-9] ]]; then
-          echo "Invalid branch name! Skipping builds"
-          run_builds="false"
-        fi
+          echo "repository: $commit_repo"
+          echo "commit: $commit_ref"
 
-        echo "run_builds=$run_builds" >> $GITHUB_OUTPUT
-        echo "commit_ref=$commit_ref" >> $GITHUB_OUTPUT
-        echo "build_docker=$has_docker_image_label" >> $GITHUB_OUTPUT
-        echo "docker_tag=$branch_name" >> $GITHUB_OUTPUT
+          manual_tag="${{ inputs.docker_tag }}"
+          if [[ ! -z "$manual_tag" ]]; then
+            has_docker_image_label="true"
+            branch_name="$manual_tag"
+            run_builds="true"
+          fi
+
+          if [[ "$branch_name" == "master" ]] || [[ "$branch_name" =~ ^v[0-9] ]]; then
+            echo "Invalid branch name! Skipping builds"
+            run_builds="false"
+          fi
+
+          echo "run_builds=$run_builds" >> $GITHUB_OUTPUT
+          echo "commit_ref=$commit_ref" >> $GITHUB_OUTPUT
+          echo "build_docker=$has_docker_image_label" >> $GITHUB_OUTPUT
+          echo "docker_tag=$branch_name" >> $GITHUB_OUTPUT
 
   check_source:
     name: "Run code checks"
@@ -74,9 +73,6 @@ jobs:
     with:
       ref: ${{ needs.prinfo.outputs.commit_ref }}
       docker: ${{ needs.prinfo.outputs.build_docker == 'true' }}
-      docker_repository: "ethpandaops/assertoor"
+      docker_repository: "ghcr.io/noku-team/assertoor"
       docker_tag_prefix: ${{needs.prinfo.outputs.docker_tag}}
       additional_tags: "['${{needs.prinfo.outputs.docker_tag}}','${{needs.prinfo.outputs.docker_tag}}-latest']"
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
