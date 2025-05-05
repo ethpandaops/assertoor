@@ -7,8 +7,8 @@ toolchain go1.24.1
 require (
 	github.com/attestantio/go-eth2-client v0.25.0
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
-	github.com/ethereum/go-ethereum v1.15.8
-	github.com/ethpandaops/ethwallclock v0.3.0
+	github.com/ethereum/go-ethereum v1.15.10
+	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/gorilla/mux v1.8.1
