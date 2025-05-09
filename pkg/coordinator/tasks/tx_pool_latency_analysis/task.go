@@ -181,35 +181,35 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Errorf("Transaction latency too high: %dmus (expected <= %dmus)", avgLatency.Microseconds(), t.config.HighLatency)
 		t.ctx.SetResult(types.TaskResultFailure)
 	} else {
-		latenciesMus := make([]int64, len(latencies))
-
-		for i, latency := range latencies {
-			latenciesMus[i] = latency.Microseconds()
-		}
-
-		plot, err := hdr.HdrPlot(latenciesMus)
-		if err != nil {
-			t.logger.Errorf("Failed to generate HDR plot: %v", err)
-			t.ctx.SetResult(types.TaskResultFailure)
-			return nil
-		}
-
-		outputs := map[string]interface{}{
-			"tx_count":           t.config.TxCount,
-			"avg_latency_mus":    avgLatency.Microseconds(),
-			"tx_pool_latency_hdr_plot": plot,
-			"latencies": latenciesMus,
-		}
-
-		outputsJSON, _ := json.Marshal(outputs)
-		t.logger.Infof("outputs_json: %s", string(outputsJSON))
-
 		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
 		t.ctx.Outputs.SetVar("avg_latency_mus", avgLatency.Microseconds())
 		t.ctx.Outputs.SetVar("detailed_latencies", latencies)
 
 		t.ctx.SetResult(types.TaskResultSuccess)
 	}
+	
+	latenciesMus := make([]int64, len(latencies))
+
+	for i, latency := range latencies {
+		latenciesMus[i] = latency.Microseconds()
+	}
+
+	plot, err := hdr.HdrPlot(latenciesMus)
+	if err != nil {
+		t.logger.Errorf("Failed to generate HDR plot: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+
+	outputs := map[string]interface{}{
+		"tx_count":           t.config.TxCount,
+		"avg_latency_mus":    avgLatency.Microseconds(),
+		"tx_pool_latency_hdr_plot": plot,
+		"latencies": latenciesMus,
+	}
+
+	outputsJSON, _ := json.Marshal(outputs)
+	t.logger.Infof("outputs_json: %s", string(outputsJSON))
 
 	return nil
 }
