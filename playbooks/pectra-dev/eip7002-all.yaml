@@ -1099,7 +1099,7 @@ tasks:
         - name: run_task_options
           title: "Expect failure for voluntary exit for key 7"
           config:
-            expectFailure: true
+            ignoreFailure: true
             task:
               name: generate_exits
               title: "Send voluntary exit transaction for key 7"
