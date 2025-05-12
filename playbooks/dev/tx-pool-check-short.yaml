@@ -6,10 +6,10 @@ config:
   walletPrivkey: ""
 tasks:
 - name: tx_pool_throughput_analysis
-  title: "Check transaction pool throughput with 20.000 transactions"
+  title: "Check transaction pool throughput with 10.000 transactions"
   timeout: 30m
   config:
-    qps: 20000
+    qps: 10000
     measureInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
@@ -19,12 +19,12 @@ tasks:
   config:
     waitTime: 5
 - name: tx_pool_latency_analysis
-  title: "Check transaction pool latency with 20.000 transactions"
+  title: "Check transaction pool latency with 10.000 transactions"
   timeout: 30m
   config:
-    txCount: 20000
+    txCount: 10000
     measureInterval: 1000
-    highLatency: 5000
+    highLatency: 3500
     failOnHighLatency: true
   configVars:
     privateKey: "walletPrivkey"
