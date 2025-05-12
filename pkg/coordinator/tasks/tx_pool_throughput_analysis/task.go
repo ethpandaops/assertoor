@@ -173,7 +173,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		gotTx += len(*_txs)
 
-		if gotTx%t.config.MeasureInterval != 0 || gotTx >= 9900 {
+		if gotTx%t.config.MeasureInterval != 0 {
 			continue
 		}
 
