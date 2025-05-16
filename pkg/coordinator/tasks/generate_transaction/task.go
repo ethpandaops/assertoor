@@ -379,7 +379,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				if authorization.Nonce != nil {
 					authEntry.Nonce = *authorization.Nonce
 				} else {
-					authEntry.Nonce = authWallet.UseNextNonce(!bytes.Equal(authEntry.Address.Bytes(), t.wallet.GetAddress().Bytes()))
+					authEntry.Nonce = authWallet.UseNextNonce(true)
 				}
 
 				authEntry, err := ethtypes.SignSetCode(authWallet.GetPrivateKey(), authEntry)
