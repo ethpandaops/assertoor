@@ -129,6 +129,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			// generate and sign tx
 			go func() {
+				if ctx.Err() != nil {
+					return;
+				}
+
 				tx, err := t.generateTransaction(ctx)
 				if err != nil {
 					t.logger.Errorf("Failed to create transaction: %v", err)
