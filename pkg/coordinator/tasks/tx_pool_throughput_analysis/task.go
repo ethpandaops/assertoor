@@ -154,6 +154,10 @@ func (t *Task) Execute(ctx context.Context) error {
 				txs = append(txs, tx)
 			}()
 
+			if isFailed {
+				return;
+			}
+
 			time.Sleep(sleepTime)
 		}
 
@@ -164,7 +168,15 @@ func (t *Task) Execute(ctx context.Context) error {
 	lastMeasureTime := time.Now()
 	gotTx := 0
 
+	if isFailed {
+		return nil;
+	}
+
 	for gotTx < t.config.QPS {
+		if isFailed {
+			return nil
+		}
+
 		// Add a timeout of 10 seconds for reading transaction messages
 		readChan := make(chan struct {
 			txs *eth.TransactionsPacket
@@ -201,12 +213,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
 
 		lastMeasureTime = time.Now()
-	}
-
-	if isFailed {
-		t.logger.Errorf("Failed to execute task %v", TaskName)
-		t.ctx.SetResult(types.TaskResultFailure)
-		return nil
 	}
 
 	totalTime := time.Since(startTime)
