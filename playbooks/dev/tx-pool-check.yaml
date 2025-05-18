@@ -24,7 +24,7 @@ tasks:
   config:
     txCount: 1000
     measureInterval: 100
-    highLatency: 5000
+    highLatency: 1000
     failOnHighLatency: true
   configVars:
     privateKey: "walletPrivkey"
@@ -80,36 +80,7 @@ tasks:
   config:
     txCount: 15000
     measureInterval: 1500
-    highLatency: 5000
-    failOnHighLatency: true
-  configVars:
-    privateKey: "walletPrivkey"
-- name: tx_pool_clean
-  title: "Clean transaction pool"
-  timeout: 40m
-  config:
-    waitTime: 5
-- name: tx_pool_throughput_analysis
-  timeout: 40m
-  title: "Check transaction pool throughput with 20.000 transactions in one second"
-  config:
-    qps: 20000
-    measureInterval: 2000
-  configVars:
-    privateKey: "walletPrivkey"
-- name: tx_pool_clean
-  title: "Clean transaction pool"
-  timeout: 40m
-  config:
-    waitTime: 5
-- name: tx_pool_latency_analysis
-  title: "Check transaction pool latency with 20.000 transactions"
-  timeout: 40m
-  config:
-    txCount: 20000
-    measureInterval: 2000
     highLatency: 7000
     failOnHighLatency: true
   configVars:
     privateKey: "walletPrivkey"
-
