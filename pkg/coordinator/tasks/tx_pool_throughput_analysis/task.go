@@ -181,7 +181,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			return nil
 		}
 
-		// Add a timeout of 10 seconds for reading transaction messages
+		// Add a timeout of 180 seconds for reading transaction messages
 		readChan := make(chan struct {
 			txs *eth.TransactionsPacket
 			err error
@@ -203,8 +203,8 @@ func (t *Task) Execute(ctx context.Context) error {
 				return nil
 			}
 			gotTx += len(*result.txs)
-		case <-time.After(10 * time.Second):
-			t.logger.Errorf("Timeout after 10 seconds while reading transaction messages")
+		case <-time.After(180 * time.Second):
+			t.logger.Errorf("Timeout after 180 seconds while reading transaction messages")
 			t.ctx.SetResult(types.TaskResultFailure)
 			return nil
 		}
