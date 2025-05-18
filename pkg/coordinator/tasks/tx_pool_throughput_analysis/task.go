@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/forkid"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/helper"
@@ -164,14 +165,33 @@ func (t *Task) Execute(ctx context.Context) error {
 	gotTx := 0
 
 	for gotTx < t.config.QPS {
-		_txs, err := conn.ReadTransactionMessages()
-		if err != nil {
-			t.logger.Errorf("Failed to read transaction messages: %v", err)
+		// Add a timeout of 10 seconds for reading transaction messages
+		readChan := make(chan struct {
+			txs *eth.TransactionsPacket
+			err error
+		})
+
+		go func() {
+			txs, err := conn.ReadTransactionMessages()
+			readChan <- struct {
+				txs *eth.TransactionsPacket
+				err error
+			}{txs, err}
+		}()
+
+		select {
+		case result := <-readChan:
+			if result.err != nil {
+				t.logger.Errorf("Failed to read transaction messages: %v", result.err)
+				t.ctx.SetResult(types.TaskResultFailure)
+				return nil
+			}
+			gotTx += len(*result.txs)
+		case <-time.After(10 * time.Second):
+			t.logger.Errorf("Timeout after 10 seconds while reading transaction messages")
 			t.ctx.SetResult(types.TaskResultFailure)
 			return nil
 		}
-
-		gotTx += len(*_txs)
 
 		if gotTx%t.config.MeasureInterval != 0 {
 			continue
