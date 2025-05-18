@@ -1,4 +1,4 @@
-id: tx-pool-check
+id: tx-pool-check-short
 name: "Check transaction pool"
 timeout: 30m
 disable: false
