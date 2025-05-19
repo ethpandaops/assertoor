@@ -129,8 +129,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			// generate and sign tx
 			go func() {
-				if ctx.Err() != nil {
-					return;
+				if ctx.Err() != nil && !isFailed {
+					return
 				}
 
 				tx, err := t.generateTransaction(ctx)
@@ -152,6 +152,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				if err != nil {
 					t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
 					t.ctx.SetResult(types.TaskResultFailure)
+					isFailed = true
 					return
 				}
 
@@ -159,7 +160,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			}()
 
 			if isFailed {
-				return;
+				return
 			}
 
 			time.Sleep(sleepTime)
@@ -173,7 +174,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	gotTx := 0
 
 	if isFailed {
-		return nil;
+		return nil
 	}
 
 	for gotTx < t.config.QPS {
@@ -204,9 +205,26 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 			gotTx += len(*result.txs)
 		case <-time.After(180 * time.Second):
-			t.logger.Errorf("Timeout after 180 seconds while reading transaction messages")
-			t.ctx.SetResult(types.TaskResultFailure)
-			return nil
+			t.logger.Warnf("Timeout after 180 seconds while reading transaction messages. Re-sending transactions...")
+
+			// Calculate how many transactions we're still missing
+			missingTxCount := t.config.QPS - gotTx
+			if missingTxCount <= 0 {
+				break
+			}
+
+			// Re-send transactions to the original client
+			for i := 0; i < missingTxCount && i < len(txs); i++ {
+				err = client.GetRPCClient().SendTransaction(ctx, txs[i])
+				if err != nil {
+					t.logger.WithError(err).Errorf("Failed to re-send transaction message, error: %v", err)
+					t.ctx.SetResult(types.TaskResultFailure)
+					return nil
+				}
+			}
+
+			t.logger.Infof("Re-sent %d transactions", missingTxCount)
+			continue
 		}
 
 		if gotTx%t.config.MeasureInterval != 0 {
