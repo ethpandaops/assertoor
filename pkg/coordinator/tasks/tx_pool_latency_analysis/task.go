@@ -114,7 +114,6 @@ func (t *Task) Execute(ctx context.Context) error {
 	var latencies []time.Duration
 
 	var txs []*ethtypes.Transaction
-	retryCount := 0
 
 	for i := 0; i < t.config.TxCount; i++ {
 		tx, err := t.generateTransaction(ctx)
@@ -127,24 +126,13 @@ func (t *Task) Execute(ctx context.Context) error {
 		startTx := time.Now()
 
 		err = client.GetRPCClient().SendTransaction(ctx, tx)
-
 		if err != nil {
 			t.logger.Errorf("Failed to send transaction: %v. Nonce: %d. ", err, tx.Nonce())
-
-			i--
-			retryCount++
-
-			if retryCount > 1000 {
-				t.logger.Errorf("Too many retries")
-				t.ctx.SetResult(types.TaskResultFailure)
-				return nil
-			}
-
-			continue
+			t.ctx.SetResult(types.TaskResultFailure)
+			return nil
 		}
 
 		txs = append(txs, tx)
-		retryCount = 0
 
 		// Create a context with timeout for reading transaction messages
 		readCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
