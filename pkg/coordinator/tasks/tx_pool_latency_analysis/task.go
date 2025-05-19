@@ -146,11 +146,27 @@ func (t *Task) Execute(ctx context.Context) error {
 		txs = append(txs, tx)
 		retryCount = 0
 
-		_, err = conn.ReadTransactionMessages()
-		if err != nil {
-			t.logger.Errorf("Failed to read transaction messages: %v", err)
-			t.ctx.SetResult(types.TaskResultFailure)
-			return nil
+		// Create a context with timeout for reading transaction messages
+		readCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		done := make(chan error, 1)
+		go func() {
+			_, readErr := conn.ReadTransactionMessages()
+			done <- readErr
+		}()
+
+		select {
+		case err = <-done:
+			if err != nil {
+				t.logger.Errorf("Failed to read transaction messages: %v", err)
+				t.ctx.SetResult(types.TaskResultFailure)
+				return nil
+			}
+		case <-readCtx.Done():
+			t.logger.Warnf("Timeout waiting for transaction message, retrying transaction")
+			i-- // Retry this transaction
+			continue
 		}
 
 		latency := time.Since(startTx)
@@ -187,7 +203,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		t.ctx.SetResult(types.TaskResultSuccess)
 	}
-	
+
 	latenciesMus := make([]int64, len(latencies))
 
 	for i, latency := range latencies {
@@ -202,10 +218,10 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	outputs := map[string]interface{}{
-		"tx_count":           t.config.TxCount,
-		"avg_latency_mus":    avgLatency.Microseconds(),
+		"tx_count":                 t.config.TxCount,
+		"avg_latency_mus":          avgLatency.Microseconds(),
 		"tx_pool_latency_hdr_plot": plot,
-		"latencies": latenciesMus,
+		"latencies":                latenciesMus,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
