@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -152,7 +153,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				return nil
 			}
 		case <-readCtx.Done():
-			t.logger.Warnf("Timeout waiting for transaction message, retrying transaction")
+			t.logger.Warnf("Timeout waiting for transaction message at index %d, retrying transaction", i)
 			i-- // Retry this transaction
 			continue
 		}
@@ -181,23 +182,74 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	if t.config.FailOnHighLatency && avgLatency.Microseconds() > t.config.HighLatency {
-		t.logger.Errorf("Transaction latency too high: %dmus (expected <= %dmus)", avgLatency.Microseconds(), t.config.HighLatency)
-		t.ctx.SetResult(types.TaskResultFailure)
-	} else {
-		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
-		t.ctx.Outputs.SetVar("avg_latency_mus", avgLatency.Microseconds())
-		t.ctx.Outputs.SetVar("detailed_latencies", latencies)
-
-		t.ctx.SetResult(types.TaskResultSuccess)
-	}
-
+	// Convert latencies to microseconds for processing
 	latenciesMus := make([]int64, len(latencies))
-
 	for i, latency := range latencies {
 		latenciesMus[i] = latency.Microseconds()
 	}
 
+	// Calculate statistics
+	var totalLatencyMus int64
+	var maxLatency int64 = 0
+	var minLatency int64 = 0
+	if len(latenciesMus) > 0 {
+		minLatency = latenciesMus[0]
+	}
+
+	for _, lat := range latenciesMus {
+		totalLatencyMus += lat
+		if lat > maxLatency {
+			maxLatency = lat
+		}
+		if lat < minLatency {
+			minLatency = lat
+		}
+	}
+
+	// Calculate mean
+	var meanLatency float64 = 0
+	if len(latenciesMus) > 0 {
+		meanLatency = float64(totalLatencyMus) / float64(len(latenciesMus))
+	}
+
+	// Sort for percentiles
+	sortedLatencies := make([]int64, len(latenciesMus))
+	copy(sortedLatencies, latenciesMus)
+	sort.Slice(sortedLatencies, func(i, j int) bool {
+		return sortedLatencies[i] < sortedLatencies[j]
+	})
+
+	// Calculate percentiles
+	percentile50th := float64(0)
+	percentile90th := float64(0)
+	percentile95th := float64(0)
+	percentile99th := float64(0)
+
+	if len(sortedLatencies) > 0 {
+		getPercentile := func(pct float64) float64 {
+			idx := int(float64(len(sortedLatencies)-1) * pct / 100)
+			return float64(sortedLatencies[idx])
+		}
+
+		percentile50th = getPercentile(50)
+		percentile90th = getPercentile(90)
+		percentile95th = getPercentile(95)
+		percentile99th = getPercentile(99)
+	}
+
+	// Create statistics map for output
+	latenciesStats := map[string]float64{
+		"total": float64(totalLatencyMus),
+		"mean":  meanLatency,
+		"50th":  percentile50th,
+		"90th":  percentile90th,
+		"95th":  percentile95th,
+		"99th":  percentile99th,
+		"max":   float64(maxLatency),
+		"min":   float64(minLatency),
+	}
+
+	// Generate HDR plot
 	plot, err := hdr.HdrPlot(latenciesMus)
 	if err != nil {
 		t.logger.Errorf("Failed to generate HDR plot: %v", err)
@@ -205,11 +257,22 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
+	if t.config.FailOnHighLatency && avgLatency.Microseconds() > t.config.HighLatency {
+		t.logger.Errorf("Transaction latency too high: %dmus (expected <= %dmus)", avgLatency.Microseconds(), t.config.HighLatency)
+		t.ctx.SetResult(types.TaskResultFailure)
+	} else {
+		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
+		t.ctx.Outputs.SetVar("avg_latency_mus", avgLatency.Microseconds())
+		t.ctx.Outputs.SetVar("latencies", latenciesStats)
+
+		t.ctx.SetResult(types.TaskResultSuccess)
+	}
+
 	outputs := map[string]interface{}{
 		"tx_count":                 t.config.TxCount,
 		"avg_latency_mus":          avgLatency.Microseconds(),
 		"tx_pool_latency_hdr_plot": plot,
-		"latencies":                latenciesMus,
+		"latencies":                latenciesStats,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
