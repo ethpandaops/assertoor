@@ -232,7 +232,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 
 		t.logger.Infof("Got %d transactions", gotTx)
-		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", t.config.MeasureInterval, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
+		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", gotTx, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
 
 		lastMeasureTime = time.Now()
 	}
