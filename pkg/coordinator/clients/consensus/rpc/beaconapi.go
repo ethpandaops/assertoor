@@ -496,3 +496,25 @@ func (bc *BeaconClient) SubmitProposerSlashing(ctx context.Context, slashing *ph
 
 	return nil
 }
+
+type NodeIdentity struct {
+	PeerID             string            `json:"peer_id"`
+	ENR                string            `json:"enr"`
+	P2PAddresses       []string          `json:"p2p_addresses"`
+	DiscoveryAddresses []string          `json:"discovery_addresses"`
+	Metadata           map[string]string `json:"metadata"`
+}
+
+type NodeIdentityResponse struct {
+	Data *NodeIdentity `json:"data"`
+}
+
+func (bc *BeaconClient) GetNodeIdentity(ctx context.Context) (*NodeIdentity, error) {
+	var response NodeIdentityResponse
+	err := bc.getJSON(ctx, fmt.Sprintf("%s/eth/v1/node/identity", bc.endpoint), &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Data, nil
+}
