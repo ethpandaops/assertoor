@@ -176,8 +176,6 @@ func (manager *Manager) loadBlockReceipts(block *execution.Block) []*ethtypes.Re
 		client := clients[cliIdx]
 
 		reqCtx, reqCtxCancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-		//nolint:gocritic // ignore
 		defer reqCtxCancel()
 
 		receipts, err := client.GetRPCClient().GetBlockReceipts(reqCtx, block.Hash)

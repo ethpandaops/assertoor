@@ -158,7 +158,13 @@ func (stream *Stream) connect() (r io.ReadCloser, err error) {
 }
 
 func (stream *Stream) stream(r io.ReadCloser) {
-	defer r.Close()
+	defer func() {
+		if err := r.Close(); err != nil {
+			if stream.Logger != nil {
+				stream.Logger.Printf("failed to close reader: %v", err)
+			}
+		}
+	}()
 
 	stream.Ready <- true
 

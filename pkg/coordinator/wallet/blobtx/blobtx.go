@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/sirupsen/logrus"
 )
 
 func GenerateBlobSidecar(blobRefs []string, txIdx, replacementIdx uint64) ([]common.Hash, *types.BlobTxSidecar, error) {
@@ -129,7 +130,12 @@ func loadURLRef(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
+
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			logrus.WithError(err).Warn("failed to close response body")
+		}
+	}()
 
 	if response.StatusCode != 200 {
 		return nil, fmt.Errorf("received http error: %v", response.Status)

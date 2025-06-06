@@ -211,7 +211,6 @@ func (ec *ExecutionClient) SendTransaction(ctx context.Context, tx *types.Transa
 	return ec.ethClient.SendTransaction(reqCtx, tx)
 }
 
-//nolint:gocritic // ignore
 func (ec *ExecutionClient) GetEthCall(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	closeFn := ec.enforceConcurrencyLimit(ctx)
 	if closeFn == nil {
