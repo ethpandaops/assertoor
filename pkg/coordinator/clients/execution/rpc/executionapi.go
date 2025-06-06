@@ -211,7 +211,7 @@ func (ec *ExecutionClient) SendTransaction(ctx context.Context, tx *types.Transa
 	return ec.ethClient.SendTransaction(reqCtx, tx)
 }
 
-func (ec *ExecutionClient) GetEthCall(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+func (ec *ExecutionClient) GetEthCall(ctx context.Context, msg *ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	closeFn := ec.enforceConcurrencyLimit(ctx)
 	if closeFn == nil {
 		return nil, fmt.Errorf("client busy")
@@ -219,5 +219,5 @@ func (ec *ExecutionClient) GetEthCall(ctx context.Context, msg ethereum.CallMsg,
 
 	defer closeFn()
 
-	return ec.ethClient.CallContract(ctx, msg, blockNumber)
+	return ec.ethClient.CallContract(ctx, *msg, blockNumber)
 }

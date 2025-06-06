@@ -104,12 +104,14 @@ func (ah *APIHandler) GetTestRunTaskDetails(w http.ResponseWriter, r *http.Reque
 	logCount := taskStatus.Logger.GetLogEntryCount()
 	logStart := uint64(0)
 	logLimit := uint64(100)
+
 	if logCount > logLimit {
 		logStart = logCount - logLimit
 	}
 
 	taskLog := taskStatus.Logger.GetLogEntries(logStart, logLimit)
 	taskData.Log = make([]*GetTestRunDetailedTaskLog, len(taskLog))
+
 	for i, log := range taskLog {
 		logData := &GetTestRunDetailedTaskLog{
 			Time:    time.Unix(0, log.LogTime*int64(time.Millisecond)),

@@ -83,8 +83,8 @@ func (vn *ValidatorNames) loadFromYaml(fileName string) error {
 	}
 
 	defer func() {
-		if err := f.Close(); err != nil {
-			vn.logger.WithError(err).Warn("failed to close file")
+		if err2 := f.Close(); err2 != nil {
+			vn.logger.WithError(err2).Warn("failed to close file")
 		}
 	}()
 
@@ -145,8 +145,8 @@ func (vn *ValidatorNames) loadFromRangesAPI(apiURL string) error {
 	}
 
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			vn.logger.WithError(err).Warn("failed to close response body")
+		if err2 := resp.Body.Close(); err2 != nil {
+			vn.logger.WithError(err2).Warn("failed to close response body")
 		}
 	}()
 

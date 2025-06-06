@@ -128,7 +128,6 @@ func (fh *FrontendHandler) TestRunData(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//nolint:gocyclo // ignore: intentionally complex function
 func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error) {
 	test := fh.coordinator.GetTestByRunID(runID)
 	if test == nil {
@@ -164,6 +163,7 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 
 	// get result headers
 	resultHeaderMap := map[uint64][]db.TaskResultHeader{}
+
 	if !fh.securityTrimmed {
 		resultHeaders, err := fh.coordinator.Database().GetAllTaskResultHeaders(runID)
 		if err != nil {
@@ -209,10 +209,10 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 				taskData.Status = api.TaskStatusPending
 			case taskStatus.IsRunning:
 				taskData.Status = api.TaskStatusRunning
-				taskData.RunTime = int64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+				taskData.RunTime = time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()
 			default:
 				taskData.Status = api.TaskStatusComplete
-				taskData.RunTime = int64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+				taskData.RunTime = taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()
 			}
 
 			switch taskStatus.Result {
@@ -235,6 +235,7 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 					if resName == "" {
 						resName = fmt.Sprintf("%v-%v", header.Type, header.Index)
 					}
+
 					taskData.ResultFiles[i] = &TestRunTaskResult{
 						Type:  header.Type,
 						Index: header.Index,

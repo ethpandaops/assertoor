@@ -109,7 +109,13 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 				Title:       taskState.Title(),
 				Started:     taskStatus.IsStarted,
 				Completed:   taskStatus.IsStarted && !taskStatus.IsRunning,
-				Timeout:     uint64(taskState.Timeout().Milliseconds()),
+			}
+
+			timeout := taskState.Timeout().Milliseconds()
+			if timeout < 0 {
+				taskData.Timeout = 0
+			} else {
+				taskData.Timeout = uint64(timeout)
 			}
 
 			switch {
@@ -118,12 +124,24 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 			case taskStatus.IsRunning:
 				taskData.Status = TaskStatusRunning
 				taskData.StartTime = taskStatus.StartTime.UnixMilli()
-				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+
+				duration := time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()
+				if duration < 0 {
+					taskData.RunTime = 0
+				} else {
+					taskData.RunTime = uint64(duration)
+				}
 			default:
 				taskData.Status = TaskStatusComplete
 				taskData.StartTime = taskStatus.StartTime.UnixMilli()
 				taskData.StopTime = taskStatus.StopTime.UnixMilli()
-				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+
+				duration := taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()
+				if duration < 0 {
+					taskData.RunTime = 0
+				} else {
+					taskData.RunTime = uint64(duration)
+				}
 			}
 
 			switch taskStatus.Result {

@@ -90,8 +90,8 @@ func (bc *BeaconClient) getJSON(ctx context.Context, requrl string, returnValue 
 	}
 
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			logrus.WithError(err).Warn("failed to close response body")
+		if err2 := resp.Body.Close(); err2 != nil {
+			logrus.WithError(err2).Warn("failed to close response body")
 		}
 	}()
 
@@ -145,8 +145,8 @@ func (bc *BeaconClient) postJSON(ctx context.Context, requrl string, postData, r
 	}
 
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			logrus.WithError(err).Warn("failed to close response body")
+		if err2 := resp.Body.Close(); err2 != nil {
+			logrus.WithError(err2).Warn("failed to close response body")
 		}
 	}()
 
