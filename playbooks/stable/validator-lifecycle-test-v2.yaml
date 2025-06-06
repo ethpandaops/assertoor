@@ -3,7 +3,7 @@ name: "Validator Lifecycle Test (v2)"
 timeout: 672h
 config:
   walletPrivkey: ""
-  depositContract: "0x4242424242424242424242424242424242424242"
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
 
 tasks:
 - name: check_clients_are_healthy
@@ -143,7 +143,7 @@ tasks:
               config:
                 minWithdrawalCount: 1
               configVars:
-                expectWithdrawals: "| [{publicKey: .validatorPubkeys[0], address: .depositorAddress, minAmount: 31000000000000000000}]"
+                expectWithdrawals: "| [{publicKey: .validatorPubkeys[0], address: .depositorAddress, minAmount: 31000000000}]"
 
 # slash 2 validators before exitability delay (1 with withdrawal address, 1 without)
 - name: run_tasks
@@ -313,7 +313,7 @@ tasks:
               config:
                 minWithdrawalCount: 1
               configVars:
-                expectWithdrawals: "| [{publicKey: .validatorPubkey, address: .depositorAddress, minAmount: 31000000000000000000}]"
+                expectWithdrawals: "| [{publicKey: .validatorPubkey, address: .depositorAddress, minAmount: 31000000000}]"
 
 
 # status:
@@ -436,20 +436,20 @@ tasks:
                   config:
                     minWithdrawalCount: 1
                   configVars:
-                    expectWithdrawals: "| [{publicKey: .validatorPubkeys[5], address: .depositorAddress, minAmount: 63500000000000000000}]"
+                    expectWithdrawals: "| [{publicKey: .validatorPubkeys[5], address: .depositorAddress, minAmount: 63500000000}]"
                 - name: check_consensus_block_proposals
                   title: "Wait for partial withdrawal for ${{ validatorPubkeys[8] }}"
                   config:
                     minWithdrawalCount: 1
                   configVars:
-                    expectWithdrawals: "| [{publicKey: .validatorPubkeys[8], address: .depositorAddress, minAmount: 31500000000000000000}]"
+                    expectWithdrawals: "| [{publicKey: .validatorPubkeys[8], address: .depositorAddress, minAmount: 31500000000}]"
                 - name: check_consensus_block_proposals
                   title: "Wait for partial withdrawal for ${{ validatorPubkeys[9] }}"
                   config:
                     minWithdrawalCount: 1
                   configVars:
-                    expectWithdrawals: "| [{publicKey: .validatorPubkeys[9], address: .depositorAddress, minAmount: 31500000000000000000}]"
-              
+                    expectWithdrawals: "| [{publicKey: .validatorPubkeys[9], address: .depositorAddress, minAmount: 31500000000}]"
+
 
 # all keys should be extied now.
 # slashed validators have a withdrawal delay of 2048 epochs, which is not tracked here. this affects key 2, 3, 6 & 7.

@@ -8,18 +8,18 @@ import (
 )
 
 type TaskState struct {
-	RunID      int    `db:"run_id"`
-	TaskID     int    `db:"task_id"`
-	ParentTask int    `db:"parent_task"`
+	RunID      uint64 `db:"run_id"`
+	TaskID     uint64 `db:"task_id"`
+	ParentTask uint64 `db:"parent_task"`
 	Name       string `db:"name"`
 	Title      string `db:"title"`
 	RefID      string `db:"ref_id"`
-	Timeout    int    `db:"timeout"`
+	Timeout    int64  `db:"timeout"`
 	IfCond     string `db:"ifcond"`
 	RunFlags   uint32 `db:"run_flags"`
 	StartTime  int64  `db:"start_time"`
 	StopTime   int64  `db:"stop_time"`
-	ScopeOwner int    `db:"scope_owner"`
+	ScopeOwner uint64 `db:"scope_owner"`
 	TaskConfig string `db:"task_config"`
 	TaskStatus string `db:"task_status"`
 	TaskResult int    `db:"task_result"`
@@ -27,8 +27,8 @@ type TaskState struct {
 }
 
 type TaskStateIndex struct {
-	TaskID     int    `db:"task_id"`
-	ParentTask int    `db:"parent_task"`
+	TaskID     uint64 `db:"task_id"`
+	ParentTask uint64 `db:"parent_task"`
 	RunFlags   uint32 `db:"run_flags"`
 }
 
@@ -134,7 +134,7 @@ func (db *Database) UpdateTaskStateStatus(tx *sqlx.Tx, state *TaskState, updateF
 }
 
 // GetTaskStateIndex returns the task index for a given test run.
-func (db *Database) GetTaskStateIndex(runID int) ([]*TaskStateIndex, error) {
+func (db *Database) GetTaskStateIndex(runID uint64) ([]*TaskStateIndex, error) {
 	var states []*TaskStateIndex
 
 	err := db.reader.Select(&states, `
@@ -151,7 +151,7 @@ func (db *Database) GetTaskStateIndex(runID int) ([]*TaskStateIndex, error) {
 }
 
 // GetTaskStateByTaskID returns a task state by task ID.
-func (db *Database) GetTaskStateByTaskID(runID, taskID int) (*TaskState, error) {
+func (db *Database) GetTaskStateByTaskID(runID, taskID uint64) (*TaskState, error) {
 	var state TaskState
 
 	err := db.reader.Get(&state, `

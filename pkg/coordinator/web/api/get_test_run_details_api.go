@@ -109,30 +109,48 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 				Title:       taskState.Title(),
 				Started:     taskStatus.IsStarted,
 				Completed:   taskStatus.IsStarted && !taskStatus.IsRunning,
-				Timeout:     uint64(taskState.Timeout().Seconds()),
+			}
+
+			timeout := taskState.Timeout().Milliseconds()
+			if timeout < 0 {
+				taskData.Timeout = 0
+			} else {
+				taskData.Timeout = uint64(timeout)
 			}
 
 			switch {
 			case !taskStatus.IsStarted:
-				taskData.Status = "pending"
+				taskData.Status = TaskStatusPending
 			case taskStatus.IsRunning:
-				taskData.Status = "running"
-				taskData.StartTime = taskStatus.StartTime.Unix()
-				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+				taskData.Status = TaskStatusRunning
+				taskData.StartTime = taskStatus.StartTime.UnixMilli()
+
+				duration := time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()
+				if duration < 0 {
+					taskData.RunTime = 0
+				} else {
+					taskData.RunTime = uint64(duration)
+				}
 			default:
-				taskData.Status = "complete"
-				taskData.StartTime = taskStatus.StartTime.Unix()
-				taskData.StopTime = taskStatus.StopTime.Unix()
-				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+				taskData.Status = TaskStatusComplete
+				taskData.StartTime = taskStatus.StartTime.UnixMilli()
+				taskData.StopTime = taskStatus.StopTime.UnixMilli()
+
+				duration := taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()
+				if duration < 0 {
+					taskData.RunTime = 0
+				} else {
+					taskData.RunTime = uint64(duration)
+				}
 			}
 
 			switch taskStatus.Result {
 			case types.TaskResultNone:
-				taskData.Result = "none"
+				taskData.Result = TaskResultNone
 			case types.TaskResultSuccess:
-				taskData.Result = "success"
+				taskData.Result = TaskResultSuccess
 			case types.TaskResultFailure:
-				taskData.Result = "failure"
+				taskData.Result = TaskResultFailure
 			}
 
 			if taskStatus.Error != nil {
@@ -140,8 +158,8 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 			}
 
 			logCount := taskStatus.Logger.GetLogEntryCount()
-			logStart := 0
-			logLimit := 100
+			logStart := uint64(0)
+			logLimit := uint64(100)
 
 			if logCount > logLimit {
 				logStart = logCount - logLimit

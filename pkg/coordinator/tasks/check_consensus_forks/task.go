@@ -101,7 +101,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 func (t *Task) runCheck() types.TaskResult {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
-	headForks := consensusPool.GetHeadForks(int64(t.config.MaxForkDistance))
+	headForks := consensusPool.GetHeadForks(t.config.MaxForkDistance)
 	headForkInfo := make([]*ForkInfo, len(headForks))
 
 	for i, headFork := range headForks {
@@ -123,7 +123,7 @@ func (t *Task) runCheck() types.TaskResult {
 		t.logger.Warnf("failed setting `forks` output: %v", err)
 	}
 
-	if len(headForks)-1 > int(t.config.MaxForkCount) {
+	if headForkLen := uint64(len(headForks)); headForkLen >= 1 && headForkLen-1 > t.config.MaxForkCount {
 		t.logger.Warnf("check failed: too many forks. (have: %v, want <= %v)", len(headForks)-1, t.config.MaxForkCount)
 
 		for idx, fork := range headForks {

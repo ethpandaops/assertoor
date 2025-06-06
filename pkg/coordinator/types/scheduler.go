@@ -13,6 +13,7 @@ import (
 type TaskSchedulerRunner interface {
 	TaskScheduler
 	GetServices() TaskServices
+	GetTestRunID() uint64
 	ParseTaskOptions(rawtask helper.IRawMessage) (*TaskOptions, error)
 	ExecuteTask(ctx context.Context, taskIndex TaskIndex, taskWatchFn func(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)) error
 	WatchTaskPass(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)
@@ -20,7 +21,7 @@ type TaskSchedulerRunner interface {
 
 type TaskScheduler interface {
 	GetTaskState(taskIndex TaskIndex) TaskState
-	GetTaskCount() int
+	GetTaskCount() uint64
 	GetAllTasks() []TaskIndex
 	GetRootTasks() []TaskIndex
 	GetAllCleanupTasks() []TaskIndex

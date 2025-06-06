@@ -249,7 +249,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Infof("set task result to failed, %v transactions reverted unexpectedly (FailOnReject)", revertCount)
 		t.ctx.SetResult(types.TaskResultFailure)
 	case totalCount == 0:
-		t.logger.Infof("set task result to failed, no tansactions sent")
+		t.logger.Infof("set task result to failed, no transactions sent")
 		t.ctx.SetResult(types.TaskResultFailure)
 	}
 
@@ -372,9 +372,9 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 
 	err = txWallet.SendTransaction(ctx, tx, &wallet.SendTransactionOptions{
 		Clients:            clients,
-		ClientsStartOffset: int(transactionIdx),
+		ClientsStartOffset: transactionIdx,
 		OnConfirm:          confirmedFn,
-		LogFn: func(client *execution.Client, retry int, rebroadcast int, err error) {
+		LogFn: func(client *execution.Client, retry uint64, rebroadcast uint64, err error) {
 			if err != nil {
 				t.logger.WithFields(logrus.Fields{
 					"client": client.GetName(),

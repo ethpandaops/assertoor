@@ -1,10 +1,12 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/gorilla/mux"
 )
@@ -20,19 +22,28 @@ type GetTestRunResponse struct {
 }
 
 type GetTestRunTask struct {
-	Index       uint64 `json:"index"`
-	ParentIndex uint64 `json:"parent_index"`
-	Name        string `json:"name"`
-	Title       string `json:"title"`
-	Started     bool   `json:"started"`
-	Completed   bool   `json:"completed"`
-	StartTime   int64  `json:"start_time"`
-	StopTime    int64  `json:"stop_time"`
-	Timeout     uint64 `json:"timeout"`
-	RunTime     uint64 `json:"runtime"`
-	Status      string `json:"status"`
-	Result      string `json:"result"`
-	ResultError string `json:"result_error"`
+	Index       uint64                 `json:"index"`
+	ParentIndex uint64                 `json:"parent_index"`
+	Name        string                 `json:"name"`
+	Title       string                 `json:"title"`
+	Started     bool                   `json:"started"`
+	Completed   bool                   `json:"completed"`
+	StartTime   int64                  `json:"start_time"`
+	StopTime    int64                  `json:"stop_time"`
+	Timeout     uint64                 `json:"timeout"`
+	RunTime     uint64                 `json:"runtime"`
+	Status      string                 `json:"status"`
+	Result      string                 `json:"result"`
+	ResultFiles []GetTestRunTaskResult `json:"result_files"`
+	ResultError string                 `json:"result_error"`
+}
+
+type GetTestRunTaskResult struct {
+	Type  string `json:"type"`
+	Index uint64 `json:"index"`
+	Name  string `json:"name"`
+	Size  uint64 `json:"size"`
+	URL   string `json:"url"`
 }
 
 // GetTestRun godoc
@@ -79,6 +90,19 @@ func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
 		response.StopTime = testInstance.StopTime().Unix()
 	}
 
+	// get result headers
+	resultHeaderMap := map[uint64][]db.TaskResultHeader{}
+
+	resultHeaders, err := ah.coordinator.Database().GetAllTaskResultHeaders(runID)
+	if err != nil {
+		ah.sendErrorResponse(w, r.URL.String(), "failed to get result headers", http.StatusInternalServerError)
+		return
+	}
+
+	for _, header := range resultHeaders {
+		resultHeaderMap[header.TaskID] = append(resultHeaderMap[header.TaskID], header)
+	}
+
 	taskScheduler := testInstance.GetTaskScheduler()
 	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
 		allTasks := taskScheduler.GetAllTasks()
@@ -96,34 +120,65 @@ func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
 				Title:       taskState.Title(),
 				Started:     taskStatus.IsStarted,
 				Completed:   taskStatus.IsStarted && !taskStatus.IsRunning,
-				Timeout:     uint64(taskState.Timeout().Seconds()),
+			}
+
+			timeout := taskState.Timeout().Milliseconds()
+			if timeout < 0 {
+				taskData.Timeout = 0
+			} else {
+				taskData.Timeout = uint64(timeout)
 			}
 
 			switch {
 			case !taskStatus.IsStarted:
-				taskData.Status = "pending"
+				taskData.Status = TaskStatusPending
 			case taskStatus.IsRunning:
-				taskData.Status = "running"
-				taskData.StartTime = taskStatus.StartTime.Unix()
-				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+				taskData.Status = TaskStatusRunning
+				taskData.StartTime = taskStatus.StartTime.UnixMilli()
+
+				duration := time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()
+				if duration < 0 {
+					taskData.RunTime = 0
+				} else {
+					taskData.RunTime = uint64(duration)
+				}
 			default:
-				taskData.Status = "complete"
-				taskData.StartTime = taskStatus.StartTime.Unix()
-				taskData.StopTime = taskStatus.StopTime.Unix()
-				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
+				taskData.Status = TaskStatusComplete
+				taskData.StartTime = taskStatus.StartTime.UnixMilli()
+				taskData.StopTime = taskStatus.StopTime.UnixMilli()
+
+				duration := taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()
+				if duration < 0 {
+					taskData.RunTime = 0
+				} else {
+					taskData.RunTime = uint64(duration)
+				}
 			}
 
 			switch taskStatus.Result {
 			case types.TaskResultNone:
-				taskData.Result = "none"
+				taskData.Result = TaskResultNone
 			case types.TaskResultSuccess:
-				taskData.Result = "success"
+				taskData.Result = TaskResultSuccess
 			case types.TaskResultFailure:
-				taskData.Result = "failure"
+				taskData.Result = TaskResultFailure
 			}
 
 			if taskStatus.Error != nil {
 				taskData.ResultError = taskStatus.Error.Error()
+			}
+
+			if len(resultHeaderMap[uint64(taskState.Index())]) > 0 {
+				taskData.ResultFiles = make([]GetTestRunTaskResult, len(resultHeaderMap[uint64(taskState.Index())]))
+				for i, header := range resultHeaderMap[uint64(taskState.Index())] {
+					taskData.ResultFiles[i] = GetTestRunTaskResult{
+						Type:  header.Type,
+						Index: header.Index,
+						Name:  header.Name,
+						Size:  header.Size,
+						URL:   fmt.Sprintf("/api/v1/test_run/%v/task/%v/result/%v/%v", runID, taskState.Index(), header.Type, header.Index),
+					}
+				}
 			}
 
 			response.Tasks = append(response.Tasks, taskData)

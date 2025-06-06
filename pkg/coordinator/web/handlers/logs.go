@@ -17,7 +17,7 @@ type Logs struct {
 }
 
 type LogsEntry struct {
-	TIdx    int64             `json:"tidx"`
+	TIdx    uint64            `json:"tidx"`
 	Time    time.Time         `json:"time"`
 	Level   uint64            `json:"level"`
 	Message string            `json:"msg"`
@@ -33,7 +33,7 @@ func (fh *FrontendHandler) LogsData(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
-	sinceTime, err := strconv.ParseInt(vars["since"], 10, 32)
+	sinceTime, err := strconv.ParseUint(vars["since"], 10, 64)
 	if err != nil {
 		fmt.Printf("err: %v", err)
 
@@ -53,15 +53,15 @@ func (fh *FrontendHandler) LogsData(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (fh *FrontendHandler) getLogsPageData(since int64) *Logs {
+func (fh *FrontendHandler) getLogsPageData(since uint64) *Logs {
 	pageData := &Logs{}
 
-	taskLog := fh.coordinator.LogReader().GetLogEntries(int(since), 0)
+	taskLog := fh.coordinator.LogReader().GetLogEntries(since, 0)
 	pageData.Log = make([]*LogsEntry, len(taskLog))
 
 	for i, log := range taskLog {
 		logData := &LogsEntry{
-			TIdx:    int64(log.LogIndex),
+			TIdx:    log.LogIndex,
 			Time:    time.Unix(0, log.LogTime*int64(time.Millisecond)),
 			Level:   uint64(log.LogLevel),
 			Message: log.LogMessage,

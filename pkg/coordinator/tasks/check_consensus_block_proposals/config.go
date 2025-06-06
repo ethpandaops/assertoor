@@ -3,6 +3,7 @@ package checkconsensusblockproposals
 import "math/big"
 
 type Config struct {
+	CheckLookback                int    `yaml:"checkLookback" json:"checkLookback"`
 	BlockCount                   int    `yaml:"blockCount" json:"blockCount"`
 	GraffitiPattern              string `yaml:"graffitiPattern" json:"graffitiPattern"`
 	ValidatorNamePattern         string `yaml:"validatorNamePattern" json:"validatorNamePattern"`
@@ -35,6 +36,7 @@ type Config struct {
 		PublicKey string   `yaml:"publicKey" json:"publicKey"`
 		Address   string   `yaml:"address" json:"address"`
 		MinAmount *big.Int `yaml:"minAmount" json:"minAmount"`
+		MaxAmount *big.Int `yaml:"maxAmount" json:"maxAmount"`
 	} `yaml:"expectWithdrawals" json:"expectWithdrawals"`
 	ExpectDepositRequests []struct {
 		PublicKey             string   `yaml:"publicKey" json:"publicKey"`
@@ -55,7 +57,8 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		BlockCount: 1,
+		CheckLookback: 1,
+		BlockCount:    1,
 	}
 }
 

@@ -43,6 +43,10 @@ func (ts *TaskScheduler) GetServices() types.TaskServices {
 	return ts.services
 }
 
+func (ts *TaskScheduler) GetTestRunID() uint64 {
+	return ts.testRunID
+}
+
 func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.TaskIndex, error) {
 	task, err := ts.newTaskState(options, nil, nil, false)
 	if err != nil {
@@ -140,12 +144,12 @@ func (ts *TaskScheduler) GetAllTasks() []types.TaskIndex {
 	return taskList
 }
 
-func (ts *TaskScheduler) GetTaskCount() int {
+func (ts *TaskScheduler) GetTaskCount() uint64 {
 	if ts == nil {
 		return 0
 	}
 
-	return len(ts.allTasks)
+	return uint64(len(ts.allTasks))
 }
 
 func (ts *TaskScheduler) GetRootTasks() []types.TaskIndex {

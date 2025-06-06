@@ -366,11 +366,11 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				Sidecar:    blobSidecar,
 			}
 		case t.config.SetCodeTxType:
-			authList := ethtypes.AuthorizationList{}
+			authList := []ethtypes.SetCodeAuthorization{}
 
 			for idx, authorization := range t.config.Authorizations {
-				authEntry := &ethtypes.Authorization{
-					ChainID: authorization.ChainID,
+				authEntry := ethtypes.SetCodeAuthorization{
+					ChainID: *uint256.NewInt(authorization.ChainID),
 					Address: common.HexToAddress(authorization.CodeAddress),
 				}
 
@@ -379,10 +379,10 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 				if authorization.Nonce != nil {
 					authEntry.Nonce = *authorization.Nonce
 				} else {
-					authEntry.Nonce = authWallet.UseNextNonce(!bytes.Equal(authEntry.Address.Bytes(), t.wallet.GetAddress().Bytes()))
+					authEntry.Nonce = authWallet.UseNextNonce(true)
 				}
 
-				authEntry, err := ethtypes.SignAuth(authEntry, authWallet.GetPrivateKey())
+				authEntry, err := ethtypes.SignSetCode(authWallet.GetPrivateKey(), authEntry)
 				if err != nil {
 					return nil, err
 				}
@@ -391,7 +391,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 			}
 
 			txObj = &ethtypes.SetCodeTx{
-				ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID().Uint64(),
+				ChainID:   uint256.MustFromBig(t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID()),
 				Nonce:     nonce,
 				GasTipCap: uint256.MustFromBig(&t.config.TipCap.Value),
 				GasFeeCap: uint256.MustFromBig(&t.config.FeeCap.Value),

@@ -1,7 +1,6 @@
 
 # final stage
 FROM debian:stable-slim
-WORKDIR /app
 RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
   libssl-dev \
   ca-certificates \
@@ -9,10 +8,16 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
   git \
   curl \
   make \
+  sudo \
   && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-RUN update-ca-certificates
-COPY bin/* /app
+  && rm -rf /var/lib/apt/lists/* \
+  && update-ca-certificates
+RUN groupadd -g 10001 assertoor && useradd -m -u 10001 -g assertoor assertoor
+RUN echo "assertoor ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/assertoor
+WORKDIR /app
+COPY bin/* /app/
+RUN chown -R assertoor:assertoor /app
+USER assertoor
 EXPOSE 8080
 ENTRYPOINT ["./assertoor"]
 CMD []

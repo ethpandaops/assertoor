@@ -296,16 +296,16 @@ func (wallet *Wallet) BuildTransaction(ctx context.Context, buildFn func(ctx con
 }
 
 type TxConfirmFn func(tx *types.Transaction, receipt *types.Receipt, err error)
-type TxLogFn func(client *execution.Client, retry int, rebroadcast int, err error)
+type TxLogFn func(client *execution.Client, retry uint64, rebroadcast uint64, err error)
 
 type SendTransactionOptions struct {
 	Clients            []*execution.Client
-	ClientsStartOffset int
+	ClientsStartOffset uint64
 
 	OnConfirm TxConfirmFn
 	LogFn     TxLogFn
 
-	MaxRebroadcasts     int
+	MaxRebroadcasts     uint64
 	RebroadcastInterval time.Duration
 }
 
@@ -343,8 +343,8 @@ func (wallet *Wallet) SendTransaction(ctx context.Context, tx *types.Transaction
 
 	var err error
 
-	for i := 0; i < len(options.Clients); i++ {
-		client := options.Clients[(i+options.ClientsStartOffset)%len(options.Clients)]
+	for i := uint64(0); i < uint64(len(options.Clients)); i++ {
+		client := options.Clients[(i+options.ClientsStartOffset)%uint64(len(options.Clients))]
 
 		err = client.GetRPCClient().SendTransaction(ctx, tx)
 
@@ -367,15 +367,15 @@ func (wallet *Wallet) SendTransaction(ctx context.Context, tx *types.Transaction
 
 	if options.MaxRebroadcasts > 0 {
 		go func() {
-			for i := 0; i < options.MaxRebroadcasts; i++ {
+			for i := uint64(0); i < options.MaxRebroadcasts; i++ {
 				select {
 				case <-confirmCtx.Done():
 					return
 				case <-time.After(options.RebroadcastInterval):
 				}
 
-				for j := 0; j < len(options.Clients); j++ {
-					client := options.Clients[(i+j+options.ClientsStartOffset+1)%len(options.Clients)]
+				for j := uint64(0); j < uint64(len(options.Clients)); j++ {
+					client := options.Clients[(i+j+options.ClientsStartOffset+1)%uint64(len(options.Clients))]
 
 					err = client.GetRPCClient().SendTransaction(ctx, tx)
 
@@ -470,7 +470,7 @@ func (wallet *Wallet) processTransactionInclusion(block *execution.Block, tx *ty
 
 	if receipt != nil {
 		wallet.confirmedBalance = wallet.confirmedBalance.Sub(wallet.confirmedBalance, tx.Value())
-		txFee := new(big.Int).Mul(receipt.EffectiveGasPrice, big.NewInt(int64(receipt.GasUsed)))
+		txFee := new(big.Int).Mul(receipt.EffectiveGasPrice, big.NewInt(0).SetUint64(receipt.GasUsed))
 		wallet.confirmedBalance = wallet.confirmedBalance.Sub(wallet.confirmedBalance, txFee)
 		wallet.pendingBalance = wallet.pendingBalance.Sub(wallet.pendingBalance, txFee)
 	}
@@ -503,7 +503,7 @@ func (wallet *Wallet) processStaleConfirmations(block *execution.Block) {
 		clients := block.GetSeenBy()
 		client := clients[0]
 
-		lastNonce, err := client.GetRPCClient().GetNonceAt(context.Background(), wallet.address, big.NewInt(int64(block.Number)))
+		lastNonce, err := client.GetRPCClient().GetNonceAt(context.Background(), wallet.address, big.NewInt(0).SetUint64(block.Number))
 		if err != nil {
 			return
 		}
@@ -552,12 +552,7 @@ func (wallet *Wallet) loadTransactionReceipt(ctx context.Context, block *executi
 		cliIdx := retryCount % uint64(len(clients))
 		client := clients[cliIdx]
 
-		reqCtx, reqCtxCancel := context.WithTimeout(ctx, 5*time.Second)
-
-		//nolint:gocritic // ignore
-		defer reqCtxCancel()
-
-		receipt, err := client.GetRPCClient().GetTransactionReceipt(reqCtx, tx.Hash())
+		receipt, err := wallet.loadTransactionReceiptFromClient(ctx, client, tx)
 		if err == nil {
 			return receipt
 		}
@@ -577,4 +572,11 @@ func (wallet *Wallet) loadTransactionReceipt(ctx context.Context, block *executi
 			return nil
 		}
 	}
+}
+
+func (wallet *Wallet) loadTransactionReceiptFromClient(ctx context.Context, client *execution.Client, tx *types.Transaction) (*types.Receipt, error) {
+	reqCtx, reqCtxCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer reqCtxCancel()
+
+	return client.GetRPCClient().GetTransactionReceipt(reqCtx, tx.Hash())
 }

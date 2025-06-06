@@ -69,7 +69,12 @@ func (manager *Manager) GetWalletByAddress(address common.Address) *Wallet {
 func (manager *Manager) runBlockTransactionsLoop() {
 	defer func() {
 		if err := recover(); err != nil {
-			manager.logger.WithError(err.(error)).Panicf("uncaught panic in wallet.Manager.runBlockTransactionsLoop: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			manager.logger.WithError(err2).Panicf("uncaught panic in wallet.Manager.runBlockTransactionsLoop: %v, stack: %v", err, string(debug.Stack()))
 
 			time.Sleep(10 * time.Second)
 
@@ -142,8 +147,9 @@ func (manager *Manager) processBlockTransactions(block *execution.Block) {
 
 		if tx.Type() == ethtypes.SetCodeTxType {
 			// in eip7702 transactions, the nonces of all authorities are increased by >= 1, so we need to resync all affected wallets
-			for _, authorization := range tx.AuthList() {
-				authority, err := authorization.Authority()
+			authorizations := tx.SetCodeAuthorizations()
+			for i := 0; i < len(authorizations); i++ {
+				authority, err := authorizations[i].Authority()
 				if err != nil {
 					manager.logger.Warnf("error decoding authority address (block %v, tx %v): %v", block.Number, idx, err)
 					continue
@@ -175,12 +181,7 @@ func (manager *Manager) loadBlockReceipts(block *execution.Block) []*ethtypes.Re
 		cliIdx := retryCount % uint64(len(clients))
 		client := clients[cliIdx]
 
-		reqCtx, reqCtxCancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-		//nolint:gocritic // ignore
-		defer reqCtxCancel()
-
-		receipts, err := client.GetRPCClient().GetBlockReceipts(reqCtx, block.Hash)
+		receipts, err := manager.loadBlockReceiptsFromClient(client, block)
 		if err == nil {
 			return receipts
 		}
@@ -201,4 +202,11 @@ func (manager *Manager) loadBlockReceipts(block *execution.Block) []*ethtypes.Re
 			return nil
 		}
 	}
+}
+
+func (manager *Manager) loadBlockReceiptsFromClient(client *execution.Client, block *execution.Block) ([]*ethtypes.Receipt, error) {
+	reqCtx, reqCtxCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer reqCtxCancel()
+
+	return client.GetRPCClient().GetBlockReceipts(reqCtx, block.Hash)
 }

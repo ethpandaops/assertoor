@@ -16,7 +16,12 @@ import (
 func (client *Client) runClientLoop() {
 	defer func() {
 		if err := recover(); err != nil {
-			client.logger.WithError(err.(error)).Errorf("uncaught panic in PoolClient.runPoolClientLoop subroutine: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			client.logger.WithError(err2).Errorf("uncaught panic in PoolClient.runPoolClientLoop subroutine: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 
@@ -154,15 +159,19 @@ func (client *Client) runClientLogic() error {
 
 			switch evt.Event {
 			case rpc.StreamBlockEvent:
-				err := client.processBlockEvent(evt.Data.(*v1.BlockEvent))
-				if err != nil {
-					client.logger.Warnf("failed processing block event: %v", err)
+				if blockEvent, ok := evt.Data.(*v1.BlockEvent); ok {
+					err := client.processBlockEvent(blockEvent)
+					if err != nil {
+						client.logger.Warnf("failed processing block event: %v", err)
+					}
 				}
 
 			case rpc.StreamFinalizedEvent:
-				err := client.processFinalizedEvent(evt.Data.(*v1.FinalizedCheckpointEvent))
-				if err != nil {
-					client.logger.Warnf("failed processing finalized event: %v", err)
+				if finalizedEvent, ok := evt.Data.(*v1.FinalizedCheckpointEvent); ok {
+					err := client.processFinalizedEvent(finalizedEvent)
+					if err != nil {
+						client.logger.Warnf("failed processing finalized event: %v", err)
+					}
 				}
 			}
 

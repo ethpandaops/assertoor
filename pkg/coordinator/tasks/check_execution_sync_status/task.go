@@ -172,7 +172,7 @@ func (t *Task) processClientCheck(client *clients.PoolClient, syncStatus *rpc.Sy
 		return false
 	}
 
-	if int64(currentBlock) < int64(t.config.MinBlockHeight) {
+	if int64(currentBlock) < int64(t.config.MinBlockHeight) { //nolint:gosec // no overflow possible
 		checkLogger.Debugf("check failed. check: MinBlockHeight, expected: >= %v, got: %v", t.config.MinBlockHeight, currentBlock)
 		return false
 	}

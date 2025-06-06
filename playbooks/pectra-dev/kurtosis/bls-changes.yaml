@@ -13,6 +13,12 @@ tasks:
   config:
     minClientCount: 1
 
+- name: check_consensus_slot_range
+  title: "Wait for slot >= 1"
+  timeout: 2h
+  config:
+    minSlotNumber: 1
+
 - name: run_task_options
   title: "Generate ${validatorCount} BLS changes"
   config:

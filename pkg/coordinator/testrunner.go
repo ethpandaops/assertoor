@@ -16,24 +16,24 @@ type TestRunner struct {
 	coordinator types.Coordinator
 
 	runIDCounter       uint64
-	lastExecutedRunID  uint64
 	testSchedulerMutex sync.Mutex
 
-	testRunMap           map[uint64]types.Test
-	testQueue            []types.TestRunner
-	testRegistryMutex    sync.RWMutex
-	testNotificationChan chan bool
+	testRunMap               map[uint64]types.Test
+	testQueue                []types.TestRunner
+	testRegistryMutex        sync.RWMutex
+	queueNotificationChan    chan bool
+	offQueueNotificationChan chan types.TestRunner
 }
 
 func NewTestRunner(coordinator types.Coordinator, lastRunID uint64) *TestRunner {
 	return &TestRunner{
-		coordinator:       coordinator,
-		runIDCounter:      lastRunID,
-		lastExecutedRunID: lastRunID,
+		coordinator:  coordinator,
+		runIDCounter: lastRunID,
 
-		testRunMap:           map[uint64]types.Test{},
-		testQueue:            []types.TestRunner{},
-		testNotificationChan: make(chan bool, 1),
+		testRunMap:               map[uint64]types.Test{},
+		testQueue:                []types.TestRunner{},
+		queueNotificationChan:    make(chan bool, 1),
+		offQueueNotificationChan: make(chan types.TestRunner, 10),
 	}
 }
 
@@ -76,25 +76,29 @@ func (c *TestRunner) RemoveTestFromQueue(runID uint64) bool {
 	return false
 }
 
-func (c *TestRunner) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.TestRunner, error) {
+func (c *TestRunner) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate, skipQueue bool) (types.TestRunner, error) {
 	if descriptor.Err() != nil {
 		return nil, fmt.Errorf("cannot create test from failed test descriptor: %w", descriptor.Err())
 	}
 
-	testRef, err := c.createTestRun(descriptor, configOverrides, allowDuplicate)
+	testRef, err := c.createTestRun(descriptor, configOverrides, allowDuplicate, skipQueue)
 	if err != nil {
 		return nil, err
 	}
 
-	select {
-	case c.testNotificationChan <- true:
-	default:
+	if skipQueue {
+		c.offQueueNotificationChan <- testRef
+	} else {
+		select {
+		case c.queueNotificationChan <- true:
+		default:
+		}
 	}
 
 	return testRef, nil
 }
 
-func (c *TestRunner) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate bool) (types.TestRunner, error) {
+func (c *TestRunner) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate, skipQueue bool) (types.TestRunner, error) {
 	c.testSchedulerMutex.Lock()
 	defer c.testSchedulerMutex.Unlock()
 
@@ -115,7 +119,10 @@ func (c *TestRunner) createTestRun(descriptor types.TestDescriptor, configOverri
 	}
 
 	c.testRegistryMutex.Lock()
-	c.testQueue = append(c.testQueue, testRef)
+	if !skipQueue {
+		c.testQueue = append(c.testQueue, testRef)
+	}
+
 	c.testRunMap[runID] = testRef
 	c.testRegistryMutex.Unlock()
 
@@ -164,7 +171,7 @@ runLoop:
 			select {
 			case <-ctx.Done():
 				break runLoop
-			case <-c.testNotificationChan:
+			case <-c.queueNotificationChan:
 			case <-time.After(60 * time.Second):
 			}
 		}
@@ -173,9 +180,18 @@ runLoop:
 	waitGroup.Wait()
 }
 
-func (c *TestRunner) runTest(ctx context.Context, testRef types.TestRunner) {
-	c.lastExecutedRunID = testRef.RunID()
+func (c *TestRunner) RunOffQueueTestExecutionLoop(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case testRef := <-c.offQueueNotificationChan:
+			go c.runTest(ctx, testRef)
+		}
+	}
+}
 
+func (c *TestRunner) runTest(ctx context.Context, testRef types.TestRunner) {
 	if err := testRef.Validate(); err != nil {
 		testRef.Logger().Errorf("test validation failed: %v", err)
 		return
@@ -189,15 +205,23 @@ func (c *TestRunner) runTest(ctx context.Context, testRef types.TestRunner) {
 func (c *TestRunner) RunTestScheduler(ctx context.Context) {
 	defer func() {
 		if err := recover(); err != nil {
-			c.coordinator.Logger().WithError(err.(error)).Panicf("uncaught panic in TestRunner.RunTestScheduler: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			c.coordinator.Logger().Panicf("uncaught panic in TestRunner.RunTestScheduler: %v, stack: %v", err2, string(debug.Stack()))
 		}
 	}()
 
 	// startup scheduler
 	for _, testDescr := range c.getStartupTests() {
-		_, err := c.ScheduleTest(testDescr, nil, false)
+		testConfig := testDescr.Config()
+		skipQueue := testConfig.Schedule != nil && testConfig.Schedule.SkipQueue
+
+		_, err := c.ScheduleTest(testDescr, nil, false, skipQueue)
 		if err != nil {
-			c.coordinator.Logger().Errorf("could not schedule startup test execution for %v (%v): %v", testDescr.ID(), testDescr.Config().Name, err)
+			c.coordinator.Logger().Errorf("could not schedule startup test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
 		}
 	}
 
@@ -217,9 +241,12 @@ func (c *TestRunner) RunTestScheduler(ctx context.Context) {
 		}
 
 		for _, testDescr := range c.getCronTests(cronTime) {
-			_, err := c.ScheduleTest(testDescr, nil, false)
+			testConfig := testDescr.Config()
+			skipQueue := testConfig.Schedule != nil && testConfig.Schedule.SkipQueue
+
+			_, err := c.ScheduleTest(testDescr, nil, false, skipQueue)
 			if err != nil {
-				c.coordinator.Logger().Errorf("could not schedule cron test execution for %v (%v): %v", testDescr.ID(), testDescr.Config().Name, err)
+				c.coordinator.Logger().Errorf("could not schedule cron test execution for %v (%v): %v", testDescr.ID(), testConfig.Name, err)
 			}
 		}
 	}
@@ -284,7 +311,12 @@ func (c *TestRunner) getCronTests(cronTime time.Time) []types.TestDescriptor {
 func (c *TestRunner) RunTestCleanup(ctx context.Context, retentionTime time.Duration) {
 	defer func() {
 		if err := recover(); err != nil {
-			c.coordinator.Logger().WithError(err.(error)).Panicf("uncaught panic in TestRunner.runTestCleanup: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			c.coordinator.Logger().WithError(err2).Panicf("uncaught panic in TestRunner.runTestCleanup: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 

@@ -14,6 +14,9 @@ The `run_task_matrix` task is designed to execute a specified task multiple time
 - **`failTaskCount`**:\
   The number of child tasks that may to fail (result status "failure") before the `run_task_matrix` task to stops and returns a failure result. A value of 0 means that the appearance of any failure in child tasks will cause the overall task to fail.
 
+- **`failOnUndecided`**:\
+  If set to true, the `run_task_matrix` task will fail if neither the `succeedTaskCount` nor the `failTaskCount` is reached.
+
 - **`matrixValues`**:\
   An array of values that form the matrix. Each value in this array is used to run the child task with a different input.
 
@@ -33,7 +36,9 @@ Default settings for the `run_task_matrix` task:
     runConcurrent: false
     succeedTaskCount: 0
     failTaskCount: 0
+    failOnUndecided: true
     matrixValues: []
     matrixVar: ""
     task: {}
 ```
+

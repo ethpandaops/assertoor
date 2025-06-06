@@ -108,12 +108,12 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 	// add to database
 	if database := ts.services.Database(); database != nil {
 		taskState.dbTaskState = &db.TaskState{
-			RunID:   int(ts.testRunID),
-			TaskID:  int(taskIdx),
+			RunID:   ts.testRunID,
+			TaskID:  uint64(taskIdx),
 			Name:    taskState.options.Name,
 			Title:   taskState.Title(),
 			RefID:   taskState.options.ID,
-			Timeout: int(taskState.options.Timeout.Seconds()),
+			Timeout: int64(taskState.options.Timeout.Seconds()),
 			IfCond:  taskState.options.If,
 		}
 
@@ -122,7 +122,7 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 		}
 
 		if parentState != nil {
-			taskState.dbTaskState.ParentTask = int(parentState.index)
+			taskState.dbTaskState.ParentTask = uint64(parentState.index)
 		}
 
 		err := database.RunTransaction(func(tx *sqlx.Tx) error {
@@ -293,7 +293,11 @@ func (ts *taskState) GetScopeOwner() types.TaskIndex {
 		return 0
 	}
 
-	return types.TaskIndex(scopeOwner.(uint64))
+	if scopeOwnerInt, ok := scopeOwner.(uint64); ok {
+		return types.TaskIndex(scopeOwnerInt)
+	}
+
+	return 0
 }
 
 func (ts *taskState) GetTaskResultUpdateChan(oldResult types.TaskResult) <-chan bool {

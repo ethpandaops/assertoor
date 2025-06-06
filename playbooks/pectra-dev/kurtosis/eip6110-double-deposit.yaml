@@ -4,7 +4,7 @@ name: "EIP6110 double deposit test"
 timeout: 1h
 config:
   walletPrivkey: ""
-  depositContract: "0x4242424242424242424242424242424242424242"
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
 tasks:
 - name: check_clients_are_healthy
   title: "Check if at least one client is ready"
@@ -31,12 +31,12 @@ tasks:
   config:
     tasks:
     - name: generate_deposits
-      title: "Generate deposit with 33 ETH"
+      title: "Generate deposit with 2 ETH"
       config:
         limitTotal: 1
         limitPerSlot: 1
         limitPending: 1
-        depositAmount: 33
+        depositAmount: 2
         awaitReceipt: true
         failOnReject: true
       configVars:
@@ -44,12 +44,12 @@ tasks:
         mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
         depositContract: "depositContract"
     - name: generate_deposits
-      title: "Generate deposits with 33 ETH"
+      title: "Generate deposits with 2 ETH"
       config:
         limitTotal: 1
         limitPerSlot: 1
         limitPending: 1
-        depositAmount: 33
+        depositAmount: 2
         awaitReceipt: true
         failOnReject: true
       configVars:

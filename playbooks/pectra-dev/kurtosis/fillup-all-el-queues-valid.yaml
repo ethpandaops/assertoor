@@ -1,0 +1,108 @@
+
+id: fillup-all-el-queues-valid
+name: "Fillup all EL request queues with valid requests"
+timeout: 1h
+config:
+  walletPrivkey: ""
+  requestCount: 500  # number of requests to send
+  walletCount:  1 # number of wallets to send from
+  requestFeeAmount: 10000000000000000  # 0.01 ETH
+  throughputPerWallet: 20
+  maxPendingPerWallet: 40
+  walletSeed: ""
+  keysPerRequestType: 500
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# wait for electra activation
+- name: check_consensus_slot_range
+  title: "Wait for first block"
+  timeout: 1h
+  config:
+    minSlotNumber: 1
+
+# generate child wallets
+- name: generate_child_wallet
+  id: withdrawal_wallet2
+  title: "Generate withdrawal wallet"
+  config:
+    prefundMinBalance: 1000000000000000000
+  configVars:
+    walletSeed: "| \"fillup-withdrawal-queue-\" + .walletSeed + \"0\""
+    privateKey: "walletPrivkey"
+- name: generate_child_wallet
+  id: consolidation_wallet2
+  title: "Generate consolidation wallet"
+  config:
+    prefundMinBalance: 1000000000000000000
+  configVars:
+    walletSeed: "| \"fillup-consolidation-queue-\" + .walletSeed + \"0\""
+    privateKey: "walletPrivkey"
+
+# generate BLS changes for all validators
+- name: run_tasks
+  title: "Generate BLS changes for all validators"
+  config:
+    stopChildOnResult: false
+    tasks:
+    - name: generate_bls_changes
+      title: "Send BLS changes for withdrawal wallet"
+      config:
+        startIndex: 0
+      configVars:
+        mnemonic: "validatorMnemonic"
+        targetAddress: "tasks.withdrawal_wallet2.outputs.childWallet.address"
+        limitTotal: "keysPerRequestType"
+        indexCount: "keysPerRequestType"
+    - name: generate_bls_changes
+      title: "Send BLS changes for consolidation wallet"
+      configVars:
+        mnemonic: "validatorMnemonic"
+        targetAddress: "tasks.consolidation_wallet2.outputs.childWallet.address"
+        startIndex: "keysPerRequestType"
+        limitTotal: "keysPerRequestType"
+        indexCount: "keysPerRequestType"
+
+- name: sleep
+  title: "Wait for BLS changes to be processed"
+  config:
+    duration: 13m
+
+# wait for electra activation
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+- name: check_consensus_slot_range
+  title: "Wait for electra activation"
+  timeout: 1h
+  configVars:
+    minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
+
+# fillup all EL request queues (deposit, withdrawal, consolidation)
+- name: run_tasks_concurrent
+  title: "Fillup all EL request queues"
+  config:
+    tasks:
+    - name: run_external_tasks
+      title: "Fillup deposit queue with ${{requestCount}} deposits"
+      config:
+        testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/fillup-deposit-queue.yaml
+      configVars:
+        testConfig: "| { \"depositCount\": .requestCount, \"depositMaxIndex\": 1, \"throughputPerIndex\": .throughputPerWallet, \"maxPendingPerIndex\": .maxPendingPerWallet, \"walletSeed\": .walletSeed }"
+    - name: run_external_tasks
+      title: "Fillup withdrawal request queue with ${{requestCount}} withdrawal requests"
+      config:
+        testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/fillup-withdrawal-queue.yaml
+      configVars:
+        testConfig: "| { \"withdrawalCount\": .requestCount, \"withdrawalMaxIndex\": 1, \"withdrawalTxFee\": .requestFeeAmount, \"throughputPerIndex\": .throughputPerWallet, \"maxPendingPerIndex\": .maxPendingPerWallet, \"walletSeed\": .walletSeed, \"sourceStartValidatorIndex\": 0, \"sourceValidatorCount\": .keysPerRequestType, \"targetValidatorIndex\": .keysPerRequestType, \"withdrawAmount\": 0 }"
+    - name: run_external_tasks
+      title: "Fillup consolidation request queue with ${{requestCount}} consolidation requests"
+      config:
+        testFile: https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/playbooks/pectra-dev/kurtosis/fillup-consolidation-queue.yaml
+      configVars:
+        testConfig: "| { \"consolidationCount\": .requestCount, \"consolidationMaxIndex\": 1, \"consolidationTxFee\": .requestFeeAmount, \"throughputPerIndex\": .throughputPerWallet, \"maxPendingPerIndex\": .maxPendingPerWallet, \"walletSeed\": .walletSeed, \"sourceStartValidatorIndex\": .keysPerRequestType, \"sourceValidatorCount\": .keysPerRequestType, \"targetValidatorIndex\": .keysPerRequestType }"

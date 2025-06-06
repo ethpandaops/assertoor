@@ -61,7 +61,7 @@ func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
 		ID:         testDescriptor.ID(),
 		Source:     testDescriptor.Source(),
 		Name:       testConfig.Name,
-		Timeout:    uint64(testConfig.Timeout.Duration.Seconds()),
+		Timeout:    uint64(testConfig.Timeout.Seconds()),
 		Config:     testConfig.Config,
 		ConfigVars: testConfig.ConfigVars,
 		Schedule:   testConfig.Schedule,

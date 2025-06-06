@@ -107,11 +107,11 @@ func (t *Task) LoadConfig() error {
 //nolint:gocyclo // no need to reduce complexity
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.SourceStartIndex > 0 {
-		t.nextIndex = uint64(t.config.SourceStartIndex)
+		t.nextIndex = uint64(t.config.SourceStartIndex) //nolint:gosec // no overflow possible
 	}
 
 	if t.config.SourceIndexCount > 0 {
-		t.lastIndex = t.nextIndex + uint64(t.config.SourceIndexCount)
+		t.lastIndex = t.nextIndex + uint64(t.config.SourceIndexCount) //nolint:gosec // no overflow possible
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
@@ -382,7 +382,7 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 	err = txWallet.SendTransaction(ctx, tx, &wallet.SendTransactionOptions{
 		Clients:   clients,
 		OnConfirm: onConfirm,
-		LogFn: func(client *execution.Client, retry int, rebroadcast int, err error) {
+		LogFn: func(client *execution.Client, retry uint64, rebroadcast uint64, err error) {
 			if err != nil {
 				return
 			}

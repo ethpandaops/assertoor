@@ -493,7 +493,7 @@ func (t *Task) aggregateAttestationVotes(votes *epochVotes, slot, committee uint
 
 	for bitIdx, attDuty := range voteValidators {
 		validatorIdx := attDuty.validator
-		if aggregationBits.BitAt(uint64(bitIdx) + aggregationBitsOffset) {
+		if aggregationBits.BitAt(uint64(bitIdx) + aggregationBitsOffset) { //nolint:gosec // no overflow possible
 			if votes.activityMap[validatorIdx] {
 				continue
 			}

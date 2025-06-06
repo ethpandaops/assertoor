@@ -51,11 +51,11 @@ func (lh *logDBWriter) Fire(entry *logrus.Entry) error {
 	lh.lastIdx = logIdx
 
 	taskLog := &db.TaskLog{
-		RunID:      int(lh.logger.options.TestRunID),
-		TaskID:     int(lh.logger.options.TaskID),
-		LogIndex:   int(logIdx),
+		RunID:      lh.logger.options.TestRunID,
+		TaskID:     lh.logger.options.TaskID,
+		LogIndex:   logIdx,
 		LogTime:    entry.Time.UnixMilli(),
-		LogLevel:   int(entry.Level),
+		LogLevel:   uint32(entry.Level),
 		LogMessage: entry.Message,
 	}
 
@@ -147,43 +147,50 @@ func (lh *logDBWriter) getBufferEntries() []*db.TaskLog {
 	return entries
 }
 
-func (lh *logDBWriter) GetLogEntryCount() int {
-	return int(lh.lastIdx)
+func (lh *logDBWriter) GetLogEntryCount() uint64 {
+	return lh.lastIdx
 }
 
-func (lh *logDBWriter) GetLogEntries(from, limit int) []*db.TaskLog {
+func (lh *logDBWriter) GetLogEntries(from, limit uint64) []*db.TaskLog {
 	bufEntries := lh.getBufferEntries()
 
 	if len(bufEntries) > 0 && bufEntries[0].LogIndex >= from {
 		firstIdx := bufEntries[0].LogIndex
 		if firstIdx > from {
-			if len(bufEntries) <= firstIdx-from {
+			if uint64(len(bufEntries)) <= firstIdx-from {
 				return nil
 			}
 
 			bufEntries = bufEntries[firstIdx-from:]
 		}
 
-		if limit == 0 || len(bufEntries) <= limit {
+		if limit == 0 || uint64(len(bufEntries)) <= limit {
 			return bufEntries
 		}
 
 		return bufEntries[0:limit]
 	}
 
-	dbEntries, err := lh.logger.options.Database.GetTaskLogs(int(lh.logger.options.TestRunID), int(lh.logger.options.TaskID), from, limit)
+	dbEntries, err := lh.logger.options.Database.GetTaskLogs(lh.logger.options.TestRunID, lh.logger.options.TaskID, from, limit)
 	if err != nil {
 		return nil
 	}
 
-	if len(dbEntries) == limit || len(bufEntries) == 0 {
+	if uint64(len(dbEntries)) == limit || len(bufEntries) == 0 {
 		return dbEntries
 	}
 
 	if len(dbEntries) > 0 && dbEntries[len(dbEntries)-1].LogIndex >= bufEntries[0].LogIndex {
 		// remove overlapping entries
-		bufEntries = bufEntries[dbEntries[len(dbEntries)-1].LogIndex-bufEntries[0].LogIndex+1:]
+		lastDBIndex := dbEntries[len(dbEntries)-1].LogIndex
+		firstBufIndex := bufEntries[0].LogIndex
+		bufEntries = bufEntries[lastDBIndex-firstBufIndex+1:]
 	}
 
-	return append(bufEntries, dbEntries...)
+	dbEntries = append(dbEntries, bufEntries...)
+	if uint64(len(dbEntries)) > limit {
+		return dbEntries[:limit]
+	}
+
+	return dbEntries
 }

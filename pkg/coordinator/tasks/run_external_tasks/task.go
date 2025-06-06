@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -83,7 +84,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	// create new variable scope for test configuration
 	testVars := t.ctx.Vars.NewScope()
 	testVars.SetVar("scopeOwner", uint64(t.ctx.Index))
-	t.ctx.Outputs.SetSubScope("childScope", testVars)
+	t.ctx.Outputs.SetSubScope("childScope", vars.NewScopeFilter(testVars))
 
 	// add default config from external test to variable scope
 	for k, v := range testConfig.Config {
@@ -100,7 +101,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		testConfig.ConfigVars[k] = v
 	}
 
-	err = testVars.CopyVars(testVars, testConfig.ConfigVars)
+	err = testVars.CopyVars(t.ctx.Vars, testConfig.ConfigVars)
 	if err != nil {
 		return fmt.Errorf("error decoding external test configVars %v: %v", t.config.TestFile, err)
 	}
@@ -202,7 +203,11 @@ func (t *Task) loadTestConfig(ctx context.Context, testFile string) (*types.Test
 			return nil, err
 		}
 
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.logger.WithError(err).Warn("failed to close response body")
+			}
+		}()
 
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("error loading test config from url: %v, result: %v %v", testFile, resp.StatusCode, resp.Status)
@@ -215,7 +220,11 @@ func (t *Task) loadTestConfig(ctx context.Context, testFile string) (*types.Test
 			return nil, fmt.Errorf("error loading test config from file %v: %w", testFile, err)
 		}
 
-		defer f.Close()
+		defer func() {
+			if err := f.Close(); err != nil {
+				t.logger.WithError(err).Warn("failed to close file")
+			}
+		}()
 
 		reader = f
 	}

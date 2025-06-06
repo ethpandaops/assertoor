@@ -2,6 +2,8 @@
 VERSION := $(shell git rev-parse --short HEAD)
 GOLDFLAGS += -X 'github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.BuildVersion="$(VERSION)"'
 GOLDFLAGS += -X 'github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.BuildRelease="$(RELEASE)"'
+CURRENT_UID := $(shell id -u)
+CURRENT_GID := $(shell id -g)
 
 .PHONY: all docs test clean
 
@@ -27,8 +29,8 @@ devnet-run: devnet
 	go run main.go --config .hack/devnet/generated-assertoor-config.yaml
 
 devnet-run-docker: devnet
-	docker build --file ./Dockerfile-local -t assertoor:devnet-run .
-	docker run --rm -v $(PWD):/workspace -p 8080:8080 -it assertoor:devnet-run --config .hack/devnet/generated-assertoor-config.yaml
+	docker build --file ./Dockerfile-local -t assertoor:devnet-run --build-arg userid=$(CURRENT_UID) --build-arg groupid=$(CURRENT_GID) .
+	docker run --rm -v $(PWD):/workspace -p 8080:8080 -u $(CURRENT_UID):$(CURRENT_GID) --network kt-assertoor -it assertoor:devnet-run --config .hack/devnet/generated-assertoor-config.yaml
 
 devnet-clean:
 	.hack/devnet/cleanup.sh

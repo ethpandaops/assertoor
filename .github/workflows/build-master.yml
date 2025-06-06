@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout base code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         path: code
     - name: Generate wiki from docs
@@ -83,38 +83,38 @@ jobs:
     steps:
     # download build artifacts
     - name: "Download build artifacts"
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
 
     # (re)create snapshot binary release
     - name: Update snapshot tag & remove previous snapshot release
-      uses: actions/github-script@v3
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
       with:
         github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
           try {
             var snapshotTag = "snapshot";
-            var snapshotRelease = await github.repos.getReleaseByTag({
+            var snapshotRelease = await github.rest.repos.getReleaseByTag({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag: snapshotTag
             });
             if(snapshotRelease && snapshotRelease.data && snapshotRelease.data.tag_name == snapshotTag) {
               console.log("delete previous snapshot release");
-              await github.repos.deleteRelease({
+              await github.rest.repos.deleteRelease({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release_id: snapshotRelease.data.id
               });
             }
 
-            var snapshotRef = await github.git.getRef({
+            var snapshotRef = await github.rest.git.getRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
               ref: "tags/" + snapshotTag
             });
             if(snapshotRef && snapshotRef.data && snapshotRef.data.ref) {
               if(snapshotRef.data.object.sha !== context.sha) {
-                await github.git.updateRef({
+                await github.rest.git.updateRef({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   ref: "tags/" + snapshotTag,
@@ -123,7 +123,7 @@ jobs:
               }
             }
             else {
-              await github.git.createRef({
+              await github.rest.git.createRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 ref: "tags/" + snapshotTag,
@@ -134,7 +134,7 @@ jobs:
             console.log(e)
           }
     - name: Create snapshot release
-      uses: actions/create-release@v1
+      uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1.1.4
       id: create_release
       with:
         draft: false
@@ -164,7 +164,7 @@ jobs:
         cd assertoor_windows_amd64
         zip -r -q ../assertoor_snapshot_windows_amd64.zip .
     - name: "Upload snapshot release artifact: assertoor_snapshot_windows_amd64.zip"
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assertoor_snapshot_windows_amd64.zip
@@ -178,7 +178,7 @@ jobs:
         cd assertoor_linux_amd64
         tar -czf ../assertoor_snapshot_linux_amd64.tar.gz .
     - name: "Upload snapshot release artifact: assertoor_snapshot_linux_amd64.tar.gz"
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assertoor_snapshot_linux_amd64.tar.gz
@@ -192,7 +192,7 @@ jobs:
         cd assertoor_linux_arm64
         tar -czf ../assertoor_snapshot_linux_arm64.tar.gz .
     - name: "Upload snapshot release artifact: assertoor_snapshot_linux_arm64.tar.gz"
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assertoor_snapshot_linux_arm64.tar.gz
@@ -206,7 +206,7 @@ jobs:
         cd assertoor_darwin_amd64
         tar -czf ../assertoor_snapshot_darwin_amd64.tar.gz .
     - name: "Upload snapshot release artifact: assertoor_snapshot_darwin_amd64.tar.gz"
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assertoor_snapshot_darwin_amd64.tar.gz
@@ -220,7 +220,7 @@ jobs:
         cd assertoor_darwin_arm64
         tar -czf ../assertoor_snapshot_darwin_arm64.tar.gz .
     - name: "Upload snapshot release artifact: assertoor_snapshot_darwin_arm64.tar.gz"
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assertoor_snapshot_darwin_arm64.tar.gz

@@ -6,11 +6,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
+	"syscall"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
 )
 
@@ -77,6 +82,19 @@ func (t *Task) Execute(ctx context.Context) error {
 	cmdLogger := t.logger.WithField("shell", t.config.Shell)
 	cmdLogger.Info("running command")
 
+	// create temp dir for task
+	taskDir, err := os.MkdirTemp(os.TempDir(), fmt.Sprintf("assertoor_%v_%v_", t.ctx.Scheduler.GetTestRunID(), t.ctx.Index))
+	if err != nil {
+		cmdLogger.Errorf("failed creating task dir: %v", err)
+		return err
+	}
+
+	defer func() {
+		if err2 := os.RemoveAll(taskDir); err2 != nil {
+			cmdLogger.Errorf("failed cleaning up task dir: %v", err2)
+		}
+	}()
+
 	//nolint:gosec // ignore
 	command := exec.CommandContext(ctx, t.config.Shell, t.config.ShellArgs...)
 
@@ -123,6 +141,28 @@ func (t *Task) Execute(ctx context.Context) error {
 		command.Env = append(command.Env, fmt.Sprintf("%v=%v", envName, string(varJSON)))
 	}
 
+	// create summaries file
+	summaryFile, err := newResultFile(filepath.Join(taskDir, "summary"))
+	if err != nil {
+		cmdLogger.Errorf("failed creating summary file: %v", err)
+		return err
+	}
+
+	command.Env = append(command.Env, fmt.Sprintf("ASSERTOOR_SUMMARY=%v", summaryFile.FilePath()))
+
+	// create folder for result files
+	resultDir := filepath.Join(taskDir, "results")
+	if err = os.MkdirAll(resultDir, 0o700); err != nil {
+		cmdLogger.Errorf("failed creating result dir: %v", err)
+		return err
+	}
+
+	command.Env = append(command.Env, fmt.Sprintf("ASSERTOOR_RESULT_DIR=%v", resultDir))
+
+	defer func() {
+		t.storeTaskResults(summaryFile, resultDir)
+	}()
+
 	// start shell
 	err = command.Start()
 	if err != nil {
@@ -137,7 +177,9 @@ func (t *Task) Execute(ctx context.Context) error {
 		return err
 	}
 
-	stdin.Close()
+	if err := stdin.Close(); err != nil {
+		t.logger.WithError(err).Warn("failed to close stdin")
+	}
 
 	// wait for process & output streams
 	var execErr error
@@ -150,6 +192,29 @@ func (t *Task) Execute(ctx context.Context) error {
 		<-stderrCloseChan
 
 		execErr = command.Wait()
+	}()
+
+	// add context kill handler
+	go func() {
+		select {
+		case <-ctx.Done():
+			cmdLogger.Warn("sending SIGINT due to context cancellation")
+
+			if err := command.Process.Signal(syscall.SIGINT); err != nil {
+				cmdLogger.Warnf("failed sending SIGINT: %v", err)
+			}
+
+			select {
+			case <-time.After(5 * time.Second):
+				cmdLogger.Warn("killing command due to context timeout")
+
+				if err := command.Process.Kill(); err != nil {
+					cmdLogger.Warnf("failed killing command: %v", err)
+				}
+			case <-waitChan:
+			}
+		case <-waitChan:
+		}
 	}()
 
 	// wait for output handler
@@ -280,4 +345,73 @@ func (t *Task) parseOutputVars(line string) bool {
 	}
 
 	return false
+}
+
+func (t *Task) storeTaskResults(summaryFile *resultFile, resultDir string) {
+	// store files to db
+	database := t.ctx.Scheduler.GetServices().Database()
+	if err2 := database.RunTransaction(func(tx *sqlx.Tx) error {
+		// store summary file
+		data, err3 := summaryFile.Cleanup()
+		if err3 != nil {
+			t.logger.Errorf("failed cleaning up summary file: %v", err3)
+		} else if len(data) > 0 {
+			if err3 = database.UpsertTaskResult(tx, &db.TaskResult{
+				RunID:  t.ctx.Scheduler.GetTestRunID(),
+				TaskID: uint64(t.ctx.Index),
+				Type:   "summary",
+				Index:  0,
+				Name:   "",
+				Size:   uint64(len(data)),
+				Data:   data,
+			}); err3 != nil {
+				t.logger.Errorf("failed storing summary file to db: %v", err3)
+			}
+		}
+
+		// store result files
+		fileIdx := uint64(0)
+
+		var storeResultFilesFn func(path string, prefix string)
+		storeResultFilesFn = func(path string, prefix string) {
+			if prefix != "" {
+				prefix += "/"
+			}
+
+			files, err3 := os.ReadDir(path)
+			if err3 != nil {
+				t.logger.Errorf("failed reading result dir: %v", err3)
+			} else {
+				for _, file := range files {
+					if file.IsDir() {
+						storeResultFilesFn(filepath.Join(path, file.Name()), fmt.Sprintf("%v%v", prefix, file.Name()))
+						continue
+					}
+
+					data, err3 := os.ReadFile(filepath.Join(path, file.Name()))
+					if err3 != nil {
+						t.logger.Errorf("failed reading result file: %v", err3)
+					} else if err3 = database.UpsertTaskResult(tx, &db.TaskResult{
+						RunID:  t.ctx.Scheduler.GetTestRunID(),
+						TaskID: uint64(t.ctx.Index),
+						Type:   "result",
+						Index:  fileIdx,
+						Name:   fmt.Sprintf("%v%v", prefix, file.Name()),
+						Size:   uint64(len(data)),
+						Data:   data,
+					}); err3 != nil {
+						t.logger.Errorf("failed storing result file to db: %v", err3)
+					}
+
+					fileIdx++
+				}
+			}
+		}
+
+		storeResultFilesFn(resultDir, "")
+
+		return nil
+	}); err2 != nil {
+		t.logger.Errorf("failed storing task results to db: %v", err2)
+	}
 }

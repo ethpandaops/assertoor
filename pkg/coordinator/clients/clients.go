@@ -111,7 +111,12 @@ func (pool *ClientPool) AddClient(config *ClientConfig) error {
 func (pool *ClientPool) processConsensusBlockNotification(poolClient *PoolClient) {
 	defer func() {
 		if err := recover(); err != nil {
-			pool.logger.WithError(err.(error)).Errorf("uncaught panic in processConsensusBlockNotification subroutine: %v, stack: %v", err, string(debug.Stack()))
+			var err2 error
+			if errval, errok := err.(error); errok {
+				err2 = errval
+			}
+
+			pool.logger.WithError(err2).Errorf("uncaught panic in processConsensusBlockNotification subroutine: %v, stack: %v", err, string(debug.Stack()))
 		}
 	}()
 

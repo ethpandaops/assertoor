@@ -1,0 +1,47 @@
+
+id: dev-deposits
+name: "Dev deposits test"
+timeout: 1h
+config:
+  walletPrivkey: ""
+  validatorMnemonic: ""
+  depositCount: 2
+  depositAmount: 32
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
+  waitForElectra: false
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# wait for electra activation
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+- name: check_consensus_slot_range
+  title: "Wait for electra activation"
+  if: "waitForElectra"
+  timeout: 1h
+  configVars:
+    minEpochNumber: "tasks.get_specs.outputs.specs.ELECTRA_FORK_EPOCH"
+
+- name: run_tasks
+  title: "Generate deposits"
+  config:
+    stopChildOnResult: false
+    tasks:
+    - name: generate_deposits
+      title: "Generate deposits"
+      config:
+        limitPerSlot: 10
+        limitPending: 10
+        awaitReceipt: true
+        failOnReject: true
+      configVars:
+        walletPrivkey: "walletPrivkey"
+        mnemonic: "validatorMnemonic"
+        depositContract: "depositContract"
+        depositAmount: "depositAmount"
+        limitTotal: "depositCount"

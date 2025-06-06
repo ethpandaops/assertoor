@@ -13,6 +13,9 @@ type Config struct {
 	// number of failed child tasks to make this task fail (0 = all tasks)
 	FailTaskCount uint64 `yaml:"failTaskCount" json:"failTaskCount"`
 
+	// fail task if neither succeedTaskCount nor failTaskCount is reached, but all tasks completed
+	FailOnUndecided bool `yaml:"failOnUndecided" json:"failOnUndecided"`
+
 	// create a new variable scope for the child tasks
 	NewVariableScope bool `yaml:"newVariableScope" json:"newVariableScope"`
 

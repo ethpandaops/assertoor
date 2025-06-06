@@ -6,7 +6,7 @@ config:
   walletPrivkey: ""
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
   validatorStartIndex: 0
-  depositContract: "0x4242424242424242424242424242424242424242"
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
 tasks:
 - name: check_clients_are_healthy
   title: "Check if at least one client is ready"
@@ -135,7 +135,7 @@ tasks:
                 minDepositRequestCount: 1
               configVars:
                 expectDepositRequests: "| [{publicKey: .tasks.validator_pubkeys.outputs.pubkeys[2], amount: 1000000000}]"
-        
+
         # check if key 2 has 0x02 credentials
         - name: check_consensus_validator_status
           title: "Get validator info for key 2 (expect 0x02 credentials)"
@@ -150,7 +150,7 @@ tasks:
         - name: run_shell
           title: "Check if key 2 has 0x02 credentials"
           config:
-            envVars: 
+            envVars:
               validator: "tasks.key2_status.outputs.validator"
             command: |
               withdrawal_creds=$(echo "$validator" | jq -r '.validator.withdrawal_credentials')
@@ -190,7 +190,7 @@ tasks:
                 minWithdrawalRequestCount: 1
               configVars:
                 expectWithdrawalRequests: "| [{validatorPubkey: .tasks.validator_pubkeys.outputs.pubkeys[2], sourceAddress: .tasks.wallet_details.outputs.address, amount: 0}]"
-        
+
         # wait for exit to be processed
         - name: check_consensus_validator_status
           title: "Wait for key 2 to exit"

@@ -87,30 +87,69 @@ func (t *Task) Execute(ctx context.Context) error {
 	totalMatches := 0
 	matchingBlocks := []*consensus.Block{}
 
+	checkBlockMatch := func(block *consensus.Block) bool {
+		matches := t.checkBlock(ctx, block)
+		if matches {
+			matchingBlocks = append(matchingBlocks, block)
+			t.logger.Infof("matching block %v [0x%x]", block.Slot, block.Root)
+
+			totalMatches++
+		}
+
+		if t.config.BlockCount > 0 {
+			if totalMatches >= t.config.BlockCount {
+				t.setMatchingBlocksOutput(matchingBlocks)
+				t.ctx.SetResult(types.TaskResultSuccess)
+
+				return true
+			}
+		} else {
+			if matches {
+				t.ctx.SetResult(types.TaskResultSuccess)
+			} else {
+				t.ctx.SetResult(types.TaskResultNone)
+			}
+		}
+
+		return false
+	}
+
+	// check current block
+	if t.config.CheckLookback > 0 {
+		if blocks := consensusPool.GetBlockCache().GetCachedBlocks(); len(blocks) > 0 {
+			lookbackBlocks := []*consensus.Block{}
+			block := blocks[0]
+
+			for {
+				lookbackBlocks = append(lookbackBlocks, block)
+				if len(lookbackBlocks) >= t.config.CheckLookback {
+					break
+				}
+
+				parentRoot := block.GetParentRoot()
+				if parentRoot == nil {
+					break
+				}
+
+				block = consensusPool.GetBlockCache().GetCachedBlockByRoot(*parentRoot)
+				if block == nil {
+					break
+				}
+			}
+
+			for i := len(lookbackBlocks) - 1; i >= 0; i-- {
+				if checkBlockMatch(lookbackBlocks[i]) {
+					return nil
+				}
+			}
+		}
+	}
+
 	for {
 		select {
 		case block := <-blockSubscription.Channel():
-			matches := t.checkBlock(ctx, block)
-			if matches {
-				matchingBlocks = append(matchingBlocks, block)
-				t.logger.Infof("matching block %v [0x%x]", block.Slot, block.Root)
-
-				totalMatches++
-			}
-
-			if t.config.BlockCount > 0 {
-				if totalMatches >= t.config.BlockCount {
-					t.setMatchingBlocksOutput(matchingBlocks)
-					t.ctx.SetResult(types.TaskResultSuccess)
-
-					return nil
-				}
-			} else {
-				if matches {
-					t.ctx.SetResult(types.TaskResultSuccess)
-				} else {
-					t.ctx.SetResult(types.TaskResultNone)
-				}
+			if checkBlockMatch(block) {
+				return nil
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -600,19 +639,22 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 				}
 
 				if validator.Validator.PublicKey.String() == expectedWithdrawal.PublicKey {
-					withdrawalAmount := big.NewInt(int64(withdrawal.Amount))
-					withdrawalAmount = withdrawalAmount.Mul(withdrawalAmount, big.NewInt(1000000000))
+					withdrawalAmount := big.NewInt(0).SetUint64(uint64(withdrawal.Amount))
 
 					switch {
 					case expectedWithdrawal.Address != "" && !strings.EqualFold(expectedWithdrawal.Address, withdrawal.Address.String()):
 						t.logger.Warnf("check failed: withdrawal found, but execution address does not match (have: %v, want: %v)", withdrawal.Address.String(), expectedWithdrawal.Address)
-					case expectedWithdrawal.MinAmount.Cmp(big.NewInt(0)) > 0 && expectedWithdrawal.MinAmount.Cmp(withdrawalAmount) > 0:
+					case expectedWithdrawal.MinAmount != nil && expectedWithdrawal.MinAmount.Cmp(big.NewInt(0)) > 0 && expectedWithdrawal.MinAmount.Cmp(withdrawalAmount) > 0:
 						t.logger.Warnf("check failed: withdrawal found, but amount lower than minimum (have: %v, want >= %v)", withdrawalAmount, expectedWithdrawal.MinAmount)
+					case expectedWithdrawal.MaxAmount != nil && expectedWithdrawal.MaxAmount.Cmp(big.NewInt(0)) > 0 && expectedWithdrawal.MaxAmount.Cmp(withdrawalAmount) < 0:
+						t.logger.Warnf("check failed: withdrawal found, but amount higher than maximum (have: %v, want <= %v)", withdrawalAmount, expectedWithdrawal.MaxAmount)
 					default:
 						found = true
 					}
 
-					break
+					if found {
+						break
+					}
 				}
 			}
 
@@ -679,9 +721,10 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 				expectedWithdrawalCreds = common.FromHex(expectedDepositRequest.WithdrawalCredentials)
 			}
 
+		requestLoop:
 			for _, depositRequest := range depositRequests {
 				if expectedDepositRequest.PublicKey == "" || depositRequest.Pubkey.String() == expectedDepositRequest.PublicKey {
-					depositAmount := big.NewInt(int64(depositRequest.Amount))
+					depositAmount := big.NewInt(0).SetUint64(uint64(depositRequest.Amount))
 
 					switch {
 					case expectedDepositRequest.WithdrawalCredentials != "" && !bytes.Equal(expectedWithdrawalCreds, depositRequest.WithdrawalCredentials):
@@ -690,9 +733,8 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 						t.logger.Warnf("check failed: deposit request found, but amount does not match (have: %v, want: %v)", depositAmount, expectedDepositRequest.Amount.String())
 					default:
 						found = true
+						break requestLoop
 					}
-
-					break
 				}
 			}
 
@@ -733,9 +775,10 @@ func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *s
 				expectedPubKey = common.FromHex(expectedWithdrawalRequest.ValidatorPubkey)
 			}
 
+		requestLoop:
 			for _, withdrawalRequest := range withdrawalRequests {
 				if expectedWithdrawalRequest.ValidatorPubkey == "" || bytes.Equal(withdrawalRequest.ValidatorPubkey[:], expectedPubKey) {
-					withdrawalAmount := big.NewInt(int64(withdrawalRequest.Amount))
+					withdrawalAmount := big.NewInt(0).SetUint64(uint64(withdrawalRequest.Amount))
 
 					switch {
 					case expectedWithdrawalRequest.SourceAddress != "" && !bytes.Equal(expectedAddress, withdrawalRequest.SourceAddress[:]):
@@ -744,9 +787,8 @@ func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *s
 						t.logger.Warnf("check failed: deposit request found, but amount does not match (have: %v, want: %v)", withdrawalAmount, expectedWithdrawalRequest.Amount.String())
 					default:
 						found = true
+						break requestLoop
 					}
-
-					break
 				}
 			}
 
@@ -791,6 +833,7 @@ func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData
 				expectedTgtPubKey = common.FromHex(expectedConsolidationRequest.TargetPubkey)
 			}
 
+		requestLoop:
 			for _, consolidationRequest := range consolidationRequests {
 				if expectedConsolidationRequest.SourcePubkey == "" || bytes.Equal(consolidationRequest.SourcePubkey[:], expectedSrcPubKey) {
 					switch {
@@ -801,9 +844,8 @@ func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData
 
 					default:
 						found = true
+						break requestLoop
 					}
-
-					break
 				}
 			}
 

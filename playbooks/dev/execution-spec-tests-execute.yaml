@@ -10,11 +10,82 @@ config:
   seedPrivateKey: ""
   seedAmount: "1" # (In Wei). Amount used to seed child accounts for test execution. Can also use "1 ether" or "10000 gwei" as input
   extraFlags: ""
+  runSetup: true
+  runTests: true
+  specTestsPath: ""
+  cleanupTestsPath: true
   solcVersion: "0.8.24"
 tasks:
   - name: run_shell
-    title: "Execute tests: ${gitRepo}@${gitBranch} [${testPath}]"
+    title: "Clone and prepare execution spec tests: ${gitRepo}@${gitBranch}"
+    id: setup
+    if: runSetup
+    config:
+      shell: bash
+      shellArgs: [--login]
+      envVars:
+        GIT_REPO: gitRepo
+        GIT_BRANCH: gitBranch
+        SOLC_VERSION: "solcVersion"
+        SPEC_TESTS_PATH: specTestsPath
+      command: |
+        set -e
+
+        # Convert env vars. They are passed as RAW JSON values
+
+        GIT_REPO=$(echo $GIT_REPO | jq -r)
+        GIT_BRANCH=$(echo $GIT_BRANCH | jq -r)
+        SOLC_VERSION=$(echo $SOLC_VERSION | jq -r)
+        SPEC_TESTS_PATH=$(echo $SPEC_TESTS_PATH | jq -r)
+
+        # Check if pip (python package manager) is installed
+        if ! command -v pip &> /dev/null
+        then
+          echo "pip could not be found. Please install python3-pip"
+          exit 1
+        fi
+
+        # Create dir for temp files
+        if [ -z "$SPEC_TESTS_PATH" ]; then
+          tmp_dir=$(mktemp -d -t execution-spec-tests-XXXXXXXXXX)
+          
+          echo "============================"
+          echo "Temp dir created: ${tmp_dir}"
+          echo "============================"
+
+          echo "::set-var specTestsPath ${tmp_dir}"
+        fi
+
+        echo "============================"
+        echo "Clone git repo ${GIT_REPO} @ ${GIT_BRANCH}"
+        echo "============================"
+        git clone ${GIT_REPO} --branch ${GIT_BRANCH} --single-branch $SPEC_TESTS_PATH
+
+        cd $SPEC_TESTS_PATH
+        export HOME=$SPEC_TESTS_PATH
+        export PATH=$PATH:$HOME/.local/bin
+
+        echo "============================"
+        echo "Installing dependencies"
+        echo "============================"
+        pip install uv
+        uv sync --all-extras
+        uv run solc-select use "${SOLC_VERSION}" --always-install
+        
+  - name: generate_child_wallet
+    id: testwallet
+    if: runTests
+    title: "Generate main wallet for tests"
+    config:
+      randomSeed: true
+    configVars:
+      privateKey: "seedPrivateKey"
+      prefundMinBalance: "seedAmount"
+
+  - name: run_shell
+    title: "Execute tests: [${testPath}]"
     id: execute
+    if: runTests
     config:
       shell: bash
       shellArgs: [--login]
@@ -24,10 +95,12 @@ tasks:
         TEST_PATH: testPath
         CHAIN_ID: chainID
         RPC_ENDPOINT: rpcEndpoint
-        PRIVATE_KEY: seedPrivateKey
+        PRIVATE_KEY: tasks.testwallet.outputs.childWallet.privkey
         SEED_AMOUNT: seedAmount
         EXTRA_FLAGS: extraFlags
         SOLC_VERSION: "solcVersion"
+        SPEC_TESTS_PATH: specTestsPath
+        CLEANUP_TESTS_PATH: cleanupTestsPath
       command: |
         set -e
 
@@ -42,6 +115,8 @@ tasks:
         SEED_AMOUNT=$(echo $SEED_AMOUNT | jq -r)
         EXTRA_FLAGS=$(echo $EXTRA_FLAGS | jq -r)
         SOLC_VERSION=$(echo $SOLC_VERSION | jq -r)
+        SPEC_TESTS_PATH=$(echo $SPEC_TESTS_PATH | jq -r)
+        CLEANUP_TESTS_PATH=$(echo $CLEANUP_TESTS_PATH | jq -r)
 
         echo "RPC_ENDPOINT: ${RPC_ENDPOINT}"
         echo "CHAIN_ID: ${CHAIN_ID}"
@@ -64,34 +139,21 @@ tasks:
         fi
 
         # Create dir for temp files
-        tmp_dir=$(mktemp -d -t execution-spec-tests-XXXXXXXXXX)
-        cd $tmp_dir
-        export HOME=$tmp_dir
-        echo "============================"
-        echo "Temp dir created: ${tmp_dir}"
-        echo "============================"
+        cd $SPEC_TESTS_PATH
+        export HOME=$SPEC_TESTS_PATH
+        export PATH=$PATH:$HOME/.local/bin
 
-        function cleanup {
-          rv=$?
-          rm -rf "$tmp_dir"
-          echo "tmpdir removed"
-          exit $rv
-        }
+        if [ "$CLEANUP_TESTS_PATH" == "true" ]; then
+          function cleanup {
+            rv=$?
+            rm -rf "$SPEC_TESTS_PATH"
+            echo "tmpdir removed"
+            exit $rv
+          }
 
-        trap cleanup EXIT # always remove tempdir on exit
+          trap cleanup EXIT # always remove tempdir on exit
+        fi
 
-        echo "============================"
-        echo "Clone git repo ${GIT_REPO} @ ${GIT_BRANCH}"
-        echo "============================"
-        git clone ${GIT_REPO} --branch ${GIT_BRANCH} --single-branch
-        cd execution-spec-tests
-
-        echo "============================"
-        echo "Installing dependencies"
-        echo "============================"
-        pip install uv
-        uv sync --all-extras
-        uv run solc-select use "${SOLC_VERSION}" --always-install
         source .venv/bin/activate
 
         echo "============================"
@@ -105,37 +167,41 @@ tasks:
           --json-report \
           --json-report-file=report.json \
           --html=report.html \
-          ${EXTRA_FLAGS[@]}
+          ${EXTRA_FLAGS[@]} || true
 
         echo "============================"
         echo "Exporting reports"
         echo "============================"
-        REPORT_JSON=$(cat report.json)
-        REPORT_HTML=$(jq -Rs '.' report.html)
-        echo "::set-output reportHTML ${REPORT_HTML}"
-        echo "::set-output-json reportJSON ${REPORT_JSON}"
 
-  - name: run_task_matrix
-    title: "Show test results"
-    configVars:
-      matrixValues: "tasks.execute.outputs.reportJSON.tests"
+        cp report.json ${ASSERTOOR_RESULT_DIR}/report.json
+        cp report.html ${ASSERTOOR_RESULT_DIR}/report.html
+        mkdir -p ${ASSERTOOR_RESULT_DIR}/assets
+        curl -o ${ASSERTOOR_RESULT_DIR}/assets/style.css https://raw.githubusercontent.com/ethpandaops/assertoor/refs/heads/master/res/execution-spec-tests-styles.css
+
+        REPORT_JSON=$(cat report.json | jq -c '[.tests[] |  {"nodeid": .nodeid, "outcome": .outcome, "setupDuration": .setup.duration, "callDuration": .call.duration, "teardownDuration": .teardown.duration}]')
+        TOTAL_TESTS=$(echo "$REPORT_JSON" | jq '. | length')
+        PASSED_TESTS=$(echo "$REPORT_JSON" | jq '[.[] | select(.outcome == "passed")] | length')
+        echo "Total tests: $TOTAL_TESTS"
+        echo "Passed tests: $PASSED_TESTS"
+
+        # Check if tests passed
+        echo "::set-output passedTests ${PASSED_TESTS}"
+        echo "::set-output totalTests ${TOTAL_TESTS}"
+
+        exit 0
+
+  - name: run_shell
+    title: "Check test results (${{tasks.execute.outputs.passedTests}} / ${{tasks.execute.outputs.totalTests}} passed)"
+    id: check
+    if: runTests
     config:
-      runConcurrent: true
-      matrixVar: "testResult"
-      task:
-        name: run_shell
-        title: "${{testResult.nodeid}}"
-        config:
-          shell: bash
-          envVars:
-            TEST_RESULT: testResult
-          command: |
-            DURATION_SECONDS=$(echo $TEST_RESULT | jq -r '.setup.duration + .call.duration + .teardown.duration')
-            echo "::set-output-json customRunTimeSeconds ${DURATION_SECONDS}"
-            echo "::set-output-json execTestResult ${TEST_RESULT}"
-            if $(echo $TEST_RESULT | jq -e '.outcome == "passed"') ; then
-              echo "Test passed"
-            else
-              echo "Test failed"
-              exit 1
-            fi
+      shell: bash
+      envVars:
+        passedTests: "tasks.execute.outputs.passedTests"
+        totalTests: "tasks.execute.outputs.totalTests"
+      command: |
+        set -e
+        if [ "${passedTests}" != "${totalTests}" ]; then
+          echo "Some tests failed, see report.html in the task above for details"
+          exit 1
+        fi

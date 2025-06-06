@@ -16,6 +16,9 @@ type Config struct {
 	// number of failed child tasks to make this task fail (0 = all tasks)
 	FailTaskCount uint64 `yaml:"failTaskCount" json:"failTaskCount"`
 
+	// fail task if neither succeedTaskCount nor failTaskCount is reached, but all tasks completed
+	FailOnUndecided bool `yaml:"failOnUndecided" json:"failOnUndecided"`
+
 	// matrix variable name
 	MatrixValues []interface{} `yaml:"matrixValues" json:"matrixValues"`
 
@@ -27,7 +30,9 @@ type Config struct {
 }
 
 func DefaultConfig() Config {
-	return Config{}
+	return Config{
+		FailOnUndecided: true,
+	}
 }
 
 func (c *Config) Validate() error {

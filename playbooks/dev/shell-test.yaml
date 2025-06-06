@@ -1,0 +1,16 @@
+id: shell-test
+name: "Run shell test"
+timeout: 4h
+config:
+  #walletPrivkey: ""
+tasks:
+  - name: run_shell
+    title: "Create temp dir for execution spec tests"
+    id: tempdir
+    config:
+      shell: bash
+      command: |
+        set -e
+
+        echo "Hello" > $ASSERTOOR_SUMMARY
+  
