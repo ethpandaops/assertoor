@@ -294,6 +294,73 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/test_run/{runId}/task/{taskIndex}/details": {
+            "get": {
+                "description": "Returns the task details with given run ID and task index. Includes full log, configuration and result variables (unless security trimmed).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get detailed task of a given test run",
+                "operationId": "getTestRunTaskDetails",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Index of the task to get details for",
+                        "name": "taskIndex",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.GetTestRunDetailedTask"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/test_run/{runId}/task/{taskIndex}/result/{resultType}/{fileId}": {
             "get": {
                 "description": "Returns a specific result file from a task",
