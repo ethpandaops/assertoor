@@ -553,8 +553,6 @@ func (wallet *Wallet) loadTransactionReceipt(ctx context.Context, block *executi
 		client := clients[cliIdx]
 
 		reqCtx, reqCtxCancel := context.WithTimeout(ctx, 5*time.Second)
-
-		//nolint:gocritic // ignore
 		defer reqCtxCancel()
 
 		receipt, err := client.GetRPCClient().GetTransactionReceipt(reqCtx, tx.Hash())

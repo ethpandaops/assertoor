@@ -81,7 +81,12 @@ func (vn *ValidatorNames) loadFromYaml(fileName string) error {
 	if err != nil {
 		return fmt.Errorf("error opening validator names file %v: %v", fileName, err)
 	}
-	defer f.Close()
+
+	defer func() {
+		if err := f.Close(); err != nil {
+			vn.logger.WithError(err).Warn("failed to close file")
+		}
+	}()
 
 	namesYaml := map[string]string{}
 	decoder := yaml.NewDecoder(f)
@@ -139,7 +144,11 @@ func (vn *ValidatorNames) loadFromRangesAPI(apiURL string) error {
 		return fmt.Errorf("could not fetch inventory (%v): %v", getRedactedURL(apiURL), err)
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			vn.logger.WithError(err).Warn("failed to close response body")
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {

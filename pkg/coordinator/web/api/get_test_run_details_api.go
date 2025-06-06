@@ -114,25 +114,25 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 
 			switch {
 			case !taskStatus.IsStarted:
-				taskData.Status = "pending"
+				taskData.Status = TaskStatusPending
 			case taskStatus.IsRunning:
-				taskData.Status = "running"
+				taskData.Status = TaskStatusRunning
 				taskData.StartTime = taskStatus.StartTime.UnixMilli()
-				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // no overflow possible
+				taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
 			default:
-				taskData.Status = "complete"
+				taskData.Status = TaskStatusComplete
 				taskData.StartTime = taskStatus.StartTime.UnixMilli()
 				taskData.StopTime = taskStatus.StopTime.UnixMilli()
-				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // no overflow possible
+				taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
 			}
 
 			switch taskStatus.Result {
 			case types.TaskResultNone:
-				taskData.Result = "none"
+				taskData.Result = TaskResultNone
 			case types.TaskResultSuccess:
-				taskData.Result = "success"
+				taskData.Result = TaskResultSuccess
 			case types.TaskResultFailure:
-				taskData.Result = "failure"
+				taskData.Result = TaskResultFailure
 			}
 
 			if taskStatus.Error != nil {

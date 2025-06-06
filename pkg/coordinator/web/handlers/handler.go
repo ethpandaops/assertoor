@@ -155,7 +155,6 @@ func (fh *FrontendHandler) handleTemplateError(w http.ResponseWriter, r *http.Re
 			"route":      r.URL.String(),
 		}).WithError(err).Error("error executing template")
 
-		//nolint:gocritic // ignore
 		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
 
@@ -182,7 +181,6 @@ func (fh *FrontendHandler) HandlePageError(w http.ResponseWriter, r *http.Reques
 	err := notFoundTemplate.ExecuteTemplate(w, "layout", data)
 	if err != nil {
 		logrus.Errorf("error executing page error template for %v route: %v", r.URL.String(), err)
-		//nolint:gocritic // ignore
 		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
 }
@@ -200,7 +198,6 @@ func (fh *FrontendHandler) HandleNotFound(w http.ResponseWriter, r *http.Request
 	err := notFoundTemplate.ExecuteTemplate(w, "layout", data)
 	if err != nil {
 		logrus.Errorf("error executing not-found template for %v route: %v", r.URL.String(), err)
-		//nolint:gocritic // ignore
 		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
 }
@@ -238,7 +235,11 @@ func (fh *FrontendHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			logrus.WithError(err).Warn("failed to close file")
+		}
+	}()
 
 	_, err = f.Stat()
 	if err != nil {

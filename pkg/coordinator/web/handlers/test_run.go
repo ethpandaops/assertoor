@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/web/api"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -127,7 +128,7 @@ func (fh *FrontendHandler) TestRunData(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//nolint:gocyclo // ignore
+//nolint:gocyclo // ignore: intentionally complex function
 func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error) {
 	test := fh.coordinator.GetTestByRunID(runID)
 	if test == nil {
@@ -205,24 +206,22 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 
 			switch {
 			case !taskStatus.IsStarted:
-				taskData.Status = "pending"
+				taskData.Status = api.TaskStatusPending
 			case taskStatus.IsRunning:
-				taskData.Status = "running"
-				taskData.RunTime = time.Since(taskStatus.StartTime).Milliseconds()
+				taskData.Status = api.TaskStatusRunning
+				taskData.RunTime = int64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
 			default:
-				taskData.Status = "complete"
-				if !taskStatus.StopTime.IsZero() && !taskStatus.StartTime.IsZero() {
-					taskData.RunTime = taskStatus.StopTime.Sub(taskStatus.StartTime).Milliseconds()
-				}
+				taskData.Status = api.TaskStatusComplete
+				taskData.RunTime = int64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds())
 			}
 
 			switch taskStatus.Result {
 			case types.TaskResultNone:
-				taskData.Result = "none"
+				taskData.Result = api.TaskResultNone
 			case types.TaskResultSuccess:
-				taskData.Result = "success"
+				taskData.Result = api.TaskResultSuccess
 			case types.TaskResultFailure:
-				taskData.Result = "failure"
+				taskData.Result = api.TaskResultFailure
 			}
 
 			if taskStatus.Error != nil {

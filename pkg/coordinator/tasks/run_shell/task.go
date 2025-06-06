@@ -177,7 +177,9 @@ func (t *Task) Execute(ctx context.Context) error {
 		return err
 	}
 
-	stdin.Close()
+	if err := stdin.Close(); err != nil {
+		t.logger.WithError(err).Warn("failed to close stdin")
+	}
 
 	// wait for process & output streams
 	var execErr error
