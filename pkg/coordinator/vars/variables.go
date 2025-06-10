@@ -231,8 +231,7 @@ func (v *Variables) getGeneralizedVarsMap() (map[string]any, error) {
 	return varsMap, nil
 }
 
-//nolint:gocritic // ignore
-func (v *Variables) ResolveQuery(queryStr string) (interface{}, bool, error) {
+func (v *Variables) ResolveQuery(queryStr string) (val interface{}, ok bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -250,7 +249,7 @@ func (v *Variables) ResolveQuery(queryStr string) (interface{}, bool, error) {
 
 	iter := query.RunWithContext(ctx, varsMap)
 
-	val, ok := iter.Next()
+	val, ok = iter.Next()
 	if !ok {
 		// no query result, skip variable assignment
 		return nil, false, nil

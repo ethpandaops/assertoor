@@ -181,12 +181,7 @@ func (manager *Manager) loadBlockReceipts(block *execution.Block) []*ethtypes.Re
 		cliIdx := retryCount % uint64(len(clients))
 		client := clients[cliIdx]
 
-		reqCtx, reqCtxCancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-		//nolint:gocritic // ignore
-		defer reqCtxCancel()
-
-		receipts, err := client.GetRPCClient().GetBlockReceipts(reqCtx, block.Hash)
+		receipts, err := manager.loadBlockReceiptsFromClient(client, block)
 		if err == nil {
 			return receipts
 		}
@@ -207,4 +202,11 @@ func (manager *Manager) loadBlockReceipts(block *execution.Block) []*ethtypes.Re
 			return nil
 		}
 	}
+}
+
+func (manager *Manager) loadBlockReceiptsFromClient(client *execution.Client, block *execution.Block) ([]*ethtypes.Receipt, error) {
+	reqCtx, reqCtxCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer reqCtxCancel()
+
+	return client.GetRPCClient().GetBlockReceipts(reqCtx, block.Hash)
 }

@@ -535,6 +535,49 @@ paths:
       summary: Get test run status by run ID
       tags:
       - TestRun
+  /api/v1/test_run/{runId}/task/{taskIndex}/details:
+    get:
+      description: Returns the task details with given run ID and task index. Includes
+        full log, configuration and result variables (unless security trimmed).
+      operationId: getTestRunTaskDetails
+      parameters:
+      - description: ID of the test run
+        in: path
+        name: runId
+        required: true
+        type: string
+      - description: Index of the task to get details for
+        in: path
+        name: taskIndex
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.GetTestRunDetailedTask'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_coordinator_web_api.Response'
+      summary: Get detailed task of a given test run
+      tags:
+      - TestRun
   /api/v1/test_run/{runId}/task/{taskIndex}/result/{resultType}/{fileId}:
     get:
       description: Returns a specific result file from a task

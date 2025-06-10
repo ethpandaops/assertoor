@@ -5,11 +5,10 @@ go 1.23.0
 toolchain go1.24.1
 
 require (
-	github.com/attestantio/go-eth2-client v0.25.0
-	github.com/davecgh/go-spew v1.1.1
+	github.com/attestantio/go-eth2-client v0.25.2
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
-	github.com/ethereum/go-ethereum v1.15.8
-	github.com/ethpandaops/ethwallclock v0.3.0
+	github.com/ethereum/go-ethereum v1.15.11
+	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/gorilla/mux v1.8.1
@@ -20,7 +19,7 @@ require (
 	github.com/juliangruber/go-intersect v1.1.0
 	github.com/lib/pq v1.10.9
 	github.com/mashingan/smapping v0.1.19
-	github.com/pressly/goose/v3 v3.24.2
+	github.com/pressly/goose/v3 v3.24.3
 	github.com/prometheus/client_golang v1.22.0
 	github.com/protolambda/zrnt v0.34.1
 	github.com/protolambda/ztyp v0.2.2
@@ -45,17 +44,17 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.17.0 // indirect
+	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/consensys/bavard v0.1.22 // indirect
-	github.com/consensys/gnark-crypto v0.14.0 // indirect
+	github.com/consensys/bavard v0.1.27 // indirect
+	github.com/consensys/gnark-crypto v0.16.0 // indirect
+	github.com/crate-crypto/go-eth-kzg v1.3.0 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a // indirect
-	github.com/crate-crypto/go-kzg-4844 v1.1.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/dot v1.6.4 // indirect
-	github.com/ethereum/c-kzg-4844 v1.0.2 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
@@ -104,7 +103,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
-	github.com/prometheus/procfs v0.16.0 // indirect
+	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/protolambda/bls12-381-util v0.1.0 // indirect
 	github.com/r3labs/sse/v2 v2.10.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -127,19 +126,19 @@ require (
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
-	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/sync v0.12.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/tools v0.31.0 // indirect
+	golang.org/x/crypto v0.38.0 // indirect
+	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
+	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/sync v0.14.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/tools v0.33.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/Knetic/govaluate.v3 v3.0.0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
-	modernc.org/libc v1.61.13 // indirect
+	modernc.org/libc v1.65.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
-	modernc.org/memory v1.9.1 // indirect
-	modernc.org/sqlite v1.36.2 // indirect
+	modernc.org/memory v1.10.0 // indirect
+	modernc.org/sqlite v1.37.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )

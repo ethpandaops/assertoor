@@ -7,11 +7,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/web/api"
 	"github.com/gorilla/mux"
 	"github.com/noku-team/assertoor/pkg/coordinator/db"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 )
 
 type TestRunPage struct {
@@ -138,7 +140,6 @@ func (fh *FrontendHandler) TestRunData(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//nolint:gocyclo // ignore
 func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error) {
 	test := fh.coordinator.GetTestByRunID(runID)
 	if test == nil {
@@ -173,13 +174,15 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 	// get result headers
 	resultHeaderMap := map[uint64][]db.TaskResultHeader{}
 
-	resultHeaders, err := fh.coordinator.Database().GetAllTaskResultHeaders(runID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get result headers: %v", err)
-	}
-
-	for _, header := range resultHeaders {
-		resultHeaderMap[header.TaskID] = append(resultHeaderMap[header.TaskID], header)
+	if !fh.securityTrimmed {
+		resultHeaders, err := fh.coordinator.Database().GetAllTaskResultHeaders(runID)
+		if err != nil {
+			logrus.WithError(err).Warnf("Failed to get result headers for run %d", runID)
+		} else {
+			for _, header := range resultHeaders {
+				resultHeaderMap[header.TaskID] = append(resultHeaderMap[header.TaskID], header)
+			}
+		}
 	}
 
 	taskScheduler := test.GetTaskScheduler()
@@ -243,115 +246,42 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 
 			switch {
 			case !taskStatus.IsStarted:
-				taskData.Status = "pending"
+				taskData.Status = api.TaskStatusPending
 			case taskStatus.IsRunning:
-				taskData.Status = "running"
-				taskData.HasRunTime = true
-				taskData.RunTime = time.Since(taskStatus.StartTime).Round(1 * time.Millisecond)
+				taskData.Status = api.TaskStatusRunning
+				taskData.RunTime = time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()
 			default:
-				taskData.Status = "complete"
-				taskData.HasRunTime = true
-				taskData.RunTime = taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond)
+				taskData.Status = api.TaskStatusComplete
+				taskData.RunTime = taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()
 			}
 
 			switch taskStatus.Result {
 			case types.TaskResultNone:
-				taskData.Result = "none"
+				taskData.Result = api.TaskResultNone
 			case types.TaskResultSuccess:
-				taskData.Result = "success"
+				taskData.Result = api.TaskResultSuccess
 			case types.TaskResultFailure:
-				taskData.Result = "failure"
+				taskData.Result = api.TaskResultFailure
 			}
 
 			if taskStatus.Error != nil {
 				taskData.ResultError = taskStatus.Error.Error()
 			}
 
-			if !fh.securityTrimmed {
-				logCount := taskStatus.Logger.GetLogEntryCount()
-				logStart := uint64(0)
-				logLimit := uint64(100)
-
-				if logCount > logLimit {
-					logStart = logCount - logLimit
-				}
-
-				taskLog := taskStatus.Logger.GetLogEntries(logStart, logLimit)
-				taskData.Log = make([]*TestRunTaskLog, len(taskLog))
-
-				for i, log := range taskLog {
-					logData := &TestRunTaskLog{
-						Time:    time.Unix(0, log.LogTime*int64(time.Millisecond)),
-						Level:   uint64(log.LogLevel),
-						Message: log.LogMessage,
-						Data:    map[string]string{},
+			if !fh.securityTrimmed && len(resultHeaderMap[taskData.Index]) > 0 {
+				taskData.ResultFiles = make([]*TestRunTaskResult, len(resultHeaderMap[taskData.Index]))
+				for i, header := range resultHeaderMap[taskData.Index] {
+					resName := header.Name
+					if resName == "" {
+						resName = fmt.Sprintf("%v-%v", header.Type, header.Index)
 					}
 
-					if log.LogFields != "" {
-						err := yaml.Unmarshal([]byte(log.LogFields), &logData.Data)
-						if err == nil {
-							logData.DataLen = uint64(len(logData.Data))
-						}
-					}
-
-					taskData.Log[i] = logData
-				}
-
-				taskConfig, err := yaml.Marshal(taskState.Config())
-				if err != nil {
-					taskData.ConfigYaml = fmt.Sprintf("failed marshalling config: %v", err)
-				} else {
-					taskData.ConfigYaml = fmt.Sprintf("\n%v\n", string(taskConfig))
-				}
-
-				taskStatusVars := taskState.GetTaskStatusVars().GetVarsMap(nil, false)
-				if taskOutput, ok := taskStatusVars["outputs"]; ok {
-					if taskOutputMap, ok := taskOutput.(map[string]interface{}); ok {
-						if customRunTimeSecondsRaw, ok := taskOutputMap["customRunTimeSeconds"]; ok {
-							customRunTime, ok := customRunTimeSecondsRaw.(float64)
-							if ok {
-								taskData.CustomRunTime = time.Duration(customRunTime * float64(time.Second))
-								taskData.HasCustomRunTime = true
-							}
-						}
-					}
-				}
-
-				taskResult, err := yaml.Marshal(taskStatusVars)
-				if err != nil {
-					taskData.ResultYaml = fmt.Sprintf("failed marshalling result: %v", err)
-				} else {
-					refComment := ""
-
-					if taskState.ID() != "" {
-						scopeOwner := "root"
-						if scopeOwnerID := taskState.GetScopeOwner(); scopeOwnerID != 0 {
-							scopeOwner = fmt.Sprintf("task %v", scopeOwnerID)
-						}
-
-						refComment = fmt.Sprintf("# available from %v scope via `tasks.%v`:\n", scopeOwner, taskState.ID())
-					}
-
-					taskData.ResultYaml = fmt.Sprintf("\n%v%v\n", refComment, string(taskResult))
-				}
-
-				if len(resultHeaderMap[taskData.Index]) > 0 {
-					taskData.ResultFiles = make([]*TestRunTaskResult, len(resultHeaderMap[taskData.Index]))
-					taskData.HaveResultFiles = true
-
-					for i, header := range resultHeaderMap[taskData.Index] {
-						resName := header.Name
-						if resName == "" {
-							resName = fmt.Sprintf("%v-%v", header.Type, header.Index)
-						}
-
-						taskData.ResultFiles[i] = &TestRunTaskResult{
-							Type:  header.Type,
-							Index: header.Index,
-							Name:  resName,
-							Size:  header.Size,
-							URL:   fmt.Sprintf("/api/v1/test_run/%v/task/%v/result/%v/%v?view", runID, taskData.Index, header.Type, header.Index),
-						}
+					taskData.ResultFiles[i] = &TestRunTaskResult{
+						Type:  header.Type,
+						Index: header.Index,
+						Name:  resName,
+						Size:  header.Size,
+						URL:   fmt.Sprintf("/api/v1/test_run/%v/task/%v/result/%v/%v", runID, taskData.Index, header.Type, header.Index),
 					}
 				}
 			}

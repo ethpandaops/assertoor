@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -102,7 +104,11 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 			return nil, nil, err
 		}
 
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				logrus.WithError(err).Warn("failed to close response body")
+			}
+		}()
 
 		if resp.StatusCode != http.StatusOK {
 			return nil, nil, fmt.Errorf("error loading test config from url: %v, result: %v %v", extTestCfg.File, resp.StatusCode, resp.Status)
@@ -115,7 +121,11 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 			return nil, nil, fmt.Errorf("error loading test config from file %v: %w", extTestCfg.File, err)
 		}
 
-		defer f.Close()
+		defer func() {
+			if err := f.Close(); err != nil {
+				logrus.WithError(err).Warn("failed to close file")
+			}
+		}()
 
 		reader = f
 	}

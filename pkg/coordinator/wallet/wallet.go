@@ -552,12 +552,7 @@ func (wallet *Wallet) loadTransactionReceipt(ctx context.Context, block *executi
 		cliIdx := retryCount % uint64(len(clients))
 		client := clients[cliIdx]
 
-		reqCtx, reqCtxCancel := context.WithTimeout(ctx, 5*time.Second)
-
-		//nolint:gocritic // ignore
-		defer reqCtxCancel()
-
-		receipt, err := client.GetRPCClient().GetTransactionReceipt(reqCtx, tx.Hash())
+		receipt, err := wallet.loadTransactionReceiptFromClient(ctx, client, tx)
 		if err == nil {
 			return receipt
 		}
@@ -577,4 +572,11 @@ func (wallet *Wallet) loadTransactionReceipt(ctx context.Context, block *executi
 			return nil
 		}
 	}
+}
+
+func (wallet *Wallet) loadTransactionReceiptFromClient(ctx context.Context, client *execution.Client, tx *types.Transaction) (*types.Receipt, error) {
+	reqCtx, reqCtxCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer reqCtxCancel()
+
+	return client.GetRPCClient().GetTransactionReceipt(reqCtx, tx.Hash())
 }

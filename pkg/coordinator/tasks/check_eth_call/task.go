@@ -135,7 +135,7 @@ func (t *Task) Execute(ctx context.Context) error {
 func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *execution.Block) {
 	// Set up the call message
 	address := common.HexToAddress(t.config.CallAddress)
-	callMsg := ethereum.CallMsg{
+	callMsg := &ethereum.CallMsg{
 		Data: common.FromHex(t.config.EthCallData),
 		To:   &address,
 	}
