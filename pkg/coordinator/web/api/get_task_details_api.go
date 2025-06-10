@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"
 )

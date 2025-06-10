@@ -7,12 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/web/api"
-	"github.com/gorilla/mux"
 	"github.com/noku-team/assertoor/pkg/coordinator/db"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/noku-team/assertoor/pkg/coordinator/web/api"
+	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,39 +20,29 @@ type TestRunPage struct {
 	Name         string         `json:"name"`
 	IsStarted    bool           `json:"started"`
 	IsCompleted  bool           `json:"completed"`
-	StartTime    time.Time      `json:"start_time"`
-	StopTime     time.Time      `json:"stop_time"`
-	Timeout      time.Duration  `json:"timeout"`
+	StartTime    int64          `json:"start_time"`
+	StopTime     int64          `json:"stop_time"`
+	Timeout      int64          `json:"timeout"` // milliseconds
 	Status       string         `json:"status"`
 	IsSecTrimmed bool           `json:"is_sec_trimmed"`
 	Tasks        []*TestRunTask `json:"tasks"`
 }
 
 type TestRunTask struct {
-	Index            uint64               `json:"index"`
-	ParentIndex      uint64               `json:"parent_index"`
-	GraphLevels      []uint64             `json:"graph_levels"`
-	HasChildren      bool                 `json:"has_children"`
-	Name             string               `json:"name"`
-	Title            string               `json:"title"`
-	IsStarted        bool                 `json:"started"`
-	IsCompleted      bool                 `json:"completed"`
-	StartTime        time.Time            `json:"start_time"`
-	StopTime         time.Time            `json:"stop_time"`
-	Timeout          time.Duration        `json:"timeout"`
-	HasTimeout       bool                 `json:"has_timeout"`
-	RunTime          time.Duration        `json:"runtime"`
-	HasRunTime       bool                 `json:"has_runtime"`
-	CustomRunTime    time.Duration        `json:"custom_runtime"`
-	HasCustomRunTime bool                 `json:"has_custom_runtime"`
-	Status           string               `json:"status"`
-	Result           string               `json:"result"`
-	ResultError      string               `json:"result_error"`
-	Log              []*TestRunTaskLog    `json:"log"`
-	ConfigYaml       string               `json:"config_yaml"`
-	ResultYaml       string               `json:"result_yaml"`
-	ResultFiles      []*TestRunTaskResult `json:"result_files"`
-	HaveResultFiles  bool                 `json:"have_result_files"`
+	Index       uint64               `json:"index"`
+	ParentIndex uint64               `json:"parent_index"`
+	Name        string               `json:"name"`
+	Title       string               `json:"title"`
+	IsStarted   bool                 `json:"started"`
+	IsCompleted bool                 `json:"completed"`
+	StartTime   int64                `json:"start_time"`
+	StopTime    int64                `json:"stop_time"`
+	Timeout     int64                `json:"timeout"` // milliseconds
+	RunTime     int64                `json:"runtime"` // milliseconds
+	Status      string               `json:"status"`
+	Result      string               `json:"result"`
+	ResultError string               `json:"result_error"`
+	ResultFiles []*TestRunTaskResult `json:"result_files"`
 }
 
 type TestRunTaskResult struct {
@@ -150,9 +138,9 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 		RunID:        runID,
 		TestID:       test.TestID(),
 		Name:         test.Name(),
-		StartTime:    test.StartTime(),
-		StopTime:     test.StopTime(),
-		Timeout:      test.Timeout(),
+		StartTime:    test.StartTime().UnixMilli(),
+		StopTime:     test.StopTime().UnixMilli(),
+		Timeout:      test.Timeout().Milliseconds(),
 		Status:       string(test.Status()),
 		IsSecTrimmed: fh.securityTrimmed,
 	}
@@ -169,6 +157,8 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 		pageData.IsCompleted = true
 	case types.TestStatusSkipped:
 	case types.TestStatusAborted:
+		pageData.IsStarted = true
+		pageData.IsCompleted = true
 	}
 
 	// get result headers
@@ -187,13 +177,13 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 
 	taskScheduler := test.GetTaskScheduler()
 	if taskScheduler != nil && taskScheduler.GetTaskCount() > 0 {
-		indentationMap := map[uint64]int{}
+		taskMap := make(map[uint64]*TestRunTask)
 
 		allTasks := taskScheduler.GetAllTasks()
 		cleanupTasks := taskScheduler.GetAllCleanupTasks()
 		allTasks = append(allTasks, cleanupTasks...)
 
-		for idx, task := range allTasks {
+		for _, task := range allTasks {
 			taskState := taskScheduler.GetTaskState(task)
 			taskStatus := taskState.GetTaskStatus()
 
@@ -204,44 +194,14 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 				Title:       taskState.Title(),
 				IsStarted:   taskStatus.IsStarted,
 				IsCompleted: taskStatus.IsStarted && !taskStatus.IsRunning,
-				StartTime:   taskStatus.StartTime,
-				StopTime:    taskStatus.StopTime,
-				Timeout:     taskState.Timeout(),
-				HasTimeout:  taskState.Timeout() > 0,
-				GraphLevels: []uint64{},
-			}
-
-			indentation := 0
-			if taskData.ParentIndex > 0 {
-				indentation = indentationMap[taskData.ParentIndex] + 1
-			}
-
-			indentationMap[taskData.Index] = indentation
-
-			if indentation > 0 {
-				for i := 0; i < indentation; i++ {
-					taskData.GraphLevels = append(taskData.GraphLevels, 0)
-				}
-
-				taskData.GraphLevels[indentation-1] = 3
-
-				for i := idx - 1; i >= 0; i-- {
-					if pageData.Tasks[i].Index == taskData.ParentIndex {
-						pageData.Tasks[i].HasChildren = true
-						break
-					}
-
-					if len(pageData.Tasks[i].GraphLevels) < indentation {
-						break
-					}
-
-					if pageData.Tasks[i].ParentIndex == taskData.ParentIndex {
-						pageData.Tasks[i].GraphLevels[indentation-1] = 2
-						break
-					}
-
-					pageData.Tasks[i].GraphLevels[indentation-1] = 1
-				}
+				StartTime:   taskStatus.StartTime.UnixMilli(),
+				StopTime:    taskStatus.StopTime.UnixMilli(),
+				Timeout:     taskState.Timeout().Milliseconds(),
+				RunTime:     time.Since(taskStatus.StartTime).Milliseconds(),
+				Status:      "complete",
+				Result:      "unknown",
+				ResultError: "",
+				ResultFiles: nil,
 			}
 
 			switch {
@@ -287,6 +247,7 @@ func (fh *FrontendHandler) getTestRunPageData(runID uint64) (*TestRunPage, error
 			}
 
 			pageData.Tasks = append(pageData.Tasks, taskData)
+			taskMap[taskData.Index] = taskData
 		}
 	}
 

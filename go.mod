@@ -5,7 +5,9 @@ go 1.23.0
 toolchain go1.24.1
 
 require (
+	github.com/HdrHistogram/hdrhistogram-go v1.1.2
 	github.com/attestantio/go-eth2-client v0.25.2
+	github.com/davecgh/go-spew v1.1.1
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
 	github.com/ethereum/go-ethereum v1.15.11
 	github.com/ethpandaops/ethwallclock v0.4.0
@@ -39,7 +41,6 @@ require (
 )
 
 require (
-	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
@@ -115,7 +116,7 @@ require (
 	github.com/swaggo/files v1.0.1 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tdewolff/parse v2.3.4+incompatible // indirect
-	github.com/tdewolff/test v1.0.10 // indirect
+	github.com/tdewolff/test v1.0.11 // indirect
 	github.com/tklauser/go-sysconf v0.3.14 // indirect
 	github.com/tklauser/numcpus v0.8.0 // indirect
 	github.com/wealdtech/go-bytesutil v1.2.1 // indirect

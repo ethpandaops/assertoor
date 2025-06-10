@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
