@@ -4,20 +4,16 @@ type Config struct {
 	PrivateKey string `yaml:"privateKey" json:"privateKey"`
 
 	QPS                  int   `yaml:"qps" json:"qps"`
-	TxCount              int   `yaml:"txCount" json:"txCount"`
+	Duration_s           int   `yaml:"duration_s" json:"duration_s"`
 	MeasureInterval      int   `yaml:"measureInterval" json:"measureInterval"`
-	HighLatency          int64 `yaml:"highLatency" json:"highLatency"`
-	FailOnHighLatency    bool  `yaml:"failOnHighLatency" json:"failOnHighLatency"`
 	SecondsBeforeRunning int64 `yaml:"secondsBeforeRunning" json:"secondsBeforeRunning"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		QPS:                  1000,
-		TxCount:              1000,
+		QPS:                  100,
+		Duration_s:           60,
 		MeasureInterval:      100,
-		HighLatency:          5000, // in microseconds
-		FailOnHighLatency:    true,
 		SecondsBeforeRunning: 0,
 	}
 }
