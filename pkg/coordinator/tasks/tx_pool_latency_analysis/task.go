@@ -126,7 +126,6 @@ func (t *Task) Execute(ctx context.Context) error {
 	var totNumberOfTxes int = t.config.QPS * t.config.Duration_s
 	var txs []*ethtypes.Transaction = make([]*ethtypes.Transaction, totNumberOfTxes)
 	var txStartTime []time.Time = make([]time.Time, totNumberOfTxes)
-	var hashToIndex map[string]int = make(map[string]int)
 	var testDeadline time.Time = time.Now().Add(time.Duration(t.config.Duration_s+60) * time.Second)
 	var latenciesMus = make([]int64, totNumberOfTxes)
 
@@ -153,7 +152,7 @@ func (t *Task) Execute(ctx context.Context) error {
 					return
 				}
 
-				tx, err := t.generateTransaction(ctx)
+				tx, err := t.generateTransaction(ctx, i)
 				if err != nil {
 					t.logger.Errorf("Failed to create transaction: %v", err)
 					t.ctx.SetResult(types.TaskResultFailure)
@@ -171,7 +170,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				}
 
 				txs[i] = tx
-				hashToIndex[tx.Hash().String()] = i
+				//hashToIndex[tx.Hash().String()] = i
 				sentTxCount++
 
 				// log transaction sending
@@ -220,7 +219,15 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 
 			for _, tx := range *txes {
-				tx_index := hashToIndex[tx.Hash().String()]
+				tx_data := tx.Data()
+				// read tx_data that is in the format "tx_index:<index>"
+				var tx_index int
+				_, err := fmt.Sscanf(string(tx_data), "tx_index:%d", &tx_index)
+				if err != nil {
+					t.logger.Errorf("Failed to parse transaction data: %v", err)
+					t.ctx.SetResult(types.TaskResultFailure)
+					return
+				}
 				latenciesMus[tx_index] = time.Now().Sub(txStartTime[tx_index]).Microseconds()
 				receivedEvents++
 
@@ -357,7 +364,7 @@ func (t *Task) getTcpConn(ctx context.Context, client *execution.Client) (*sentr
 	return conn, nil
 }
 
-func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, error) {
+func (t *Task) generateTransaction(ctx context.Context, i int) (*ethtypes.Transaction, error) {
 	tx, err := t.wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
 		addr := t.wallet.GetAddress()
 		toAddr := &addr
@@ -377,7 +384,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 			Gas:       50000,
 			To:        toAddr,
 			Value:     txAmount,
-			Data:      []byte{},
+			Data:      []byte(fmt.Sprintf("tx_index:%d", i)),
 		}
 
 		return ethtypes.NewTx(txObj), nil
