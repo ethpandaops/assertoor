@@ -9,8 +9,11 @@ The `tx_pool_throughput_analysis` task evaluates the throughput of transaction p
 - **`privateKey`**:
   The private key of the account to use for sending transactions.
 
-- **`qps`**:
+- **`tps`**:
   The total number of transactions to send in one second.
+
+- **`duration_s`**:
+  The test duration (the number of transactions to send is calculated as `tps * duration_s`).
 
 - **`measureInterval`**:
   The interval at which the script logs progress (e.g., every 100 transactions).
@@ -25,7 +28,8 @@ The `tx_pool_throughput_analysis` task evaluates the throughput of transaction p
 ```yaml
 - name: tx_pool_throughput_analysis
   config:
-    qps: 15000
+    tps: 100
+    duration_s: 10  
     measureInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
