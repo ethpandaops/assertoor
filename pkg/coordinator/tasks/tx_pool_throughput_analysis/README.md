@@ -20,8 +20,11 @@ The `tx_pool_throughput_analysis` task evaluates the throughput of transaction p
 
 ### Outputs
 
-- **`total_time_mus`**:
-  The total time taken to send the transactions in microseconds.
+- **`tx_count`**:
+  The total number of transactions sent.
+
+- **`max_latency_mus`**:
+  The max latency of the transactions in microseconds.
 
 ### Defaults
 
