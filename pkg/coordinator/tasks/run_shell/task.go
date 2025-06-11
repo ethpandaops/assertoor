@@ -396,7 +396,7 @@ func (t *Task) storeTaskResults(summaryFile *resultFile, resultDir string) {
 						TaskID: uint64(t.ctx.Index),
 						Type:   "result",
 						Index:  fileIdx,
-						Name:   file.Name(),
+						Name:   fmt.Sprintf("%v%v", prefix, file.Name()),
 						Size:   uint64(len(data)),
 						Data:   data,
 					}); err3 != nil {
