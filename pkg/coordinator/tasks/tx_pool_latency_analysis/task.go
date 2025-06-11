@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
-	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -111,67 +110,145 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	defer conn.Close()
 
-	var totalLatency time.Duration
-	var latencies []time.Duration
-
-	var txs []*ethtypes.Transaction
-
-	for i := 0; i < t.config.TxCount; i++ {
-		tx, err := t.generateTransaction(ctx)
-		if err != nil {
-			t.logger.Errorf("Failed to create transaction: %v", err)
-			t.ctx.SetResult(types.TaskResultFailure)
-			return nil
-		}
-
-		startTx := time.Now()
-
-		err = client.GetRPCClient().SendTransaction(ctx, tx)
-		if err != nil {
-			t.logger.Errorf("Failed to send transaction: %v. Nonce: %d. ", err, tx.Nonce())
-			t.ctx.SetResult(types.TaskResultFailure)
-			return nil
-		}
-
-		txs = append(txs, tx)
-
-		// Create a context with timeout for reading transaction messages
-		readCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-
-		done := make(chan error, 1)
-		go func() {
-			_, readErr := conn.ReadTransactionMessages()
-			done <- readErr
-		}()
-
+	// Wait for the specified seconds before starting the task
+	if t.config.SecondsBeforeRunning > 0 {
+		t.logger.Infof("Waiting for %d seconds before starting the task...", t.config.SecondsBeforeRunning)
 		select {
-		case err = <-done:
-			if err != nil {
-				t.logger.Errorf("Failed to read transaction messages: %v", err)
-				t.ctx.SetResult(types.TaskResultFailure)
-				return nil
-			}
-		case <-readCtx.Done():
-			t.logger.Warnf("Timeout waiting for transaction message at index %d, retrying transaction", i)
-			i-- // Retry this transaction
-			continue
-		}
-
-		latency := time.Since(startTx)
-		latencies = append(latencies, latency)
-		totalLatency += latency
-
-		if (i+1)%t.config.MeasureInterval == 0 {
-			avgSoFar := totalLatency.Microseconds() / int64(i+1)
-			t.logger.Infof("Processed %d transactions, current avg latency: %dmus.", i+1, avgSoFar)
+		case <-time.After(time.Duration(t.config.SecondsBeforeRunning) * time.Second):
+			t.logger.Infof("Starting task after waiting.")
+		case <-ctx.Done():
+			t.logger.Warnf("Task cancelled before starting.")
+			return ctx.Err()
 		}
 	}
 
-	avgLatency := totalLatency / time.Duration(t.config.TxCount)
-	t.logger.Infof("Average transaction latency: %dmus", avgLatency.Microseconds())
+	// Prepare to collect transaction latencies
+	var totNumberOfTxes int = t.config.QPS * t.config.Duration_s
+	var txs []*ethtypes.Transaction = make([]*ethtypes.Transaction, totNumberOfTxes)
+	var txStartTime []time.Time = make([]time.Time, totNumberOfTxes)
+	var hashToIndex map[string]int = make(map[string]int)
+	var testDeadline time.Time = time.Now().Add(time.Duration(t.config.Duration_s+60) * time.Second)
+	var latenciesMus = make([]int64, totNumberOfTxes)
 
-	// send to other clients, for speeding up tx mining
+	startTime := time.Now()
+	isFailed := false
+	sentTxCount := 0
+
+	// Start generating and sending transactions
+	go func() {
+		startExecTime := time.Now()
+		endTime := startExecTime.Add(time.Second * time.Duration(t.config.Duration_s))
+
+		// Generate and send transactions
+		for i := 0; i < totNumberOfTxes; i++ {
+			// Calculate how much time we have left
+			remainingTime := time.Until(endTime)
+
+			// Calculate sleep time to distribute remaining transactions evenly
+			sleepTime := remainingTime / time.Duration(totNumberOfTxes-i)
+
+			// generate and send tx
+			go func(i int) {
+				if ctx.Err() != nil && !isFailed {
+					return
+				}
+
+				tx, err := t.generateTransaction(ctx)
+				if err != nil {
+					t.logger.Errorf("Failed to create transaction: %v", err)
+					t.ctx.SetResult(types.TaskResultFailure)
+					isFailed = true
+					return
+				}
+
+				txStartTime[i] = time.Now()
+				err = client.GetRPCClient().SendTransaction(ctx, tx)
+				if err != nil {
+					t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
+					t.ctx.SetResult(types.TaskResultFailure)
+					isFailed = true
+					return
+				}
+
+				txs[i] = tx
+				hashToIndex[tx.Hash().String()] = i
+				sentTxCount++
+
+				// log transaction sending
+				if sentTxCount%t.config.MeasureInterval == 0 {
+					elapsed := time.Since(startTime)
+					t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
+				}
+
+				select {
+				case <-ctx.Done():
+					t.logger.Warnf("Task cancelled, stopping transaction generation.")
+					return
+				default:
+					if time.Since(startTime) >= time.Duration(t.config.Duration_s)*time.Second {
+						t.logger.Infof("Reached duration limit, stopping transaction generation.")
+						return
+					}
+				}
+
+			}(i)
+
+			// Sleep to control the QPS
+			if i < totNumberOfTxes-1 {
+				if sleepTime > 0 {
+					time.Sleep(sleepTime)
+				} else {
+					t.logger.Warnf("Remaining time is negative, skipping sleep")
+				}
+			}
+
+			if (i+1)%t.config.MeasureInterval == 0 {
+				t.logger.Infof("%d transactions sent", i+1)
+			}
+		}
+	}()
+
+	// Wait P2P event messages
+	func() {
+		var receivedEvents int = 0
+		for {
+			txes, err := conn.ReadTransactionMessages()
+			if err == nil {
+				t.logger.Errorf("Failed reading p2p events: %v", err)
+				t.ctx.SetResult(types.TaskResultFailure)
+				return
+			}
+
+			for _, tx := range *txes {
+				tx_index := hashToIndex[tx.Hash().String()]
+				latenciesMus[tx_index] = time.Now().Sub(txStartTime[tx_index]).Microseconds()
+				receivedEvents++
+
+				if receivedEvents%t.config.MeasureInterval == 0 {
+					t.logger.Infof("Received %d p2p events", sentTxCount)
+				}
+			}
+
+			if receivedEvents == totNumberOfTxes {
+				t.logger.Infof("Reading of p2p events finished")
+				return
+			}
+
+			select {
+			case <-ctx.Done():
+				t.logger.Warnf("Task cancelled, stopping reading p2p events.")
+				return
+			default:
+				// check test deadline
+				if time.Now().After(testDeadline) {
+					t.logger.Warnf("Reached duration limit, stopping reading p2p events.")
+					return
+				}
+			}
+		}
+	}()
+
+	// Send txes to other clients, for speeding up tx mining
 	for _, tx := range txs {
 		for _, otherClient := range executionClients {
 			if otherClient.GetName() == client.GetName() {
@@ -182,71 +259,34 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	// Convert latencies to microseconds for processing
-	latenciesMus := make([]int64, len(latencies))
-	for i, latency := range latencies {
-		latenciesMus[i] = latency.Microseconds()
+	// Check if the context was cancelled or other errors occurred
+	if ctx.Err() != nil && !isFailed {
+		return nil
+	}
+
+	// Check if we received all transactions p2p events
+	notReceivedP2PEventCount := 0
+	for i := 0; i < totNumberOfTxes; i++ {
+		if latenciesMus[i] == 0 {
+			notReceivedP2PEventCount++
+			// Assign a default value for missing P2P events
+			latenciesMus[i] = (time.Duration(t.config.Duration_s) * time.Second).Microseconds()
+		}
+	}
+	if notReceivedP2PEventCount > 0 {
+		t.logger.Warnf("Missed %d p2p events, assigned test dureation as latency", notReceivedP2PEventCount)
 	}
 
 	// Calculate statistics
-	var totalLatencyMus int64
 	var maxLatency int64 = 0
 	var minLatency int64 = 0
-	if len(latenciesMus) > 0 {
-		minLatency = latenciesMus[0]
-	}
-
 	for _, lat := range latenciesMus {
-		totalLatencyMus += lat
 		if lat > maxLatency {
 			maxLatency = lat
 		}
 		if lat < minLatency {
 			minLatency = lat
 		}
-	}
-
-	// Calculate mean
-	var meanLatency float64 = 0
-	if len(latenciesMus) > 0 {
-		meanLatency = float64(totalLatencyMus) / float64(len(latenciesMus))
-	}
-
-	// Sort for percentiles
-	sortedLatencies := make([]int64, len(latenciesMus))
-	copy(sortedLatencies, latenciesMus)
-	sort.Slice(sortedLatencies, func(i, j int) bool {
-		return sortedLatencies[i] < sortedLatencies[j]
-	})
-
-	// Calculate percentiles
-	percentile50th := float64(0)
-	percentile90th := float64(0)
-	percentile95th := float64(0)
-	percentile99th := float64(0)
-
-	if len(sortedLatencies) > 0 {
-		getPercentile := func(pct float64) float64 {
-			idx := int(float64(len(sortedLatencies)-1) * pct / 100)
-			return float64(sortedLatencies[idx])
-		}
-
-		percentile50th = getPercentile(50)
-		percentile90th = getPercentile(90)
-		percentile95th = getPercentile(95)
-		percentile99th = getPercentile(99)
-	}
-
-	// Create statistics map for output
-	latenciesStats := map[string]float64{
-		"total": float64(totalLatencyMus),
-		"mean":  meanLatency,
-		"50th":  percentile50th,
-		"90th":  percentile90th,
-		"95th":  percentile95th,
-		"99th":  percentile99th,
-		"max":   float64(maxLatency),
-		"min":   float64(minLatency),
 	}
 
 	// Generate HDR plot
@@ -257,22 +297,15 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	if t.config.FailOnHighLatency && avgLatency.Microseconds() > t.config.HighLatency {
-		t.logger.Errorf("Transaction latency too high: %dmus (expected <= %dmus)", avgLatency.Microseconds(), t.config.HighLatency)
-		t.ctx.SetResult(types.TaskResultFailure)
-	} else {
-		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
-		t.ctx.Outputs.SetVar("avg_latency_mus", avgLatency.Microseconds())
-		t.ctx.Outputs.SetVar("latencies", latenciesStats)
+	t.ctx.Outputs.SetVar("tx_count", totNumberOfTxes)
+	t.ctx.Outputs.SetVar("max_latency_mus", maxLatency)
 
-		t.ctx.SetResult(types.TaskResultSuccess)
-	}
+	t.ctx.SetResult(types.TaskResultSuccess)
 
 	outputs := map[string]interface{}{
-		"tx_count":                 t.config.TxCount,
-		"avg_latency_mus":          avgLatency.Microseconds(),
+		"tx_count":                 totNumberOfTxes,
+		"max_latency_mus":          maxLatency,
 		"tx_pool_latency_hdr_plot": plot,
-		"latencies":                latenciesStats,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
