@@ -228,7 +228,7 @@ func (t *Task) Execute(ctx context.Context) error {
 					t.ctx.SetResult(types.TaskResultFailure)
 					return
 				}
-				latenciesMus[tx_index] = time.Now().Sub(txStartTime[tx_index]).Microseconds()
+				latenciesMus[tx_index] = time.Since(txStartTime[tx_index]).Microseconds()
 				receivedEvents++
 
 				if receivedEvents%t.config.MeasureInterval == 0 {
@@ -374,9 +374,7 @@ func (t *Task) generateTransaction(ctx context.Context, i int) (*ethtypes.Transa
 		feeCap := &helper.BigInt{Value: *big.NewInt(100000000000)} // 100 Gwei
 		tipCap := &helper.BigInt{Value: *big.NewInt(1000000000)}   // 1 Gwei
 
-		var txObj ethtypes.TxData
-
-		txObj = &ethtypes.DynamicFeeTx{
+		txObj := &ethtypes.DynamicFeeTx{
 			ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
 			Nonce:     nonce,
 			GasTipCap: &tipCap.Value,
