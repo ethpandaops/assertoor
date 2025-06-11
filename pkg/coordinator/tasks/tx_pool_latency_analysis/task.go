@@ -228,6 +228,11 @@ func (t *Task) Execute(ctx context.Context) error {
 					t.ctx.SetResult(types.TaskResultFailure)
 					return
 				}
+				if tx_index < 0 || tx_index >= totNumberOfTxes {
+					t.logger.Errorf("Transaction index out of range: %d", tx_index)
+					t.ctx.SetResult(types.TaskResultFailure)
+					return
+				}
 				latenciesMus[tx_index] = time.Since(txStartTime[tx_index]).Microseconds()
 				receivedEvents++
 
