@@ -111,64 +111,130 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	defer conn.Close()
 
-	var totalLatency time.Duration
-	var latencies []time.Duration
+	// Create three synchronized arrays for precise latency calculation
+	sendTimestamps := make([]time.Time, t.config.QPS)
+	receiveTimestamps := make([]time.Time, t.config.QPS)
 
 	var txs []*ethtypes.Transaction
+	hashToIndex := make(map[string]int) // Map hash to array index
 
-	for i := 0; i < t.config.TxCount; i++ {
-		tx, err := t.generateTransaction(ctx)
-		if err != nil {
-			t.logger.Errorf("Failed to create transaction: %v", err)
-			t.ctx.SetResult(types.TaskResultFailure)
-			return nil
-		}
+	startTime := time.Now()
+	isFailed := false
+	sentTxCount := 0
 
-		startTx := time.Now()
+	// Send transactions at QPS rate
+	go func() {
+		startExecTime := time.Now()
+		endTime := startExecTime.Add(time.Second)
 
-		err = client.GetRPCClient().SendTransaction(ctx, tx)
-		if err != nil {
-			t.logger.Errorf("Failed to send transaction: %v. Nonce: %d. ", err, tx.Nonce())
-			t.ctx.SetResult(types.TaskResultFailure)
-			return nil
-		}
-
-		txs = append(txs, tx)
-
-		// Create a context with timeout for reading transaction messages
-		readCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-
-		done := make(chan error, 1)
-		go func() {
-			_, readErr := conn.ReadTransactionMessages()
-			done <- readErr
-		}()
-
-		select {
-		case err = <-done:
-			if err != nil {
-				t.logger.Errorf("Failed to read transaction messages: %v", err)
-				t.ctx.SetResult(types.TaskResultFailure)
-				return nil
+		for i := range t.config.QPS {
+			if ctx.Err() != nil || isFailed {
+				return
 			}
-		case <-readCtx.Done():
-			t.logger.Warnf("Timeout waiting for transaction message at index %d, retrying transaction", i)
-			i-- // Retry this transaction
-			continue
+
+			// Calculate how much time we have left
+			remainingTime := time.Until(endTime)
+
+			// Calculate sleep time to distribute remaining transactions evenly
+			sleepTime := remainingTime / time.Duration(t.config.QPS-i)
+
+			// Generate and send transaction
+			go func(index int) {
+				if ctx.Err() != nil || isFailed {
+					return
+				}
+
+				tx, err := t.generateTransaction(ctx)
+				if err != nil {
+					t.logger.Errorf("Failed to create transaction: %v", err)
+					t.ctx.SetResult(types.TaskResultFailure)
+					isFailed = true
+					return
+				}
+
+				startTx := time.Now()
+
+				err = client.GetRPCClient().SendTransaction(ctx, tx)
+				if err != nil {
+					t.logger.Errorf("Failed to send transaction: %v. Nonce: %d. ", err, tx.Nonce())
+					t.ctx.SetResult(types.TaskResultFailure)
+					isFailed = true
+					return
+				}
+
+				// Store transaction data in synchronized arrays
+				txHash := tx.Hash().String()
+				sendTimestamps[index] = startTx
+				hashToIndex[txHash] = index
+
+				txs = append(txs, tx)
+				sentTxCount++
+
+				if sentTxCount%t.config.MeasureInterval == 0 {
+					elapsed := time.Since(startTime)
+					t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
+				}
+			}(i)
+
+			if isFailed {
+				return
+			}
+
+			time.Sleep(sleepTime)
 		}
 
-		latency := time.Since(startTx)
-		latencies = append(latencies, latency)
-		totalLatency += latency
+		execTime := time.Since(startExecTime)
+		t.logger.Infof("Time to generate and send %d transactions: %v", t.config.QPS, execTime)
+	}()
 
-		if (i+1)%t.config.MeasureInterval == 0 {
-			avgSoFar := totalLatency.Microseconds() / int64(i+1)
-			t.logger.Infof("Processed %d transactions, current avg latency: %dmus.", i+1, avgSoFar)
+	// Read transactions back from peer to measure network latency
+	gotTx := 0
+	for gotTx < t.config.QPS && !isFailed {
+		if ctx.Err() != nil {
+			break
+		}
+
+		receivedTxs, err := conn.ReadTransactionMessages()
+		if err != nil {
+			t.logger.Errorf("Failed to read transaction messages: %v", err)
+			t.ctx.SetResult(types.TaskResultFailure)
+			return nil
+		}
+
+		// Process received transactions and store receive timestamps
+		for _, receivedTx := range *receivedTxs {
+			receivedHash := receivedTx.Hash().String()
+			if index, exists := hashToIndex[receivedHash]; exists {
+				receiveTimestamps[index] = time.Now()
+				gotTx++
+			}
+		}
+
+		if gotTx%t.config.MeasureInterval == 0 {
+			t.logger.Infof("Received %d transactions", gotTx)
 		}
 	}
 
-	avgLatency := totalLatency / time.Duration(t.config.TxCount)
+	if isFailed {
+		return nil
+	}
+
+	// Calculate latencies from synchronized arrays
+	var latencies []time.Duration
+	var totalLatency time.Duration
+
+	for i := range t.config.QPS {
+		if !receiveTimestamps[i].IsZero() && !sendTimestamps[i].IsZero() {
+			latency := receiveTimestamps[i].Sub(sendTimestamps[i])
+			latencies = append(latencies, latency)
+			totalLatency += latency
+		}
+	}
+
+	avgLatency := time.Duration(0)
+	if len(latencies) > 0 {
+		avgLatency = totalLatency / time.Duration(len(latencies))
+	}
 	t.logger.Infof("Average transaction latency: %dmus", avgLatency.Microseconds())
 
 	// send to other clients, for speeding up tx mining
@@ -261,7 +327,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Errorf("Transaction latency too high: %dmus (expected <= %dmus)", avgLatency.Microseconds(), t.config.HighLatency)
 		t.ctx.SetResult(types.TaskResultFailure)
 	} else {
-		t.ctx.Outputs.SetVar("tx_count", t.config.TxCount)
+		t.ctx.Outputs.SetVar("tx_count", len(latencies))
+		t.ctx.Outputs.SetVar("qps", t.config.QPS)
 		t.ctx.Outputs.SetVar("avg_latency_mus", avgLatency.Microseconds())
 		t.ctx.Outputs.SetVar("latencies", latenciesStats)
 
@@ -269,7 +336,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	outputs := map[string]interface{}{
-		"tx_count":                 t.config.TxCount,
+		"tx_count":                 len(latencies),
+		"qps":                      t.config.QPS,
 		"avg_latency_mus":          avgLatency.Microseconds(),
 		"tx_pool_latency_hdr_plot": plot,
 		"latencies":                latenciesStats,
