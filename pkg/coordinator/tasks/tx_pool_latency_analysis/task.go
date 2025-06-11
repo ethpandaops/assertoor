@@ -212,7 +212,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		var receivedEvents int = 0
 		for {
 			txes, err := conn.ReadTransactionMessages()
-			if err == nil {
+			if err != nil {
 				t.logger.Errorf("Failed reading p2p events: %v", err)
 				t.ctx.SetResult(types.TaskResultFailure)
 				return
