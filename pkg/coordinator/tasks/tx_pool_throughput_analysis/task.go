@@ -26,7 +26,7 @@ var (
 	TaskName       = "tx_pool_throughput_analysis"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Checks the throughput of transactions in the Ethereum TxPool",
+		Description: "Checks the TxPool transaction propagation throughput",
 		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
@@ -100,6 +100,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	client := executionClients[rand.Intn(len(executionClients))]
 
+	t.logger.Infof("Measuring TxPool transaction propagation *throughput*")
+	t.logger.Infof("Targeting client: %s, TPS: %d, Duration: %d seconds",
+		client.GetName(), t.config.TPS, t.config.Duration_s)
+
 	conn, err := t.getTcpConn(ctx, client)
 	if err != nil {
 		t.logger.Errorf("Failed to get wire eth TCP connection: %v", err)
@@ -121,14 +125,17 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	// Prepare to send transactions
+	// Prepare to collect transaction latencies
 	var totNumberOfTxes int = t.config.TPS * t.config.Duration_s
 	var txs []*ethtypes.Transaction = make([]*ethtypes.Transaction, totNumberOfTxes)
+	var txStartTime []time.Time = make([]time.Time, totNumberOfTxes)
 	var testDeadline time.Time = time.Now().Add(time.Duration(t.config.Duration_s+60*30) * time.Second)
+	var latenciesMus = make([]int64, totNumberOfTxes)
 
 	startTime := time.Now()
 	isFailed := false
 	sentTxCount := 0
+	duplicatedP2PEventCount := 0
 	coordinatedOmissionEventCount := 0
 
 	// Start generating and sending transactions
@@ -155,6 +162,7 @@ func (t *Task) Execute(ctx context.Context) error {
 					return
 				}
 
+				txStartTime[i] = time.Now()
 				err = client.GetRPCClient().SendTransaction(ctx, tx)
 				if err != nil {
 					t.logger.WithField("client", client.GetName()).Errorf("Failed to send transaction: %v", err)
@@ -185,20 +193,16 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			select {
 			case <-ctx.Done():
-				{
-					t.logger.Warnf("Task cancelled, stopping transaction generation.")
+				t.logger.Warnf("Task cancelled, stopping transaction generation.")
+				return
+			default:
+				// if testDeadline reached, stop sending txes
+				if isFailed {
 					return
 				}
-			default:
-				{
-					// if testDeadline reached, stop sending txes
-					if isFailed {
-						return
-					}
-					if time.Now().After(testDeadline) {
-						t.logger.Infof("Reached duration limit, stopping transaction generation.")
-						return
-					}
+				if time.Now().After(testDeadline) {
+					t.logger.Infof("Reached duration limit, stopping transaction generation.")
+					return
 				}
 			}
 		}
@@ -233,7 +237,14 @@ func (t *Task) Execute(ctx context.Context) error {
 					isFailed = true
 					return
 				}
-				//latenciesMus[tx_index] = time.Since(txStartTime[tx_index]).Microseconds()
+
+				// log the duplicated p2p events, and count duplicated p2p events
+				// todo: add a timeout of N seconds that activates if duplicatedP2PEventCount + receivedEvents >= totNumberOfTxes, if exceeded, exit the function
+				if latenciesMus[tx_index] != 0 {
+					duplicatedP2PEventCount++
+				}
+
+				latenciesMus[tx_index] = time.Since(txStartTime[tx_index]).Microseconds()
 				receivedEvents++
 
 				if receivedEvents%t.config.MeasureInterval == 0 {
@@ -260,10 +271,15 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}()
 
-	lastMeasureTime := time.Since(startTime)
+	lastMeasureDelay := time.Since(startTime)
+	t.logger.Infof("Last measure delay since start time: %s", lastMeasureDelay)
 
 	if coordinatedOmissionEventCount > 0 {
-		t.logger.Warnf("Coordinated omission events count: %d", coordinatedOmissionEventCount)
+		t.logger.Warnf("Coordinated omission events: %d", coordinatedOmissionEventCount)
+	}
+
+	if duplicatedP2PEventCount > 0 {
+		t.logger.Warnf("Duplicated p2p events: %d", duplicatedP2PEventCount)
 	}
 
 	// Send txes to other clients, for speeding up tx mining
@@ -282,13 +298,26 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
+	// Check if we received all transactions p2p events
+	notReceivedP2PEventCount := 0
+	for i := 0; i < totNumberOfTxes; i++ {
+		if latenciesMus[i] == 0 {
+			notReceivedP2PEventCount++
+			// Assign a default value for missing P2P events
+			latenciesMus[i] = (time.Duration(t.config.Duration_s) * time.Second).Microseconds()
+		}
+	}
+	if notReceivedP2PEventCount > 0 {
+		t.logger.Warnf("Missed p2p events: %d (assigned latency=duration)", notReceivedP2PEventCount)
+	}
+
 	// Calculate statistics
-	processed_tx_per_second := float64(sentTxCount) / lastMeasureTime.Seconds()
+	processed_tx_per_second := float64(sentTxCount) / lastMeasureDelay.Seconds()
 
 	t.ctx.Outputs.SetVar("mean_tps_throughput", processed_tx_per_second)
-	t.logger.Infof("Processed %d transactions in %.2fs, mean throughput: %.2f tx/s", sentTxCount, lastMeasureTime.Seconds(), processed_tx_per_second)
+	t.logger.Infof("Processed %d transactions in %.2fs, mean throughput: %.2f tx/s", sentTxCount, lastMeasureDelay.Seconds(), processed_tx_per_second)
 	t.ctx.Outputs.SetVar("tx_count", totNumberOfTxes)
-	t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, lastMeasureTime.Seconds())
+	t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, lastMeasureDelay.Seconds())
 
 	t.ctx.SetResult(types.TaskResultSuccess)
 

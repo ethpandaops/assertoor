@@ -27,7 +27,7 @@ var (
 	TaskName       = "tx_pool_latency_analysis"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Checks the latency of transactions in the Ethereum TxPool",
+		Description: "Checks the TxPool transaction propagation latency",
 		Config:      DefaultConfig(),
 		NewTask:     NewTask,
 	}
@@ -101,6 +101,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	client := executionClients[rand.Intn(len(executionClients))]
 
+	t.logger.Infof("Measuring TxPool transaction propagation *latency*")
+	t.logger.Infof("Targeting client: %s, TPS: %d, Duration: %d seconds",
+		client.GetName(), t.config.TPS, t.config.Duration_s)
+
 	conn, err := t.getTcpConn(ctx, client)
 	if err != nil {
 		t.logger.Errorf("Failed to get wire eth TCP connection: %v", err)
@@ -169,7 +173,6 @@ func (t *Task) Execute(ctx context.Context) error {
 				}
 
 				txs[i] = tx
-				//hashToIndex[tx.Hash().String()] = i
 				sentTxCount++
 
 				// log transaction sending
@@ -177,6 +180,7 @@ func (t *Task) Execute(ctx context.Context) error {
 					elapsed := time.Since(startTime)
 					t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
 				}
+
 			}(i)
 
 			// Sleep to control the TPS
@@ -190,20 +194,16 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			select {
 			case <-ctx.Done():
-				{
-					t.logger.Warnf("Task cancelled, stopping transaction generation.")
+				t.logger.Warnf("Task cancelled, stopping transaction generation.")
+				return
+			default:
+				// if testDeadline reached, stop sending txes
+				if isFailed {
 					return
 				}
-			default:
-				{
-					// if testDeadline reached, stop sending txes
-					if isFailed {
-						return
-					}
-					if time.Now().After(testDeadline) {
-						t.logger.Infof("Reached duration limit, stopping transaction generation.")
-						return
-					}
+				if time.Now().After(testDeadline) {
+					t.logger.Infof("Reached duration limit, stopping transaction generation.")
+					return
 				}
 			}
 		}
@@ -272,12 +272,15 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}()
 
+	lastMeasureDelay := time.Since(startTime)
+	t.logger.Infof("Last measure delay since start time: %s", lastMeasureDelay)
+
 	if coordinatedOmissionEventCount > 0 {
-		t.logger.Warnf("Coordinated omission events count: %d", coordinatedOmissionEventCount)
+		t.logger.Warnf("Coordinated omission events: %d", coordinatedOmissionEventCount)
 	}
 
 	if duplicatedP2PEventCount > 0 {
-		t.logger.Warnf("Duplicated p2p event count: %d", duplicatedP2PEventCount)
+		t.logger.Warnf("Duplicated p2p events: %d", duplicatedP2PEventCount)
 	}
 
 	// Send txes to other clients, for speeding up tx mining
@@ -306,7 +309,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 	if notReceivedP2PEventCount > 0 {
-		t.logger.Warnf("Missed %d p2p events, assigned test dureation as latency", notReceivedP2PEventCount)
+		t.logger.Warnf("Missed p2p events: %d (assigned latency=duration)", notReceivedP2PEventCount)
 	}
 
 	// Calculate statistics
