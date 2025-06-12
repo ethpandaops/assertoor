@@ -182,27 +182,26 @@ func (t *Task) Execute(ctx context.Context) error {
 					coordinatedOmissionEventCount++
 				}
 			}
-		}
 
-		select {
-		case <-ctx.Done():
-			{
-				t.logger.Warnf("Task cancelled, stopping transaction generation.")
-				return
-			}
-		default:
-			{
-				// if testDeadline reached, stop sending txes
-				if isFailed {
+			select {
+			case <-ctx.Done():
+				{
+					t.logger.Warnf("Task cancelled, stopping transaction generation.")
 					return
 				}
-				if time.Now().After(testDeadline) {
-					t.logger.Infof("Reached duration limit, stopping transaction generation.")
-					return
+			default:
+				{
+					// if testDeadline reached, stop sending txes
+					if isFailed {
+						return
+					}
+					if time.Now().After(testDeadline) {
+						t.logger.Infof("Reached duration limit, stopping transaction generation.")
+						return
+					}
 				}
 			}
 		}
-
 	}()
 
 	// Wait P2P event messages
