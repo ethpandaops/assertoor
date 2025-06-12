@@ -5,8 +5,8 @@ disable: false
 config:
   walletPrivkey: ""
 tasks:
-- name: tx_pool_throughput_analysis
-  title: "Check transaction pool throughput with 10.000 transactions"
+- name: tx_pool_latency_analysis
+  title: "Check transaction pool latency with 10.000 transactions"
   timeout: 30m
   config:
     tps: 1000
@@ -19,8 +19,8 @@ tasks:
   timeout: 30m
   config:
     waitTime: 5
-- name: tx_pool_latency_analysis
-  title: "Check transaction pool latency with 10.000 transactions"
+- name: tx_pool_throughput_analysis
+  title: "Check transaction pool throughput with 10.000 transactions"
   timeout: 30m
   config:
     tps: 1000
