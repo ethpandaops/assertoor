@@ -133,10 +133,10 @@ func (t *Task) Execute(ctx context.Context) error {
 	isFailed := false
 	sentTxCount := 0
 	duplicatedP2PEventCount := 0
+	coordinatedOmissionEventsCount := 0
 
 	// Start generating and sending transactions
 	go func() {
-		var logOnce bool = false
 		startExecTime := time.Now()
 		endTime := startExecTime.Add(time.Second * time.Duration(t.config.Duration_s))
 
@@ -184,10 +184,11 @@ func (t *Task) Execute(ctx context.Context) error {
 				if sleepTime > 0 {
 					time.Sleep(sleepTime)
 				} else {
-					if !logOnce {
+					if coordinatedOmissionEventsCount == 0 {
 						t.logger.Warnf("Remaining time is negative, skipping sleep")
-						logOnce = true
 					}
+
+					coordinatedOmissionEventsCount++
 				}
 			}
 
@@ -329,6 +330,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("min_latency_mus", minLatency)
 	t.ctx.Outputs.SetVar("max_latency_mus", maxLatency)
 	t.ctx.Outputs.SetVar("duplicated_p2p_event_count", duplicatedP2PEventCount)
+	t.ctx.Outputs.SetVar("coordinated_omission_events_count", coordinatedOmissionEventsCount)
 
 	t.ctx.SetResult(types.TaskResultSuccess)
 
@@ -338,6 +340,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		"max_latency_mus":          maxLatency,
 		"tx_pool_latency_hdr_plot": plot,
 		"duplicated_p2p_event_count": duplicatedP2PEventCount,
+		"coordinated_omission_events_count": coordinatedOmissionEventsCount,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
