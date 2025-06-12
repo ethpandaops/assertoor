@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/forkid"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/helper"
@@ -125,6 +124,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	// Prepare to send transactions
 	var totNumberOfTxes int = t.config.TPS * t.config.Duration_s
 	var txs []*ethtypes.Transaction = make([]*ethtypes.Transaction, totNumberOfTxes)
+	var testDeadline time.Time = time.Now().Add(time.Duration(t.config.Duration_s+60*30) * time.Second)
 
 	startTime := time.Now()
 	isFailed := false
@@ -145,9 +145,6 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			// generate and send tx
 			go func() {
-				if ctx.Err() != nil && !isFailed {
-					return
-				}
 
 				tx, err := t.generateTransaction(ctx)
 				if err != nil {
@@ -174,21 +171,7 @@ func (t *Task) Execute(ctx context.Context) error {
 					t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
 				}
 
-				select {
-				case <-ctx.Done():
-					t.logger.Warnf("Task cancelled, stopping transaction generation.")
-					return
-				default:
-					if time.Since(startTime) >= time.Duration(t.config.Duration_s)*time.Second {
-						t.logger.Infof("Reached duration limit, stopping transaction generation.")
-						return
-					}
-				}
 			}()
-
-			if isFailed {
-				return
-			}
 
 			// Sleep to control the TPS
 			if i < totNumberOfTxes-1 {
@@ -200,79 +183,83 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 		}
 
-		execTime := time.Since(startExecTime)
-		t.logger.Infof("Time to generate %d transactions: %v", t.config.TPS, execTime)
-	}()
-
-	lastMeasureTime := time.Now()
-	gotTx := 0
-
-	if isFailed {
-		return nil
-	}
-
-	for gotTx < t.config.TPS {
-		if isFailed {
-			return nil
+		select {
+		case <-ctx.Done():
+			{
+				t.logger.Warnf("Task cancelled, stopping transaction generation.")
+				return
+			}
+		default:
+			{
+				// if testDeadline reached, stop sending txes
+				if isFailed {
+					return
+				}
+				if time.Now().After(testDeadline) {
+					t.logger.Infof("Reached duration limit, stopping transaction generation.")
+					return
+				}
+			}
 		}
 
-		// Add a timeout of 180 seconds for reading transaction messages
-		readChan := make(chan struct {
-			p2pTxs *eth.TransactionsPacket
-			err error
-		})
+	}()
 
-		go func() {
-			txs, err := conn.ReadTransactionMessages()
-			readChan <- struct {
-				p2pTxs *eth.TransactionsPacket
-				err error
-			}{txs, err}
-		}()
-
-		select {
-		case result := <-readChan:
-			if result.err != nil {
-				t.logger.Errorf("Failed to read transaction messages: %v", result.err)
+	// Wait P2P event messages
+	func() {
+		var receivedEvents int = 0
+		for {
+			txes, err := conn.ReadTransactionMessages()
+			if err != nil {
+				t.logger.Errorf("Failed reading p2p events: %v", err)
 				t.ctx.SetResult(types.TaskResultFailure)
-				return nil
-			}
-			gotTx += len(*result.p2pTxs)
-		case <-time.After(180 * time.Second):
-			t.logger.Warnf("Timeout after 180 seconds while reading transaction messages. Re-sending transactions...")
-
-			// Calculate how many transactions we're still missing
-			missingTxCount := t.config.TPS - gotTx
-			if missingTxCount <= 0 {
-				break
+				return
 			}
 
-			// Re-send transactions to the original client
-			for i := 0; i < missingTxCount && i < len(txs); i++ {
-				err = client.GetRPCClient().SendTransaction(ctx, txs[i])
+			for _, tx := range *txes {
+				tx_data := tx.Data()
+				// read tx_data that is in the format "tx_index:<index>"
+				var tx_index int
+				_, err := fmt.Sscanf(string(tx_data), "tx_index:%d", &tx_index)
 				if err != nil {
-					t.logger.WithError(err).Errorf("Failed to re-send transaction message, error: %v", err)
+					t.logger.Errorf("Failed to parse transaction data: %v", err)
 					t.ctx.SetResult(types.TaskResultFailure)
-					return nil
+					isFailed = true
+					return
+				}
+				if tx_index < 0 || tx_index >= totNumberOfTxes {
+					t.logger.Errorf("Transaction index out of range: %d", tx_index)
+					t.ctx.SetResult(types.TaskResultFailure)
+					isFailed = true
+					return
+				}
+				//latenciesMus[tx_index] = time.Since(txStartTime[tx_index]).Microseconds()
+				receivedEvents++
+
+				if receivedEvents%t.config.MeasureInterval == 0 {
+					t.logger.Infof("Received %d p2p events", sentTxCount)
 				}
 			}
 
-			t.logger.Infof("Re-sent %d transactions", missingTxCount)
-			continue
+			if receivedEvents == totNumberOfTxes {
+				t.logger.Infof("Reading of p2p events finished")
+				return
+			}
+
+			select {
+			case <-ctx.Done():
+				t.logger.Warnf("Task cancelled, stopping reading p2p events.")
+				return
+			default:
+				// check test deadline
+				if time.Now().After(testDeadline) {
+					t.logger.Warnf("Reached duration limit, stopping reading p2p events.")
+					return
+				}
+			}
 		}
+	}()
 
-		if gotTx%t.config.MeasureInterval != 0 {
-			continue
-		}
-
-		t.logger.Infof("Got %d transactions", gotTx)
-		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", gotTx, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
-
-		lastMeasureTime = time.Now()
-	}
-
-	totalTime := time.Since(startTime)
-	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
+	lastMeasureTime := time.Since(startTime)
 
 	// send to other clients, for speeding up tx mining
 	for _, tx := range txs {
@@ -285,15 +272,28 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	outputs := map[string]interface{}{
-		"total_time_mus": totalTime.Microseconds(),
-		"tps":            t.config.TPS,
+	// Check if the context was cancelled or other errors occurred
+	if ctx.Err() != nil && !isFailed {
+		return nil
 	}
+
+	// Calculate statistics
+	processed_tx_per_second := float64(sentTxCount) / lastMeasureTime.Seconds()
+
+	t.ctx.Outputs.SetVar("mean_throughput", processed_tx_per_second)
+	t.logger.Infof("Processed %d transactions in %.2fs, mean throughput: %.2f tx/s", sentTxCount, lastMeasureTime.Seconds(), processed_tx_per_second)
+	t.ctx.Outputs.SetVar("tx_count", totNumberOfTxes)
+	t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, lastMeasureTime.Seconds())
+
+	t.ctx.SetResult(types.TaskResultSuccess)
+
+	outputs := map[string]interface{}{
+		"tx_count":        totNumberOfTxes,
+		"mean_throughput": processed_tx_per_second,
+	}
+
 	outputsJSON, _ := json.Marshal(outputs)
 	t.logger.Infof("outputs_json: %s", string(outputsJSON))
-
-	t.ctx.Outputs.SetVar("total_time_mus", totalTime.Milliseconds())
-	t.ctx.SetResult(types.TaskResultSuccess)
 
 	return nil
 }
