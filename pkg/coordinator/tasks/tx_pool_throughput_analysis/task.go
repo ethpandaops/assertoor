@@ -129,12 +129,12 @@ func (t *Task) Execute(ctx context.Context) error {
 	startTime := time.Now()
 	isFailed := false
 	sentTxCount := 0
-	coordinatedOmissionEventsCount := 0
+	coordinatedOmissionEventCount := 0
 
 	// Start generating and sending transactions
 	go func() {
 		startExecTime := time.Now()
-		endTime := startExecTime.Add(time.Second)
+		endTime := startExecTime.Add(time.Second * time.Duration(t.config.Duration_s))
 
 		// Generate and send transactions
 		for i := 0; i < totNumberOfTxes; i++ {
@@ -145,9 +145,9 @@ func (t *Task) Execute(ctx context.Context) error {
 			sleepTime := remainingTime / time.Duration(totNumberOfTxes-i)
 
 			// generate and send tx
-			go func() {
+			go func(i int) {
 
-				tx, err := t.generateTransaction(ctx)
+				tx, err := t.generateTransaction(ctx, i)
 				if err != nil {
 					t.logger.Errorf("Failed to create transaction: %v", err)
 					t.ctx.SetResult(types.TaskResultFailure)
@@ -172,14 +172,14 @@ func (t *Task) Execute(ctx context.Context) error {
 					t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
 				}
 
-			}()
+			}(i)
 
 			// Sleep to control the TPS
 			if i < totNumberOfTxes-1 {
 				if sleepTime > 0 {
 					time.Sleep(sleepTime)
 				} else {
-					coordinatedOmissionEventsCount++
+					coordinatedOmissionEventCount++
 				}
 			}
 		}
@@ -213,6 +213,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			if err != nil {
 				t.logger.Errorf("Failed reading p2p events: %v", err)
 				t.ctx.SetResult(types.TaskResultFailure)
+				isFailed = true
 				return
 			}
 
@@ -237,7 +238,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				receivedEvents++
 
 				if receivedEvents%t.config.MeasureInterval == 0 {
-					t.logger.Infof("Received %d p2p events", sentTxCount)
+					t.logger.Infof("Received %d p2p events", receivedEvents)
 				}
 			}
 
@@ -262,11 +263,11 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	lastMeasureTime := time.Since(startTime)
 
-	if coordinatedOmissionEventsCount > 0 {
-		t.logger.Warnf("Coordinated omission events count: %d", coordinatedOmissionEventsCount)
+	if coordinatedOmissionEventCount > 0 {
+		t.logger.Warnf("Coordinated omission events count: %d", coordinatedOmissionEventCount)
 	}
 
-	// send to other clients, for speeding up tx mining
+	// Send txes to other clients, for speeding up tx mining
 	for _, tx := range txs {
 		for _, otherClient := range executionClients {
 			if otherClient.GetName() == client.GetName() {
@@ -293,9 +294,9 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.SetResult(types.TaskResultSuccess)
 
 	outputs := map[string]interface{}{
-		"tx_count":            totNumberOfTxes,
-		"mean_tps_throughput": processed_tx_per_second,
-		"coordinated_omission_events_count": coordinatedOmissionEventsCount,
+		"tx_count":                          totNumberOfTxes,
+		"mean_tps_throughput":               processed_tx_per_second,
+		"coordinated_omission_events_count": coordinatedOmissionEventCount,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
@@ -347,7 +348,7 @@ func (t *Task) getTcpConn(ctx context.Context, client *execution.Client) (*sentr
 	return conn, nil
 }
 
-func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, error) {
+func (t *Task) generateTransaction(ctx context.Context, i int) (*ethtypes.Transaction, error) {
 	tx, err := t.wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
 		addr := t.wallet.GetAddress()
 		toAddr := &addr
@@ -357,9 +358,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 		feeCap := &helper.BigInt{Value: *big.NewInt(100000000000)} // 100 Gwei
 		tipCap := &helper.BigInt{Value: *big.NewInt(1000000000)}   // 1 Gwei
 
-		var txObj ethtypes.TxData
-
-		txObj = &ethtypes.DynamicFeeTx{
+		txObj := &ethtypes.DynamicFeeTx{
 			ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
 			Nonce:     nonce,
 			GasTipCap: &tipCap.Value,
@@ -367,7 +366,7 @@ func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, 
 			Gas:       50000,
 			To:        toAddr,
 			Value:     txAmount,
-			Data:      []byte{},
+			Data:      []byte(fmt.Sprintf("tx_index:%d", i)),
 		}
 
 		return ethtypes.NewTx(txObj), nil
