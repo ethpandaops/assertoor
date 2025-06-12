@@ -184,10 +184,6 @@ func (t *Task) Execute(ctx context.Context) error {
 				if sleepTime > 0 {
 					time.Sleep(sleepTime)
 				} else {
-					if coordinatedOmissionEventsCount == 0 {
-						t.logger.Warnf("Remaining time is negative, skipping sleep")
-					}
-
 					coordinatedOmissionEventsCount++
 				}
 			}
@@ -245,7 +241,6 @@ func (t *Task) Execute(ctx context.Context) error {
 
 				// log the duplicated p2p events, and count duplicated p2p events
 				if latenciesMus[tx_index] != 0 {
-					t.logger.Warnf("Duplicated p2p event: %s", tx.Hash().String())
 					duplicatedP2PEventCount++
 				}
 
@@ -275,6 +270,14 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 		}
 	}()
+
+	if coordinatedOmissionEventsCount > 0 {
+		t.logger.Warnf("Coordinated omission events count: %d", coordinatedOmissionEventsCount)
+	}
+
+	if duplicatedP2PEventCount > 0 {
+		t.logger.Warnf("Duplicated p2p event count: %d", duplicatedP2PEventCount)
+	}
 
 	// Send txes to other clients, for speeding up tx mining
 	for _, tx := range txs {
