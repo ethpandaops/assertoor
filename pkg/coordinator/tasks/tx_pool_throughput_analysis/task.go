@@ -162,7 +162,7 @@ func (t *Task) Execute(ctx context.Context) error {
 					return
 				}
 
-				txs = append(txs, tx)
+				txs[i] = tx
 				sentTxCount++
 
 				// log transaction sending

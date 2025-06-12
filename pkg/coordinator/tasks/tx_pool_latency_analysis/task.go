@@ -133,7 +133,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	isFailed := false
 	sentTxCount := 0
 	duplicatedP2PEventCount := 0
-	coordinatedOmissionEventsCount := 0
+	coordinatedOmissionEventCount := 0
 
 	// Start generating and sending transactions
 	go func() {
@@ -184,7 +184,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				if sleepTime > 0 {
 					time.Sleep(sleepTime)
 				} else {
-					coordinatedOmissionEventsCount++
+					coordinatedOmissionEventCount++
 				}
 			}
 
@@ -272,8 +272,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}()
 
-	if coordinatedOmissionEventsCount > 0 {
-		t.logger.Warnf("Coordinated omission events count: %d", coordinatedOmissionEventsCount)
+	if coordinatedOmissionEventCount > 0 {
+		t.logger.Warnf("Coordinated omission events count: %d", coordinatedOmissionEventCount)
 	}
 
 	if duplicatedP2PEventCount > 0 {
@@ -334,17 +334,18 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("min_latency_mus", minLatency)
 	t.ctx.Outputs.SetVar("max_latency_mus", maxLatency)
 	t.ctx.Outputs.SetVar("duplicated_p2p_event_count", duplicatedP2PEventCount)
-	t.ctx.Outputs.SetVar("coordinated_omission_events_count", coordinatedOmissionEventsCount)
+	t.ctx.Outputs.SetVar("missed_p2p_event_count", notReceivedP2PEventCount)
+	t.ctx.Outputs.SetVar("coordinated_omission_event_count", coordinatedOmissionEventCount)
 
 	t.ctx.SetResult(types.TaskResultSuccess)
 
 	outputs := map[string]interface{}{
-		"tx_count":                 totNumberOfTxes,
-		"min_latency_mus":          minLatency,
-		"max_latency_mus":          maxLatency,
-		"tx_pool_latency_hdr_plot": plot,
-		"duplicated_p2p_event_count": duplicatedP2PEventCount,
-		"coordinated_omission_events_count": coordinatedOmissionEventsCount,
+		"tx_count":                          totNumberOfTxes,
+		"min_latency_mus":                   minLatency,
+		"max_latency_mus":                   maxLatency,
+		"tx_pool_latency_hdr_plot":          plot,
+		"duplicated_p2p_event_count":        duplicatedP2PEventCount,
+		"coordinated_omission_events_count": coordinatedOmissionEventCount,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
