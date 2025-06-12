@@ -149,9 +149,6 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			// generate and send tx
 			go func(i int) {
-				if ctx.Err() != nil && !isFailed {
-					return
-				}
 
 				tx, err := t.generateTransaction(ctx, i)
 				if err != nil {
@@ -222,6 +219,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			if err != nil {
 				t.logger.Errorf("Failed reading p2p events: %v", err)
 				t.ctx.SetResult(types.TaskResultFailure)
+				isFailed = true
 				return
 			}
 
@@ -233,11 +231,13 @@ func (t *Task) Execute(ctx context.Context) error {
 				if err != nil {
 					t.logger.Errorf("Failed to parse transaction data: %v", err)
 					t.ctx.SetResult(types.TaskResultFailure)
+					isFailed = true
 					return
 				}
 				if tx_index < 0 || tx_index >= totNumberOfTxes {
 					t.logger.Errorf("Transaction index out of range: %d", tx_index)
 					t.ctx.SetResult(types.TaskResultFailure)
+					isFailed = true
 					return
 				}
 				latenciesMus[tx_index] = time.Since(txStartTime[tx_index]).Microseconds()
@@ -307,6 +307,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			minLatency = lat
 		}
 	}
+	t.logger.Infof("Max latency: %d mus, Min latency: %d mus", maxLatency, minLatency)
 
 	// Generate HDR plot
 	plot, err := hdr.HdrPlot(latenciesMus)
@@ -317,12 +318,14 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	t.ctx.Outputs.SetVar("tx_count", totNumberOfTxes)
+	t.ctx.Outputs.SetVar("min_latency_mus", minLatency)
 	t.ctx.Outputs.SetVar("max_latency_mus", maxLatency)
 
 	t.ctx.SetResult(types.TaskResultSuccess)
 
 	outputs := map[string]interface{}{
 		"tx_count":                 totNumberOfTxes,
+		"min_latency_mus":          minLatency,
 		"max_latency_mus":          maxLatency,
 		"tx_pool_latency_hdr_plot": plot,
 	}
