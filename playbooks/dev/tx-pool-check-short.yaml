@@ -10,7 +10,7 @@ tasks:
   timeout: 30m
   config:
     tps: 1000
-    duration_s: 30
+    duration_s: 10
     measureInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
@@ -24,7 +24,7 @@ tasks:
   timeout: 30m
   config:
     tps: 1000
-    duration_s: 30
+    duration_s: 10
     measureInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
