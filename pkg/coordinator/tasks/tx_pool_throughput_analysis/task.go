@@ -124,12 +124,13 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// Prepare to send transactions
 	var totNumberOfTxes int = t.config.TPS * t.config.Duration_s
-	var tx_events []*ethtypes.Transaction = make([]*ethtypes.Transaction, totNumberOfTxes)
+	var txs []*ethtypes.Transaction = make([]*ethtypes.Transaction, totNumberOfTxes)
 
 	startTime := time.Now()
 	isFailed := false
 	sentTxCount := 0
 
+	// Start generating and sending transactions
 	go func() {
 		startExecTime := time.Now()
 		endTime := startExecTime.Add(time.Second)
@@ -140,7 +141,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			remainingTime := time.Until(endTime)
 
 			// Calculate sleep time to distribute remaining transactions evenly
-			sleepTime := remainingTime / time.Duration(t.config.TPS-i)
+			sleepTime := remainingTime / time.Duration(totNumberOfTxes-i)
 
 			// generate and send tx
 			go func() {
@@ -164,6 +165,7 @@ func (t *Task) Execute(ctx context.Context) error {
 					return
 				}
 
+				txs = append(txs, tx)
 				sentTxCount++
 
 				// log transaction sending
@@ -172,14 +174,30 @@ func (t *Task) Execute(ctx context.Context) error {
 					t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
 				}
 
-				tx_events = append(tx_events, tx)
+				select {
+				case <-ctx.Done():
+					t.logger.Warnf("Task cancelled, stopping transaction generation.")
+					return
+				default:
+					if time.Since(startTime) >= time.Duration(t.config.Duration_s)*time.Second {
+						t.logger.Infof("Reached duration limit, stopping transaction generation.")
+						return
+					}
+				}
 			}()
 
 			if isFailed {
 				return
 			}
 
-			time.Sleep(sleepTime)
+			// Sleep to control the TPS
+			if i < totNumberOfTxes-1 {
+				if sleepTime > 0 {
+					time.Sleep(sleepTime)
+				} else {
+					t.logger.Warnf("Remaining time is negative, skipping sleep")
+				}
+			}
 		}
 
 		execTime := time.Since(startExecTime)
@@ -230,8 +248,8 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 
 			// Re-send transactions to the original client
-			for i := 0; i < missingTxCount && i < len(tx_events); i++ {
-				err = client.GetRPCClient().SendTransaction(ctx, tx_events[i])
+			for i := 0; i < missingTxCount && i < len(txs); i++ {
+				err = client.GetRPCClient().SendTransaction(ctx, txs[i])
 				if err != nil {
 					t.logger.WithError(err).Errorf("Failed to re-send transaction message, error: %v", err)
 					t.ctx.SetResult(types.TaskResultFailure)
@@ -248,7 +266,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 
 		t.logger.Infof("Got %d transactions", gotTx)
-		t.logger.Infof("Tx/s: (%d tx_events processed): %.2f / s \n", gotTx, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
+		t.logger.Infof("Tx/s: (%d txs processed): %.2f / s \n", gotTx, float64(t.config.MeasureInterval)*float64(time.Second)/float64(time.Since(lastMeasureTime)))
 
 		lastMeasureTime = time.Now()
 	}
@@ -257,7 +275,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.logger.Infof("Total time for %d transactions: %.2fs", sentTxCount, totalTime.Seconds())
 
 	// send to other clients, for speeding up tx mining
-	for _, tx := range tx_events {
+	for _, tx := range txs {
 		for _, otherClient := range executionClients {
 			if otherClient.GetName() == client.GetName() {
 				continue

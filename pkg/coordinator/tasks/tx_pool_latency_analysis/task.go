@@ -192,6 +192,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			}(i)
 
+			if isFailed {
+				return
+			}
+
 			// Sleep to control the TPS
 			if i < totNumberOfTxes-1 {
 				if sleepTime > 0 {
