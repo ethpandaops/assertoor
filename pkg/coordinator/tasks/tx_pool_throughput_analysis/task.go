@@ -280,7 +280,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	// Calculate statistics
 	processed_tx_per_second := float64(sentTxCount) / lastMeasureTime.Seconds()
 
-	t.ctx.Outputs.SetVar("mean_throughput", processed_tx_per_second)
+	t.ctx.Outputs.SetVar("mean_tps_throughput", processed_tx_per_second)
 	t.logger.Infof("Processed %d transactions in %.2fs, mean throughput: %.2f tx/s", sentTxCount, lastMeasureTime.Seconds(), processed_tx_per_second)
 	t.ctx.Outputs.SetVar("tx_count", totNumberOfTxes)
 	t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, lastMeasureTime.Seconds())
@@ -288,8 +288,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.SetResult(types.TaskResultSuccess)
 
 	outputs := map[string]interface{}{
-		"tx_count":        totNumberOfTxes,
-		"mean_throughput": processed_tx_per_second,
+		"tx_count":            totNumberOfTxes,
+		"mean_tps_throughput": processed_tx_per_second,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)

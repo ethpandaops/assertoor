@@ -23,6 +23,9 @@ The `tx_pool_latency_analysis` task evaluates latency of transaction processing 
 - **`tx_count`**:
   The total number of transactions sent.
 
+- **`min_latency_mus`**:
+  The min latency of the transactions in microseconds.
+
 - **`max_latency_mus`**:
   The max latency of the transactions in microseconds.
 
