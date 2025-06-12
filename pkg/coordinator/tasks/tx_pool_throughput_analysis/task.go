@@ -129,6 +129,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	startTime := time.Now()
 	isFailed := false
 	sentTxCount := 0
+	coordinatedOmissionEventsCount := 0
 
 	// Start generating and sending transactions
 	go func() {
@@ -178,7 +179,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				if sleepTime > 0 {
 					time.Sleep(sleepTime)
 				} else {
-					t.logger.Warnf("Remaining time is negative, skipping sleep")
+					coordinatedOmissionEventsCount++
 				}
 			}
 		}
@@ -261,6 +262,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	lastMeasureTime := time.Since(startTime)
 
+	if coordinatedOmissionEventsCount > 0 {
+		t.logger.Warnf("Coordinated omission events count: %d", coordinatedOmissionEventsCount)
+	}
+
 	// send to other clients, for speeding up tx mining
 	for _, tx := range txs {
 		for _, otherClient := range executionClients {
@@ -290,6 +295,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	outputs := map[string]interface{}{
 		"tx_count":            totNumberOfTxes,
 		"mean_tps_throughput": processed_tx_per_second,
+		"coordinated_omission_events_count": coordinatedOmissionEventsCount,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
