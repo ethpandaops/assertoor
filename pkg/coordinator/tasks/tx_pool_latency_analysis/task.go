@@ -132,6 +132,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	startTime := time.Now()
 	isFailed := false
 	sentTxCount := 0
+	duplicatedP2PEventCount := 0
 
 	// Start generating and sending transactions
 	go func() {
@@ -240,11 +241,18 @@ func (t *Task) Execute(ctx context.Context) error {
 					isFailed = true
 					return
 				}
+
+				// log the duplicated p2p events, and count duplicated p2p events
+				if latenciesMus[tx_index] != 0 {
+					t.logger.Warnf("Duplicated p2p event: %s", tx.Hash().String())
+					duplicatedP2PEventCount++
+				}
+
 				latenciesMus[tx_index] = time.Since(txStartTime[tx_index]).Microseconds()
 				receivedEvents++
 
 				if receivedEvents%t.config.MeasureInterval == 0 {
-					t.logger.Infof("Received %d p2p events", sentTxCount)
+					t.logger.Infof("Received %d p2p events", receivedEvents)
 				}
 			}
 
@@ -320,6 +328,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("tx_count", totNumberOfTxes)
 	t.ctx.Outputs.SetVar("min_latency_mus", minLatency)
 	t.ctx.Outputs.SetVar("max_latency_mus", maxLatency)
+	t.ctx.Outputs.SetVar("duplicated_p2p_event_count", duplicatedP2PEventCount)
 
 	t.ctx.SetResult(types.TaskResultSuccess)
 
@@ -328,6 +337,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		"min_latency_mus":          minLatency,
 		"max_latency_mus":          maxLatency,
 		"tx_pool_latency_hdr_plot": plot,
+		"duplicated_p2p_event_count": duplicatedP2PEventCount,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
