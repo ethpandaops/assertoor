@@ -218,14 +218,14 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		// Add a timeout of 180 seconds for reading transaction messages
 		readChan := make(chan struct {
-			txs *eth.TransactionsPacket
+			p2pTxs *eth.TransactionsPacket
 			err error
 		})
 
 		go func() {
 			txs, err := conn.ReadTransactionMessages()
 			readChan <- struct {
-				txs *eth.TransactionsPacket
+				p2pTxs *eth.TransactionsPacket
 				err error
 			}{txs, err}
 		}()
@@ -237,7 +237,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				t.ctx.SetResult(types.TaskResultFailure)
 				return nil
 			}
-			gotTx += len(*result.txs)
+			gotTx += len(*result.p2pTxs)
 		case <-time.After(180 * time.Second):
 			t.logger.Warnf("Timeout after 180 seconds while reading transaction messages. Re-sending transactions...")
 
