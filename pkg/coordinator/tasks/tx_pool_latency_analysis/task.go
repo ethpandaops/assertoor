@@ -253,7 +253,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				}
 			}
 
-			if receivedEvents == totNumberOfTxes {
+			if receivedEvents >= totNumberOfTxes {
 				t.logger.Infof("Reading of p2p events finished")
 				return
 			}
