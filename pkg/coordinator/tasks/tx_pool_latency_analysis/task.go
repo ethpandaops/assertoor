@@ -126,7 +126,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	var totNumberOfTxes int = t.config.TPS * t.config.Duration_s
 	var txs []*ethtypes.Transaction = make([]*ethtypes.Transaction, totNumberOfTxes)
 	var txStartTime []time.Time = make([]time.Time, totNumberOfTxes)
-	var testDeadline time.Time = time.Now().Add(time.Duration(t.config.Duration_s+60) * time.Second)
+	var testDeadline time.Time = time.Now().Add(time.Duration(t.config.Duration_s+60*30) * time.Second)
 	var latenciesMus = make([]int64, totNumberOfTxes)
 
 	startTime := time.Now()
@@ -135,6 +135,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// Start generating and sending transactions
 	go func() {
+		var logOnce bool = false
 		startExecTime := time.Now()
 		endTime := startExecTime.Add(time.Second * time.Duration(t.config.Duration_s))
 
@@ -178,35 +179,37 @@ func (t *Task) Execute(ctx context.Context) error {
 					elapsed := time.Since(startTime)
 					t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
 				}
-
-				select {
-				case <-ctx.Done():
-					t.logger.Warnf("Task cancelled, stopping transaction generation.")
-					return
-				default:
-					if time.Since(startTime) >= time.Duration(t.config.Duration_s)*time.Second {
-						t.logger.Infof("Reached duration limit, stopping transaction generation.")
-						return
-					}
-				}
-
 			}(i)
-
-			if isFailed {
-				return
-			}
 
 			// Sleep to control the TPS
 			if i < totNumberOfTxes-1 {
 				if sleepTime > 0 {
 					time.Sleep(sleepTime)
 				} else {
-					t.logger.Warnf("Remaining time is negative, skipping sleep")
+					if !logOnce {
+						t.logger.Warnf("Remaining time is negative, skipping sleep")
+						logOnce = true
+					}
 				}
 			}
 
-			if (i+1)%t.config.MeasureInterval == 0 {
-				t.logger.Infof("%d transactions sent", i+1)
+			select {
+			case <-ctx.Done():
+				{
+					t.logger.Warnf("Task cancelled, stopping transaction generation.")
+					return
+				}
+			default:
+				{
+					// if testDeadline reached, stop sending txes
+					if isFailed {
+						return
+					}
+					if time.Now().After(testDeadline) {
+						t.logger.Infof("Reached duration limit, stopping transaction generation.")
+						return
+					}
+				}
 			}
 		}
 	}()
