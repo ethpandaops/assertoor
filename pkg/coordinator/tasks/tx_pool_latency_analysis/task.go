@@ -240,6 +240,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				}
 
 				// log the duplicated p2p events, and count duplicated p2p events
+				// todo: add a timeout of N seconds that activates if duplicatedP2PEventCount + receivedEvents >= totNumberOfTxes, if exceeded, exit the function
 				if latenciesMus[tx_index] != 0 {
 					duplicatedP2PEventCount++
 				}
