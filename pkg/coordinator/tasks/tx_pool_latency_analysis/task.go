@@ -123,7 +123,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	// Prepare to collect transaction latencies
-	var totNumberOfTxes int = t.config.QPS * t.config.Duration_s
+	var totNumberOfTxes int = t.config.TPS * t.config.Duration_s
 	var txs []*ethtypes.Transaction = make([]*ethtypes.Transaction, totNumberOfTxes)
 	var txStartTime []time.Time = make([]time.Time, totNumberOfTxes)
 	var testDeadline time.Time = time.Now().Add(time.Duration(t.config.Duration_s+60) * time.Second)
@@ -192,7 +192,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			}(i)
 
-			// Sleep to control the QPS
+			// Sleep to control the TPS
 			if i < totNumberOfTxes-1 {
 				if sleepTime > 0 {
 					time.Sleep(sleepTime)

@@ -3,7 +3,7 @@ package txpoollatencyanalysis
 type Config struct {
 	PrivateKey string `yaml:"privateKey" json:"privateKey"`
 
-	QPS                  int   `yaml:"qps" json:"qps"`
+	TPS                  int   `yaml:"tps" json:"tps"`
 	Duration_s           int   `yaml:"duration_s" json:"duration_s"`
 	MeasureInterval      int   `yaml:"measureInterval" json:"measureInterval"`
 	SecondsBeforeRunning int64 `yaml:"secondsBeforeRunning" json:"secondsBeforeRunning"`
@@ -11,7 +11,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		QPS:                  100,
+		TPS:                  100,
 		Duration_s:           60,
 		MeasureInterval:      100,
 		SecondsBeforeRunning: 0,

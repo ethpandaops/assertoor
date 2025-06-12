@@ -123,7 +123,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	// Prepare to send transactions
-	var totNumberOfTxes int = t.config.QPS * t.config.Duration_s
+	var totNumberOfTxes int = t.config.TPS * t.config.Duration_s
 	var tx_events []*ethtypes.Transaction = make([]*ethtypes.Transaction, totNumberOfTxes)
 
 	startTime := time.Now()
@@ -140,7 +140,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			remainingTime := time.Until(endTime)
 
 			// Calculate sleep time to distribute remaining transactions evenly
-			sleepTime := remainingTime / time.Duration(t.config.QPS-i)
+			sleepTime := remainingTime / time.Duration(t.config.TPS-i)
 
 			// generate and send tx
 			go func() {
@@ -183,7 +183,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 
 		execTime := time.Since(startExecTime)
-		t.logger.Infof("Time to generate %d transactions: %v", t.config.QPS, execTime)
+		t.logger.Infof("Time to generate %d transactions: %v", t.config.TPS, execTime)
 	}()
 
 	lastMeasureTime := time.Now()
@@ -193,7 +193,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	for gotTx < t.config.QPS {
+	for gotTx < t.config.TPS {
 		if isFailed {
 			return nil
 		}
@@ -224,7 +224,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			t.logger.Warnf("Timeout after 180 seconds while reading transaction messages. Re-sending transactions...")
 
 			// Calculate how many transactions we're still missing
-			missingTxCount := t.config.QPS - gotTx
+			missingTxCount := t.config.TPS - gotTx
 			if missingTxCount <= 0 {
 				break
 			}
@@ -269,7 +269,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	outputs := map[string]interface{}{
 		"total_time_mus": totalTime.Microseconds(),
-		"qps":            t.config.QPS,
+		"tps":            t.config.TPS,
 	}
 	outputsJSON, _ := json.Marshal(outputs)
 	t.logger.Infof("outputs_json: %s", string(outputsJSON))
