@@ -1,4 +1,4 @@
-package txpoolcheck
+package tx_pool_throughput_analysis
 
 type Config struct {
 	PrivateKey string `yaml:"privateKey" json:"privateKey"`

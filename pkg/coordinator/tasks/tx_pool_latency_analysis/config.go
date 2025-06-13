@@ -1,4 +1,4 @@
-package txpoollatencyanalysis
+package txpool_latency_analysis
 
 type Config struct {
 	PrivateKey string `yaml:"privateKey" json:"privateKey"`
