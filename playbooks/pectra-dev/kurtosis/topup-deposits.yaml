@@ -1,0 +1,40 @@
+
+id: topup-deposits
+name: "Topup deposits"
+timeout: 1h
+config:
+  walletPrivkey: ""
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  depositCount: 100
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
+  validatorStartIndex: 0
+  validatorCount: 100
+  depositAmount: 32
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: run_task_options
+  title: "Generate ${{depositCount}} top up deposits"
+  config:
+    task:
+      name: generate_deposits
+      title: "Generate top up deposits with ${{depositAmount}} ETH each"
+      config:
+        limitPerSlot: 10
+        limitPending: 10
+        topUpDeposit: true
+        awaitReceipt: true
+        failOnReject: true
+      configVars:
+        limitTotal: "depositCount"
+        walletPrivkey: "walletPrivkey"
+        depositContract: "depositContract"
+        depositAmount: "depositAmount"
+        startIndex: "validatorStartIndex"
+        indexCount: "validatorCount"
+        mnemonic: "validatorMnemonic"
+
