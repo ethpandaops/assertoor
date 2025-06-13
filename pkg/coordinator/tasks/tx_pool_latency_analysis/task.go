@@ -112,21 +112,33 @@ func (t *Task) Execute(ctx context.Context) error {
 	// Prepare to collect transaction latencies
 	var testDeadline time.Time = time.Now().Add(time.Duration(t.config.Duration_s+60*30) * time.Second)
 
-	load_tool := tx_load_tool.NewLoadTool(ctx, t.ctx, t.logger, t.wallet, client)
+	load_target := tx_load_tool.NewLoadTarget(ctx, t.ctx, t.logger, t.wallet, client)
+	load := tx_load_tool.NewLoad(load_target, t.config.TPS, t.config.Duration_s, testDeadline)
 
 	// Generate and sending transactions, waiting for their propagation
-	txs, latenciesMus, duplicatedP2PEventCount, coordinatedOmissionEventCount, notReceivedP2PEventCount, isFailed :=
-		load_tool.ExecuteTPSLevel(t.config.TPS, t.config.Duration_s, testDeadline)
+	err = load.Execute()
+	if err != nil {
+		t.logger.Errorf("Error during transaction load execution: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return err
+	}
 
-	totNumberOfTxes := len(txs)
+	// Collect the transactions and their latencies
+	result, err := load.MeasurePropagationLatencies()
+	if err != nil {
+		t.logger.Errorf("Error measuring transaction propagation latencies: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return err
+	}
 
 	// Check if the context was cancelled or other errors occurred
-	if ctx.Err() != nil && !isFailed {
-		return nil
+	if result.Failed {
+		return fmt.Errorf("Error measuring transaction propagation latencies: load failed")
 	}
 
 	// Send txes to other clients, for speeding up tx mining
-	for _, tx := range txs {
+	t.logger.Infof("Sending %d transactions to other clients for mining", len(result.Txs))
+	for _, tx := range result.Txs {
 		for _, otherClient := range executionClients {
 			if otherClient.GetName() == client.GetName() {
 				continue
@@ -135,11 +147,12 @@ func (t *Task) Execute(ctx context.Context) error {
 			otherClient.GetRPCClient().SendTransaction(ctx, tx)
 		}
 	}
+	t.logger.Infof("Total transactions sent: %d", result.TotalTxs)
 
 	// Calculate statistics
 	var maxLatency int64 = 0
 	var minLatency int64 = 0
-	for _, lat := range latenciesMus {
+	for _, lat := range result.LatenciesMus {
 		if lat > maxLatency {
 			maxLatency = lat
 		}
@@ -150,29 +163,30 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.logger.Infof("Max latency: %d mus, Min latency: %d mus", maxLatency, minLatency)
 
 	// Generate HDR plot
-	plot, err := hdr.HdrPlot(latenciesMus)
+	plot, err := hdr.HdrPlot(result.LatenciesMus)
 	if err != nil {
 		t.logger.Errorf("Failed to generate HDR plot: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
 
-	t.ctx.Outputs.SetVar("tx_count", totNumberOfTxes)
+	t.ctx.Outputs.SetVar("tx_count", result.TotalTxs)
 	t.ctx.Outputs.SetVar("min_latency_mus", minLatency)
 	t.ctx.Outputs.SetVar("max_latency_mus", maxLatency)
-	t.ctx.Outputs.SetVar("duplicated_p2p_event_count", duplicatedP2PEventCount)
-	t.ctx.Outputs.SetVar("missed_p2p_event_count", notReceivedP2PEventCount)
-	t.ctx.Outputs.SetVar("coordinated_omission_event_count", coordinatedOmissionEventCount)
+	t.ctx.Outputs.SetVar("duplicated_p2p_event_count", result.DuplicatedP2PEventCount)
+	t.ctx.Outputs.SetVar("missed_p2p_event_count", result.NotReceivedP2PEventCount)
+	t.ctx.Outputs.SetVar("coordinated_omission_event_count", result.CoordinatedOmissionEventCount)
 
 	t.ctx.SetResult(types.TaskResultSuccess)
 
 	outputs := map[string]interface{}{
-		"tx_count":                          totNumberOfTxes,
+		"tx_count":                          result.TotalTxs,
 		"min_latency_mus":                   minLatency,
 		"max_latency_mus":                   maxLatency,
 		"tx_pool_latency_hdr_plot":          plot,
-		"duplicated_p2p_event_count":        duplicatedP2PEventCount,
-		"coordinated_omission_events_count": coordinatedOmissionEventCount,
+		"duplicated_p2p_event_count":        result.DuplicatedP2PEventCount,
+		"coordinated_omission_events_count": result.CoordinatedOmissionEventCount,
+		"missed_p2p_event_count":            result.NotReceivedP2PEventCount,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)

@@ -19,19 +19,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type LoadTool struct {
+const logInterval = 100 // Log every 100 transactions
+
+type LoadTarget struct {
 	ctx      context.Context
 	task_ctx *types.TaskContext
 	wallet   *wallet.Wallet
 	logger   logrus.FieldLogger
 	client   *execution.Client
-	failed   bool
 }
 
-// NewLoadTool creates a new LoadTool instance
-func NewLoadTool(ctx context.Context, task_ctx *types.TaskContext, logger logrus.FieldLogger,
-	wallet *wallet.Wallet, client *execution.Client) *LoadTool {
-	return &LoadTool{
+// NewLoadTarget creates a new LoadTarget instance
+func NewLoadTarget(ctx context.Context, task_ctx *types.TaskContext, logger logrus.FieldLogger,
+	wallet *wallet.Wallet, client *execution.Client) *LoadTarget {
+	return &LoadTarget{
 		ctx:      ctx,
 		task_ctx: task_ctx,
 		wallet:   wallet,
@@ -40,212 +41,282 @@ func NewLoadTool(ctx context.Context, task_ctx *types.TaskContext, logger logrus
 	}
 }
 
-// ExecuteTPSLevel generates and sends transactions at the specified TPS level for the specified duration
-func (t *LoadTool) ExecuteTPSLevel(TPS int, duration_s int, testDeadline time.Time) ([]*ethtypes.Transaction, []int64, int, int, int, bool) {
-	// Prepare to collect transaction latencies
-	const logInterval = 100 // Log every 100 transactions
-	var totNumberOfTxes int = TPS * duration_s
-	var txs []*ethtypes.Transaction = make([]*ethtypes.Transaction, totNumberOfTxes)
-	var txStartTime []time.Time = make([]time.Time, totNumberOfTxes)
-	var latenciesMus = make([]int64, totNumberOfTxes)
+type LoadResult struct {
+	Failed    bool
+	StartTime time.Time
+	EndTime   time.Time // sent time of the last transaction
+	// Data collected during the load test
+	TotalTxs         int
+	Txs              []*ethtypes.Transaction
+	TxStartTime      []time.Time
+	LatenciesMus     []int64
+	LastMeasureDelay time.Duration
+	// Statistics
+	SentTxCount                   int
+	DuplicatedP2PEventCount       int
+	CoordinatedOmissionEventCount int
+	NotReceivedP2PEventCount      int
+}
 
-	startTime := time.Now()
-	isFailed := false
-	sentTxCount := 0
-	duplicatedP2PEventCount := 0
-	coordinatedOmissionEventCount := 0
-
-	conn, err := t.getTcpConn(t.ctx, t.client)
-	if err != nil {
-		t.logger.Errorf("Failed to get wire eth TCP connection: %v", err)
-		t.task_ctx.SetResult(types.TaskResultFailure)
-		return nil
+// NewLoadResult creates a new LoadResult instance
+func NewLoadResult(totNumberOfTxes int) *LoadResult {
+	return &LoadResult{
+		TotalTxs:                      totNumberOfTxes,
+		Txs:                           make([]*ethtypes.Transaction, totNumberOfTxes),
+		TxStartTime:                   make([]time.Time, totNumberOfTxes),
+		LatenciesMus:                  make([]int64, totNumberOfTxes),
+		SentTxCount:                   0,
+		DuplicatedP2PEventCount:       0,
+		CoordinatedOmissionEventCount: 0,
 	}
+}
 
-	defer conn.Close()
+type Load struct {
+	target       *LoadTarget
+	testDeadline time.Time
+	TPS          int
+	Duration_s   int
+	Result       *LoadResult
+}
+
+// NewLoad creates a new Load instance
+func NewLoad(target *LoadTarget, TPS int, duration_s int, testDeadline time.Time) *Load {
+	return &Load{
+		target:       target,
+		TPS:          TPS,
+		Duration_s:   duration_s,
+		testDeadline: testDeadline,
+		Result:       NewLoadResult(TPS * duration_s),
+	}
+}
+
+// ExecuteTPSLevel generates and sends transactions at the specified TPS level for the specified duration
+func (l *Load) Execute() error {
+	// Prepare to collect transaction latencies
+	l.Result.Failed = false
+	l.Result.SentTxCount = 0
+	l.Result.DuplicatedP2PEventCount = 0
+	l.Result.CoordinatedOmissionEventCount = 0
 
 	// Start generating and sending transactions
 	go func() {
-		startExecTime := time.Now()
-		endTime := startExecTime.Add(time.Second * time.Duration(duration_s))
+		// Sleep to ensure the start time is recorded correctly
+		time.Sleep(100 * time.Millisecond)
+
+		l.Result.StartTime = time.Now()
+		endTime := l.Result.StartTime.Add(time.Second * time.Duration(l.Duration_s))
+		l.target.logger.Infof("Starting transaction generation at %s", l.Result.StartTime)
 
 		// Generate and send transactions
-		for i := 0; i < totNumberOfTxes; i++ {
+		for i := 0; i < l.Result.TotalTxs; i++ {
 			// Calculate how much time we have left
 			remainingTime := time.Until(endTime)
 
 			// Calculate sleep time to distribute remaining transactions evenly
-			sleepTime := remainingTime / time.Duration(totNumberOfTxes-i)
+			sleepTime := remainingTime / time.Duration(l.Result.TotalTxs-i)
 
 			// generate and send tx
 			go func(i int) {
 
-				tx, err := t.generateTransaction(t.ctx, i)
+				tx, err := l.target.generateTransaction(i)
 				if err != nil {
-					t.logger.Errorf("Failed to create transaction: %v", err)
-					t.task_ctx.SetResult(types.TaskResultFailure)
-					isFailed = true
+					l.target.logger.Errorf("Failed to create transaction: %v", err)
+					l.target.task_ctx.SetResult(types.TaskResultFailure)
+					l.Result.Failed = true
 					return
 				}
 
-				txStartTime[i] = time.Now()
-				err = t.client.GetRPCClient().SendTransaction(t.ctx, tx)
+				l.Result.TxStartTime[i] = time.Now()
+				err = l.target.sendTransaction(tx)
 				if err != nil {
-					t.logger.WithField("client", t.client.GetName()).Errorf("Failed to send transaction: %v", err)
-					t.task_ctx.SetResult(types.TaskResultFailure)
-					isFailed = true
+					l.target.logger.WithField("client", l.target.client.GetName()).Errorf("Failed to send transaction: %v", err)
+					l.target.task_ctx.SetResult(types.TaskResultFailure)
+					l.Result.Failed = true
 					return
 				}
 
-				txs[i] = tx
-				sentTxCount++
+				l.Result.Txs[i] = tx
+				l.Result.SentTxCount++
 
 				// log transaction sending
-				if sentTxCount%logInterval == 0 {
-					elapsed := time.Since(startTime)
-					t.logger.Infof("Sent %d transactions in %.2fs", sentTxCount, elapsed.Seconds())
+				if l.Result.SentTxCount%logInterval == 0 {
+					elapsed := time.Since(l.Result.StartTime)
+					l.target.logger.Infof("Sent %d transactions in %.2fs", l.Result.SentTxCount, elapsed.Seconds())
 				}
 
 			}(i)
 
 			// Sleep to control the TPS
-			if i < totNumberOfTxes-1 {
+			if i < l.Result.TotalTxs-1 {
 				if sleepTime > 0 {
 					time.Sleep(sleepTime)
 				} else {
-					coordinatedOmissionEventCount++
+					l.Result.CoordinatedOmissionEventCount++
 				}
 			}
 
 			select {
-			case <-t.ctx.Done():
-				t.logger.Warnf("Task cancelled, stopping transaction generation.")
+			case <-l.target.ctx.Done():
+				l.target.logger.Warnf("Task cancelled, stopping transaction generation.")
 				return
 			default:
 				// if testDeadline reached, stop sending txes
-				if isFailed {
+				if l.Result.Failed {
 					return
 				}
-				if time.Now().After(testDeadline) {
-					t.logger.Infof("Reached duration limit, stopping transaction generation.")
+				if time.Now().After(l.testDeadline) {
+					l.target.logger.Infof("Reached duration limit, stopping transaction generation.")
 					return
 				}
 			}
 		}
+
+		l.Result.EndTime = time.Now()
+		l.target.logger.Infof("Finished sending transactions at %s", l.Result.EndTime)
 	}()
+
+	return nil
+}
+
+// MeasurePropagationLatencies reads P2P events and calculates propagation latencies for each transaction
+func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
+
+	// Get a P2P connection to read events
+	conn, err := l.target.getTcpConn()
+	if err != nil {
+		l.target.logger.Errorf("Failed to get P2P connection: %v", err)
+		l.target.task_ctx.SetResult(types.TaskResultFailure)
+		return l.Result, fmt.Errorf("measurement stopped: failed to get P2P connection")
+	}
+
+	defer conn.Close()
 
 	// Wait P2P event messages
 	var receivedEvents int = 0
 	for {
 		txes, err := conn.ReadTransactionMessages()
 		if err != nil {
-			t.logger.Errorf("Failed reading p2p events: %v", err)
-			t.task_ctx.SetResult(types.TaskResultFailure)
-			isFailed = true
-			return
+			l.target.logger.Errorf("Failed reading p2p events: %v", err)
+			l.target.task_ctx.SetResult(types.TaskResultFailure)
+			l.Result.Failed = true
+			return l.Result, fmt.Errorf("measurement stopped: failed reading p2p events")
 		}
 
-		for _, tx := range *txes {
+		for i, tx := range *txes {
 			tx_data := tx.Data()
 			// read tx_data that is in the format "tx_index:<index>"
 			var tx_index int
 			_, err := fmt.Sscanf(string(tx_data), "tx_index:%d", &tx_index)
 			if err != nil {
-				t.logger.Errorf("Failed to parse transaction data: %v", err)
-				t.task_ctx.SetResult(types.TaskResultFailure)
-				isFailed = true
-				return
+				l.target.logger.Errorf("Failed to parse transaction data: %v", err)
+				l.target.task_ctx.SetResult(types.TaskResultFailure)
+				l.Result.Failed = true
+				return l.Result, fmt.Errorf("measurement stopped: failed to parse transaction data at event %d", i)
 			}
-			if tx_index < 0 || tx_index >= totNumberOfTxes {
-				t.logger.Errorf("Transaction index out of range: %d", tx_index)
-				t.task_ctx.SetResult(types.TaskResultFailure)
-				isFailed = true
-				return
+			if tx_index < 0 || tx_index >= l.Result.TotalTxs {
+				l.target.logger.Errorf("Transaction index out of range: %d", tx_index)
+				l.target.task_ctx.SetResult(types.TaskResultFailure)
+				l.Result.Failed = true
+				return l.Result, fmt.Errorf("measurement stopped: transaction index out of range at event %d", i)
 			}
 
 			// log the duplicated p2p events, and count duplicated p2p events
-			// todo: add a timeout of N seconds that activates if duplicatedP2PEventCount + receivedEvents >= totNumberOfTxes, if exceeded, exit the function
-			if latenciesMus[tx_index] != 0 {
-				duplicatedP2PEventCount++
+			// todo: add a timeout of N seconds that activates if DuplicatedP2PEventCount + receivedEvents >= totNumberOfTxes, if exceeded, exit the function
+			if l.Result.LatenciesMus[tx_index] != 0 {
+				l.Result.DuplicatedP2PEventCount++
 			}
 
-			latenciesMus[tx_index] = time.Since(txStartTime[tx_index]).Microseconds()
+			l.Result.LatenciesMus[tx_index] = time.Since(l.Result.TxStartTime[tx_index]).Microseconds()
 			receivedEvents++
 
 			if receivedEvents%logInterval == 0 {
-				t.logger.Infof("Received %d p2p events", receivedEvents)
+				l.target.logger.Infof("Received %d p2p events", receivedEvents)
 			}
 		}
 
-		if receivedEvents >= totNumberOfTxes {
-			t.logger.Infof("Reading of p2p events finished")
+		if receivedEvents >= l.Result.TotalTxs {
+			l.target.logger.Infof("Reading of p2p events finished")
 			break
 		}
 
 		select {
-		case <-t.ctx.Done():
-			t.logger.Warnf("Task cancelled, stopping reading p2p events.")
-			return
+		case <-l.target.ctx.Done():
+			l.target.logger.Warnf("Task cancelled, stopping reading p2p events.")
+			l.Result.Failed = true
+			return l.Result, fmt.Errorf("measurement stopped: task cancelled")
 		default:
 			// check test deadline
-			if time.Now().After(testDeadline) {
-				t.logger.Warnf("Reached duration limit, stopping reading p2p events.")
-				return
+			if time.Now().After(l.testDeadline) {
+				l.target.logger.Warnf("Reached duration limit, stopping reading p2p events.")
+				l.Result.Failed = true
+				return l.Result, fmt.Errorf("measurement stopped: reached duration limit")
+			}
+			// check if the execution failed
+			if l.Result.Failed {
+				l.target.logger.Warnf("Execution failed, stopping reading p2p events.")
+				return l.Result, fmt.Errorf("measurement stopped: execution failed")
 			}
 		}
 	}
 
-	lastMeasureDelay := time.Since(startTime)
-	t.logger.Infof("Last measure delay since start time: %s", lastMeasureDelay)
-
-	if coordinatedOmissionEventCount > 0 {
-		t.logger.Warnf("Coordinated omission events: %d", coordinatedOmissionEventCount)
+	// check if the execution failed
+	if l.Result.Failed {
+		l.target.logger.Warnf("Execution failed, stopping reading p2p events.")
+		return l.Result, fmt.Errorf("measurement stopped: execution failed")
 	}
 
-	if duplicatedP2PEventCount > 0 {
-		t.logger.Warnf("Duplicated p2p events: %d", duplicatedP2PEventCount)
+	// Calculate the last measure delay
+	l.Result.LastMeasureDelay = time.Since(l.Result.StartTime)
+	l.target.logger.Infof("Last measure delay since start time: %s", l.Result.LastMeasureDelay)
+
+	if l.Result.CoordinatedOmissionEventCount > 0 {
+		l.target.logger.Warnf("Coordinated omission events: %d", l.Result.CoordinatedOmissionEventCount)
+	}
+
+	if l.Result.DuplicatedP2PEventCount > 0 {
+		l.target.logger.Warnf("Duplicated p2p events: %d", l.Result.DuplicatedP2PEventCount)
 	}
 
 	// Check if we received all transactions p2p events
-	notReceivedP2PEventCount := 0
-	for i := 0; i < totNumberOfTxes; i++ {
-		if latenciesMus[i] == 0 {
-			notReceivedP2PEventCount++
+	l.Result.NotReceivedP2PEventCount = 0
+	for i := 0; i < l.Result.TotalTxs; i++ {
+		if l.Result.LatenciesMus[i] == 0 {
+			l.Result.NotReceivedP2PEventCount++
 			// Assign a default value for missing P2P events
-			latenciesMus[i] = (time.Duration(duration_s) * time.Second).Microseconds()
+			l.Result.LatenciesMus[i] = (time.Duration(l.Duration_s) * time.Second).Microseconds()
 		}
 	}
-	if notReceivedP2PEventCount > 0 {
-		t.logger.Warnf("Missed p2p events: %d (assigned latency=duration)", notReceivedP2PEventCount)
+	if l.Result.NotReceivedP2PEventCount > 0 {
+		l.target.logger.Warnf("Missed p2p events: %d (assigned latency=duration)", l.Result.NotReceivedP2PEventCount)
 	}
 
-	return txs, latenciesMus, duplicatedP2PEventCount, coordinatedOmissionEventCount, notReceivedP2PEventCount, isFailed
+	return l.Result, nil
 }
 
-func (t *LoadTool) getTcpConn(ctx context.Context, client *execution.Client) (*sentry.Conn, error) {
+func (t *LoadTarget) getTcpConn() (*sentry.Conn, error) {
 	chainConfig := params.AllDevChainProtocolChanges
 
-	head, err := client.GetRPCClient().GetLatestBlock(ctx)
+	head, err := t.client.GetRPCClient().GetLatestBlock(t.ctx)
 	if err != nil {
 		t.task_ctx.SetResult(types.TaskResultFailure)
 		return nil, err
 	}
 
-	chainID, err := client.GetRPCClient().GetEthClient().ChainID(ctx)
+	chainID, err := t.client.GetRPCClient().GetEthClient().ChainID(t.ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	chainConfig.ChainID = chainID
 
-	genesis, err := client.GetRPCClient().GetEthClient().BlockByNumber(ctx, new(big.Int).SetUint64(0))
+	genesis, err := t.client.GetRPCClient().GetEthClient().BlockByNumber(t.ctx, new(big.Int).SetUint64(0))
 	if err != nil {
 		t.logger.Errorf("Failed to fetch genesis block: %v", err)
 		t.task_ctx.SetResult(types.TaskResultFailure)
 		return nil, err
 	}
 
-	conn, err := sentry.GetTcpConn(client)
+	conn, err := sentry.GetTcpConn(t.client)
 	if err != nil {
 		t.logger.Errorf("Failed to get TCP connection: %v", err)
 		t.task_ctx.SetResult(types.TaskResultFailure)
@@ -260,13 +331,13 @@ func (t *LoadTool) getTcpConn(ctx context.Context, client *execution.Client) (*s
 		return nil, err
 	}
 
-	t.logger.Infof("Connected to %s", client.GetName())
+	t.logger.Infof("Connected to %s", t.client.GetName())
 
 	return conn, nil
 }
 
-func (t *LoadTool) generateTransaction(ctx context.Context, i int) (*ethtypes.Transaction, error) {
-	tx, err := t.wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
+func (t *LoadTarget) generateTransaction(i int) (*ethtypes.Transaction, error) {
+	tx, err := t.wallet.BuildTransaction(t.ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
 		addr := t.wallet.GetAddress()
 		toAddr := &addr
 
@@ -294,4 +365,8 @@ func (t *LoadTool) generateTransaction(ctx context.Context, i int) (*ethtypes.Tr
 	}
 
 	return tx, nil
+}
+
+func (t *LoadTarget) sendTransaction(tx *ethtypes.Transaction) error {
+	return t.client.GetRPCClient().SendTransaction(t.ctx, tx)
 }
