@@ -9,10 +9,9 @@ tasks:
   title: "Check transaction pool latency with 1.000 transactions"
   timeout: 5m
   config:
-    txCount: 1000
-    measureInterval: 100
-    highLatency: 1000
-    failOnHighLatency: true
+    tps: 1000
+    duration_s: 10
+    measureInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
 - name: tx_pool_clean
@@ -24,8 +23,9 @@ tasks:
   timeout: 5m
   title: "Check transaction pool throughput with 1.000 transactions in one second"
   config:
-    qps: 1000
-    measureInterval: 100
+    tps: 1000
+    duration_s: 10
+    measureInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
 # - name: tx_pool_clean

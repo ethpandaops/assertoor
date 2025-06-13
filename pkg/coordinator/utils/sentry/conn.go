@@ -1,6 +1,7 @@
 package sentry
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
@@ -267,28 +268,54 @@ loop:
 }
 
 // readUntil reads eth protocol messages until a message of the target type is
-// received.  It returns an error if there is a disconnect, or if the context
-// is cancelled before a message of the desired type can be read.
-func readUntil[T any](conn *Conn) (*T, error) {
-	for {
-		received, err := conn.ReadEth()
-		if err != nil {
-			if err == errDisc {
-				return nil, errDisc
-			}
-			continue
-		}
+// received.  It returns an error if there is a disconnect, timeout expires,
+// or if the context is cancelled before a message of the desired type can be read.
+func readUntil[T any](conn *Conn, ctx context.Context) (*T, error) {
+	resultCh := make(chan *T, 1)
+	errCh := make(chan error, 1)
 
-		switch res := received.(type) {
-		case *T:
-			return res, nil
+	go func() {
+		defer close(resultCh)
+		defer close(errCh)
+
+		for {
+			received, err := conn.ReadEth()
+			if err != nil {
+				if err == errDisc {
+					errCh <- errDisc
+					return
+				}
+				continue
+			}
+
+			switch res := received.(type) {
+			case *T:
+				resultCh <- res
+				return
+			}
 		}
+	}()
+
+	select {
+	case result := <-resultCh:
+		return result, nil
+	case err := <-errCh:
+		return nil, err
+	case <-ctx.Done():
+		return nil, fmt.Errorf("timeoutExpired")
 	}
 }
 
 // readTransactionMessages reads transaction messages from the connection.
-func (conn *Conn) ReadTransactionMessages() (*eth.TransactionsPacket, error) {
-	return readUntil[eth.TransactionsPacket](conn)
+// The timeout parameter is optional - if provided and > 0, the function will timeout after the specified duration.
+func (conn *Conn) ReadTransactionMessages(timeout ...time.Duration) (*eth.TransactionsPacket, error) {
+	ctx := context.Background()
+	if len(timeout) > 0 && timeout[0] > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout[0])
+		defer cancel()
+	}
+	return readUntil[eth.TransactionsPacket](conn, ctx)
 }
 
 // dialAs attempts to dial a given node and perform a handshake using the generated
