@@ -1,11 +1,11 @@
-package txpoolcheck
+package tx_pool_throughput_analysis
 
 type Config struct {
 	PrivateKey string `yaml:"privateKey" json:"privateKey"`
 
 	TPS                  int `yaml:"tps" json:"tps"`
 	Duration_s           int `yaml:"duration_s" json:"duration_s"`
-	MeasureInterval      int `yaml:"measureInterval" json:"measureInterval"`
+	LogInterval          int `yaml:"logInterval" json:"logInterval"`
 	SecondsBeforeRunning int `yaml:"secondsBeforeRunning" json:"secondsBeforeRunning"`
 }
 
@@ -13,7 +13,7 @@ func DefaultConfig() Config {
 	return Config{
 		TPS:                  100,
 		Duration_s:           60,
-		MeasureInterval:      100,
+		LogInterval:          100,
 		SecondsBeforeRunning: 0,
 	}
 }

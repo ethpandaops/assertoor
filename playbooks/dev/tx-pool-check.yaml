@@ -11,7 +11,7 @@ tasks:
   config:
     tps: 1000
     duration_s: 10
-    measureInterval: 1000
+    logInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
 - name: tx_pool_clean
@@ -25,7 +25,7 @@ tasks:
   config:
     tps: 1000
     duration_s: 10
-    measureInterval: 1000
+    logInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
 # - name: tx_pool_clean
@@ -38,7 +38,7 @@ tasks:
 #   timeout: 10m
 #   config:
 #     txCount: 10000
-#     measureInterval: 1000
+#     logInterval: 1000
 #     highLatency: 5000
 #     failOnHighLatency: true
 #   configVars:
@@ -53,7 +53,7 @@ tasks:
 #   timeout: 10m
 #   config:
 #     qps: 10000
-#     measureInterval: 1000
+#     logInterval: 1000
 #   configVars:
 #     privateKey: "walletPrivkey"
 # - name: tx_pool_clean
@@ -66,7 +66,7 @@ tasks:
 #   timeout: 30m
 #   config:
 #     txCount: 15000
-#     measureInterval: 1500
+#     logInterval: 1500
 #     highLatency: 7000
 #     failOnHighLatency: true
 #   configVars:
@@ -81,6 +81,6 @@ tasks:
 #   title: "Check transaction pool throughput with 15.000 transactions in one second"
 #   config:
 #     qps: 15000
-#     measureInterval: 1500
+#     logInterval: 1500
 #   configVars:
 #     privateKey: "walletPrivkey"

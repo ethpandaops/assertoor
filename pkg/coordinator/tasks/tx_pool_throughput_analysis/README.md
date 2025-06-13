@@ -15,7 +15,7 @@ The `tx_pool_throughput_analysis` task evaluates the throughput of transaction p
 - **`duration_s`**:
   The test duration (the number of transactions to send is calculated as `tps * duration_s`).
 
-- **`measureInterval`**:
+- **`logInterval`**:
   The interval at which the script logs progress (e.g., every 100 transactions).
 
 ### Outputs
@@ -31,9 +31,9 @@ The `tx_pool_throughput_analysis` task evaluates the throughput of transaction p
 ```yaml
 - name: tx_pool_throughput_analysis
   config:
-    tps: 100
+    tps: 1000
     duration_s: 10  
-    measureInterval: 1000
+    logInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
 ```

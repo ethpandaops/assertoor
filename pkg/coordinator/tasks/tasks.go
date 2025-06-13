@@ -38,10 +38,10 @@ import (
 	runtaskoptions "github.com/noku-team/assertoor/pkg/coordinator/tasks/run_task_options"
 	runtasks "github.com/noku-team/assertoor/pkg/coordinator/tasks/run_tasks"
 	runtasksconcurrent "github.com/noku-team/assertoor/pkg/coordinator/tasks/run_tasks_concurrent"
-	txpoollatencyanalysis "github.com/noku-team/assertoor/pkg/coordinator/tasks/tx_pool_latency_analysis"
-	txpoolthroughputanalysis "github.com/noku-team/assertoor/pkg/coordinator/tasks/tx_pool_throughput_analysis"
-	txpoolclean "github.com/noku-team/assertoor/pkg/coordinator/tasks/tx_pool_clean"
 	sleep "github.com/noku-team/assertoor/pkg/coordinator/tasks/sleep"
+	txpoolclean "github.com/noku-team/assertoor/pkg/coordinator/tasks/tx_pool_clean"
+	txpoolthroughputanalysis "github.com/noku-team/assertoor/pkg/coordinator/tasks/tx_pool_throughput_analysis"
+	txpoollatencyanalysis "github.com/noku-team/assertoor/pkg/coordinator/tasks/tx_pool_latency_analysis"
 )
 
 var AvailableTaskDescriptors = []*types.TaskDescriptor{
