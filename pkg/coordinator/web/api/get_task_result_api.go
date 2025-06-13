@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/noku-team/assertoor/pkg/coordinator/db"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/gorilla/mux"
 )
 
 // GetTaskResult godoc
@@ -92,18 +92,20 @@ func (ah *APIHandler) GetTaskResult(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if view parameter is set
-	viewMode := r.URL.Query().Has("view")
+	downloadMode := r.URL.Query().Has("download")
 
 	// Determine content type
 	contentType := "application/octet-stream"
 
-	if viewMode {
+	if !downloadMode {
 		ext := strings.ToLower(filepath.Ext(resultFile.Name))
 		switch ext {
 		case ".txt", ".log", ".yaml", ".yml", ".json", ".md":
 			contentType = "text/plain"
 		case ".html", ".htm":
 			contentType = "text/html"
+		case ".css":
+			contentType = "text/css"
 		case ".png":
 			contentType = "image/png"
 		case ".jpg", ".jpeg":
@@ -118,7 +120,7 @@ func (ah *APIHandler) GetTaskResult(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", contentType)
 
-	if !viewMode {
+	if downloadMode {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", resultFile.Name))
 	}
 

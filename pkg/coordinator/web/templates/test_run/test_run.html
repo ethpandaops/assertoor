@@ -1,6 +1,13 @@
 {{ define "page" }}
-<div class="d-flex flex-column flex-grow-1 mt-3 container-fluid">
-    <h2 class="py-2">Test Run {{ .RunID }}: {{ .Name }}</h2>
+<!-- Include KnockoutJS library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.1/knockout-latest.js"></script>
+<!-- Include Knockout Mapping Plugin -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/knockout.mapping/2.4.1/knockout.mapping.min.js"></script>
+<!-- Include jQuery (if still needed for Bootstrap components or potentially AJAX, though fetch API is also an option) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<div id="ko-root" class="d-flex flex-column flex-grow-1 mt-3 container-fluid">
+    <h2 class="py-2">Test Run {{ .RunID }}: {{ html "<!-- ko text: name -->" }}{{ html "<!-- /ko -->" }}</h2>
 
     <!-- client pool status -->
     <table class="test-header">
@@ -8,69 +15,64 @@
         <td style="width: 200px">
           Test ID:
         </td>
-        <td>
-          {{ .TestID }}
-        </td>
+        <td data-bind="text: testId"></td>
       </tr>
       <tr>
         <td>
           Test Status:
         </td>
         <td>
-        {{ if eq .Status "pending" }}
+          {{ html "<!-- ko if: status() == 'pending' -->" }}
           <span class="badge rounded-pill text-bg-secondary">
             <i class="far fa-hourglass-half"></i> Pending
           </span>
-        {{ else if eq .Status "running" }}
+          {{ html "<!-- /ko -->" }}
+          {{ html "<!-- ko if: status() == 'running' -->" }}
           <span class="badge rounded-pill text-bg-primary">
             <i class="far fa-play-circle"></i> Running
           </span>
-        {{ else if eq .Status "success" }}
+          {{ html "<!-- /ko -->" }}
+          {{ html "<!-- ko if: status() == 'success' -->" }}
           <span class="badge rounded-pill text-bg-success">
             <i class="fas fa-check-circle"></i> Success
           </span>
-        {{ else if eq .Status "failure" }}
+          {{ html "<!-- /ko -->" }}
+          {{ html "<!-- ko if: status() == 'failure' -->" }}
           <span class="badge rounded-pill text-bg-danger">
             <i class="fas fa-times-circle"></i> Failed
           </span>
-        {{ else if eq .Status "aborted" }}
+          {{ html "<!-- /ko -->" }}
+          {{ html "<!-- ko if: status() == 'aborted' -->" }}
           <span class="badge rounded-pill text-bg-secondary">
             <i class="fas fa-times-circle"></i> Cancelled
           </span>
-        {{ else }}
-          <span class="badge rounded-pill text-bg-warning">
-            {{ .Status }}
-          </span>
-        {{ end }}
+          {{ html "<!-- /ko -->" }}
+          {{ html "<!-- ko if: status() != 'pending' && status() != 'running' && status() != 'success' && status() != 'failure' && status() != 'aborted' -->" }}
+          <span class="badge rounded-pill text-bg-warning" data-bind="text: status"></span>
+          {{ html "<!-- /ko -->" }}
         </td>
       </tr>
-      {{ if .IsStarted }}
+      {{ html "<!-- ko if: started -->" }}
       <tr>
         <td>
           Start Time:
         </td>
-        <td>
-          {{ formatDateTime .StartTime.UTC }}
-        </td>
+        <td data-bind="text: $root.formatDateTime($data.start_time)"></td>
       </tr>
-      {{ end }}
-      {{ if .IsCompleted }}
+      {{ html "<!-- /ko -->" }}
+      {{ html "<!-- ko if: completed -->" }}
       <tr>
         <td>
           Finish Time:
         </td>
-        <td>
-          {{ formatDateTime .StopTime.UTC }}
-        </td>
+        <td data-bind="text: $root.formatDateTime($data.stop_time)"></td>
       </tr>
-      {{ end }}
+      {{ html "<!-- /ko -->" }}
       <tr>
         <td>
           Timeout:
         </td>
-        <td>
-          {{ .Timeout }}
-        </td>
+        <td data-bind="text: formatDuration(timeout)"></td>
       </tr>
     </table>
 
@@ -89,241 +91,224 @@
             <th style="width:50px;"></th>
           </tr>
         </thead>
-        <tbody>
-          <tr class="details-row"></tr>
-          {{ $isSecTrimmed := .IsSecTrimmed }}
-          {{ range $i, $task := .Tasks }}
-          <tr class="accordion-toggle task-row" data-task-id="{{ $task.Index }}" data-parent-id="{{ $task.ParentIndex }}" data-task-status="{{ $task.Status }}" data-task-result="{{ $task.Result }}">
+        <tbody data-bind="foreach: tasks">
+          {{ html "<!-- ko if: $data.isVisible -->" }}
+          <tr class="accordion-toggle task-row" data-bind="click: $root.handleRowClick">
             <td class="task-graph">
               <div class="task-graph-cell">
                 <div class="graph-container">
-                  {{ range $l, $graph := $task.GraphLevels }}
-                  <div class="graph-level {{ if gt $graph 0 }}graph-line{{ end }} {{ if eq $graph 3 }}graph-last{{ end }}">
-                    {{ if gt $graph 1 }}
+                  {{ html "<!-- ko foreach: $data.graph_levels -->" }}
+                  <div class="graph-level" data-bind="css: { 'graph-line': $data > 0, 'graph-last': $data == 3 }">
+                    {{ html "<!-- ko if: $data > 1 -->" }}
                     <div class="graph-item"></div>
-                    {{ end }}
+                    {{ html "<!-- /ko -->" }}
                   </div>
-                  {{ end }}
-                  {{ if $task.HasChildren }}
-                  <div class="graph-button expanded">
-                    <button class="btn btn-link btn-sm p-0 me-1 task-collapse-btn">
-                      <i class="fas fa-square-minus"></i>
+                  {{ html "<!-- /ko -->" }}
+                  {{ html "<!-- ko if: $data.has_children -->" }}
+                  <div class="graph-button" data-bind="css: { 'expanded': $data.isExpanded }">
+                    <button class="btn btn-link btn-sm p-0 me-1 task-collapse-btn" data-bind="click: $data.toggleExpand, clickBubble: false">
+                        <i class="fas" data-bind="css: { 'fa-square-minus': $data.isExpanded, 'fa-square-plus': !$data.isExpanded() }"></i>
                     </button>
                     <div class="graph-expand-line"></div>
                   </div>
-                  {{ end }}
+                  {{ html "<!-- /ko -->" }}
                   <div class="graph-label">
-                    <span>
-                      {{ $task.Index }}
-                    </span>
+                    <span data-bind="text: $data.index"></span>
                   </div>
                 </div>
               </div>
             </td>
-            <td>{{ $task.Name }}</td>
-            <td>{{ $task.Title }}</td>
+            <td data-bind="text: $data.name"></td>
+            <td data-bind="text: $data.title"></td>
             <td>
-              {{ if $task.HasRunTime }}{{ $task.RunTime }}{{ else }}?{{ end }}
-              {{ if $task.HasTimeout }} / {{ $task.Timeout }}{{ end }}
-              {{ if $task.HasCustomRunTime}}
-                <span data-bs-toggle="tooltip"
-                      data-bs-placement="top"
-                      data-bs-title="Custom timer via outputs.customRunTimeSeconds" >
-                  ({{ $task.CustomRunTime}})
-                </span>
-              {{ end }}
+                <span data-bind="text: $data.runTimeDisplay"></span>
+                {{ html "<!-- ko if: $data.has_timeout -->" }}
+                / <span data-bind="text: $root.formatDuration($data.timeout)"></span>
+                {{ html "<!-- /ko -->" }}
+                {{ html "<!-- ko if: $data.has_custom_runtime -->" }}
+                  <span data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        data-bs-title="Custom timer via outputs.customRunTimeSeconds" >
+                    (<span data-bind="text: $root.formatDuration($data.custom_runtime)"></span>)
+                  </span>
+                {{ html "<!-- /ko -->" }}
             </td>
             <td>
-              {{ if eq $task.Result "success" }}
+              {{ html "<!-- ko if: $data.result() == 'success' -->" }}
                 <span class="badge rounded-pill text-bg-success">
                   <i class="fas fa-check"></i>
                 </span>
-              {{ else if eq $task.Result "failure" }}
+              {{ html "<!-- /ko -->" }}
+              {{ html "<!-- ko if: $data.result() == 'failure' -->" }}
                 <span class="badge rounded-pill text-bg-danger">
                   <i class="fas fa-times"></i>
                 </span>
-              {{ else }}
+              {{ html "<!-- /ko -->" }}
+              {{ html "<!-- ko if: $data.result() != 'success' && $data.result() != 'failure' -->" }}
                 <span class="badge rounded-pill text-bg-secondary">
                   <i class="fas fa-question"></i>
                 </span>
-              {{ end }}
+              {{ html "<!-- /ko -->" }}
 
-              {{ if eq $task.Status "pending" }}
+              {{ html "<!-- ko if: $data.status() == 'pending' -->" }}
                 <span class="badge rounded-pill text-bg-secondary">
                   <i class="far fa-hourglass-half"></i>
                 </span>
-              {{ else if eq $task.Status "running" }}
+              {{ html "<!-- /ko -->" }}
+              {{ html "<!-- ko if: $data.status() == 'running' -->" }}
                 <span class="badge rounded-pill text-bg-primary">
                   <i class="far fa-play-circle"></i>
                 </span>
-              {{ end }}
+              {{ html "<!-- /ko -->" }}
             </td>
-            <td class="p-0"><button class="btn btn-default btn-xs task-details-btn" data-bs-toggle="collapse" data-bs-target="#task-details-{{ $task.Index }}"><i class="fa fa-eye" aria-hidden="true"></i></button></td>
+            <td class="p-0">
+                <button class="btn btn-default btn-xs task-details-btn" data-bind="click: $data.toggleDetails, clickBubble: false">
+                    <i class="fa fa-eye" aria-hidden="true"></i>
+                </button>
+            </td>
           </tr>
           <tr>
             <td colspan="12" class="details-row task-panel">
-              <div class="accordian-body collapse" id="task-details-{{ $task.Index }}">
+              {{ html "<!-- ko if: $data.isDetailsVisible -->" }}
+              <div class="accordian-body collapse show" data-bind="attr: { id: 'task-details-' + $data.index() }">
                 <div class="details-content">
                   <table>
                     <tr>
                       <td style="width: 200px;">Status:</td>
                       <td>
-                        {{ if eq $task.Status "pending" }}
+                        {{ html "<!-- ko if: $data.status() == 'pending' -->" }}
                           <span class="badge rounded-pill text-bg-secondary">
                             <i class="far fa-hourglass-half"></i> Pending
                           </span>
-                        {{ else if eq $task.Status "running" }}
+                        {{ html "<!-- /ko -->" }}
+                        {{ html "<!-- ko if: $data.status() == 'running' -->" }}
                           <span class="badge rounded-pill text-bg-primary">
                             <i class="far fa-play-circle"></i> Running
                           </span>
-                        {{ else if eq $task.Status "complete" }}
+                        {{ html "<!-- /ko -->" }}
+                        {{ html "<!-- ko if: $data.status() == 'complete' -->" }}
                           <span class="badge rounded-pill text-bg-success">
                             <i class="far fa-check-circle"></i> Complete
                           </span>
-                        {{ else }}
+                        {{ html "<!-- /ko -->" }}
+                         {{ html "<!-- ko if: $data.status() != 'pending' && $data.status() != 'running' && $data.status() != 'complete' -->" }}
                           <span class="badge rounded-pill text-bg-warning">
-                            <i class="far fa-question"></i> {{ $task.Status }}
+                            <i class="far fa-question"></i> <span data-bind="text: $data.status"></span>
                           </span>
-                        {{ end }}
+                        {{ html "<!-- /ko -->" }}
                       </td>
                     </tr>
                     <tr>
                       <td>Result:</td>
                       <td>
-                        {{ if eq $task.Result "success" }}
+                        {{ html "<!-- ko if: $data.result() == 'success' -->" }}
                           <span class="badge rounded-pill text-bg-success">
                             <i class="fas fa-check"></i> Success
                           </span>
-                        {{ else if eq $task.Result "failure" }}
+                        {{ html "<!-- /ko -->" }}
+                        {{ html "<!-- ko if: $data.result() == 'failure' -->" }}
                           <span class="badge rounded-pill text-bg-danger">
                             <i class="fas fa-times"></i> Failure
                           </span>
-                        {{ else }}
+                        {{ html "<!-- /ko -->" }}
+                        {{ html "<!-- ko if: $data.result() != 'success' && $data.result() != 'failure' -->" }}
                           <span class="badge rounded-pill text-bg-secondary">
                             <i class="fas fa-question"></i> None
                           </span>
-                        {{ end }}
+                        {{ html "<!-- /ko -->" }}
                       </td>
                     </tr>
-                    {{ if $task.IsStarted }}
+                    {{ html "<!-- ko if: $data.started -->" }}
                     <tr>
                       <td>Start Time:</td>
-                      <td>{{ formatDateTime $task.StartTime.UTC }}</td>
+                      <td data-bind="text: $parent.formatDateTime($data.start_time)"></td>
                     </tr>
-                    {{ end }}
-                    {{ if $task.IsCompleted }}
+                    {{ html "<!-- /ko -->" }}
+                    {{ html "<!-- ko if: $data.completed -->" }}
                     <tr>
                       <td>Finish Time:</td>
-                      <td>{{ formatDateTime $task.StopTime.UTC }}</td>
+                      <td data-bind="text: $parent.formatDateTime($data.stop_time)"></td>
                     </tr>
-                    {{ end }}
-                    {{ if not (eq $task.ResultError "") }}
-                    <tr>
-                      <td>Error Result:</td>
-                      <td>
-                        <pre>{{ .ResultError }}</pre>
-                      </td>
-                    </tr>
-                    {{ end }}
+                    {{ html "<!-- /ko -->" }}
                   </table>
 
-                  {{ if not $isSecTrimmed }}
-                  {{ if $task.IsStarted }}
-                  <ul class="nav nav-tabs mt-2" id="task{{ $task.Index }}-tabs" role="tablist">
+                  {{ html "<!-- ko if: !$parent.is_sec_trimmed -->" }}
+                  {{ html "<!-- ko if: $data.started -->" }}
+                  <ul class="nav nav-tabs mt-2" role="tablist" data-bind="attr: { id: 'task' + $data.index() + '-tabs' }">
                     <li class="nav-item" role="presentation">
-                      <button class="nav-link active" id="task{{ $task.Index }}-logs-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-logs" type="button" role="tab" aria-controls="task{{ $task.Index }}-logs" aria-selected="true">Logs</button>
+                      <button class="nav-link active" data-bs-toggle="tab" type="button" role="tab" aria-selected="true" data-bind="attr: { id: 'task' + $data.index() + '-logs-tab', 'data-bs-target': '#task' + $data.index() + '-logs', 'aria-controls': 'task' + $data.index() + '-logs' }">Logs</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                      <button class="nav-link" id="task{{ $task.Index }}-config-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-config" type="button" role="tab" aria-controls="task{{ $task.Index }}-config" aria-selected="false">Config</button>
+                      <button class="nav-link" data-bs-toggle="tab" type="button" role="tab" aria-selected="false" data-bind="attr: { id: 'task' + $data.index() + '-config-tab', 'data-bs-target': '#task' + $data.index() + '-config', 'aria-controls': 'task' + $data.index() + '-config' }">Config</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                      <button class="nav-link" id="task{{ $task.Index }}-result-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-result" type="button" role="tab" aria-controls="task{{ $task.Index }}-result" aria-selected="false">Result</button>
+                      <button class="nav-link" data-bs-toggle="tab" type="button" role="tab" aria-selected="false" data-bind="attr: { id: 'task' + $data.index() + '-result-tab', 'data-bs-target': '#task' + $data.index() + '-result', 'aria-controls': 'task' + $data.index() + '-result' }">Result</button>
                     </li>
-                    {{ if $task.HaveResultFiles }}
+                    {{ html "<!-- ko if: $data.have_result_files -->" }}
                     <li class="nav-item" role="presentation">
-                      <button class="nav-link" id="task{{ $task.Index }}-result-files-tab" data-bs-toggle="tab" data-bs-target="#task{{ $task.Index }}-result-files" type="button" role="tab" aria-controls="task{{ $task.Index }}-result-files" aria-selected="false">Result Files</button>
+                      <button class="nav-link" data-bs-toggle="tab" type="button" role="tab" aria-selected="false" data-bind="attr: { id: 'task' + $data.index() + '-result-files-tab', 'data-bs-target': '#task' + $data.index() + '-result-files', 'aria-controls': 'task' + $data.index() + '-result-files' }">Result Files</button>
                     </li>
-                    {{ end }}
+                    {{ html "<!-- /ko -->" }}
                   </ul>
                   <div class="card">
-                    <div class="tab-content card-body" id="task{{ $task.Index }}-tabcontent">
-                      <div class="tab-pane fade show active" id="task{{ $task.Index }}-logs" role="tabpanel" aria-labelledby="task{{ $task.Index }}-logs-tab">
+                    <div class="tab-content card-body" data-bind="attr: { id: 'task' + $data.index() + '-tabcontent' }">
+                      <div class="tab-pane fade show active" role="tabpanel" data-bind="attr: { id: 'task' + $data.index() + '-logs', 'aria-labelledby': 'task' + $data.index() + '-logs-tab' }">
                         <div style="max-height:400px; overflow-y:auto;">
                           <table>
-                          {{ range $i, $log := .Log }}
-                            <tr>
-                              <td style="width: 200px;">
-                                {{ formatDateTime $log.Time.UTC }}
-                              </td>
-                              <td style="width: 80px;">
-                                {{ if eq $log.Level 0 }}
-                                  <span class="loglevel-0 text-danger">PANIC</span>
-                                {{ else if eq $log.Level 1 }}
-                                  <span class="loglevel-1 text-danger">FATAL</span>
-                                {{ else if eq $log.Level 2 }}
-                                  <span class="loglevel-2 text-danger">ERROR</span>
-                                {{ else if eq $log.Level 3 }}
-                                  <span class="loglevel-3 text-warning">WARN</span>
-                                {{ else if eq $log.Level 4 }}
-                                  <span class="loglevel-4 text-info">INFO</span>
-                                {{ else if eq $log.Level 5 }}
-                                  <span class="loglevel-5 text-secondary">DEBUG</span>
-                                {{ else if eq $log.Level 6 }}
-                                  <span class="loglevel-6 text-secondary">TRACE</span>
-                                {{ end }}
-                              </td>
-                              <td style="width: 70px;">
-                                <span class="badge rounded-pill text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" title="{{ range $key, $val := .Data }}{{ $key }}: {{ $val }}<br>{{ end }}">{{ $log.DataLen }} Fields</span>
-                              </td>
-                              <td>
-                                {{ $log.Message }}
-                              </td>
-                            </tr>
-                          {{ end }}
+                            <tbody data-bind="foreach: $data.log">
+                              <tr>
+                                <td style="width: 200px;" data-bind="text: $root.formatDateTime($data.time)"></td>
+                                <td style="width: 80px;">
+                                  {{ html "<!-- ko if: $data.level() == 0 -->" }}<span class="loglevel-0 text-danger">PANIC</span>{{ html "<!-- /ko -->" }}
+                                  {{ html "<!-- ko if: $data.level() == 1 -->" }}<span class="loglevel-1 text-danger">FATAL</span>{{ html "<!-- /ko -->" }}
+                                  {{ html "<!-- ko if: $data.level() == 2 -->" }}<span class="loglevel-2 text-danger">ERROR</span>{{ html "<!-- /ko -->" }}
+                                  {{ html "<!-- ko if: $data.level() == 3 -->" }}<span class="loglevel-3 text-warning">WARN</span>{{ html "<!-- /ko -->" }}
+                                  {{ html "<!-- ko if: $data.level() == 4 -->" }}<span class="loglevel-4 text-info">INFO</span>{{ html "<!-- /ko -->" }}
+                                  {{ html "<!-- ko if: $data.level() == 5 -->" }}<span class="loglevel-5 text-secondary">DEBUG</span>{{ html "<!-- /ko -->" }}
+                                  {{ html "<!-- ko if: $data.level() == 6 -->" }}<span class="loglevel-6 text-secondary">TRACE</span>{{ html "<!-- /ko -->" }}
+                                </td>
+                                <td style="width: 70px;">
+                                  <span class="badge rounded-pill text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" data-bind="attr: { title: $data.dataTitle }"><span data-bind="text: $data.datalen"></span> Fields</span>
+                                </td>
+                                <td data-bind="text: $data.msg"></td>
+                              </tr>
+                            </tbody>
                           </table>
                         </div>
                       </div>
-                      <div class="tab-pane fade card-body" id="task{{ $task.Index }}-config" role="tabpanel" aria-labelledby="task{{ $task.Index }}-config-tab">
-                        <pre style="text-wrap: pretty">{{ $task.ConfigYaml }}</pre>
+                      <div class="tab-pane fade card-body" role="tabpanel" data-bind="attr: { id: 'task' + $data.index() + '-config', 'aria-labelledby': 'task' + $data.index() + '-config-tab' }">
+                        <pre style="text-wrap: pretty" data-bind="text: $data.config_yaml"></pre>
                       </div>
-                      <div class="tab-pane fade card-body" id="task{{ $task.Index }}-result" role="tabpanel" aria-labelledby="task{{ $task.Index }}-result-tab">
-                        <pre style="text-wrap: pretty">{{ $task.ResultYaml }}</pre>
+                      <div class="tab-pane fade card-body" role="tabpanel" data-bind="attr: { id: 'task' + $data.index() + '-result', 'aria-labelledby': 'task' + $data.index() + '-result-tab' }">
+                        <pre style="text-wrap: pretty" data-bind="text: $data.result_yaml"></pre>
                       </div>
-                      {{ if $task.HaveResultFiles }}
-                      <div class="tab-pane fade card-body" id="task{{ $task.Index }}-result-files" role="tabpanel" aria-labelledby="task{{ $task.Index }}-result-files-tab">
+                      {{ html "<!-- ko if: $data.have_result_files -->" }}
+                      <div class="tab-pane fade card-body" role="tabpanel" data-bind="attr: { id: 'task' + $data.index() + '-result-files', 'aria-labelledby': 'task' + $data.index() + '-result-files-tab' }">
                         <table class="table table-sm">
-                          <thead>
-                            <tr>
-                              <th>Type</th>
-                              <th>Name</th>
-                              <th>Index</th>
-                              <th>Size</th>
-                            </tr>
-                          </thead>
+                          <thead><tr><th>Type</th><th>Name</th><th>Index</th><th>Size</th></tr></thead>
                           <tbody>
-                            {{ range $result := $task.ResultFiles }}
+                            {{ html "<!-- ko foreach: $data.result_files -->" }}
                             <tr>
-                              <td>{{ $result.Type }}</td>
-                              <td><a href="{{ $result.URL }}">{{ $result.Name }}</a></td>
-                              <td>{{ $result.Index }}</td>
-                              <td>{{ $result.Size }}</td>
+                              <td data-bind="text: $data.type"></td>
+                              <td><a data-bind="attr: { href: $data.url }, text: $data.name"></a></td>
+                              <td data-bind="text: $data.index"></td>
+                              <td data-bind="text: $data.size"></td>
                             </tr>
-                            {{ end }}
+                            {{ html "<!-- /ko -->" }}
                           </tbody>
                         </table>
                       </div>
-                      {{ end }}
+                      {{ html "<!-- /ko -->" }}
                     </div>
                   </div>
-                  {{ end }}
-                  {{ end }}
-
+                  {{ html "<!-- /ko -->" }}
+                  {{ html "<!-- /ko -->" }}
                 </div>
               </div>
+              {{ html "<!-- /ko -->" }}
             </td>
           </tr>
-
-          {{ end }}
+          {{ html "<!-- /ko -->" }}
         </tbody>
       </table>
     </div>
@@ -334,117 +319,659 @@
 {{ end }}
 {{ define "js" }}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  // build task relationship map
-  var taskParentMap = {};
-  var expandedState = {};
-  var taskRows = $(".details-table tr.task-row");
-  taskRows.each(function() {
-    var taskId = $(this).data("task-id");
-    var parentId = $(this).data("parent-id");
-    taskParentMap[taskId] = parentId;
-    expandedState[parentId] = true;
+
+// Knockout ViewModel and logic will go here
+function TaskViewModel(data, allTasksMap, parentViewModel) {
+  var self = this;
+  // Store parent reference
+  self.parentViewModel = parentViewModel;
+
+  // Map initial data (subset of full details)
+  ko.mapping.fromJS(data, {}, self);
+
+  // --- Observables for UI State ---
+  self.isExpanded = ko.observable(true); // Default expand state (will be adjusted)
+  self.isDetailsVisible = ko.observable(false);
+  self.isVisible = ko.observable(true); // Controlled by parent expansion
+
+  // --- Observables for Detailed Data (Lazy Loaded) ---
+  self.log = ko.observableArray([]);
+  self.config_yaml = ko.observable('');
+  self.result_yaml = ko.observable('');
+  self.areDetailsLoaded = ko.observable(false); // Flag to track if details fetched
+  self.isLoadingDetails = ko.observable(false); // Flag for loading indicator
+  self.graph_levels = ko.observableArray([]); // Will be calculated by parent
+  self.children = ko.observableArray([]); // Will be calculated by parent
+  self.isLoaded = ko.observable(false); // Flag to track if children resolved
+  self.expandInitialized = ko.observable(""); // track initial expand logic done
+
+  // --- Computed Observables for Display Logic ---
+  self.has_children = ko.computed(function() {
+    return self.children().length > 0;
   });
 
-  // set initial expand state
-  taskRows.each(function() {
-    var taskId = $(this).data("task-id");
-
-    var taskResult = $(this).data("task-result");
-    var taskStatus = $(this).data("task-status");
-
-    if (taskStatus == "running") return;
-    if (taskResult == "failure") return;
-
-    updateExpandState($(this), false);
+  self.has_timeout = ko.computed(function() {
+      // Ensure timeout is defined and greater than 0
+      const timeoutVal = ko.unwrap(self.timeout);
+      return typeof timeoutVal === 'number' && timeoutVal > 0;
   });
 
-  
-  // Handle collapse/expand buttons
-  document.querySelectorAll('.task-collapse-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation(); // Prevent row expansion
+  self.has_runtime = ko.computed(function() {
+      // Check if runtime is a number (API sends integer, 0 is valid)
+      const runtimeVal = ko.unwrap(self.runtime);
+      return typeof runtimeVal === 'number';
+  });
 
-      var taskRow = $(this).closest("tr.task-row");
-      var taskId = taskRow.data("task-id");
+  self.runTimeDisplay = ko.computed(function() {
+    const status = self.status();
 
-      var isExpanded = expandedState[taskId];
-      updateExpandState(taskRow, !isExpanded);
+    // LIVE runtime for running tasks
+    if (status === 'running') {
+      const startMs = ko.unwrap(self.start_time);
+      if (!isNaN(startMs)) {
+        const nowMs = self.parentViewModel.currentTime();
+        if (nowMs && nowMs > startMs) {
+          const deltaMs = nowMs - startMs;
+          return (deltaMs / 1000).toFixed(3) + 's';
+        }
+      }
+    }
+    else if (status === 'pending') {
+      return '?';
+    }
+
+    // For completed tasks display stored runtime if available
+    if (self.has_runtime()) {
+      const ms = self.runtime(); // convert ns to ms
+      return (ms / 1000).toFixed(3) + 's';
+    }
+
+    // If runtime not provided but we have valid start & stop times, compute once
+    const startStr = ko.unwrap(self.start_time);
+    const stopStr = ko.unwrap(self.stop_time);
+    if (startStr && stopStr) {
+      const startMs = Date.parse(startStr);
+      const stopMs = Date.parse(stopStr);
+      if (!isNaN(startMs) && !isNaN(stopMs) && stopMs > startMs) {
+        const deltaMs = stopMs - startMs;
+        return (deltaMs / 1000).toFixed(3) + 's';
+      }
+    }
+
+    return '-';
+  });
+
+  self.have_result_files = ko.computed(function() {
+    const files = ko.unwrap(self.result_files);
+    return files && files.length > 0;
+  });
+
+  // Computed for log data tooltip title
+  self.logDataTitle = function(logEntry) {
+    let title = "";
+    const dataObj = ko.unwrap(logEntry.data);
+    if (dataObj) {
+      for (const key in dataObj) {
+        if (dataObj.hasOwnProperty(key)) {
+          title += `${key}: ${dataObj[key]}<br>`;
+        }
+      }
+    }
+    return title || "No extra data";
+  };
+
+  // Find children (call this after all tasks are in the map)
+  self.findChildren = function() {
+    if (self.isLoaded()) return;
+    for (const taskId in allTasksMap) {
+      const task = allTasksMap[taskId];
+      if (ko.unwrap(task.parent_index) === ko.unwrap(self.index)) {
+        self.children.push(task);
+      }
+    }
+    self.isLoaded(true);
+  };
+
+  // --- UI Actions ---
+  self.toggleExpand = function() {
+    const newState = !self.isExpanded();
+    self.isExpanded(newState);
+    self.setChildVisibility(newState, true);
+  };
+
+  self.setChildVisibility = function(visible, recursive) {
+    ko.utils.arrayForEach(self.children(), function(child) {
+      // Only hide if parent is collapsing.
+      // If parent is expanding, child visibility depends on its own expand state.
+      if (!visible) {
+        child.isVisible(false);
+      } else {
+        // When expanding parent, make immediate children visible.
+        // Their own children visibility depends on their expanded state.
+        child.isVisible(true);
+        // If the child itself is not expanded, its children should remain hidden.
+        if (recursive && child.isExpanded()) {
+          child.setChildVisibility(true, true);
+        } else if (recursive && !child.isExpanded()) {
+          child.setChildVisibility(false, true); // Ensure grandchildren hidden
+        }
+      }
+
+      // // Old simpler logic:
+      // child.isVisible(visible);
+      // if (recursive) {
+      //     child.setChildVisibility(visible, true);
+      // }
     });
-  });
+  };
 
-  taskRows.each(function() {
-    $(this).click(function(e) {
-      if (e.target.classList.contains('task-details-btn')) return;
-      $(this).find('.task-details-btn').click();
-    });
-  });
+  self.toggleDetails = function() {
+    const isVisible = !self.isDetailsVisible();
+    self.isDetailsVisible(isVisible);
+    if (isVisible) {
+      self.loadTaskDetailsIfNeeded(); // Load details when panel is opened
+      // Ensure bootstrap tooltips are re-initialized if shown
+      setTimeout(function() {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll(`#task-details-${self.index()} [data-bs-toggle="tooltip"]`))
+        tooltipTriggerList.map(function(tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+      }, 100); // Small delay to ensure elements are in DOM
+    }
+  };
 
-  function updateExpandState(taskRow, expand) {
-    var taskId = taskRow.data("task-id");
-    expandedState[taskId] = expand;
+  // Function to load detailed task info (Logs, Config, Result YAML)
+  self.loadTaskDetailsIfNeeded = async function() {
+    if (self.areDetailsLoaded() || self.isLoadingDetails() || self.parentViewModel.is_sec_trimmed) {
+        return; // Already loaded, loading, or security trimmed
+    }
 
-    updateExpandRow(taskRow, expand);
+    self.isLoadingDetails(true);
+    const runId = self.parentViewModel.runId();
+    const taskIndex = ko.unwrap(self.index);
+    const detailUrl = `/api/v1/test_run/${runId}/task/${taskIndex}/details`; // Assumed endpoint
 
-    if (expand) {
-      // expand all children (including children of children, but only if not collapsed by itself)
-      var expandTaskIds = Object.keys(taskParentMap).filter(function(childId) {
-        if(taskId == childId ||!isParentTask(taskId, childId)) return false;
+    console.log(`Fetching details for task ${taskIndex} from ${detailUrl}`);
 
-        var parentId = taskParentMap[childId];
-        while (parentId != taskId && parentId != 0) {
-          if (!expandedState[parentId]) return false;
-          parentId = taskParentMap[parentId];
+    try {
+        const response = await fetch(detailUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const detailDataWrapper = await response.json();
+
+        if (detailDataWrapper.status === "OK" && detailDataWrapper.data) {
+            const detailData = detailDataWrapper.data;
+            // Map the detailed data onto the existing observables
+            // We manually map here as ko.mapping might overwrite computeds/other state
+            if (detailData.log) {
+                // Process log timestamps
+                 const processedLogs = detailData.log.map(logEntry => {
+                     logEntry.time = new Date(logEntry.time); // Convert string to Date object if needed by formatter
+                     // Create observable properties within log entry for reactivity if needed
+                     return ko.mapping.fromJS(logEntry); // Make log entries observable
+                 });
+                 self.log(processedLogs); // Update the observable array
+            }
+            self.config_yaml(detailData.config_yaml || '');
+            self.result_yaml(detailData.result_yaml || '');
+            self.areDetailsLoaded(true);
+            console.log(`Details loaded for task ${taskIndex}`);
+        } else {
+            console.error(`Failed to get successful detail data for task ${taskIndex}:`, detailDataWrapper.status, detailDataWrapper.data);
+            self.config_yaml("Error loading config.");
+            self.result_yaml("Error loading result.");
+            // Optionally set log to an error message
+        }
+    } catch (error) {
+        console.error(`Error fetching details for task ${taskIndex}:`, error);
+        self.config_yaml("Error loading config.");
+        self.result_yaml("Error loading result.");
+        // Optionally set log to an error message
+    } finally {
+        self.isLoadingDetails(false);
+    }
+  };
+
+  // Function to initialize expand state (call after hierarchy is built)
+  self.initializeExpandState = function(allTasksMap) {
+    if (self.expandInitialized() === self.status()) {
+      return; // already processed, keep user state
+    }
+
+    self.isExpanded(true);
+
+    if (self.status() === 'complete' && self.result() === 'success') {
+      let hasProblemDescendant = false;
+      let queue = [];
+      const directChildren = ko.unwrap(self.children);
+      ko.utils.arrayForEach(directChildren, function(child) {
+        queue.push(child);
+      });
+      // Use mapped snake_case index
+      let visited = new Set([self.index()]);
+
+      while (queue.length > 0) {
+        const currentTask = queue.shift();
+        // Use mapped snake_case index
+        if (visited.has(currentTask.index())) continue;
+        visited.add(currentTask.index());
+
+        // Check mapped snake_case status/result
+        if (currentTask.status() === 'running' || currentTask.result() === 'failure') {
+          hasProblemDescendant = true;
+          break;
         }
 
-        return true;
-      });
+        // Use computed has_children
+        if (currentTask.has_children()) { // Use computed
+          const childrenOfCurrent = ko.unwrap(currentTask.children);
+          ko.utils.arrayForEach(childrenOfCurrent, function(child) {
+            // Use mapped snake_case index
+            if (!visited.has(child.index())) {
+              queue.push(child);
+            }
+          });
+        }
+      }
 
-      expandTaskIds.forEach(function(taskId) {
-        $(`.task-row[data-task-id="${taskId}"]`).removeClass('d-none');
-      });
-    } else {
-      // collapse all children (including children of children)
-      var hideTaskIds = Object.keys(taskParentMap).filter(function(childId) {
-        return taskId != childId && isParentTask(taskId, childId);
-      });
-
-      hideTaskIds.forEach(function(taskId) {
-        $(`.task-row[data-task-id="${taskId}"]`).addClass('d-none');
-      });
+      if (!hasProblemDescendant) {
+        self.isExpanded(false); // Keep UI state camelCase
+      }
     }
+
+    self.expandInitialized(self.status()); // mark done
+  };
+}
+
+function TestRunViewModel(initialData) { // Accept initial data directly
+  var self = this;
+  self.currentTime = ko.observable(Date.now());
+
+  // Update currentTime every second for live runtime display
+  setInterval(function(){ self.currentTime(Date.now()); }, 1000);
+  self.allTasksMap = {}; // For quick lookup by index
+  self.intervalId = null; // To store the refresh interval ID
+  self.runId = ko.observable(initialData.run_id || null); // Store runId
+
+  // --- Mapping Options ---
+  // Define how the 'tasks' array should be handled during updates
+  var taskMappingOptions = {
+    key: function(data) {
+      return ko.utils.unwrapObservable(data.index);
+    },
+    create: function(options) {
+      // options.data is the raw data for the task from the API
+      // options.parent is the TestRunViewModel instance (self)
+
+      // Check if task already exists in our map
+      let existingTask = self.allTasksMap[options.data.index];
+      if (existingTask) {
+        // Update existing TaskViewModel instance using the new data
+        ko.mapping.fromJS(options.data, {}, existingTask);
+        return existingTask; // Return the updated instance
+      } else {
+        // Create a new TaskViewModel instance for a new task
+        const newTaskViewModel = new TaskViewModel(options.data, self.allTasksMap, self);
+        self.allTasksMap[options.data.index] = newTaskViewModel;
+        // Hierarchy linking will be done *after* mapping is complete
+        return newTaskViewModel;
+      }
+    }
+  };
+
+  var mappingOptions = {
+    'tasks': taskMappingOptions,
+    // Ignore these during mapping as they are managed internally
+    'ignore': ["allTasksMap", "intervalId", "isComplete", "is_sec_trimmed"]
+  };
+
+
+  // Map the initial data using Knockout Mapping
+  ko.mapping.fromJS(initialData, mappingOptions, self);
+
+  // --- Computed for Completion Status ---
+  self.isComplete = ko.computed(function() {
+    const status = self.status();
+    return status === 'success' || status === 'failure' || status === 'aborted';
+  });
+
+
+  // --- Helper Functions (can stay the same) ---
+  self.formatDateTime = function(dateTimeStr) {
+    if (!dateTimeStr || !ko.unwrap(dateTimeStr)) return '-';
+    try {
+      const dt = new Date(ko.unwrap(dateTimeStr));
+      // Format as YYYY-MM-DD HH:MM:SS.ms
+      return dt.toISOString().replace('T', ' ').slice(0, -1);
+    } catch (e) {
+      return ko.unwrap(dateTimeStr); // Fallback
+    }
+  };
+  self.formatDuration = function(durationMsObs) {
+    const durationMs = ko.unwrap(durationMsObs);
+    if (!durationMs || durationMs <= 0) return "-";
+
+    const totalSeconds = durationMs / 1000;
+
+    if (totalSeconds < 60) {
+      // Less than a minute: show seconds with 3 decimal places
+      return totalSeconds.toFixed(3) + "s";
+    } else if (totalSeconds < 3600) {
+      // Less than an hour: show minutes and seconds
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
+    } else {
+      // One hour or more: show hours, minutes, and seconds
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      return `${hours}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+    }
+  };
+
+  // --- Build Initial Task Hierarchy & State ---
+  // This logic now needs to run initially AND after updates
+  self.buildAndInitializeHierarchy = function() {
+    const taskViewModels = self.tasks(); // Get the current list of TaskViewModels
+    const rootTasks = [];
+
+    // Clear existing children arrays before rebuilding
+    ko.utils.arrayForEach(taskViewModels, function(taskViewModel) {
+      taskViewModel.children([]); // Reset children
+      taskViewModel.isLoaded(false); // Reset loaded flag
+    });
+    self.allTasksMap = {}; // Reset map
+    ko.utils.arrayForEach(taskViewModels, function(taskViewModel) {
+      self.allTasksMap[ko.unwrap(taskViewModel.index)] = taskViewModel; // Rebuild map
+    });
+
+
+    // Build hierarchy (link children)
+    ko.utils.arrayForEach(taskViewModels, function(taskViewModel) {
+      const parentIndex = ko.unwrap(taskViewModel.parent_index);
+      if (parentIndex === 0) {
+        rootTasks.push(taskViewModel);
+      } else {
+        const parentViewModel = self.allTasksMap[parentIndex];
+        if (parentViewModel) {
+          // Ensure the parent knows about this child
+          if (!parentViewModel.children().includes(taskViewModel)) {
+            parentViewModel.children.push(taskViewModel);
+          }
+        } else {
+          console.warn("Parent task not found for task index:", ko.unwrap(taskViewModel.index));
+          // Consider adding as root if parent consistently missing after updates
+          if (!rootTasks.includes(taskViewModel)) {
+            rootTasks.push(taskViewModel);
+          }
+        }
+      }
+      taskViewModel.isLoaded(true); // Mark as processed for hierarchy
+    });
+
+    // Initial collapse/expand state (run this AFTER hierarchy is built)
+    ko.utils.arrayForEach(taskViewModels, function(taskViewModel) {
+      // Check if initializeExpandState exists - might not if mapping failed?
+      if (typeof taskViewModel.initializeExpandState === 'function') {
+        taskViewModel.initializeExpandState(self.allTasksMap);
+      }
+    });
+
+    // Calculate Graph Levels
+    self.calculateGraphLevels();
+
+    // Apply visibility based on expansion state
+    ko.utils.arrayForEach(taskViewModels, function(task) {
+      const parentIndex = ko.unwrap(task.parent_index);
+      if (parentIndex && parentIndex !== 0) {
+        const parent = self.allTasksMap[parentIndex];
+        // If parent exists and is NOT expanded, hide this task and its children recursively
+        if (parent && !parent.isExpanded()) {
+          task.isVisible(false);
+          // Need to ensure setChildVisibility is robust
+          if (typeof task.setChildVisibility === 'function') {
+            task.setChildVisibility(false, true); // Hide children recursively
+          }
+        } else if (parent && parent.isExpanded()) {
+          // If parent IS expanded, this task should be visible
+          task.isVisible(true);
+          // Visibility of its own children depends on its own expanded state
+          if (typeof task.setChildVisibility === 'function') {
+            task.setChildVisibility(task.isExpanded(), true);
+          }
+        } else if (!parent) {
+          // If parent doesn't exist (e.g., orphan), treat as root, make visible
+          task.isVisible(true);
+          if (typeof task.setChildVisibility === 'function') {
+            task.setChildVisibility(task.isExpanded(), true); // Apply to children
+          }
+        }
+      } else {
+        // Root tasks are always visible initially
+        task.isVisible(true);
+        if (typeof task.setChildVisibility === 'function') {
+          task.setChildVisibility(task.isExpanded(), true); // Apply to children
+        }
+      }
+    });
+
+    // Re-Initialize bootstrap tooltips after potential DOM updates
+    setTimeout(function() {
+      // Dispose existing tooltips first to prevent duplicates
+      const existingTooltips = bootstrap.Tooltip.getInstance(document.body); // Get tooltips attached to body (or specific container)
+      if (existingTooltips) {
+        // This might not be the correct way to dispose all; need per-element disposal if possible
+        // For now, let's just re-initialize, Bootstrap might handle duplicates?
+      }
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+      tooltipTriggerList.map(function(tooltipTriggerEl) {
+        // Ensure we don't create multiple tooltips on the same element
+        if (!bootstrap.Tooltip.getInstance(tooltipTriggerEl)) {
+          return new bootstrap.Tooltip(tooltipTriggerEl)
+        }
+        return bootstrap.Tooltip.getInstance(tooltipTriggerEl); // Return existing if found
+      })
+    }, 300); // Delay slightly more
+
+  };
+
+  // Calculate Graph Levels
+  self.calculateGraphLevels = function() {
+    const taskViewModels = self.tasks();
+    const indentationMap = {};
+
+    for (let idx = 0; idx < taskViewModels.length; idx++) {
+      const taskVM = taskViewModels[idx];
+      const index = ko.unwrap(taskVM.index);
+      const parentIndex = ko.unwrap(taskVM.parent_index);
+
+      let indentation = 0;
+      if (parentIndex > 0) {
+        indentation = (indentationMap[parentIndex] || 0) + 1;
+      }
+      indentationMap[index] = indentation;
+
+      // Prepare graph levels array
+      let levels = [];
+
+      if (indentation > 0) {
+        // Fill with 0s
+        for (let i = 0; i < indentation; i++) levels.push(0);
+
+        // Assume current task is last (3) until proven otherwise
+        levels[indentation - 1] = 3;
+
+        // Walk backwards through previous tasks to adjust lines
+        for (let i = idx - 1; i >= 0; i--) {
+          const prev = taskViewModels[i];
+
+          // Case 1: reached direct parent – mark parent.has_children implicitly and stop
+          if (ko.unwrap(prev.index) === parentIndex) {
+            break;
+          }
+
+          // If previous task is shallower than current indentation, stop
+          if (prev.graph_levels().length < indentation) {
+            break;
+          }
+
+          // Case 2: older sibling (same parent)
+          if (ko.unwrap(prev.parent_index) === parentIndex) {
+            const prevLevels = prev.graph_levels().slice();
+            prevLevels[indentation - 1] = 2; // not last sibling any more
+            prev.graph_levels(prevLevels);
+            break;
+          }
+
+          // Case 3: task in‐between – keep vertical line running
+          const betweenLevels = prev.graph_levels().slice();
+          betweenLevels[indentation - 1] = 1;
+          prev.graph_levels(betweenLevels);
+        }
+      }
+
+      // Set current graph levels
+      taskVM.graph_levels(levels);
+    }
+  };
+
+  // Run initial hierarchy build
+  self.buildAndInitializeHierarchy();
+
+  // --- Data Refresh Logic ---
+  self.refreshData = async function() {
+    if (!self.runId()) {
+      console.warn("No runId available for refresh.");
+      return;
+    }
+    if (self.isComplete()) { // Check if already complete
+      console.log("Test run is complete, stopping refresh.");
+      if (self.intervalId) {
+        clearInterval(self.intervalId);
+        self.intervalId = null;
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/v1/test_run/${self.runId()}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const newData = await response.json();
+
+      if (newData.status === "OK" && newData.data) {
+        // Apply the update using knockout mapping
+        ko.mapping.fromJS(newData.data, mappingOptions, self);
+
+        // Rebuild hierarchy and update UI state after mapping
+        self.buildAndInitializeHierarchy();
+
+        // Check again if the *new* status indicates completion
+        if (self.isComplete()) {
+          console.log("Test run completed after refresh, stopping timer.");
+          if (self.intervalId) {
+            clearInterval(self.intervalId);
+            self.intervalId = null;
+          }
+        }
+
+      } else {
+        console.error("Failed to get successful data:", newData.status, newData.data);
+        // Optionally stop refresh on API error status? Or keep trying?
+        // For now, keep trying. Could implement backoff later.
+      }
+    } catch (error) {
+      console.error("Error fetching test run update:", error);
+      // Optionally stop refresh on network error?
+      // if (self.intervalId) {
+      //     clearInterval(self.intervalId);
+      //     self.intervalId = null;
+      // }
+    }
+  };
+
+
+  // --- Helper for log data title (remains the same) ---
+  self.createLogDataTitle = function(dataObj) {
+    let title = "";
+    if (dataObj) {
+      for (const key in dataObj) {
+        if (dataObj.hasOwnProperty(key)) {
+          title += `${key}: ${dataObj[key]}<br>`;
+        }
+      }
+    }
+    return title || "No extra data";
+  };
+
+  self.handleRowClick = function(task, event) {
+    // Find the closest TD ancestor of the clicked element
+    let targetTd = $(event.target).closest('td');
+
+    // Check if the click was on the graph cell (first td)
+    if (targetTd.length && targetTd.hasClass('task-graph')) {
+      // Only toggle expand if the task actually has children (use computed)
+      if (task.has_children()) { // Use computed property
+        task.toggleExpand();
+      }
+    } else {
+      // Otherwise, toggle the details panel
+      task.toggleDetails();
+    }
+  };
+
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Parse the JSON directly here and pass it to the ViewModel
+  var initialData = {};
+  try {
+    // Parse JSON from the script tag with id 'page-data-json'
+    const jsonDataElement = document.getElementById('page-data-json');
+    if (!jsonDataElement) {
+      throw new Error("Page data JSON element not found.");
+    }
+    // IMPORTANT: The Go template needs to marshal the struct to JSON for this to work.
+    // Assuming the {{ . }} in the script tag outputs valid JSON.
+    initialData = JSON.parse(jsonDataElement.textContent);
+  } catch (e) {
+    console.error("Failed to parse initial page data:", e);
+    // Optionally display an error message on the page
+    document.getElementById('ko-root').innerHTML = '<div class="alert alert-danger">Error loading test run data. Check template output.</div>';
+    return; // Stop execution if data parsing fails
   }
 
-  function isParentTask(taskId, headTaskId) {
-    var currentTaskId = headTaskId;
-    while (currentTaskId != taskId && currentTaskId != 0) {
-      currentTaskId = taskParentMap[currentTaskId];
-    }
-    return currentTaskId == taskId;
-  }
+  // Ensure initialData has a 'data' property if the API response wraps it
+  const viewModelData = initialData.data || initialData;
 
-  function updateExpandRow(taskRow, isExpanded) {
-    var icon = taskRow.find(".task-collapse-btn i");
-    if (isExpanded) {
-      icon.removeClass('fa-square-plus');
-      icon.addClass('fa-square-minus');
-    } else {
-      icon.removeClass('fa-square-minus');
-      icon.addClass('fa-square-plus');
-    }
 
-    var graphButton = taskRow.find(".graph-button");
-    if (isExpanded) {
-      graphButton.addClass('expanded');
-    } else {
-      graphButton.removeClass('expanded');
-    }
+  var viewModel = new TestRunViewModel(viewModelData); // Pass the actual data object
+  ko.applyBindings(viewModel, document.getElementById('ko-root'));
+
+  // Start periodic refresh only if the test is not already completed
+  if (!viewModel.isComplete() && viewModel.runId()) {
+    console.log("Starting periodic refresh for run ID:", viewModel.runId());
+    // Refresh every 5 seconds (adjust as needed)
+    viewModel.intervalId = setInterval(viewModel.refreshData, 10000);
+  } else {
+    console.log("Test run already complete or runId missing, not starting refresh.");
   }
 });
+
 </script>
+
+<!-- Restore the script tag used to hold the embedded JSON -->
+<script type="application/json" id="page-data-json">
+{{ . }}
+</script>
+
 {{ end }}
 {{ define "css" }}
 <style>
+
 .task-panel .accordion-body {
   padding: 8px;
   background-color: #fbfbfb;
@@ -497,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', function() {
   visibility: hidden;
 }
 
-.task-graph .graph-container .graph-button.expanded .graph-expand-line {
+.task-graph .graph-button.expanded .graph-expand-line {
   visibility: visible;
 }
 
