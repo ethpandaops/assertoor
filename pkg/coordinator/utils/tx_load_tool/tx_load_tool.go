@@ -292,7 +292,7 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 		}
 	}
 	if l.Result.NotReceivedP2PEventCount > 0 {
-		l.target.logger.Warnf("Missed p2p events: %d (assigned latency=duration)", l.Result.NotReceivedP2PEventCount)
+		l.target.logger.Warnf("Missed p2p events: %d", l.Result.NotReceivedP2PEventCount)
 	}
 
 	return l.Result, nil

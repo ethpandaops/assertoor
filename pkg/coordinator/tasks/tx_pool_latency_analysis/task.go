@@ -7,6 +7,7 @@ import (
 	"github.com/noku-team/assertoor/pkg/coordinator/utils/tx_load_tool"
 	"math"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -162,6 +163,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 	t.logger.Infof("Max latency: %d mus, Min latency: %d mus", maxLatency, minLatency)
+	t.logger.Infof("Max latency: %d ms, Min latency: %d ms", maxLatency/1000, minLatency/1000)
 
 	// Generate HDR plot
 	plot, err := hdr.HdrPlot(result.LatenciesMus)
@@ -170,6 +172,15 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
+	t.logger.Infof("HDR plot generated successfully")
+	plotFilePath := "tx_pool_latency_hdr_plot.csv"
+	err = os.WriteFile(plotFilePath, []byte(plot), 0644)
+	if err != nil {
+		t.logger.Errorf("Failed to write HDR plot to file: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+	t.logger.Infof("HDR plot saved to file: %s", plotFilePath)
 
 	t.ctx.Outputs.SetVar("tx_count", result.TotalTxs)
 	t.ctx.Outputs.SetVar("min_latency_mus", minLatency)
