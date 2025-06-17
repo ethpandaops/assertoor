@@ -130,7 +130,7 @@ additional_services:
 - dora
 assertoor_params:
   run_stability_check: false
-  run_block_proposal_check: true
+  run_block_proposal_check: false
 ```
 
 This configuration:
@@ -175,6 +175,7 @@ web:
 
 # Custom external tests
 externalTests:
+  - file: https://raw.githubusercontent.com/noku-team/assertoor/master/playbooks/stable/block-proposal-check.yaml
   - file: https://raw.githubusercontent.com/noku-team/assertoor/master/playbooks/dev/tx-pool-check-short.yaml
   
 # Custom logging configuration
