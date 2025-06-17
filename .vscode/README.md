@@ -7,6 +7,12 @@ This document explains how to use the debug configuration for Assertoor in VSCod
 Before using the debugger, make sure you have installed:
 
 - **Go v1.23.0** - Required programming language
+- **Delve** - Go debugger required by VSCode for debugging Go applications:
+
+  ```bash
+  go install -v github.com/go-delve/delve/cmd/dlv@latest
+  ```
+
 - **Docker** - Container platform required by Kurtosis. Install Docker Desktop for your platform from [docker.com](https://www.docker.com/products/docker-desktop/)
 - **Kurtosis CLI** - Development environment orchestration tool. Install following the official guide:
   
