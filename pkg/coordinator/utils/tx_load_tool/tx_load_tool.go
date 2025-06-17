@@ -230,6 +230,7 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 			if l.Result.LatenciesMus[tx_index] != 0 {
 				l.Result.DuplicatedP2PEventCount++
 			} else {
+				l.Result.LastMeasureDelay = time.Since(l.Result.StartTime)
 				l.Result.LatenciesMus[tx_index] = time.Since(l.Result.TxStartTime[tx_index]).Microseconds()
 				receivedEvents++
 			}
@@ -271,7 +272,6 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 	}
 
 	// Calculate the last measure delay
-	l.Result.LastMeasureDelay = time.Since(l.Result.StartTime)
 	l.target.logger.Infof("Last measure delay since start time: %s", l.Result.LastMeasureDelay)
 
 	if l.Result.CoordinatedOmissionEventCount > 0 {
