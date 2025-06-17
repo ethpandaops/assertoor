@@ -130,9 +130,12 @@ func (l *Load) Execute() error {
 				l.Result.TxStartTime[i] = time.Now()
 				err = l.target.sendTransaction(tx)
 				if err != nil {
-					l.target.logger.WithField("client", l.target.client.GetName()).Errorf("Failed to send transaction: %v", err)
-					l.target.task_ctx.SetResult(types.TaskResultFailure)
-					l.Result.Failed = true
+					if !l.Result.Failed {
+						l.target.logger.WithField("client", l.target.client.GetName()).Errorf("Failed to send transaction: %v", err)
+						l.target.task_ctx.SetResult(types.TaskResultFailure)
+						l.Result.Failed = true
+					}
+
 					return
 				}
 
@@ -206,6 +209,11 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 			l.target.task_ctx.SetResult(types.TaskResultFailure)
 			l.Result.Failed = true
 			return l.Result, fmt.Errorf("measurement stopped: failed reading p2p events")
+		}
+
+		if txes == nil || len(*txes) == 0 {
+			l.target.logger.Warnf("No p2p events received")
+			continue
 		}
 
 		for i, tx := range *txes {

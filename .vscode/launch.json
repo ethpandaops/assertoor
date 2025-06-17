@@ -8,8 +8,7 @@
       "mode": "auto",
       "program": "${workspaceFolder}/main.go",
       "args": ["--config", ".hack/devnet/generated-assertoor-config.yaml"],
-      "preLaunchTask": "devnet-setup",
-      "showLog": true
+      "preLaunchTask": "devnet-setup"
     },
     {
       "name": "Debug go assertoor",
@@ -17,8 +16,7 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/main.go",
-      "args": ["--config", ".hack/devnet/generated-assertoor-config.yaml"],
-      "showLog": true
+      "args": ["--config", ".hack/devnet/generated-assertoor-config.yaml"]
     }
   ]
 }
