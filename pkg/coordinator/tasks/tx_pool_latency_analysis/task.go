@@ -156,7 +156,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		if lat > maxLatency {
 			maxLatency = lat
 		}
-		if lat < minLatency {
+		if lat < minLatency && lat > 0 {
 			minLatency = lat
 		}
 	}
