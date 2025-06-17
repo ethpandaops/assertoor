@@ -53,7 +53,7 @@ Before using the debugger, make sure you have installed:
   
   **Other platforms:** Download from [yq releases](https://github.com/mikefarah/yq/releases)
 
-- **PostgreSQL Client (psql)** - Required for database cleanup operations:
+- **PostgreSQL Client (psql)** - Required if you want to use PostgreSQL as database
   
   **macOS:**
 
