@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/noku-team/assertoor/pkg/coordinator/utils/tx_load_tool"
+	"math"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -151,16 +153,17 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// Calculate statistics
 	var maxLatency int64 = 0
-	var minLatency int64 = 0
+	var minLatency int64 = math.MaxInt64
 	for _, lat := range result.LatenciesMus {
 		if lat > maxLatency {
 			maxLatency = lat
 		}
-		if lat < minLatency {
+		if lat < minLatency && lat > 0 {
 			minLatency = lat
 		}
 	}
-	t.logger.Infof("Max latency: %d mus, Min latency: %d mus", maxLatency, minLatency)
+	t.logger.Infof("Max latency: %d mus (%d ms), Min latency: %d mus (%d ms)",
+		maxLatency, maxLatency/1000, minLatency, minLatency/1000)
 
 	// Generate HDR plot
 	plot, err := hdr.HdrPlot(result.LatenciesMus)
@@ -169,6 +172,15 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.SetResult(types.TaskResultFailure)
 		return nil
 	}
+	t.logger.Infof("HDR plot generated successfully")
+	plotFilePath := "tx_pool_latency_hdr_plot.csv"
+	err = os.WriteFile(plotFilePath, []byte(plot), 0644)
+	if err != nil {
+		t.logger.Errorf("Failed to write HDR plot to file: %v", err)
+		t.ctx.SetResult(types.TaskResultFailure)
+		return nil
+	}
+	t.logger.Infof("HDR plot saved to file: %s", plotFilePath)
 
 	t.ctx.Outputs.SetVar("tx_count", result.TotalTxs)
 	t.ctx.Outputs.SetVar("min_latency_mus", minLatency)
@@ -176,6 +188,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("duplicated_p2p_event_count", result.DuplicatedP2PEventCount)
 	t.ctx.Outputs.SetVar("missed_p2p_event_count", result.NotReceivedP2PEventCount)
 	t.ctx.Outputs.SetVar("coordinated_omission_event_count", result.CoordinatedOmissionEventCount)
+	t.ctx.Outputs.SetVar("hdr_plot", plot)
 
 	t.ctx.SetResult(types.TaskResultSuccess)
 

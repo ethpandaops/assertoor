@@ -71,23 +71,23 @@ func NewLoadResult(totNumberOfTxes int) *LoadResult {
 }
 
 type Load struct {
-	target          *LoadTarget
-	testDeadline    time.Time
-	TPS             int
-	Duration_s      int
-	LogInterval     int
-	Result          *LoadResult
+	target       *LoadTarget
+	testDeadline time.Time
+	TPS          int
+	Duration_s   int
+	LogInterval  int
+	Result       *LoadResult
 }
 
 // NewLoad creates a new Load instance
 func NewLoad(target *LoadTarget, TPS int, duration_s int, testDeadline time.Time, logInterval int) *Load {
 	return &Load{
-		target:          target,
-		TPS:             TPS,
-		Duration_s:      duration_s,
-		testDeadline:    testDeadline,
-		LogInterval:     logInterval,
-		Result:          NewLoadResult(TPS * duration_s),
+		target:       target,
+		TPS:          TPS,
+		Duration_s:   duration_s,
+		testDeadline: testDeadline,
+		LogInterval:  logInterval,
+		Result:       NewLoadResult(TPS * duration_s),
 	}
 }
 
@@ -288,11 +288,11 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 		if l.Result.LatenciesMus[i] == 0 {
 			l.Result.NotReceivedP2PEventCount++
 			// Assign a default value for missing P2P events
-			l.Result.LatenciesMus[i] = (time.Duration(l.Duration_s) * time.Second).Microseconds()
+			l.Result.LatenciesMus[i] = -1
 		}
 	}
 	if l.Result.NotReceivedP2PEventCount > 0 {
-		l.target.logger.Warnf("Missed p2p events: %d (assigned latency=duration)", l.Result.NotReceivedP2PEventCount)
+		l.target.logger.Warnf("Missed p2p events: %d", l.Result.NotReceivedP2PEventCount)
 	}
 
 	return l.Result, nil
