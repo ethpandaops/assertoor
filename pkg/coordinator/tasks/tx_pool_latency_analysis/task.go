@@ -162,8 +162,8 @@ func (t *Task) Execute(ctx context.Context) error {
 			minLatency = lat
 		}
 	}
-	t.logger.Infof("Max latency: %d mus, Min latency: %d mus", maxLatency, minLatency)
-	t.logger.Infof("Max latency: %d ms, Min latency: %d ms", maxLatency/1000, minLatency/1000)
+	t.logger.Infof("Max latency: %d mus (%d ms), Min latency: %d mus (%d ms)",
+		maxLatency, maxLatency/1000, minLatency, minLatency/1000)
 
 	// Generate HDR plot
 	plot, err := hdr.HdrPlot(result.LatenciesMus)
