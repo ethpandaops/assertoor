@@ -188,6 +188,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("duplicated_p2p_event_count", result.DuplicatedP2PEventCount)
 	t.ctx.Outputs.SetVar("missed_p2p_event_count", result.NotReceivedP2PEventCount)
 	t.ctx.Outputs.SetVar("coordinated_omission_event_count", result.CoordinatedOmissionEventCount)
+	t.ctx.Outputs.SetVar("hdr_plot", plot)
 
 	t.ctx.SetResult(types.TaskResultSuccess)
 
