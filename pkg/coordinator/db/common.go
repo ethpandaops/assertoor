@@ -12,6 +12,7 @@ import (
 
 	// sql backend drivers
 	_ "github.com/glebarez/go-sqlite"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/lib/pq"
 )
 

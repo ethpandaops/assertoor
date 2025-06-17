@@ -1,0 +1,91 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "kurtosis-stop",
+      "type": "shell",
+      "command": "kurtosis enclave stop assertoor || true",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "kurtosis-remove",
+      "type": "shell",
+      "command": "kurtosis enclave rm assertoor || true",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "db-pgsql-cleanup",
+      "type": "shell",
+      "command": "PGPASSWORD='' psql -h 127.0.0.1 -p 5432 -U postgres -d assertoor -c 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;' || true",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "db-sqlite-cleanup",
+      "type": "shell",
+      "command": "rm -f .hack/devnet/sqlite.db* || true",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "devnet-setup",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "kurtosis-stop",
+        "kurtosis-remove",
+        "db-pgsql-cleanup",
+        "db-sqlite-cleanup",
+        "devnet-setup-only"
+      ]
+    },
+    {
+      "label": "devnet-setup-only",
+      "type": "shell",
+      "command": ".hack/devnet/run.sh",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    }
+  ]
+} 
