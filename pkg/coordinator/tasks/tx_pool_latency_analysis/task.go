@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/noku-team/assertoor/pkg/coordinator/utils/tx_load_tool"
+	"math"
 	"math/rand"
 	"time"
 
@@ -151,7 +152,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// Calculate statistics
 	var maxLatency int64 = 0
-	var minLatency int64 = 0
+	var minLatency int64 = math.MaxInt64
 	for _, lat := range result.LatenciesMus {
 		if lat > maxLatency {
 			maxLatency = lat
