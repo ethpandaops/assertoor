@@ -73,9 +73,9 @@ Before using the debugger, make sure you have installed:
   sudo yum install postgresql
   ```
 
-## "Debug Go assertoor" Configuration
+## "Clean debug Go assertoor" Configuration
 
-The `Debug Go assertoor` configuration in the `launch.json` file allows you to start Assertoor in debug mode directly from VSCode.
+The `Clean debug Go assertoor` configuration in the `launch.json` file allows you to start Assertoor in debug mode directly from VSCode.
 
 ### What happens when you launch the configuration
 
