@@ -51,6 +51,7 @@ func BasicPing(remoteAddress string, rpcAdmin string, logger logrus.FieldLogger)
 
 func (te *sentryenv) localEndpoint() v4wire.Endpoint {
 	addr := te.endpoint.LocalAddr().(*net.UDPAddr)
+
 	return v4wire.Endpoint{
 		IP:  addr.IP.To4(),
 		UDP: uint16(addr.Port),
@@ -71,22 +72,28 @@ func (te *sentryenv) send(req v4wire.Packet) []byte {
 	if err != nil {
 		panic(fmt.Errorf("can't encode %v packet: %v", req.Name(), err))
 	}
+
 	if _, err := te.endpoint.WriteTo(packet, te.remoteAddr); err != nil {
 		panic(fmt.Errorf("can't send %v: %v", req.Name(), err))
 	}
+
 	return hash
 }
 
 func (te *sentryenv) read() (v4wire.Packet, []byte, error) {
 	buf := make([]byte, 2048)
+
 	if err := te.endpoint.SetReadDeadline(time.Now().Add(waitTime)); err != nil {
 		return nil, nil, err
 	}
+
 	n, _, err := te.endpoint.ReadFrom(buf)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	p, _, hash, err := v4wire.Decode(buf[:n])
+
 	return p, hash, err
 }
 
@@ -98,16 +105,19 @@ func (te *sentryenv) checkPingPong(pingHash []byte) error {
 		pings int
 		pongs int
 	)
+
 	for i := 0; i < 2; i++ {
 		reply, _, err := te.read()
 		if err != nil {
 			return err
 		}
+
 		switch reply.Kind() {
 		case v4wire.PongPacket:
 			if err := te.checkPong(reply, pingHash); err != nil {
 				return err
 			}
+
 			pongs++
 		case v4wire.PingPacket:
 			pings++
@@ -115,9 +125,11 @@ func (te *sentryenv) checkPingPong(pingHash []byte) error {
 			return fmt.Errorf("expected PING or PONG, got %v %v", reply.Name(), reply)
 		}
 	}
+
 	if pongs == 1 && pings == 1 {
 		return nil
 	}
+
 	return fmt.Errorf("expected 1 PING  (got %d) and 1 PONG (got %d)", pings, pongs)
 }
 
@@ -127,9 +139,11 @@ func (te *sentryenv) checkPong(reply v4wire.Packet, pingHash []byte) error {
 	if reply == nil {
 		return errors.New("expected PONG reply, got nil")
 	}
+
 	if reply.Kind() != v4wire.PongPacket {
 		return fmt.Errorf("expected PONG reply, got %v %v", reply.Name(), reply)
 	}
+
 	pong := reply.(*v4wire.Pong)
 	if !bytes.Equal(pong.ReplyTok, pingHash) {
 		return fmt.Errorf("PONG reply token mismatch: got %x, want %x", pong.ReplyTok, pingHash)
@@ -143,9 +157,11 @@ func (te *sentryenv) checkPong(reply v4wire.Packet, pingHash []byte) error {
 	if !want.IP.Equal(pong.To.IP) || want.UDP != pong.To.UDP {
 		return fmt.Errorf("PONG 'to' endpoint mismatch: got %+v, want %+v", pong.To, want)
 	}
+
 	if v4wire.Expired(pong.Expiration) {
 		return fmt.Errorf("PONG is expired (%v)", pong.Expiration)
 	}
+
 	return nil
 }
 
@@ -219,21 +235,27 @@ func ConnectToP2p(remoteAddress string, rpcAdmin string, logger logrus.FieldLogg
 
 	if !node.IPAddr().IsValid() || node.UDP() == 0 {
 		var ip net.IP
+
 		var tcpPort, udpPort int
+
 		if node.IPAddr().IsValid() {
 			ip = node.IPAddr().AsSlice()
 		} else {
 			ip = net.ParseIP("127.0.0.1")
 		}
+
 		if tcpPort = node.TCP(); tcpPort == 0 {
 			tcpPort = 30303
 		}
+
 		if udpPort = node.UDP(); udpPort == 0 {
 			udpPort = 30303
 		}
+
 		node = enode.NewV4(node.Pubkey(), ip, tcpPort, udpPort)
 	}
 
 	addr := &net.UDPAddr{IP: node.IP(), Port: node.UDP()}
+
 	return &sentryenv{endpoint, key, node, addr, rpcAdmin}
 }

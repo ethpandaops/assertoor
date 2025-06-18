@@ -68,12 +68,14 @@ func (t *Task) LoadConfig() error {
 	}
 
 	privKey, _ := crypto.HexToECDSA(config.PrivateKey)
+
 	t.wallet, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
 	if err != nil {
 		return fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
 	t.config = config
+
 	return nil
 }
 
@@ -88,6 +90,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	if len(executionClients) == 0 {
 		t.logger.Errorf("No execution clients available")
 		t.ctx.SetResult(types.TaskResultFailure)
+
 		return nil
 	}
 
@@ -110,7 +113,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	// Prepare to collect transaction latencies
-	var testDeadline time.Time = time.Now().Add(time.Duration(t.config.Duration_s+60*30) * time.Second)
+	var testDeadline = time.Now().Add(time.Duration(t.config.Duration_s+60*30) * time.Second)
 
 	load_target := tx_load_tool.NewLoadTarget(ctx, t.ctx, t.logger, t.wallet, client)
 	load := tx_load_tool.NewLoad(load_target, t.config.TPS, t.config.Duration_s, testDeadline, t.config.LogInterval)
@@ -120,6 +123,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	if err != nil {
 		t.logger.Errorf("Error during transaction load execution: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
+
 		return err
 	}
 
@@ -128,6 +132,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	if err != nil {
 		t.logger.Errorf("Error measuring transaction propagation latencies: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
+
 		return err
 	}
 
@@ -138,6 +143,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// Send txes to other clients, for speeding up tx mining
 	t.logger.Infof("Sending %d transactions to other clients for mining", len(result.Txs))
+
 	for _, tx := range result.Txs {
 		for _, otherClient := range executionClients {
 			if otherClient.GetName() == client.GetName() {
@@ -147,6 +153,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			otherClient.GetRPCClient().SendTransaction(ctx, tx)
 		}
 	}
+
 	t.logger.Infof("Total transactions sent: %d", result.TotalTxs)
 
 	// Calculate statistics

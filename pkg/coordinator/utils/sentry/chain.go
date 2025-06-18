@@ -60,20 +60,24 @@ func NewChain(dir string) (*Chain, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	gblock := gen.ToBlock()
 
 	blocks, err := blocksFromFile(filepath.Join(dir, "chain.rlp"), gblock)
 	if err != nil {
 		return nil, err
 	}
+
 	state, err := readState(filepath.Join(dir, "headstate.json"))
 	if err != nil {
 		return nil, err
 	}
+
 	accounts, err := readAccounts(filepath.Join(dir, "accounts.json"))
 	if err != nil {
 		return nil, err
 	}
+
 	return &Chain{
 		genesis: gen,
 		blocks:  blocks,
@@ -99,34 +103,44 @@ func (c *Chain) Head() *types.Block {
 func (c *Chain) AccountsInHashOrder() []state.DumpAccount {
 	list := make([]state.DumpAccount, len(c.state))
 	i := 0
+
 	for addr, acc := range c.state {
 		list[i] = acc
 		list[i].Address = &addr
+
 		if len(acc.AddressHash) != 32 {
 			panic(fmt.Errorf("missing/invalid SecureKey in dump account %v", addr))
 		}
+
 		i++
 	}
+
 	slices.SortFunc(list, func(x, y state.DumpAccount) int {
 		return bytes.Compare(x.AddressHash, y.AddressHash)
 	})
+
 	return list
 }
 
 // CodeHashes returns all bytecode hashes contained in the head state.
 func (c *Chain) CodeHashes() []common.Hash {
 	var hashes []common.Hash
+
 	seen := make(map[common.Hash]struct{})
 	seen[types.EmptyCodeHash] = struct{}{}
+
 	for _, acc := range c.state {
 		h := common.BytesToHash(acc.CodeHash)
 		if _, ok := seen[h]; ok {
 			continue
 		}
+
 		hashes = append(hashes, h)
 		seen[h] = struct{}{}
 	}
+
 	slices.SortFunc(hashes, (common.Hash).Cmp)
+
 	return hashes
 }
 
@@ -156,6 +170,7 @@ func (c *Chain) RootAt(height int) common.Hash {
 	if height < c.Len() {
 		return c.blocks[height].Root()
 	}
+
 	return common.Hash{}
 }
 
@@ -165,6 +180,7 @@ func (c *Chain) GetSender(idx int) (common.Address, uint64) {
 	accounts := slices.SortedFunc(maps.Keys(c.senders), common.Address.Cmp)
 
 	addr := accounts[idx]
+
 	return addr, c.senders[addr].Nonce
 }
 
@@ -173,6 +189,7 @@ func (c *Chain) IncNonce(addr common.Address, amt uint64) {
 	if _, ok := c.senders[addr]; !ok {
 		panic("nonce increment for non-signer")
 	}
+
 	c.senders[addr].Nonce += amt
 }
 
@@ -182,6 +199,7 @@ func (c *Chain) Balance(addr common.Address) *big.Int {
 	if acc, ok := c.state[addr]; ok {
 		bal, _ = bal.SetString(acc.Balance, 10)
 	}
+
 	return bal
 }
 
@@ -189,10 +207,12 @@ func (c *Chain) Balance(addr common.Address) *big.Int {
 // account was in the hivechain accounts dump.
 func (c *Chain) SignTx(from common.Address, tx *types.Transaction) (*types.Transaction, error) {
 	signer := types.LatestSigner(c.config)
+
 	acc, ok := c.senders[from]
 	if !ok {
 		return nil, fmt.Errorf("account not available for signing: %s", from)
 	}
+
 	return types.SignTx(tx, signer, acc.Key)
 }
 
@@ -201,6 +221,7 @@ func (c *Chain) GetHeaders(req *eth.GetBlockHeadersPacket) ([]*types.Header, err
 	if req.Amount < 1 {
 		return nil, errors.New("no block headers requested")
 	}
+
 	var (
 		headers     = make([]*types.Header, req.Amount)
 		blockNumber uint64
@@ -212,20 +233,25 @@ func (c *Chain) GetHeaders(req *eth.GetBlockHeadersPacket) ([]*types.Header, err
 			blockNumber = block.Number().Uint64()
 		}
 	}
+
 	if headers[0] == nil {
 		return nil, fmt.Errorf("no headers found for given origin number %v, hash %v", req.Origin.Number, req.Origin.Hash)
 	}
+
 	if req.Reverse {
 		for i := 1; i < int(req.Amount); i++ {
 			blockNumber -= (1 - req.Skip)
 			headers[i] = c.blocks[blockNumber].Header()
 		}
+
 		return headers, nil
 	}
+
 	for i := 1; i < int(req.Amount); i++ {
 		blockNumber += (1 + req.Skip)
 		headers[i] = c.blocks[blockNumber].Header()
 	}
+
 	return headers, nil
 }
 
@@ -235,6 +261,7 @@ func (c *Chain) Shorten(height int) *Chain {
 	copy(blocks, c.blocks[:height])
 
 	config := *c.config
+
 	return &Chain{
 		blocks: blocks,
 		config: &config,
@@ -246,10 +273,12 @@ func loadGenesis(genesisFile string) (core.Genesis, error) {
 	if err != nil {
 		return core.Genesis{}, err
 	}
+
 	var gen core.Genesis
 	if err := json.Unmarshal(chainConfig, &gen); err != nil {
 		return core.Genesis{}, err
 	}
+
 	return gen, nil
 }
 
@@ -259,16 +288,21 @@ func blocksFromFile(chainfile string, gblock *types.Block) ([]*types.Block, erro
 	if err != nil {
 		return nil, err
 	}
+
 	defer fh.Close()
+
 	var reader io.Reader = fh
 	if strings.HasSuffix(chainfile, ".gz") {
 		if reader, err = gzip.NewReader(reader); err != nil {
 			return nil, err
 		}
 	}
+
 	stream := rlp.NewStream(reader, 0)
+
 	var blocks = make([]*types.Block, 1)
 	blocks[0] = gblock
+
 	for i := 0; ; i++ {
 		var b types.Block
 		if err := stream.Decode(&b); err == io.EOF {
@@ -276,11 +310,14 @@ func blocksFromFile(chainfile string, gblock *types.Block) ([]*types.Block, erro
 		} else if err != nil {
 			return nil, fmt.Errorf("at block index %d: %v", i, err)
 		}
+
 		if b.NumberU64() != uint64(i+1) {
 			return nil, fmt.Errorf("block at index %d has wrong number %d", i, b.NumberU64())
 		}
+
 		blocks = append(blocks, &b)
 	}
+
 	return blocks, nil
 }
 
@@ -289,19 +326,23 @@ func readState(file string) (map[common.Address]state.DumpAccount, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to read state: %v", err)
 	}
+
 	var dump state.Dump
 	if err := json.Unmarshal(f, &dump); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal state: %v", err)
 	}
 
 	state := make(map[common.Address]state.DumpAccount)
+
 	for key, acct := range dump.Accounts {
 		var addr common.Address
 		if err := addr.UnmarshalText([]byte(key)); err != nil {
 			return nil, fmt.Errorf("invalid address %q", key)
 		}
+
 		state[addr] = acct
 	}
+
 	return state, nil
 }
 
@@ -310,20 +351,26 @@ func readAccounts(file string) (map[common.Address]*senderInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to read state: %v", err)
 	}
+
 	type account struct {
 		Key hexutil.Bytes `json:"key"`
 	}
+
 	keys := make(map[common.Address]account)
 	if err := json.Unmarshal(f, &keys); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal accounts: %v", err)
 	}
+
 	accounts := make(map[common.Address]*senderInfo)
+
 	for addr, acc := range keys {
 		pk, err := crypto.HexToECDSA(common.Bytes2Hex(acc.Key))
 		if err != nil {
 			return nil, fmt.Errorf("unable to read private key for %s: %v", err, addr)
 		}
+
 		accounts[addr] = &senderInfo{Key: pk, Nonce: 0}
 	}
+
 	return accounts, nil
 }

@@ -71,12 +71,14 @@ func (t *Task) LoadConfig() error {
 	}
 
 	privKey, _ := crypto.HexToECDSA(config.PrivateKey)
+
 	t.wallet, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
 	if err != nil {
 		return fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
 	t.config = config
+
 	return nil
 }
 
@@ -91,6 +93,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	if len(executionClients) == 0 {
 		t.logger.Errorf("No execution clients available")
 		t.ctx.SetResult(types.TaskResultFailure)
+
 		return nil
 	}
 
@@ -113,7 +116,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	// Prepare to collect transaction latencies
-	var testDeadline time.Time = time.Now().Add(time.Duration(t.config.Duration_s+60*30) * time.Second)
+	var testDeadline = time.Now().Add(time.Duration(t.config.Duration_s+60*30) * time.Second)
 
 	load_target := tx_load_tool.NewLoadTarget(ctx, t.ctx, t.logger, t.wallet, client)
 	load := tx_load_tool.NewLoad(load_target, t.config.TPS, t.config.Duration_s, testDeadline, t.config.LogInterval)
@@ -123,6 +126,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	if err != nil {
 		t.logger.Errorf("Error during transaction load execution: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
+
 		return err
 	}
 
@@ -131,6 +135,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	if err != nil {
 		t.logger.Errorf("Error measuring transaction propagation latencies: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
+
 		return err
 	}
 
@@ -141,6 +146,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// Send txes to other clients, for speeding up tx mining
 	t.logger.Infof("Sending %d transactions to other clients for mining", len(result.Txs))
+
 	for _, tx := range result.Txs {
 		for _, otherClient := range executionClients {
 			if otherClient.GetName() == client.GetName() {
@@ -150,19 +156,24 @@ func (t *Task) Execute(ctx context.Context) error {
 			otherClient.GetRPCClient().SendTransaction(ctx, tx)
 		}
 	}
+
 	t.logger.Infof("Total transactions sent: %d", result.TotalTxs)
 
 	// Calculate statistics
 	var maxLatency int64 = 0
+
 	var minLatency int64 = math.MaxInt64
+
 	for _, lat := range result.LatenciesMus {
 		if lat > maxLatency {
 			maxLatency = lat
 		}
+
 		if lat < minLatency && lat > 0 {
 			minLatency = lat
 		}
 	}
+
 	t.logger.Infof("Max latency: %d mus (%d ms), Min latency: %d mus (%d ms)",
 		maxLatency, maxLatency/1000, minLatency, minLatency/1000)
 
@@ -171,16 +182,22 @@ func (t *Task) Execute(ctx context.Context) error {
 	if err != nil {
 		t.logger.Errorf("Failed to generate HDR plot: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
+
 		return nil
 	}
+
 	t.logger.Infof("HDR plot generated successfully")
+
 	plotFilePath := "tx_pool_latency_hdr_plot.csv"
+
 	err = os.WriteFile(plotFilePath, []byte(plot), 0644)
 	if err != nil {
 		t.logger.Errorf("Failed to write HDR plot to file: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
+
 		return nil
 	}
+
 	t.logger.Infof("HDR plot saved to file: %s", plotFilePath)
 
 	t.ctx.Outputs.SetVar("tx_count", result.TotalTxs)

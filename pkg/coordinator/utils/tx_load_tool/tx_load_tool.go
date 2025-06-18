@@ -118,17 +118,18 @@ func (l *Load) Execute() error {
 
 			// generate and send tx
 			go func(i int) {
-
 				tx, err := l.target.generateTransaction(i)
 				if err != nil {
 					l.target.logger.Errorf("Failed to create transaction: %v", err)
 					l.target.task_ctx.SetResult(types.TaskResultFailure)
 					l.Result.Failed = true
+
 					return
 				}
 
 				l.Result.TxStartTime[i] = time.Now()
 				err = l.target.sendTransaction(tx)
+
 				if err != nil {
 					if !l.Result.Failed {
 						l.target.logger.WithField("client", l.target.client.GetName()).Errorf("Failed to send transaction: %v", err)
@@ -147,7 +148,6 @@ func (l *Load) Execute() error {
 					elapsed := time.Since(l.Result.StartTime)
 					l.target.logger.Infof("Sent %d transactions in %.2fs", l.Result.SentTxCount, elapsed.Seconds())
 				}
-
 			}(i)
 
 			// Sleep to control the TPS
@@ -168,6 +168,7 @@ func (l *Load) Execute() error {
 				if l.Result.Failed {
 					return
 				}
+
 				if time.Now().After(l.testDeadline) {
 					l.target.logger.Infof("Reached duration limit, stopping transaction generation.")
 					return
@@ -184,19 +185,20 @@ func (l *Load) Execute() error {
 
 // MeasurePropagationLatencies reads P2P events and calculates propagation latencies for each transaction
 func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
-
 	// Get a P2P connection to read events
 	conn, err := l.target.getTcpConn()
 	if err != nil {
 		l.target.logger.Errorf("Failed to get P2P connection: %v", err)
 		l.target.task_ctx.SetResult(types.TaskResultFailure)
+
 		return l.Result, fmt.Errorf("measurement stopped: failed to get P2P connection")
 	}
 
 	defer conn.Close()
 
 	// Wait P2P event messages
-	var receivedEvents int = 0
+	var receivedEvents = 0
+
 	for {
 		txes, err := conn.ReadTransactionMessages(time.Duration(60) * time.Second)
 		if err != nil {
@@ -208,6 +210,7 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 			l.target.logger.Errorf("Failed reading p2p events: %v", err)
 			l.target.task_ctx.SetResult(types.TaskResultFailure)
 			l.Result.Failed = true
+
 			return l.Result, fmt.Errorf("measurement stopped: failed reading p2p events")
 		}
 
@@ -220,17 +223,21 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 			tx_data := tx.Data()
 			// read tx_data that is in the format "tx_index:<index>"
 			var tx_index int
+
 			_, err := fmt.Sscanf(string(tx_data), "tx_index:%d", &tx_index)
 			if err != nil {
 				l.target.logger.Errorf("Failed to parse transaction data: %v", err)
 				l.target.task_ctx.SetResult(types.TaskResultFailure)
 				l.Result.Failed = true
+
 				return l.Result, fmt.Errorf("measurement stopped: failed to parse transaction data at event %d", i)
 			}
+
 			if tx_index < 0 || tx_index >= l.Result.TotalTxs {
 				l.target.logger.Errorf("Transaction index out of range: %d", tx_index)
 				l.target.task_ctx.SetResult(types.TaskResultFailure)
 				l.Result.Failed = true
+
 				return l.Result, fmt.Errorf("measurement stopped: transaction index out of range at event %d", i)
 			}
 
@@ -257,12 +264,14 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 		case <-l.target.ctx.Done():
 			l.target.logger.Warnf("Task cancelled, stopping reading p2p events.")
 			l.Result.Failed = true
+
 			return l.Result, fmt.Errorf("measurement stopped: task cancelled")
 		default:
 			// check test deadline
 			if time.Now().After(l.testDeadline) {
 				l.target.logger.Warnf("Reached duration limit, stopping reading p2p events.")
 				l.Result.Failed = true
+
 				return l.Result, fmt.Errorf("measurement stopped: reached duration limit")
 			}
 			// check if the execution failed
@@ -299,6 +308,7 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 			l.Result.LatenciesMus[i] = -1
 		}
 	}
+
 	if l.Result.NotReceivedP2PEventCount > 0 {
 		l.target.logger.Warnf("Missed p2p events: %d", l.Result.NotReceivedP2PEventCount)
 	}
@@ -326,6 +336,7 @@ func (t *LoadTarget) getTcpConn() (*sentry.Conn, error) {
 	if err != nil {
 		t.logger.Errorf("Failed to fetch genesis block: %v", err)
 		t.task_ctx.SetResult(types.TaskResultFailure)
+
 		return nil, err
 	}
 
@@ -333,6 +344,7 @@ func (t *LoadTarget) getTcpConn() (*sentry.Conn, error) {
 	if err != nil {
 		t.logger.Errorf("Failed to get TCP connection: %v", err)
 		t.task_ctx.SetResult(types.TaskResultFailure)
+
 		return nil, err
 	}
 

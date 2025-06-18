@@ -65,6 +65,7 @@ func (t *Task) LoadConfig() error {
 	}
 
 	t.config = config
+
 	return nil
 }
 
@@ -88,6 +89,7 @@ func (t *Task) cleanRecursive(client *execution.Client) error {
 	if err != nil {
 		t.logger.Errorf("Error checking txpool: %v", err)
 		t.ctx.SetResult(types.TaskResultFailure)
+
 		return err
 	}
 
@@ -99,6 +101,7 @@ func (t *Task) cleanRecursive(client *execution.Client) error {
 	// wait for a while before checking again
 	time.Sleep(5 * time.Second)
 	t.logger.Infof("TxPool is not clean for client %s, checking again...", client.GetName())
+
 	return t.cleanRecursive(client)
 }
 

@@ -49,21 +49,25 @@ type Conn struct {
 // Read reads a packet from the connection.
 func (c *Conn) Read() (uint64, []byte, error) {
 	c.SetReadDeadline(time.Now().Add(timeout))
+
 	code, data, _, err := c.Conn.Read()
 	if err != nil {
 		return 0, nil, err
 	}
+
 	return code, data, nil
 }
 
 // ReadMsg attempts to read a devp2p message with a specific code.
 func (c *Conn) ReadMsg(proto Proto, code uint64, msg any) error {
 	c.SetReadDeadline(time.Now().Add(timeout))
+
 	for {
 		got, data, err := c.Read()
 		if err != nil {
 			return err
 		}
+
 		if protoOffset(proto)+code == got {
 			return rlp.DecodeBytes(data, msg)
 		}
@@ -73,11 +77,14 @@ func (c *Conn) ReadMsg(proto Proto, code uint64, msg any) error {
 // Write writes a eth packet to the connection.
 func (c *Conn) Write(proto Proto, code uint64, msg any) error {
 	c.SetWriteDeadline(time.Now().Add(timeout))
+
 	payload, err := rlp.EncodeToBytes(msg)
 	if err != nil {
 		return err
 	}
+
 	_, err = c.Conn.Write(protoOffset(proto)+code, payload)
+
 	return err
 }
 
@@ -86,25 +93,31 @@ var errDisc error = fmt.Errorf("disconnect")
 // ReadEth reads an Eth sub-protocol wire message.
 func (c *Conn) ReadEth() (any, error) {
 	c.SetReadDeadline(time.Now().Add(timeout))
+
 	for {
 		code, data, _, err := c.Conn.Read()
 		if code == discMsg {
 			return nil, errDisc
 		}
+
 		if err != nil {
 			return nil, err
 		}
+
 		if code == pingMsg {
 			c.Write(baseProto, pongMsg, []byte{})
 			continue
 		}
+
 		if getProto(code) != ethProto {
 			// Read until eth message.
 			continue
 		}
+
 		code -= baseProtoLen
 
 		var msg any
+
 		switch int(code) {
 		case eth.StatusMsg:
 			msg = new(eth.StatusPacket)
@@ -131,9 +144,11 @@ func (c *Conn) ReadEth() (any, error) {
 		default:
 			panic(fmt.Sprintf("unhandled eth msg code %d", code))
 		}
+
 		if err := rlp.DecodeBytes(data, msg); err != nil {
 			return nil, fmt.Errorf("unable to decode eth msg: %v", err)
 		}
+
 		return msg, nil
 	}
 }
@@ -144,9 +159,11 @@ func (c *Conn) Peer(chainId *big.Int, genesisHash common.Hash, headHash common.H
 	if err := c.handshake(); err != nil {
 		return fmt.Errorf("handshake failed: %v", err)
 	}
+
 	if err := c.statusExchange(chainId, genesisHash, headHash, forkId, status); err != nil {
 		return fmt.Errorf("status exchange failed: %v", err)
 	}
+
 	return nil
 }
 
@@ -154,6 +171,7 @@ func (c *Conn) Peer(chainId *big.Int, genesisHash common.Hash, headHash common.H
 func (c *Conn) handshake() error {
 	// Write hello to client.
 	pub0 := crypto.FromECDSAPub(&c.ourKey.PublicKey)[1:]
+
 	ourHandshake := &protoHandshake{
 		Version: 5,
 		Caps:    c.caps,
@@ -167,18 +185,22 @@ func (c *Conn) handshake() error {
 	if err != nil {
 		return fmt.Errorf("erroring reading handshake: %v", err)
 	}
+
 	switch code {
 	case handshakeMsg:
 		msg := new(protoHandshake)
 		if err := rlp.DecodeBytes(data, &msg); err != nil {
 			return fmt.Errorf("error decoding handshake msg: %v", err)
 		}
+
 		fmt.Println("handshake msg", msg)
 		// Set snappy if version is at least 5.
 		if msg.Version >= 5 {
 			c.SetSnappy(true)
 		}
+
 		c.negotiateEthProtocol(msg.Caps)
+
 		if c.negotiatedProtoVersion == 0 {
 			return fmt.Errorf("could not negotiate eth protocol (remote caps: %v, local eth version: %v)", msg.Caps, c.ourHighestProtoVersion)
 		}
@@ -186,6 +208,7 @@ func (c *Conn) handshake() error {
 		if c.ourHighestSnapProtoVersion != c.negotiatedSnapProtoVersion {
 			return fmt.Errorf("could not negotiate snap protocol (remote caps: %v, local snap version: %v)", msg.Caps, c.ourHighestSnapProtoVersion)
 		}
+
 		return nil
 	default:
 		return fmt.Errorf("bad handshake: got msg code %d", code)
@@ -196,7 +219,9 @@ func (c *Conn) handshake() error {
 // advertised capability from peer.
 func (c *Conn) negotiateEthProtocol(caps []p2p.Cap) {
 	var highestEthVersion uint
+
 	var highestSnapVersion uint
+
 	for _, capability := range caps {
 		switch capability.Name {
 		case "eth":
@@ -209,6 +234,7 @@ func (c *Conn) negotiateEthProtocol(caps []p2p.Cap) {
 			}
 		}
 	}
+
 	c.negotiatedProtoVersion = highestEthVersion
 	c.negotiatedSnapProtoVersion = highestSnapVersion
 }
@@ -250,6 +276,7 @@ loop:
 	if c.negotiatedProtoVersion == 0 {
 		return errors.New("eth protocol version must be set in Conn")
 	}
+
 	if status == nil {
 		// default status message
 		status = &eth.StatusPacket{
@@ -261,9 +288,11 @@ loop:
 			ForkID:          forkId,
 		}
 	}
+
 	if err := c.Write(ethProto, eth.StatusMsg, status); err != nil {
 		return fmt.Errorf("write to connection failed: %v", err)
 	}
+
 	return nil
 }
 
@@ -285,6 +314,7 @@ func readUntil[T any](conn *Conn, ctx context.Context) (*T, error) {
 					errCh <- errDisc
 					return
 				}
+
 				continue
 			}
 
@@ -310,11 +340,13 @@ func readUntil[T any](conn *Conn, ctx context.Context) (*T, error) {
 // The timeout parameter is optional - if provided and > 0, the function will timeout after the specified duration.
 func (conn *Conn) ReadTransactionMessages(timeout ...time.Duration) (*eth.TransactionsPacket, error) {
 	ctx := context.Background()
+
 	if len(timeout) > 0 && timeout[0] > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout[0])
 		defer cancel()
 	}
+
 	return readUntil[eth.TransactionsPacket](conn, ctx)
 }
 
@@ -336,15 +368,18 @@ func dialAs(remoteAddress string) (*Conn, error) {
 	conn := Conn{Conn: rlpx.NewConn(fd, node.Pubkey())}
 	conn.ourKey = key
 	_, err = conn.Handshake(conn.ourKey)
+
 	if err != nil {
 		conn.Close()
 		return nil, err
 	}
+
 	conn.caps = []p2p.Cap{
 		{Name: "eth", Version: 67},
 		{Name: "eth", Version: 68},
 	}
 	conn.ourHighestProtoVersion = 68
+
 	return &conn, nil
 }
 
