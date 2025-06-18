@@ -1,0 +1,44 @@
+name: Go CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  go-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Go environment
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.18"
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSf https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.46.2
+
+      - name: Run gofmt, golangci-lint, and staticcheck
+        run: |
+          chmod +x ./scripts/lint-go.sh
+          ./scripts/lint-go.sh
+
+      - name: Commit and push fixes
+        run: |
+          # Check if there are any changes after gofmt or golangci-lint
+          git diff --exit-code || (
+            echo "There are changes, committing the fixes..." &&
+            git config user.name "github-actions" &&
+            git config user.email "github-actions@github.com" &&
+            git add . &&
+            git commit -m "Apply gofmt and golangci-lint fixes" &&
+            git push
+          )
