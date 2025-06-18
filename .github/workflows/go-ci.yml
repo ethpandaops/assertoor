@@ -26,6 +26,9 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s v2.1.6
 
+      - name: Install staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+
       - name: Run gofmt, golangci-lint, and staticcheck
         run: |
           chmod +x ./scripts/lint-go.sh
