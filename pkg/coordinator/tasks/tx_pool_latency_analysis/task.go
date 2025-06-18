@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/noku-team/assertoor/pkg/coordinator/utils/tx_load_tool"
 	"math"
 	"math/rand"
 	"os"
 	"time"
+
+	"github.com/noku-team/assertoor/pkg/coordinator/utils/tx_load_tool"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
