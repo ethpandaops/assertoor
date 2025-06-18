@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover/v4wire"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,7 +29,7 @@ type (
 	}
 
 	Transaction struct {
-		Version    uint
+		Version uint
 	}
 )
 
@@ -92,7 +92,6 @@ func (te *sentryenv) read() (v4wire.Packet, []byte, error) {
 	p, _, hash, err := v4wire.Decode(buf[:n])
 	return p, hash, err
 }
-
 
 // checkPingPong verifies that the remote side sends both a PONG with the
 // correct hash, and a PING.
@@ -202,7 +201,7 @@ func (p *sentryenv) notifyWhenReady() (<-chan struct{}, error) {
 	return ready, nil
 }
 
-func ConnectToP2p(remoteAddress string, rpcAdmin string, logger logrus.FieldLogger) (*sentryenv) {
+func ConnectToP2p(remoteAddress string, rpcAdmin string, logger logrus.FieldLogger) *sentryenv {
 	endpoint, err := net.ListenPacket("udp", "0.0.0.0:0")
 	if err != nil {
 		logger.Errorf("Failed to listen: %v", err)

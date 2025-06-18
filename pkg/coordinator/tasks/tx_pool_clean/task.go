@@ -78,7 +78,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.cleanRecursive(client)
 	}
 
-
 	t.ctx.SetResult(types.TaskResultSuccess)
 
 	return nil

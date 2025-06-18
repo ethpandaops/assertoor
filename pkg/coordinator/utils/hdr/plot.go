@@ -11,7 +11,7 @@ import (
 func HdrPlot(data []int64) (string, error) {
 	// Create a histogram with a resolution of 1 microsecond
 	// The maximum value can be set according to your needs, here it's set to 30 million microseconds (30 seconds)
-	histogram := hdrhistogram.New(1, 30 * 1000000, 5)
+	histogram := hdrhistogram.New(1, 30*1000000, 5)
 
 	// Add the data to the histogram
 	for _, value := range data {

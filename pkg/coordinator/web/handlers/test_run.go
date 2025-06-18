@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/noku-team/assertoor/pkg/coordinator/db"
 	"github.com/noku-team/assertoor/pkg/coordinator/types"
 	"github.com/noku-team/assertoor/pkg/coordinator/web/api"
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
