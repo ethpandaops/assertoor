@@ -3,12 +3,9 @@ package sentry
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -152,54 +149,54 @@ func (te *sentryenv) checkPong(reply v4wire.Packet, pingHash []byte) error {
 	return nil
 }
 
-func (p *sentryenv) notifyWhenReady() (<-chan struct{}, error) {
-	ready := make(chan struct{})
+// func (p *sentryenv) notifyWhenReady() (<-chan struct{}, error) {
+// 	ready := make(chan struct{})
 
-	r, err := http.Post(p.adminRPC, "application/json", strings.NewReader(
-		`{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":1}`,
-	))
-	if err != nil {
-		return nil, err
-	}
-	defer r.Body.Close()
+// 	r, err := http.Post(p.adminRPC, "application/json", strings.NewReader(
+// 		`{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":1}`,
+// 	))
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer r.Body.Close()
 
-	var resp struct {
-		Result []struct {
-			Enode string `json:"enode"`
-		} `json:"result"`
-	}
+// 	var resp struct {
+// 		Result []struct {
+// 			Enode string `json:"enode"`
+// 		} `json:"result"`
+// 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
-		return nil, err
-	}
+// 	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
+// 		return nil, err
+// 	}
 
-	numConn := len(resp.Result)
+// 	numConn := len(resp.Result)
 
-	go func() {
-		for {
-			time.Sleep(100 * time.Millisecond)
+// 	go func() {
+// 		for {
+// 			time.Sleep(100 * time.Millisecond)
 
-			r, err := http.Post(p.adminRPC, "application/json", strings.NewReader(
-				`{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":1}`,
-			))
-			if err != nil {
-				continue
-			}
-			defer r.Body.Close()
+// 			r, err := http.Post(p.adminRPC, "application/json", strings.NewReader(
+// 				`{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":1}`,
+// 			))
+// 			if err != nil {
+// 				continue
+// 			}
+// 			defer r.Body.Close()
 
-			if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
-				continue
-			}
+// 			if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
+// 				continue
+// 			}
 
-			if len(resp.Result) > numConn {
-				ready <- struct{}{}
-				return
-			}
-		}
-	}()
+// 			if len(resp.Result) > numConn {
+// 				ready <- struct{}{}
+// 				return
+// 			}
+// 		}
+// 	}()
 
-	return ready, nil
-}
+// 	return ready, nil
+// }
 
 func ConnectToP2p(remoteAddress string, rpcAdmin string, logger logrus.FieldLogger) *sentryenv {
 	endpoint, err := net.ListenPacket("udp", "0.0.0.0:0")

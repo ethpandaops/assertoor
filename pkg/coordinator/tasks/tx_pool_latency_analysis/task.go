@@ -136,7 +136,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// Check if the context was cancelled or other errors occurred
 	if result.Failed {
-		return fmt.Errorf("Error measuring transaction propagation latencies: load failed")
+		return fmt.Errorf("error measuring transaction propagation latencies: load failed")
 	}
 
 	// Send txes to other clients, for speeding up tx mining
