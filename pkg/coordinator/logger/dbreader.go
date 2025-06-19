@@ -1,6 +1,6 @@
 package logger
 
-import "github.com/noku-team/assertoor/pkg/coordinator/db"
+import "github.com/erigontech/assertoor/pkg/coordinator/db"
 
 type logDBReader struct {
 	database  *db.Database

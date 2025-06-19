@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/gorhill/cronexpr"
-	"github.com/noku-team/assertoor/pkg/coordinator/test"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/test"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
 )
 
 type TestRunner struct {

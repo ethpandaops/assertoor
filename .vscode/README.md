@@ -175,8 +175,8 @@ web:
 
 # Custom external tests
 externalTests:
-  - file: https://raw.githubusercontent.com/noku-team/assertoor/master/playbooks/stable/block-proposal-check.yaml
-  - file: https://raw.githubusercontent.com/noku-team/assertoor/master/playbooks/dev/tx-pool-check-short.yaml
+  - file: https://raw.githubusercontent.com/erigontech/assertoor/master/playbooks/stable/block-proposal-check.yaml
+  - file: https://raw.githubusercontent.com/erigontech/assertoor/master/playbooks/dev/tx-pool-check-short.yaml
   
 # Custom logging configuration
 logging:

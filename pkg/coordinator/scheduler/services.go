@@ -1,11 +1,11 @@
 package scheduler
 
 import (
-	"github.com/noku-team/assertoor/pkg/coordinator/clients"
-	"github.com/noku-team/assertoor/pkg/coordinator/db"
-	"github.com/noku-team/assertoor/pkg/coordinator/names"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/wallet"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients"
+	"github.com/erigontech/assertoor/pkg/coordinator/db"
+	"github.com/erigontech/assertoor/pkg/coordinator/names"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/wallet"
 )
 
 type servicesProvider struct {

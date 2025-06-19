@@ -15,11 +15,11 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/vars"
-	"github.com/noku-team/assertoor/pkg/coordinator/wallet"
-	"github.com/noku-team/assertoor/pkg/coordinator/wallet/blobtx"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/vars"
+	"github.com/erigontech/assertoor/pkg/coordinator/wallet"
+	"github.com/erigontech/assertoor/pkg/coordinator/wallet/blobtx"
 	"github.com/sirupsen/logrus"
 )
 

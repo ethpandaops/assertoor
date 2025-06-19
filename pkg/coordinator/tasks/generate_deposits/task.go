@@ -18,10 +18,10 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/wallet"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/wallet"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/util/hashing"
 	"github.com/protolambda/ztyp/tree"
@@ -30,7 +30,7 @@ import (
 	e2types "github.com/wealdtech/go-eth2-types/v2"
 	util "github.com/wealdtech/go-eth2-util"
 
-	depositcontract "github.com/noku-team/assertoor/pkg/coordinator/tasks/generate_deposits/deposit_contract"
+	depositcontract "github.com/erigontech/assertoor/pkg/coordinator/tasks/generate_deposits/deposit_contract"
 )
 
 var (

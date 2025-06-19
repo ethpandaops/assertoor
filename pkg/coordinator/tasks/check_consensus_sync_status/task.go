@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/clients"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus/rpc"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/vars"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/consensus/rpc"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 

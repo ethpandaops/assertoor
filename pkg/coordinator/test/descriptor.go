@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )

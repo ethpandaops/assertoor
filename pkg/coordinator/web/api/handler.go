@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 

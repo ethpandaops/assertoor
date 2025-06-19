@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/vars"
-	"github.com/noku-team/assertoor/pkg/coordinator/wallet"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/vars"
+	"github.com/erigontech/assertoor/pkg/coordinator/wallet"
 	"github.com/sirupsen/logrus"
 )
 

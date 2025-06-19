@@ -7,8 +7,8 @@ import (
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 

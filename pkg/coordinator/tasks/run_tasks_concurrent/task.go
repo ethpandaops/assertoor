@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/vars"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 

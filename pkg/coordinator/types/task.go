@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/helper"
-	"github.com/noku-team/assertoor/pkg/coordinator/logger"
+	"github.com/erigontech/assertoor/pkg/coordinator/helper"
+	"github.com/erigontech/assertoor/pkg/coordinator/logger"
 )
 
 type TaskDescriptor struct {

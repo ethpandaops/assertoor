@@ -11,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/buildinfo"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/web/static"
-	"github.com/noku-team/assertoor/pkg/coordinator/web/templates"
-	"github.com/noku-team/assertoor/pkg/coordinator/web/utils"
+	"github.com/erigontech/assertoor/pkg/coordinator/buildinfo"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/web/static"
+	"github.com/erigontech/assertoor/pkg/coordinator/web/templates"
+	"github.com/erigontech/assertoor/pkg/coordinator/web/utils"
 	"github.com/sirupsen/logrus"
 )
 

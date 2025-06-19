@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/clients"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution"
 )
 
 type ClientsPage struct {

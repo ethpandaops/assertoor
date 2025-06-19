@@ -1,4 +1,4 @@
-module github.com/noku-team/assertoor
+module github.com/erigontech/assertoor
 
 go 1.23.0
 

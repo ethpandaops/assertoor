@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/noku-team/assertoor/pkg/coordinator/db"
-	"github.com/noku-team/assertoor/pkg/coordinator/logger"
-	"github.com/noku-team/assertoor/pkg/coordinator/tasks"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/vars"
+	"github.com/erigontech/assertoor/pkg/coordinator/db"
+	"github.com/erigontech/assertoor/pkg/coordinator/logger"
+	"github.com/erigontech/assertoor/pkg/coordinator/tasks"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/vars"
 	"gopkg.in/yaml.v3"
 )
 

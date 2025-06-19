@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/noku-team/assertoor/pkg/coordinator/db"
+	"github.com/erigontech/assertoor/pkg/coordinator/db"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )

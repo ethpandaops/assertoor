@@ -23,7 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/rlpx"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution"
 )
 
 var (

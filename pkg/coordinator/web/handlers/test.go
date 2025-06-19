@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 

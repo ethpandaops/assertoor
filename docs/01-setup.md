@@ -5,7 +5,7 @@
 Assertoor provides distribution-specific executables for Windows, Linux, and macOS.
 
 1. **Download the Latest Release**:\
-   Navigate to the [Releases](https://github.com/noku-team/assertoor/releases) page and download the latest version suitable for your operating system.
+   Navigate to the [Releases](https://github.com/erigontech/assertoor/releases) page and download the latest version suitable for your operating system.
 
 2. **Run the Executable**:\
    After downloading, run the executable with a test configuration file. The command will be similar to the following:
@@ -21,7 +21,7 @@ If you prefer to build Assertoor from source, ensure you have [Go](https://go.de
 1. **Clone the Repository**:\
 	Use the following commands to clone the Assertoor repository and navigate to its directory:
     ```
-    git clone https://github.com/noku-team/assertoor.git
+    git clone https://github.com/erigontech/assertoor.git
     cd assertoor
     ```
 2. **Build the Tool**:\
