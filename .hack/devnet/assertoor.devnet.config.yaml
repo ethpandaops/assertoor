@@ -24,4 +24,4 @@ validatorNames:
 #  additionalGlobalVar: xx
 
 externalTests:
-  #- file: ./cgc-test.yaml
+  #- file: ./test-playbook1.yaml
