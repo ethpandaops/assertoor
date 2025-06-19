@@ -88,7 +88,6 @@ The `Clean debug Go assertoor` configuration in the `launch.json` file allows yo
 1. **Pre-Launch Task**: The `devnet-setup` task is automatically executed to prepare the development environment
 2. **Program Launch**: The Go binary of Assertoor is launched from the workspace root
 3. **Configuration**: The program is started with the configuration file `.hack/devnet/generated-assertoor-config.yaml`
-4. **Logging**: Logs are displayed in the VSCode debug console (`showLog: true`)
 
 ### Configuration Parameters
 
