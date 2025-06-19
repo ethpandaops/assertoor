@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -56,19 +57,17 @@ type Chain struct {
 // NewChain takes the given chain.rlp file, and decodes and returns
 // the blocks from the file.
 func NewChain(dir string) (*Chain, error) {
-	gen, err := loadGenesis(filepath.Join(dir, "genesis.json"))
+	gblock, gen, err := loadGenesis(filepath.Join(dir, "genesis.json"))
 	if err != nil {
 		return nil, err
 	}
-
-	gblock := gen.ToBlock()
 
 	blocks, err := blocksFromFile(filepath.Join(dir, "chain.rlp"), gblock)
 	if err != nil {
 		return nil, err
 	}
 
-	state, err := readState(filepath.Join(dir, "headstate.json"))
+	headState, err := readState(filepath.Join(dir, "headstate.json"))
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +80,7 @@ func NewChain(dir string) (*Chain, error) {
 	return &Chain{
 		genesis: gen,
 		blocks:  blocks,
-		state:   state,
+		state:   headState,
 		senders: accounts,
 		config:  gen.Config,
 	}, nil
@@ -104,7 +103,8 @@ func (c *Chain) AccountsInHashOrder() []state.DumpAccount {
 	list := make([]state.DumpAccount, len(c.state))
 	i := 0
 
-	for addr, acc := range c.state {
+	for addr := range c.state {
+		acc := c.state[addr]
 		list[i] = acc
 		list[i].Address = &addr
 
@@ -124,13 +124,16 @@ func (c *Chain) AccountsInHashOrder() []state.DumpAccount {
 
 // CodeHashes returns all bytecode hashes contained in the head state.
 func (c *Chain) CodeHashes() []common.Hash {
-	var hashes []common.Hash
+	hashes := make([]common.Hash, 0, len(c.state))
 
 	seen := make(map[common.Hash]struct{})
 	seen[types.EmptyCodeHash] = struct{}{}
 
-	for _, acc := range c.state {
+	for addr := range c.state {
+		acc := c.state[addr]
+
 		h := common.BytesToHash(acc.CodeHash)
+
 		if _, ok := seen[h]; ok {
 			continue
 		}
@@ -139,7 +142,7 @@ func (c *Chain) CodeHashes() []common.Hash {
 		seen[h] = struct{}{}
 	}
 
-	slices.SortFunc(hashes, (common.Hash).Cmp)
+	slices.SortFunc(hashes, common.Hash.Cmp)
 
 	return hashes
 }
@@ -151,7 +154,12 @@ func (c *Chain) Len() int {
 
 // ForkID gets the fork id of the chain.
 func (c *Chain) ForkID() forkid.ID {
-	return forkid.NewID(c.config, c.blocks[0], uint64(c.Len()), c.blocks[c.Len()-1].Time())
+	chainLen := c.Len()
+	if chainLen < 0 {
+		panic("negative chain length")
+	}
+
+	return forkid.NewID(c.config, c.blocks[0], uint64(chainLen), c.blocks[c.Len()-1].Time())
 }
 
 // TD calculates the total difficulty of the chain at the
@@ -176,10 +184,10 @@ func (c *Chain) RootAt(height int) common.Hash {
 
 // GetSender returns the address associated with account at the index in the
 // pre-funded accounts list.
-func (c *Chain) GetSender(idx int) (common.Address, uint64) {
+func (c *Chain) GetSender(idx int) (addr common.Address, nonce uint64) {
 	accounts := slices.SortedFunc(maps.Keys(c.senders), common.Address.Cmp)
 
-	addr := accounts[idx]
+	addr = accounts[idx]
 
 	return addr, c.senders[addr].Nonce
 }
@@ -222,6 +230,10 @@ func (c *Chain) GetHeaders(req *eth.GetBlockHeadersPacket) ([]*types.Header, err
 		return nil, errors.New("no block headers requested")
 	}
 
+	if req.Amount > math.MaxInt {
+		return nil, errors.New("requested amount too large")
+	}
+
 	var (
 		headers     = make([]*types.Header, req.Amount)
 		blockNumber uint64
@@ -239,7 +251,7 @@ func (c *Chain) GetHeaders(req *eth.GetBlockHeadersPacket) ([]*types.Header, err
 	}
 
 	if req.Reverse {
-		for i := 1; i < int(req.Amount); i++ {
+		for i := uint64(1); i < req.Amount; i++ {
 			blockNumber -= (1 - req.Skip)
 			headers[i] = c.blocks[blockNumber].Header()
 		}
@@ -247,7 +259,7 @@ func (c *Chain) GetHeaders(req *eth.GetBlockHeadersPacket) ([]*types.Header, err
 		return headers, nil
 	}
 
-	for i := 1; i < int(req.Amount); i++ {
+	for i := uint64(1); i < req.Amount; i++ {
 		blockNumber += (1 + req.Skip)
 		headers[i] = c.blocks[blockNumber].Header()
 	}
@@ -268,18 +280,20 @@ func (c *Chain) Shorten(height int) *Chain {
 	}
 }
 
-func loadGenesis(genesisFile string) (core.Genesis, error) {
+func loadGenesis(genesisFile string) (*types.Block, core.Genesis, error) {
 	chainConfig, err := os.ReadFile(genesisFile)
 	if err != nil {
-		return core.Genesis{}, err
+		return nil, core.Genesis{}, err
 	}
 
 	var gen core.Genesis
 	if err := json.Unmarshal(chainConfig, &gen); err != nil {
-		return core.Genesis{}, err
+		return nil, core.Genesis{}, err
 	}
 
-	return gen, nil
+	gblock := gen.ToBlock()
+
+	return gblock, gen, nil
 }
 
 func blocksFromFile(chainfile string, gblock *types.Block) ([]*types.Block, error) {
@@ -311,7 +325,12 @@ func blocksFromFile(chainfile string, gblock *types.Block) ([]*types.Block, erro
 			return nil, fmt.Errorf("at block index %d: %v", i, err)
 		}
 
-		if b.NumberU64() != uint64(i+1) {
+		expectedBlockNum := i + 1
+		if expectedBlockNum < 0 {
+			return nil, fmt.Errorf("block index out of range: %d", i)
+		}
+
+		if b.NumberU64() != uint64(expectedBlockNum) {
 			return nil, fmt.Errorf("block at index %d has wrong number %d", i, b.NumberU64())
 		}
 
@@ -322,28 +341,34 @@ func blocksFromFile(chainfile string, gblock *types.Block) ([]*types.Block, erro
 }
 
 func readState(file string) (map[common.Address]state.DumpAccount, error) {
-	f, err := os.ReadFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read state: %v", err)
-	}
-
 	var dump state.Dump
-	if err := json.Unmarshal(f, &dump); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal state: %v", err)
+
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	if err := json.NewDecoder(f).Decode(&dump); err != nil {
+		return nil, err
 	}
 
-	state := make(map[common.Address]state.DumpAccount)
+	stateMap := make(map[common.Address]state.DumpAccount)
 
-	for key, acct := range dump.Accounts {
+	for key := range dump.Accounts {
+		acct := dump.Accounts[key]
+
 		var addr common.Address
+
 		if err := addr.UnmarshalText([]byte(key)); err != nil {
-			return nil, fmt.Errorf("invalid address %q", key)
+			panic(err)
 		}
 
-		state[addr] = acct
+		acct.Address = &addr
+		stateMap[addr] = acct
 	}
 
-	return state, nil
+	return stateMap, nil
 }
 
 func readAccounts(file string) (map[common.Address]*senderInfo, error) {

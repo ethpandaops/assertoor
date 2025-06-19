@@ -10,7 +10,7 @@ tasks:
   timeout: 5m
   config:
     tps: 1000
-    duration_s: 10
+    durationS: 10
     logInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
@@ -24,7 +24,7 @@ tasks:
   title: "Check transaction pool throughput with 1.000 transactions in one second"
   config:
     tps: 1000
-    duration_s: 10
+    durationS: 10
     logInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
@@ -38,7 +38,7 @@ tasks:
   timeout: 5m
   config:
     tps: 5000
-    duration_s: 5
+    durationS: 5
     logInterval: 2000
   configVars:
     privateKey: "walletPrivkey"
@@ -52,7 +52,7 @@ tasks:
   title: "Check transaction pool throughput with 5.000 transactions in one second"
   config:
     tps: 5000
-    duration_s: 5
+    durationS: 5
     logInterval: 2000
   configVars:
     privateKey: "walletPrivkey"

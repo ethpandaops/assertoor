@@ -1,4 +1,4 @@
-package tx_load_tool
+package txloadtool
 
 import (
 	"context"
@@ -7,10 +7,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/core/forkid"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/noku-team/assertoor/pkg/coordinator/helper"
@@ -21,22 +21,22 @@ import (
 )
 
 type LoadTarget struct {
-	ctx      context.Context
-	task_ctx *types.TaskContext
-	wallet   *wallet.Wallet
-	logger   logrus.FieldLogger
-	client   *execution.Client
+	ctx     context.Context
+	taskCtx *types.TaskContext
+	wallet  *wallet.Wallet
+	logger  logrus.FieldLogger
+	client  *execution.Client
 }
 
 // NewLoadTarget creates a new LoadTarget instance
-func NewLoadTarget(ctx context.Context, task_ctx *types.TaskContext, logger logrus.FieldLogger,
-	wallet *wallet.Wallet, client *execution.Client) *LoadTarget {
+func NewLoadTarget(ctx context.Context, taskCtx *types.TaskContext, logger logrus.FieldLogger,
+	w *wallet.Wallet, client *execution.Client) *LoadTarget {
 	return &LoadTarget{
-		ctx:      ctx,
-		task_ctx: task_ctx,
-		wallet:   wallet,
-		logger:   logger,
-		client:   client,
+		ctx:     ctx,
+		taskCtx: taskCtx,
+		wallet:  w,
+		logger:  logger,
+		client:  client,
 	}
 }
 
@@ -74,20 +74,20 @@ type Load struct {
 	target       *LoadTarget
 	testDeadline time.Time
 	TPS          int
-	Duration_s   int
+	DurationS    int
 	LogInterval  int
 	Result       *LoadResult
 }
 
 // NewLoad creates a new Load instance
-func NewLoad(target *LoadTarget, TPS int, duration_s int, testDeadline time.Time, logInterval int) *Load {
+func NewLoad(target *LoadTarget, tps, durationS int, testDeadline time.Time, logInterval int) *Load {
 	return &Load{
 		target:       target,
-		TPS:          TPS,
-		Duration_s:   duration_s,
+		TPS:          tps,
+		DurationS:    durationS,
 		testDeadline: testDeadline,
 		LogInterval:  logInterval,
-		Result:       NewLoadResult(TPS * duration_s),
+		Result:       NewLoadResult(tps * durationS),
 	}
 }
 
@@ -105,7 +105,7 @@ func (l *Load) Execute() error {
 		time.Sleep(100 * time.Millisecond)
 
 		l.Result.StartTime = time.Now()
-		endTime := l.Result.StartTime.Add(time.Second * time.Duration(l.Duration_s))
+		endTime := l.Result.StartTime.Add(time.Second * time.Duration(l.DurationS))
 		l.target.logger.Infof("Starting transaction generation at %s", l.Result.StartTime)
 
 		// Generate and send transactions
@@ -121,7 +121,7 @@ func (l *Load) Execute() error {
 				tx, err := l.target.generateTransaction(i)
 				if err != nil {
 					l.target.logger.Errorf("Failed to create transaction: %v", err)
-					l.target.task_ctx.SetResult(types.TaskResultFailure)
+					l.target.taskCtx.SetResult(types.TaskResultFailure)
 					l.Result.Failed = true
 
 					return
@@ -133,7 +133,7 @@ func (l *Load) Execute() error {
 				if err != nil {
 					if !l.Result.Failed {
 						l.target.logger.WithField("client", l.target.client.GetName()).Errorf("Failed to send transaction: %v", err)
-						l.target.task_ctx.SetResult(types.TaskResultFailure)
+						l.target.taskCtx.SetResult(types.TaskResultFailure)
 						l.Result.Failed = true
 					}
 
@@ -186,10 +186,10 @@ func (l *Load) Execute() error {
 // MeasurePropagationLatencies reads P2P events and calculates propagation latencies for each transaction
 func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 	// Get a P2P connection to read events
-	conn, err := l.target.getTcpConn()
+	conn, err := l.target.getTCPConn()
 	if err != nil {
 		l.target.logger.Errorf("Failed to get P2P connection: %v", err)
-		l.target.task_ctx.SetResult(types.TaskResultFailure)
+		l.target.taskCtx.SetResult(types.TaskResultFailure)
 
 		return l.Result, fmt.Errorf("measurement stopped: failed to get P2P connection")
 	}
@@ -208,7 +208,7 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 			}
 
 			l.target.logger.Errorf("Failed reading p2p events: %v", err)
-			l.target.task_ctx.SetResult(types.TaskResultFailure)
+			l.target.taskCtx.SetResult(types.TaskResultFailure)
 			l.Result.Failed = true
 
 			return l.Result, fmt.Errorf("measurement stopped: failed reading p2p events")
@@ -220,33 +220,33 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 		}
 
 		for i, tx := range *txes {
-			tx_data := tx.Data()
-			// read tx_data that is in the format "tx_index:<index>"
-			var tx_index int
+			txData := tx.Data()
+			// read txData that is in the format "txIndex:<index>"
+			var txIndex int
 
-			_, err := fmt.Sscanf(string(tx_data), "tx_index:%d", &tx_index)
+			_, err := fmt.Sscanf(string(txData), "txIndex:%d", &txIndex)
 			if err != nil {
 				l.target.logger.Errorf("Failed to parse transaction data: %v", err)
-				l.target.task_ctx.SetResult(types.TaskResultFailure)
+				l.target.taskCtx.SetResult(types.TaskResultFailure)
 				l.Result.Failed = true
 
 				return l.Result, fmt.Errorf("measurement stopped: failed to parse transaction data at event %d", i)
 			}
 
-			if tx_index < 0 || tx_index >= l.Result.TotalTxs {
-				l.target.logger.Errorf("Transaction index out of range: %d", tx_index)
-				l.target.task_ctx.SetResult(types.TaskResultFailure)
+			if txIndex < 0 || txIndex >= l.Result.TotalTxs {
+				l.target.logger.Errorf("Transaction index out of range: %d", txIndex)
+				l.target.taskCtx.SetResult(types.TaskResultFailure)
 				l.Result.Failed = true
 
 				return l.Result, fmt.Errorf("measurement stopped: transaction index out of range at event %d", i)
 			}
 
 			// log the duplicated p2p events, and count duplicated p2p events
-			if l.Result.LatenciesMus[tx_index] != 0 {
+			if l.Result.LatenciesMus[txIndex] != 0 {
 				l.Result.DuplicatedP2PEventCount++
 			} else {
 				l.Result.LastMeasureDelay = time.Since(l.Result.StartTime)
-				l.Result.LatenciesMus[tx_index] = time.Since(l.Result.TxStartTime[tx_index]).Microseconds()
+				l.Result.LatenciesMus[txIndex] = time.Since(l.Result.TxStartTime[txIndex]).Microseconds()
 				receivedEvents++
 			}
 
@@ -316,12 +316,12 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 	return l.Result, nil
 }
 
-func (t *LoadTarget) getTcpConn() (*sentry.Conn, error) {
+func (t *LoadTarget) getTCPConn() (*sentry.Conn, error) {
 	chainConfig := params.AllDevChainProtocolChanges
 
 	head, err := t.client.GetRPCClient().GetLatestBlock(t.ctx)
 	if err != nil {
-		t.task_ctx.SetResult(types.TaskResultFailure)
+		t.taskCtx.SetResult(types.TaskResultFailure)
 		return nil, err
 	}
 
@@ -335,23 +335,23 @@ func (t *LoadTarget) getTcpConn() (*sentry.Conn, error) {
 	genesis, err := t.client.GetRPCClient().GetEthClient().BlockByNumber(t.ctx, new(big.Int).SetUint64(0))
 	if err != nil {
 		t.logger.Errorf("Failed to fetch genesis block: %v", err)
-		t.task_ctx.SetResult(types.TaskResultFailure)
+		t.taskCtx.SetResult(types.TaskResultFailure)
 
 		return nil, err
 	}
 
-	conn, err := sentry.GetTcpConn(t.client)
+	conn, err := sentry.GetTCPConn(t.client)
 	if err != nil {
 		t.logger.Errorf("Failed to get TCP connection: %v", err)
-		t.task_ctx.SetResult(types.TaskResultFailure)
+		t.taskCtx.SetResult(types.TaskResultFailure)
 
 		return nil, err
 	}
 
-	forkId := forkid.NewID(chainConfig, genesis, head.NumberU64(), head.Time())
+	forkID := forkid.NewID(chainConfig, genesis, head.NumberU64(), head.Time())
 
 	// handshake
-	err = conn.Peer(chainConfig.ChainID, genesis.Hash(), head.Hash(), forkId, nil)
+	err = conn.Peer(chainConfig.ChainID, genesis.Hash(), head.Hash(), forkID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -372,14 +372,14 @@ func (t *LoadTarget) generateTransaction(i int) (*ethtypes.Transaction, error) {
 		tipCap := &helper.BigInt{Value: *big.NewInt(1000000000)}   // 1 Gwei
 
 		txObj := &ethtypes.DynamicFeeTx{
-			ChainID:   t.task_ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
+			ChainID:   t.taskCtx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
 			Nonce:     nonce,
 			GasTipCap: &tipCap.Value,
 			GasFeeCap: &feeCap.Value,
 			Gas:       50000,
 			To:        toAddr,
 			Value:     txAmount,
-			Data:      []byte(fmt.Sprintf("tx_index:%d", i)),
+			Data:      []byte(fmt.Sprintf("txIndex:%d", i)),
 		}
 
 		return ethtypes.NewTx(txObj), nil

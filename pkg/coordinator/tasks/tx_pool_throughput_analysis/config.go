@@ -1,10 +1,10 @@
-package tx_pool_throughput_analysis
+package txpoolthroughputanalysis
 
 type Config struct {
 	PrivateKey string `yaml:"privateKey" json:"privateKey"`
 
 	TPS                  int `yaml:"tps" json:"tps"`
-	Duration_s           int `yaml:"duration_s" json:"duration_s"`
+	DurationS            int `yaml:"durationS" json:"durationS"`
 	LogInterval          int `yaml:"logInterval" json:"logInterval"`
 	SecondsBeforeRunning int `yaml:"secondsBeforeRunning" json:"secondsBeforeRunning"`
 }
@@ -12,7 +12,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		TPS:                  100,
-		Duration_s:           60,
+		DurationS:            60,
 		LogInterval:          100,
 		SecondsBeforeRunning: 0,
 	}

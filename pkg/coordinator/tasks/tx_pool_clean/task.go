@@ -69,14 +69,17 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
-func (t *Task) Execute(ctx context.Context) error {
+func (t *Task) Execute(_ context.Context) error {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	executionClients := clientPool.GetExecutionPool().GetReadyEndpoints(true)
 
 	t.logger.Infof("Found %d execution clients", len(executionClients))
 
 	for _, client := range executionClients {
-		t.cleanRecursive(client)
+		err := t.cleanRecursive(client)
+		if err != nil {
+			return err
+		}
 	}
 
 	t.ctx.SetResult(types.TaskResultSuccess)

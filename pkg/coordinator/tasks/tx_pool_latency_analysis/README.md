@@ -12,8 +12,8 @@ The `tx_pool_latency_analysis` task evaluates latency of transaction processing 
 - **`tps`**:
   The total number of transactions to send in one second.
 
-- **`duration_s`**:
-  The test duration (the number of transactions to send is calculated as `tps * duration_s`).
+- **`durationS`**:
+  The test duration (the number of transactions to send is calculated as `tps * durationS`).
 
 - **`logInterval`**:
   The interval at which the script logs progress (e.g., every 100 transactions).
@@ -38,10 +38,8 @@ The `tx_pool_latency_analysis` task evaluates latency of transaction processing 
 - name: tx_pool_latency_analysis
   config:
     tps: 1000
-    duration_s: 10  
+    durationS: 10  
     logInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
 ```
-
-
