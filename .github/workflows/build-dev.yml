@@ -2,8 +2,8 @@
 name: Build PR
 
 on:
-  pull_request_target:
-    types: [synchronize]
+  # pull_request_target:
+  #   types: [synchronize]
   workflow_dispatch:
     inputs:
       docker_tag:

@@ -1,12 +1,11 @@
-name: Go CI Pipeline
+name: Go lint Pipeline
 
 on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
-      - master
+  pull_request_target:
+    types: [synchronize]
   workflow_dispatch:
 
 jobs:

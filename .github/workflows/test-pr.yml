@@ -2,6 +2,8 @@
 name: Check PR
 
 on:
+  pull_request_target:
+    types: [synchronize]
   pull_request:
     branches: [ "master" ]
   workflow_dispatch:

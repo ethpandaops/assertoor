@@ -2,9 +2,9 @@
 name: Build master
 
 on:
-  push:
-    branches:
-      - 'master'
+  # push:
+  #   branches:
+  #     - 'master'
   workflow_dispatch:
 
 concurrency:
