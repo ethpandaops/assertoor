@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/tasks"
+	"github.com/erigontech/assertoor/pkg/coordinator/tasks"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

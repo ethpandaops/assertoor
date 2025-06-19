@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution/rpc"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution/rpc"
 	"github.com/sirupsen/logrus"
 )
 

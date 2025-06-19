@@ -28,7 +28,7 @@ jobs:
       ref: ${{ github.sha }}
       release: "snapshot"
       docker: true
-      docker_repository: "noku-team/assertoor"
+      docker_repository: "erigontech/assertoor"
       docker_tag_prefix: "master"
       additional_tags: "['master','master-latest']"
     secrets:
@@ -145,16 +145,16 @@ jobs:
           ## Latest automatically built executables. (Unstable development snapshot)
           Built from master branch (commit: ${{ github.sha }})
 
-          Please read the [wiki](https://github.com/noku-team/assertoor/wiki) for setup / configuration instructions.
+          Please read the [wiki](https://github.com/erigontech/assertoor/wiki) for setup / configuration instructions.
 
           ### Release Artifacts
           | Release File  | Description |
           | ------------- | ------------- |
-          | [assertoor_snapshot_windows_amd64.zip](https://github.com/noku-team/assertoor/releases/download/snapshot/assertoor_snapshot_windows_amd64.zip) | assertoor executables for windows/amd64 |
-          | [assertoor_snapshot_linux_amd64.tar.gz](https://github.com/noku-team/assertoor/releases/download/snapshot/assertoor_snapshot_linux_amd64.tar.gz) | assertoor executables for linux/amd64 |
-          | [assertoor_snapshot_linux_arm64.tar.gz](https://github.com/noku-team/assertoor/releases/download/snapshot/assertoor_snapshot_linux_arm64.tar.gz) | assertoor executables for linux/arm64 |
-          | [assertoor_snapshot_darwin_amd64.tar.gz](https://github.com/noku-team/assertoor/releases/download/snapshot/assertoor_snapshot_darwin_amd64.tar.gz) | assertoor executable for macos/amd64 |
-          | [assertoor_snapshot_darwin_arm64.tar.gz](https://github.com/noku-team/assertoor/releases/download/snapshot/assertoor_snapshot_darwin_arm64.tar.gz) | assertoor executable for macos/arm64 |
+          | [assertoor_snapshot_windows_amd64.zip](https://github.com/erigontech/assertoor/releases/download/snapshot/assertoor_snapshot_windows_amd64.zip) | assertoor executables for windows/amd64 |
+          | [assertoor_snapshot_linux_amd64.tar.gz](https://github.com/erigontech/assertoor/releases/download/snapshot/assertoor_snapshot_linux_amd64.tar.gz) | assertoor executables for linux/amd64 |
+          | [assertoor_snapshot_linux_arm64.tar.gz](https://github.com/erigontech/assertoor/releases/download/snapshot/assertoor_snapshot_linux_arm64.tar.gz) | assertoor executables for linux/arm64 |
+          | [assertoor_snapshot_darwin_amd64.tar.gz](https://github.com/erigontech/assertoor/releases/download/snapshot/assertoor_snapshot_darwin_amd64.tar.gz) | assertoor executable for macos/amd64 |
+          | [assertoor_snapshot_darwin_arm64.tar.gz](https://github.com/erigontech/assertoor/releases/download/snapshot/assertoor_snapshot_darwin_arm64.tar.gz) | assertoor executable for macos/arm64 |
       env:
         GITHUB_TOKEN: ${{ github.token }}
 

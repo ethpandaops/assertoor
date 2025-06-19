@@ -11,11 +11,11 @@ import (
 
 	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/consensus"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/vars"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/juliangruber/go-intersect"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 )
 

@@ -18,7 +18,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: noku-team/assertoor
+  IMAGE_NAME: erigontech/assertoor
 
 jobs:
   build-and-push:

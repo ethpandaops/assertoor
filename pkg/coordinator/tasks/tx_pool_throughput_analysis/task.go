@@ -8,10 +8,10 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	txloadtool "github.com/erigontech/assertoor/pkg/coordinator/utils/tx_load_tool"
+	"github.com/erigontech/assertoor/pkg/coordinator/wallet"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	txloadtool "github.com/noku-team/assertoor/pkg/coordinator/utils/tx_load_tool"
-	"github.com/noku-team/assertoor/pkg/coordinator/wallet"
 	"github.com/sirupsen/logrus"
 )
 

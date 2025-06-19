@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/erigontech/assertoor/pkg/coordinator/db"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
 	"github.com/gorilla/mux"
-	"github.com/noku-team/assertoor/pkg/coordinator/db"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
 )
 
 type GetTestRunResponse struct {

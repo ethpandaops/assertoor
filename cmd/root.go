@@ -3,8 +3,8 @@ package cmd
 import (
 	"context"
 
-	"github.com/noku-team/assertoor/pkg/coordinator"
-	"github.com/noku-team/assertoor/pkg/coordinator/buildinfo"
+	"github.com/erigontech/assertoor/pkg/coordinator"
+	"github.com/erigontech/assertoor/pkg/coordinator/buildinfo"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

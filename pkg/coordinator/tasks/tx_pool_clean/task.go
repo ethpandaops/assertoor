@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
 	"github.com/sirupsen/logrus"
 )
 

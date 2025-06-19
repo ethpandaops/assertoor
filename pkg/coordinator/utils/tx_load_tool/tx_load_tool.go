@@ -9,14 +9,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/params"
 
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution"
+	"github.com/erigontech/assertoor/pkg/coordinator/helper"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/utils/sentry"
+	"github.com/erigontech/assertoor/pkg/coordinator/wallet"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/forkid"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
-	"github.com/noku-team/assertoor/pkg/coordinator/helper"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/utils/sentry"
-	"github.com/noku-team/assertoor/pkg/coordinator/wallet"
 	"github.com/sirupsen/logrus"
 )
 

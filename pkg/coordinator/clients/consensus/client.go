@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/consensus/rpc"
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/consensus/rpc"
 	"github.com/sirupsen/logrus"
 )
 

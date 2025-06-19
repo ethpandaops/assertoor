@@ -3,7 +3,7 @@ package runtaskoptions
 import (
 	"errors"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/helper"
+	"github.com/erigontech/assertoor/pkg/coordinator/helper"
 )
 
 type Config struct {

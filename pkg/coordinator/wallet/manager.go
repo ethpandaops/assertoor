@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/noku-team/assertoor/pkg/coordinator/clients/execution"
 	"github.com/sirupsen/logrus"
 )
 

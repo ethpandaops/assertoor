@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/erigontech/assertoor/pkg/coordinator/db"
+	"github.com/erigontech/assertoor/pkg/coordinator/scheduler"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/vars"
 	"github.com/jmoiron/sqlx"
-	"github.com/noku-team/assertoor/pkg/coordinator/db"
-	"github.com/noku-team/assertoor/pkg/coordinator/scheduler"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
-	"github.com/noku-team/assertoor/pkg/coordinator/vars"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )

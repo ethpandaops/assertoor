@@ -3,8 +3,8 @@ package scheduler
 import (
 	"fmt"
 
-	"github.com/noku-team/assertoor/pkg/coordinator/helper"
-	"github.com/noku-team/assertoor/pkg/coordinator/types"
+	"github.com/erigontech/assertoor/pkg/coordinator/helper"
+	"github.com/erigontech/assertoor/pkg/coordinator/types"
 	"gopkg.in/yaml.v3"
 )
 

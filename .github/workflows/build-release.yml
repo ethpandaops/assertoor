@@ -19,7 +19,7 @@ jobs:
       ref: ${{ github.sha }}
       release: "v${{ inputs.version }}"
       docker: true
-      docker_repository: "noku-team/assertoor"
+      docker_repository: "erigontech/assertoor"
       docker_tag_prefix: "v${{ inputs.version }}"
       additional_tags: "['v${{ inputs.version }}','latest']"
     secrets:
