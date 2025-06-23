@@ -122,6 +122,10 @@ Here's an example of a custom configuration:
 participants:
 - el_type: erigon
   el_image: test/erigon:current
+  el_extra_params:
+    - "--txpool.globalqueue 1000000"
+    - "--txpool.globalslots 1000000"
+    - "--txpool.globalbasefeeslots 1000000"
   cl_type: prysm
   count: 2
 additional_services:
