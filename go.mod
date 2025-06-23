@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.24.1
 
 require (
-	github.com/attestantio/go-eth2-client v0.25.2
+	github.com/attestantio/go-eth2-client v0.26.0
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
 	github.com/ethereum/go-ethereum v1.15.11
 	github.com/ethpandaops/ethwallclock v0.4.0
