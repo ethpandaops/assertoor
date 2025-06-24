@@ -108,7 +108,7 @@ func (l *Load) Execute() error {
 			}
 
 			// log every l.LogInterval
-			if i%l.LogInterval == 0 {
+			if (i+1)%l.LogInterval == 0 {
 				l.target.logger.Infof("Generated %d transactions in %.2fs", i, time.Since(l.Result.StartTime).Seconds())
 			}
 
