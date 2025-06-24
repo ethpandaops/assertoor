@@ -87,38 +87,7 @@ func (l *Load) Execute() error {
 			sleepTime := remainingTime / time.Duration(l.Result.TotalTxs-i)
 
 			// generate and send tx
-			go func(i int) {
-				tx, err := l.target.GenerateTransaction(i)
-				if err != nil {
-					l.target.logger.Errorf("Failed to create transaction: %v", err)
-					l.target.taskCtx.SetResult(types.TaskResultFailure)
-					l.Result.Failed = true
-
-					return
-				}
-
-				l.Result.TxStartTime[i] = time.Now()
-				err = l.target.SendTransaction(tx)
-
-				if err != nil {
-					if !l.Result.Failed {
-						l.target.logger.WithField("node", l.target.node.GetName()).Errorf("Failed to send transaction: %v", err)
-						l.target.taskCtx.SetResult(types.TaskResultFailure)
-						l.Result.Failed = true
-					}
-
-					return
-				}
-
-				l.Result.Txs[i] = tx
-				l.Result.SentTxCount++
-
-				// log transaction sending
-				if l.Result.SentTxCount%l.LogInterval == 0 {
-					elapsed := time.Since(l.Result.StartTime)
-					l.target.logger.Infof("Sent %d transactions in %.2fs", l.Result.SentTxCount, elapsed.Seconds())
-				}
-			}(i)
+			go l.generateAndSendTx(i)
 
 			// Sleep to control the TPS
 			if i < l.Result.TotalTxs-1 {
@@ -151,6 +120,39 @@ func (l *Load) Execute() error {
 	}()
 
 	return nil
+}
+
+func (l *Load) generateAndSendTx(i int) {
+	tx, err := l.target.GenerateTransaction(i)
+	if err != nil {
+		l.target.logger.Errorf("Failed to create transaction: %v", err)
+		l.target.taskCtx.SetResult(types.TaskResultFailure)
+		l.Result.Failed = true
+
+		return
+	}
+
+	l.Result.TxStartTime[i] = time.Now()
+	err = l.target.SendTransaction(tx)
+
+	if err != nil {
+		if !l.Result.Failed {
+			l.target.logger.WithField("node", l.target.node.GetName()).Errorf("Failed to send transaction: %v", err)
+			l.target.taskCtx.SetResult(types.TaskResultFailure)
+			l.Result.Failed = true
+		}
+
+		return
+	}
+
+	l.Result.Txs[i] = tx
+	l.Result.SentTxCount++
+
+	// log transaction sending
+	if l.Result.SentTxCount%l.LogInterval == 0 {
+		elapsed := time.Since(l.Result.StartTime)
+		l.target.logger.Infof("Sent %d transactions in %.2fs", l.Result.SentTxCount, elapsed.Seconds())
+	}
 }
 
 // MeasurePropagationLatencies reads P2P events and calculates propagation latencies for each transaction
