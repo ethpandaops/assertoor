@@ -157,6 +157,7 @@ func (l *Load) Execute() error {
 func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 	// Get a P2P connection to read events
 	peer := NewPeer(l.target.ctx, l.target.taskCtx, l.target.logger, l.target.node)
+
 	err := peer.Connect()
 	if err != nil {
 		l.target.logger.Errorf("Failed to get P2P connection: %v", err)

@@ -3,8 +3,11 @@ package txloadtool
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"time"
+
+	"github.com/ethereum/go-ethereum/eth/protocols/eth"
+
+	"math/big"
 
 	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution"
 	"github.com/erigontech/assertoor/pkg/coordinator/types"
@@ -12,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/sirupsen/logrus"
-	"math/big"
 )
 
 // Peer connects to an execution client (a bockchain node) on the p2p network (i.e., the peer of the node)
@@ -40,8 +42,10 @@ func (p *Peer) Close() error {
 	if p.conn != nil {
 		err := p.conn.Close()
 		p.conn = nil
+
 		return err
 	}
+
 	return nil
 }
 
@@ -92,14 +96,16 @@ func (p *Peer) Connect() error {
 	return nil
 }
 
-func (s *Peer) ReadTransactionMessages(timeout time.Duration) (*eth.TransactionsPacket, error) {
+func (p *Peer) ReadTransactionMessages(timeout time.Duration) (*eth.TransactionsPacket, error) {
 	// Check if the connection is nil
-	if s.conn == nil {
-		s.logger.Errorf("Peer has no active connection, cannot read transaction messages")
-		s.taskCtx.SetResult(types.TaskResultFailure)
+	if p.conn == nil {
+		p.logger.Errorf("Peer has no active connection, cannot read transaction messages")
+		p.taskCtx.SetResult(types.TaskResultFailure)
+
 		return nil, fmt.Errorf("peer has no active connection, cannot read transaction messages")
 	}
 
-	txs, err := s.conn.ReadTransactionMessages(timeout)
+	txs, err := p.conn.ReadTransactionMessages(timeout)
+
 	return txs, err
 }

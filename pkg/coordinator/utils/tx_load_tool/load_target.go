@@ -4,6 +4,8 @@ import (
 	"context"
 	crand "crypto/rand"
 	"fmt"
+	"math/big"
+
 	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution"
 	"github.com/erigontech/assertoor/pkg/coordinator/helper"
 	"github.com/erigontech/assertoor/pkg/coordinator/types"
@@ -11,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/sirupsen/logrus"
-	"math/big"
 )
 
 // LoadTarget represents the target for the load test
