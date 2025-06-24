@@ -109,7 +109,7 @@ func (l *Load) Execute() error {
 
 			// log every l.LogInterval
 			if (i+1)%l.LogInterval == 0 {
-				l.target.logger.Infof("Generated %d transactions in %.2fs", i, time.Since(l.Result.StartTime).Seconds())
+				l.target.logger.Infof("Generated %d transactions in %.2fs", i+1, time.Since(l.Result.StartTime).Seconds())
 			}
 
 			select {
