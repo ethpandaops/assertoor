@@ -107,6 +107,11 @@ func (l *Load) Execute() error {
 				l.Result.CoordinatedOmissionEventCount++
 			}
 
+			// log every l.LogInterval
+			if i%l.LogInterval == 0 {
+				l.target.logger.Infof("Generated %d transactions in %.2fs", i, time.Since(l.Result.StartTime).Seconds())
+			}
+
 			select {
 			case <-l.target.ctx.Done():
 				l.target.logger.Warnf("Task cancelled, stopping transaction generation.")
