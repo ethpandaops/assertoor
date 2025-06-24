@@ -1,45 +1,14 @@
 package txloadtool
 
 import (
-	"context"
-	crand "crypto/rand"
 	"fmt"
-	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/params"
-
-	"github.com/erigontech/assertoor/pkg/coordinator/clients/execution"
-	"github.com/erigontech/assertoor/pkg/coordinator/helper"
 	"github.com/erigontech/assertoor/pkg/coordinator/types"
-	"github.com/erigontech/assertoor/pkg/coordinator/utils/sentry"
-	"github.com/erigontech/assertoor/pkg/coordinator/wallet"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/core/forkid"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/sirupsen/logrus"
 )
 
-type LoadTarget struct {
-	ctx     context.Context
-	taskCtx *types.TaskContext
-	wallet  *wallet.Wallet
-	logger  logrus.FieldLogger
-	client  *execution.Client
-}
-
-// NewLoadTarget creates a new LoadTarget instance
-func NewLoadTarget(ctx context.Context, taskCtx *types.TaskContext, logger logrus.FieldLogger,
-	w *wallet.Wallet, client *execution.Client) *LoadTarget {
-	return &LoadTarget{
-		ctx:     ctx,
-		taskCtx: taskCtx,
-		wallet:  w,
-		logger:  logger,
-		client:  client,
-	}
-}
-
+// LoadResult represents the result of a load test
 type LoadResult struct {
 	Failed    bool
 	StartTime time.Time
@@ -58,18 +27,19 @@ type LoadResult struct {
 }
 
 // NewLoadResult creates a new LoadResult instance
-func NewLoadResult(totNumberOfTxes int) *LoadResult {
+func NewLoadResult(totNumberOfTxs int) *LoadResult {
 	return &LoadResult{
-		TotalTxs:                      totNumberOfTxes,
-		Txs:                           make([]*ethtypes.Transaction, totNumberOfTxes),
-		TxStartTime:                   make([]time.Time, totNumberOfTxes),
-		LatenciesMus:                  make([]int64, totNumberOfTxes),
+		TotalTxs:                      totNumberOfTxs,
+		Txs:                           make([]*ethtypes.Transaction, totNumberOfTxs),
+		TxStartTime:                   make([]time.Time, totNumberOfTxs),
+		LatenciesMus:                  make([]int64, totNumberOfTxs),
 		SentTxCount:                   0,
 		DuplicatedP2PEventCount:       0,
 		CoordinatedOmissionEventCount: 0,
 	}
 }
 
+// Load represents a load test that generates and sends transactions at a specified TPS (transactions per second) level
 type Load struct {
 	target       *LoadTarget
 	testDeadline time.Time
@@ -91,7 +61,7 @@ func NewLoad(target *LoadTarget, tps, durationS int, testDeadline time.Time, log
 	}
 }
 
-// ExecuteTPSLevel generates and sends transactions at the specified TPS level for the specified duration
+// Execute the load test generating and sending transactions at the TPS and duration specified in the Load struct.
 func (l *Load) Execute() error {
 	// Prepare to collect transaction latencies
 	l.Result.Failed = false
@@ -106,57 +76,40 @@ func (l *Load) Execute() error {
 
 		l.Result.StartTime = time.Now()
 		endTime := l.Result.StartTime.Add(time.Second * time.Duration(l.DurationS))
+
+		if l.testDeadline.Before(endTime) {
+			l.testDeadline = endTime
+		}
+
 		l.target.logger.Infof("Starting transaction generation at %s", l.Result.StartTime)
+
+		// Create a ticker to maintain consistent timing
+		interval := time.Second / time.Duration(l.TPS)
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
 
 		// Generate and send transactions
 		for i := 0; i < l.Result.TotalTxs; i++ {
-			// Calculate how much time we have left
-			remainingTime := time.Until(endTime)
+			// Wait for the next tick to maintain QPS
+			<-ticker.C
 
-			// Calculate sleep time to distribute remaining transactions evenly
-			sleepTime := remainingTime / time.Duration(l.Result.TotalTxs-i)
+			// Generate and send tx
+			before := time.Now()
 
-			// generate and send tx
-			go func(i int) {
-				tx, err := l.target.generateTransaction(i)
-				if err != nil {
-					l.target.logger.Errorf("Failed to create transaction: %v", err)
-					l.target.taskCtx.SetResult(types.TaskResultFailure)
-					l.Result.Failed = true
+			go l.generateAndSendTx(i)
 
-					return
-				}
+			after := time.Now()
 
-				l.Result.TxStartTime[i] = time.Now()
-				err = l.target.sendTransaction(tx)
+			// Check coordinated omission
+			duration := after.Sub(before)
+			if duration > interval {
+				l.Result.CoordinatedOmissionEventCount++
+			}
 
-				if err != nil {
-					if !l.Result.Failed {
-						l.target.logger.WithField("client", l.target.client.GetName()).Errorf("Failed to send transaction: %v", err)
-						l.target.taskCtx.SetResult(types.TaskResultFailure)
-						l.Result.Failed = true
-					}
-
-					return
-				}
-
-				l.Result.Txs[i] = tx
-				l.Result.SentTxCount++
-
-				// log transaction sending
-				if l.Result.SentTxCount%l.LogInterval == 0 {
-					elapsed := time.Since(l.Result.StartTime)
-					l.target.logger.Infof("Sent %d transactions in %.2fs", l.Result.SentTxCount, elapsed.Seconds())
-				}
-			}(i)
-
-			// Sleep to control the TPS
-			if i < l.Result.TotalTxs-1 {
-				if sleepTime > 0 {
-					time.Sleep(sleepTime)
-				} else {
-					l.Result.CoordinatedOmissionEventCount++
-				}
+			// log every l.LogInterval
+			if (i+1)%l.LogInterval == 0 {
+				l.target.logger.Infof("Generated %d transactions in %.2fs", i+1, time.Since(l.Result.StartTime).Seconds())
 			}
 
 			select {
@@ -164,11 +117,11 @@ func (l *Load) Execute() error {
 				l.target.logger.Warnf("Task cancelled, stopping transaction generation.")
 				return
 			default:
-				// if testDeadline reached, stop sending txes
+				// check if the execution failed
 				if l.Result.Failed {
 					return
 				}
-
+				// if testDeadline reached, stop sending txs
 				if time.Now().After(l.testDeadline) {
 					l.target.logger.Infof("Reached duration limit, stopping transaction generation.")
 					return
@@ -183,10 +136,45 @@ func (l *Load) Execute() error {
 	return nil
 }
 
+func (l *Load) generateAndSendTx(i int) {
+	tx, err := l.target.GenerateTransaction(i)
+	if err != nil {
+		l.target.logger.Errorf("Failed to create transaction: %v", err)
+		l.target.taskCtx.SetResult(types.TaskResultFailure)
+		l.Result.Failed = true
+
+		return
+	}
+
+	l.Result.TxStartTime[i] = time.Now()
+	err = l.target.SendTransaction(tx)
+
+	if err != nil {
+		if !l.Result.Failed {
+			l.target.logger.WithField("node", l.target.node.GetName()).Errorf("Failed to send transaction: %v", err)
+			l.target.taskCtx.SetResult(types.TaskResultFailure)
+			l.Result.Failed = true
+		}
+
+		return
+	}
+
+	l.Result.Txs[i] = tx
+	l.Result.SentTxCount++
+
+	// log transaction sending
+	if l.Result.SentTxCount%l.LogInterval == 0 {
+		elapsed := time.Since(l.Result.StartTime)
+		l.target.logger.Infof("Sent %d transactions in %.2fs", l.Result.SentTxCount, elapsed.Seconds())
+	}
+}
+
 // MeasurePropagationLatencies reads P2P events and calculates propagation latencies for each transaction
 func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 	// Get a P2P connection to read events
-	conn, err := l.target.getTCPConn()
+	peer := NewPeer(l.target.ctx, l.target.taskCtx, l.target.logger, l.target.node)
+
+	err := peer.Connect()
 	if err != nil {
 		l.target.logger.Errorf("Failed to get P2P connection: %v", err)
 		l.target.taskCtx.SetResult(types.TaskResultFailure)
@@ -194,13 +182,13 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 		return l.Result, fmt.Errorf("measurement stopped: failed to get P2P connection")
 	}
 
-	defer conn.Close()
+	defer peer.Close()
 
 	// Wait P2P event messages
 	var receivedEvents = 0
 
 	for {
-		txes, err := conn.ReadTransactionMessages(time.Duration(60) * time.Second)
+		txs, err := peer.ReadTransactionMessages(time.Duration(60) * time.Second)
 		if err != nil {
 			if err.Error() == "timeoutExpired" {
 				l.target.logger.Warnf("Timeout expired while reading p2p events")
@@ -214,12 +202,12 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 			return l.Result, fmt.Errorf("measurement stopped: failed reading p2p events")
 		}
 
-		if txes == nil || len(*txes) == 0 {
+		if txs == nil || len(*txs) == 0 {
 			l.target.logger.Warnf("No p2p events received")
 			continue
 		}
 
-		for i, tx := range *txes {
+		for i, tx := range *txs {
 			txData := tx.Data()
 			// read txData that is in the format "txIndex:<index>"
 			var txIndex int
@@ -241,7 +229,7 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 				return l.Result, fmt.Errorf("measurement stopped: transaction index out of range at event %d", i)
 			}
 
-			// log the duplicated p2p events, and count duplicated p2p events
+			// log the duplicated p2p events and count duplicated p2p events
 			if l.Result.LatenciesMus[txIndex] != 0 {
 				l.Result.DuplicatedP2PEventCount++
 			} else {
@@ -314,84 +302,4 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 	}
 
 	return l.Result, nil
-}
-
-func (t *LoadTarget) getTCPConn() (*sentry.Conn, error) {
-	chainConfig := params.AllDevChainProtocolChanges
-
-	head, err := t.client.GetRPCClient().GetLatestBlock(t.ctx)
-	if err != nil {
-		t.taskCtx.SetResult(types.TaskResultFailure)
-		return nil, err
-	}
-
-	chainID, err := t.client.GetRPCClient().GetEthClient().ChainID(t.ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	chainConfig.ChainID = chainID
-
-	genesis, err := t.client.GetRPCClient().GetEthClient().BlockByNumber(t.ctx, new(big.Int).SetUint64(0))
-	if err != nil {
-		t.logger.Errorf("Failed to fetch genesis block: %v", err)
-		t.taskCtx.SetResult(types.TaskResultFailure)
-
-		return nil, err
-	}
-
-	conn, err := sentry.GetTCPConn(t.client)
-	if err != nil {
-		t.logger.Errorf("Failed to get TCP connection: %v", err)
-		t.taskCtx.SetResult(types.TaskResultFailure)
-
-		return nil, err
-	}
-
-	forkID := forkid.NewID(chainConfig, genesis, head.NumberU64(), head.Time())
-
-	// handshake
-	err = conn.Peer(chainConfig.ChainID, genesis.Hash(), head.Hash(), forkID, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	t.logger.Infof("Connected to %s", t.client.GetName())
-
-	return conn, nil
-}
-
-func (t *LoadTarget) generateTransaction(i int) (*ethtypes.Transaction, error) {
-	tx, err := t.wallet.BuildTransaction(t.ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
-		addr := t.wallet.GetAddress()
-		toAddr := &addr
-
-		txAmount, _ := crand.Int(crand.Reader, big.NewInt(0).SetUint64(10*1e18))
-
-		feeCap := &helper.BigInt{Value: *big.NewInt(100000000000)} // 100 Gwei
-		tipCap := &helper.BigInt{Value: *big.NewInt(1000000000)}   // 1 Gwei
-
-		txObj := &ethtypes.DynamicFeeTx{
-			ChainID:   t.taskCtx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
-			Nonce:     nonce,
-			GasTipCap: &tipCap.Value,
-			GasFeeCap: &feeCap.Value,
-			Gas:       50000,
-			To:        toAddr,
-			Value:     txAmount,
-			Data:      []byte(fmt.Sprintf("txIndex:%d", i)),
-		}
-
-		return ethtypes.NewTx(txObj), nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
-}
-
-func (t *LoadTarget) sendTransaction(tx *ethtypes.Transaction) error {
-	return t.client.GetRPCClient().SendTransaction(t.ctx, tx)
 }
