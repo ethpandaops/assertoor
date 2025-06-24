@@ -76,13 +76,16 @@ func (l *Load) Execute() error {
 
 		l.Result.StartTime = time.Now()
 		endTime := l.Result.StartTime.Add(time.Second * time.Duration(l.DurationS))
+
 		if l.testDeadline.Before(endTime) {
 			l.testDeadline = endTime
 		}
+
 		l.target.logger.Infof("Starting transaction generation at %s", l.Result.StartTime)
 
 		// Create a ticker to maintain consistent timing
 		interval := time.Second / time.Duration(l.TPS)
+
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -93,7 +96,9 @@ func (l *Load) Execute() error {
 
 			// Generate and send tx
 			before := time.Now()
+
 			go l.generateAndSendTx(i)
+
 			after := time.Now()
 
 			// Check coordinated omission
