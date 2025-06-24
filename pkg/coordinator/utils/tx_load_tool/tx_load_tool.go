@@ -76,26 +76,30 @@ func (l *Load) Execute() error {
 
 		l.Result.StartTime = time.Now()
 		endTime := l.Result.StartTime.Add(time.Second * time.Duration(l.DurationS))
+		if l.testDeadline.Before(endTime) {
+			l.testDeadline = endTime
+		}
 		l.target.logger.Infof("Starting transaction generation at %s", l.Result.StartTime)
+
+		// Create a ticker to maintain consistent timing
+		interval := time.Second / time.Duration(l.TPS)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
 
 		// Generate and send transactions
 		for i := 0; i < l.Result.TotalTxs; i++ {
-			// Calculate how much time we have left
-			remainingTime := time.Until(endTime)
+			// Wait for the next tick to maintain QPS
+			<-ticker.C
 
-			// Calculate sleep time to distribute remaining transactions evenly
-			sleepTime := remainingTime / time.Duration(l.Result.TotalTxs-i)
-
-			// generate and send tx
+			// Generate and send tx
+			before := time.Now()
 			go l.generateAndSendTx(i)
+			after := time.Now()
 
-			// Sleep to control the TPS
-			if i < l.Result.TotalTxs-1 {
-				if sleepTime > 0 {
-					time.Sleep(sleepTime)
-				} else {
-					l.Result.CoordinatedOmissionEventCount++
-				}
+			// Check coordinated omission
+			duration := after.Sub(before)
+			if duration > interval {
+				l.Result.CoordinatedOmissionEventCount++
 			}
 
 			select {
@@ -103,11 +107,11 @@ func (l *Load) Execute() error {
 				l.target.logger.Warnf("Task cancelled, stopping transaction generation.")
 				return
 			default:
-				// if testDeadline reached, stop sending txs
+				// check if the execution failed
 				if l.Result.Failed {
 					return
 				}
-
+				// if testDeadline reached, stop sending txs
 				if time.Now().After(l.testDeadline) {
 					l.target.logger.Infof("Reached duration limit, stopping transaction generation.")
 					return
