@@ -27,12 +27,12 @@ type LoadResult struct {
 }
 
 // NewLoadResult creates a new LoadResult instance
-func NewLoadResult(totNumberOfTxes int) *LoadResult {
+func NewLoadResult(totNumberOfTxs int) *LoadResult {
 	return &LoadResult{
-		TotalTxs:                      totNumberOfTxes,
-		Txs:                           make([]*ethtypes.Transaction, totNumberOfTxes),
-		TxStartTime:                   make([]time.Time, totNumberOfTxes),
-		LatenciesMus:                  make([]int64, totNumberOfTxes),
+		TotalTxs:                      totNumberOfTxs,
+		Txs:                           make([]*ethtypes.Transaction, totNumberOfTxs),
+		TxStartTime:                   make([]time.Time, totNumberOfTxs),
+		LatenciesMus:                  make([]int64, totNumberOfTxs),
 		SentTxCount:                   0,
 		DuplicatedP2PEventCount:       0,
 		CoordinatedOmissionEventCount: 0,
@@ -134,7 +134,7 @@ func (l *Load) Execute() error {
 				l.target.logger.Warnf("Task cancelled, stopping transaction generation.")
 				return
 			default:
-				// if testDeadline reached, stop sending txes
+				// if testDeadline reached, stop sending txs
 				if l.Result.Failed {
 					return
 				}
@@ -172,7 +172,7 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 	var receivedEvents = 0
 
 	for {
-		txes, err := peer.ReadTransactionMessages(time.Duration(60) * time.Second)
+		txs, err := peer.ReadTransactionMessages(time.Duration(60) * time.Second)
 		if err != nil {
 			if err.Error() == "timeoutExpired" {
 				l.target.logger.Warnf("Timeout expired while reading p2p events")
@@ -186,12 +186,12 @@ func (l *Load) MeasurePropagationLatencies() (*LoadResult, error) {
 			return l.Result, fmt.Errorf("measurement stopped: failed reading p2p events")
 		}
 
-		if txes == nil || len(*txes) == 0 {
+		if txs == nil || len(*txs) == 0 {
 			l.target.logger.Warnf("No p2p events received")
 			continue
 		}
 
-		for i, tx := range *txes {
+		for i, tx := range *txs {
 			txData := tx.Data()
 			// read txData that is in the format "txIndex:<index>"
 			var txIndex int
