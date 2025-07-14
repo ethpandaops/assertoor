@@ -20,11 +20,13 @@ tasks:
   config:
     waitTime: 5
 - name: tx_pool_throughput_analysis
-  title: "Check transaction pool throughput with 10.000 transactions"
+  title: "Check transaction pool throughput from 500 to 2000 TPS with 250 TPS increment, duration 2s per test"
   timeout: 30m
   config:
-    tps: 2000
-    durationS: 5
+    startingTps: 500
+    endingTps: 2000
+    incrementTps: 250
+    durationS: 2
     logInterval: 1000
   configVars:
     privateKey: "walletPrivkey"

@@ -21,16 +21,18 @@ tasks:
     waitTime: 5
 - name: tx_pool_throughput_analysis
   timeout: 5m
-  title: "Check transaction pool throughput with 1.000 transactions in one second, duration 10s"
+  title: "Check transaction pool throughput from 100 to 1000 TPS with 100 TPS increment, duration 2s per test"
   config:
-    tps: 1000
-    durationS: 10
+    startingTps: 100
+    endingTps: 1000
+    incrementTps: 100
+    durationS: 2
     logInterval: 1000
   configVars:
     privateKey: "walletPrivkey"
 - name: tx_pool_clean
   title: "Clean transaction pool"
-  timeout: 5m
+  timeout: 15m
   config:
     waitTime: 5
 - name: tx_pool_latency_analysis
@@ -48,11 +50,13 @@ tasks:
   config:
     waitTime: 5
 - name: tx_pool_throughput_analysis
-  timeout: 5m
-  title: "Check transaction pool throughput with 5.000 transactions in one second, duration 5s"
+  timeout: 15m
+  title: "Check transaction pool throughput from 1000 to 5000 TPS with 500 TPS increment, duration 2s per test"
   config:
-    tps: 5000
-    durationS: 5
+    startingTps: 1000
+    endingTps: 5000
+    incrementTps: 500
+    durationS: 2
     logInterval: 2500
   configVars:
     privateKey: "walletPrivkey"
