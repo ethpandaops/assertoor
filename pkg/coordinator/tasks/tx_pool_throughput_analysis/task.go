@@ -168,6 +168,12 @@ func (t *Task) Execute(ctx context.Context) error {
 	// Set the throughput measures in the task context outputs
 	// from this plot we can compute the Maximum Sustainable Throughput or Capacity limit
 	t.ctx.Outputs.SetVar("throughput_measures", throughoutMeasures) // log coordinated_omission_event_count and missed_p2p_event_count?
+	t.ctx.Outputs.SetVar("missed_p2p_event_count", missedP2PEventCount)
+	t.ctx.Outputs.SetVar("coordinated_omission_event_count", totalCoordinatedOmissionEventCount)
+	t.ctx.Outputs.SetVar("starting_tps", t.config.StartingTPS)
+	t.ctx.Outputs.SetVar("ending_tps", t.config.EndingTPS)
+	t.ctx.Outputs.SetVar("increment_tps", t.config.IncrementTPS)
+	t.ctx.Outputs.SetVar("duration_s", t.config.DurationS)
 
 	outputs := map[string]interface{}{
 		"throughput_measures":              throughoutMeasures,
