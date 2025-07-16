@@ -19,7 +19,7 @@
     {
       "label": "kurtosis-remove",
       "type": "shell",
-      "command": "kurtosis enclave rm assertoor || true",
+      "command": "kurtosis enclave rm --force assertoor || true",
       "group": "build",
       "presentation": {
         "echo": true,
