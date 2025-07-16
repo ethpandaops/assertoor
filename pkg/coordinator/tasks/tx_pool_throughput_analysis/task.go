@@ -27,9 +27,10 @@ var (
 )
 
 type ThroughoutMeasure struct {
-	LoadTPS                  int `json:"load_tps"`
-	ProcessedTPS             int `json:"processed_tps"`
-	NotReceivedP2PEventCount int `json:"not_received_p2p_event_count"`
+	LoadTPS                       int `json:"load_tps"`
+	ProcessedTPS                  int `json:"processed_tps"`
+	NotReceivedP2PEventCount      int `json:"not_received_p2p_event_count"`
+	CoordinatedOmissionEventCount int `json:"coordinated_omission_event_count"`
 }
 
 type Task struct {
@@ -138,10 +139,11 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.config.StartingTPS, t.config.EndingTPS, t.config.IncrementTPS)
 
 	missedP2PEventCount := 0
+	totalCoordinatedOmissionEventCount := 0
 
 	for sendingTps := t.config.StartingTPS; sendingTps <= t.config.EndingTPS; sendingTps += t.config.IncrementTPS {
 		// measure the throughput with the current sendingTps
-		processedTps, notReceivedP2PEventCount, err := t.measureTpsWithLoad(loadTarget, sendingTps, t.config.DurationS, singleMeasureDeadline, percentile)
+		processedTps, notReceivedP2PEventCount, coordinatedOmissionEventCount, err := t.measureTpsWithLoad(loadTarget, sendingTps, t.config.DurationS, singleMeasureDeadline, percentile)
 		if err != nil {
 			t.logger.Errorf("Error during throughput measurement with sendingTps=%d, duration=%d: %v", sendingTps, t.config.DurationS, err)
 			t.ctx.SetResult(types.TaskResultFailure)
@@ -151,12 +153,14 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		// add to throughoutMeasures
 		throughoutMeasures = append(throughoutMeasures, ThroughoutMeasure{
-			LoadTPS:                  sendingTps,
-			ProcessedTPS:             processedTps,
-			NotReceivedP2PEventCount: notReceivedP2PEventCount,
+			LoadTPS:                       sendingTps,
+			ProcessedTPS:                  processedTps,
+			NotReceivedP2PEventCount:      notReceivedP2PEventCount,
+			CoordinatedOmissionEventCount: coordinatedOmissionEventCount,
 		})
 
 		missedP2PEventCount += notReceivedP2PEventCount
+		totalCoordinatedOmissionEventCount += coordinatedOmissionEventCount
 	}
 
 	t.logger.Infof("Finished measuring throughput, collected %d measures", len(throughoutMeasures))
@@ -166,8 +170,9 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("throughput_measures", throughoutMeasures) // log coordinated_omission_event_count and missed_p2p_event_count?
 
 	outputs := map[string]interface{}{
-		"throughput_measures":    throughoutMeasures,
-		"missed_p2p_event_count": missedP2PEventCount,
+		"throughput_measures":              throughoutMeasures,
+		"missed_p2p_event_count":           missedP2PEventCount,
+		"coordinated_omission_event_count": totalCoordinatedOmissionEventCount,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
@@ -180,7 +185,7 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) measureTpsWithLoad(loadTarget *txloadtool.LoadTarget, sendingTps, durationS int,
-	testDeadline time.Time, percentile float64) (processedTps, notReceivedP2PEventCount int, err error) {
+	testDeadline time.Time, percentile float64) (processedTps, notReceivedP2PEventCount, coordinatedOmissionEventCount int, err error) {
 	t.logger.Infof("Single measure of throughput, sending TPS: %d, duration: %d secs", sendingTps, durationS)
 
 	// Prepare to collect transaction latencies
@@ -192,7 +197,7 @@ func (t *Task) measureTpsWithLoad(loadTarget *txloadtool.LoadTarget, sendingTps,
 		t.logger.Errorf("Error during transaction load execution: %v", execErr)
 		t.ctx.SetResult(types.TaskResultFailure)
 
-		return 0, 0, execErr
+		return 0, 0, 0, execErr
 	}
 
 	// Collect the transactions and their latencies
@@ -201,12 +206,12 @@ func (t *Task) measureTpsWithLoad(loadTarget *txloadtool.LoadTarget, sendingTps,
 		t.logger.Errorf("Error measuring transaction propagation latencies: %v", measureErr)
 		t.ctx.SetResult(types.TaskResultFailure)
 
-		return 0, 0, measureErr
+		return 0, 0, 0, measureErr
 	}
 
 	// Check if the context was cancelled or other errors occurred
 	if result.Failed {
-		return 0, 0, fmt.Errorf("error measuring transaction propagation latencies: load failed")
+		return 0, 0, 0, fmt.Errorf("error measuring transaction propagation latencies: load failed")
 	}
 
 	// Send txes to other clients, for speeding up tx mining
@@ -233,7 +238,7 @@ func (t *Task) measureTpsWithLoad(loadTarget *txloadtool.LoadTarget, sendingTps,
 		// Calculate the percentile of latencies using result.LatenciesMus
 		// Not implemented yet
 		notImpl := errors.New("percentile selection not implemented, use 0.99")
-		return 0, 0, notImpl
+		return 0, 0, 0, notImpl
 	}
 
 	t.logger.Infof("Using 0.99 percentile for latency calculation")
@@ -243,10 +248,11 @@ func (t *Task) measureTpsWithLoad(loadTarget *txloadtool.LoadTarget, sendingTps,
 	processedTpsF := float64(result.TotalTxs) / result.LastMeasureDelay.Seconds()
 	processedTps = int(processedTpsF) // round
 	notReceivedP2PEventCount = result.NotReceivedP2PEventCount
+	coordinatedOmissionEventCount = result.CoordinatedOmissionEventCount
 
 	t.logger.Infof("Processed %d transactions in %.2fs, mean throughput: %.2f tx/s",
 		result.TotalTxs, result.LastMeasureDelay.Seconds(), processedTpsF)
 	t.logger.Infof("Sent %d transactions in %.2fs", result.TotalTxs, result.LastMeasureDelay.Seconds())
 
-	return processedTps, notReceivedP2PEventCount, nil
+	return processedTps, notReceivedP2PEventCount, coordinatedOmissionEventCount, nil
 }
