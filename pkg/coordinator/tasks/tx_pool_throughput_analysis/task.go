@@ -173,6 +173,10 @@ func (t *Task) Execute(ctx context.Context) error {
 		"throughput_measures":              throughoutMeasures,
 		"missed_p2p_event_count":           missedP2PEventCount,
 		"coordinated_omission_event_count": totalCoordinatedOmissionEventCount,
+		"starting_tps":                     t.config.StartingTPS,
+		"ending_tps":                       t.config.EndingTPS,
+		"increment_tps":                    t.config.IncrementTPS,
+		"duration_s":                       t.config.DurationS,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
