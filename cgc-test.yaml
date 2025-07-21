@@ -1,0 +1,18 @@
+id: cgc_validation_test
+name: "CGC Validation Test"
+timeout: 5m
+config:
+  description: "Comprehensive test to validate CGC (Custody Group Count) values in consensus layer client ENR records"
+  
+tasks:
+  - name: "check_consensus_cgc"
+    description: "Basic CGC check for all consensus clients"
+    timeout: 2m
+    config:
+      clientPattern: ".*"
+      pollInterval: 10s
+      expectedNonValidating: 0x04
+      expectedValidating: 0x08
+      minClientCount: 1
+      failOnCheckMiss: true
+      resultVar: "detected_cgc_value"
