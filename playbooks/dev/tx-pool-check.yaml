@@ -24,7 +24,7 @@ tasks:
   title: "Check transaction pool throughput from 100 to 1000 TPS with 100 TPS increment, duration 2s per test"
   config:
     startingTps: 100
-    endingTps: 1000
+    endingTps: 2000
     incrementTps: 100
     durationS: 2
     logInterval: 1000
@@ -54,8 +54,8 @@ tasks:
   title: "Check transaction pool throughput from 1000 to 5000 TPS with 500 TPS increment, duration 2s per test"
   config:
     startingTps: 1000
-    endingTps: 5000
-    incrementTps: 500
+    endingTps: 10000
+    incrementTps: 1000
     durationS: 2
     logInterval: 2500
   configVars:
