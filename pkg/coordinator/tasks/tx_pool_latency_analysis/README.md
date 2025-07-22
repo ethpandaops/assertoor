@@ -32,6 +32,24 @@ The `tx_pool_latency_analysis` task evaluates latency of transaction processing 
 - **`tx_pool_latency_hdr_plot`**:
   The HDR plot of the transaction pool latency.
 
+- **`duplicated_p2p_event_count`**:
+  The number of duplicated P2P events.
+
+- **`missed_p2p_event_count`**:
+  The number of missed P2P events.
+
+- **`coordinated_omission_event_count`**:
+  The number of coordinated omission events.
+
+- **`duplicated_p2p_event_count_percentage`**:
+  The percentage of duplicated P2P events.
+
+- **`missed_p2p_event_count_percentage`**:
+  The percentage of missed P2P events.
+
+- **`coordinated_omission_event_count_percentage`**:
+  The percentage of coordinated omission events.
+
 ### Defaults
 
 ```yaml
