@@ -138,6 +138,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.logger.Infof("Iterating over the TPS range, starting TPS: %d, ending TPS: %d, increment TPS: %d",
 		t.config.StartingTPS, t.config.EndingTPS, t.config.IncrementTPS)
 
+	totalSentTx := 0
 	missedP2PEventCount := 0
 	totalCoordinatedOmissionEventCount := 0
 
@@ -159,6 +160,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			CoordinatedOmissionEventCount: coordinatedOmissionEventCount,
 		})
 
+		totalSentTx += sendingTps * t.config.DurationS
 		missedP2PEventCount += notReceivedP2PEventCount
 		totalCoordinatedOmissionEventCount += coordinatedOmissionEventCount
 	}
@@ -174,15 +176,21 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("ending_tps", t.config.EndingTPS)
 	t.ctx.Outputs.SetVar("increment_tps", t.config.IncrementTPS)
 	t.ctx.Outputs.SetVar("duration_s", t.config.DurationS)
+	t.ctx.Outputs.SetVar("total_sent_tx", totalSentTx)
+	t.ctx.Outputs.SetVar("missed_p2p_event_count_percentage", missedP2PEventCount/totalSentTx)
+	t.ctx.Outputs.SetVar("coordinated_omission_event_count_percentage", totalCoordinatedOmissionEventCount/totalSentTx)
+	// todo: aggiungere anche qui le percentuali di missed ecc
 
 	outputs := map[string]interface{}{
-		"throughput_measures":              throughoutMeasures,
-		"missed_p2p_event_count":           missedP2PEventCount,
-		"coordinated_omission_event_count": totalCoordinatedOmissionEventCount,
-		"starting_tps":                     t.config.StartingTPS,
-		"ending_tps":                       t.config.EndingTPS,
-		"increment_tps":                    t.config.IncrementTPS,
-		"duration_s":                       t.config.DurationS,
+		"throughput_measures":               throughoutMeasures,
+		"missed_p2p_event_count":            missedP2PEventCount,
+		"coordinated_omission_event_count":  totalCoordinatedOmissionEventCount,
+		"starting_tps":                      t.config.StartingTPS,
+		"ending_tps":                        t.config.EndingTPS,
+		"increment_tps":                     t.config.IncrementTPS,
+		"duration_s":                        t.config.DurationS,
+		"total_sent_tx":                     totalSentTx,
+		"missed_p2p_event_count_percentage": missedP2PEventCount / totalSentTx,
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
