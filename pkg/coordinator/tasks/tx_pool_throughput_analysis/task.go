@@ -179,7 +179,6 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("total_sent_tx", totalSentTx)
 	t.ctx.Outputs.SetVar("missed_p2p_event_count_percentage", missedP2PEventCount/totalSentTx)
 	t.ctx.Outputs.SetVar("coordinated_omission_event_count_percentage", totalCoordinatedOmissionEventCount/totalSentTx)
-	// todo: aggiungere anche qui le percentuali di missed ecc
 
 	outputs := map[string]interface{}{
 		"throughput_measures":               throughoutMeasures,
