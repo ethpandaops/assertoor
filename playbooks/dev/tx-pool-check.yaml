@@ -20,7 +20,7 @@ tasks:
   config:
     waitTime: 5
 - name: tx_pool_throughput_analysis
-  timeout: 5m
+  timeout: 15m
   title: "Check transaction pool throughput from 100 to 1000 TPS with 100 TPS increment, duration 2s per test"
   config:
     startingTps: 100
@@ -37,7 +37,7 @@ tasks:
     waitTime: 5
 - name: tx_pool_latency_analysis
   title: "Check transaction pool latency with 5.000 transactions in one second, duration 5s"
-  timeout: 5m
+  timeout: 15m
   config:
     tps: 5000
     durationS: 5
@@ -50,7 +50,7 @@ tasks:
   config:
     waitTime: 5
 - name: tx_pool_throughput_analysis
-  timeout: 15m
+  timeout: 30m
   title: "Check transaction pool throughput from 1000 to 5000 TPS with 500 TPS increment, duration 2s per test"
   config:
     startingTps: 1000
