@@ -20,11 +20,39 @@ The `tx_pool_throughput_analysis` task evaluates the throughput of transaction p
 
 ### Outputs
 
-- **`tx_count`**:
-  The total number of transactions sent.
+- **`throughput_measures`**:
+  An array of throughput measurement objects, each containing:
+  - `load_tps`: The sending TPS for this measurement
+  - `processed_tps`: The actual processed TPS achieved
+  - `not_received_p2p_event_count`: Count of transactions that didn't receive P2P events
+  - `coordinated_omission_event_count`: Count of coordinated omission events
 
-- **`mean_tps_throughput`**:
-  The mean throughput (tps)
+- **`total_sent_tx`**:
+  The total number of transactions sent across all TPS measurements.
+
+- **`missed_p2p_event_count`**:
+  The total count of missed P2P events across all measurements.
+
+- **`coordinated_omission_event_count`**:
+  The total count of coordinated omission events across all measurements.
+
+- **`missed_p2p_event_count_percentage`**:
+  The percentage of transactions that missed P2P events.
+
+- **`coordinated_omission_event_count_percentage`**:
+  The percentage of transactions with coordinated omission events.
+
+- **`starting_tps`**:
+  The starting TPS value used in the test.
+
+- **`ending_tps`**:
+  The ending TPS value used in the test.
+
+- **`increment_tps`**:
+  The TPS increment value used between measurements.
+
+- **`duration_s`**:
+  The duration in seconds for each TPS measurement.
 
 ### Defaults
 
