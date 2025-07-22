@@ -217,9 +217,9 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("duplicated_p2p_event_count", result.DuplicatedP2PEventCount)
 	t.ctx.Outputs.SetVar("missed_p2p_event_count", result.NotReceivedP2PEventCount)
 	t.ctx.Outputs.SetVar("coordinated_omission_event_count", result.CoordinatedOmissionEventCount)
-	t.ctx.Outputs.SetVar("duplicated_p2p_event_count_percentage", result.DuplicatedP2PEventCount/result.TotalTxs)
-	t.ctx.Outputs.SetVar("missed_p2p_event_count_percentage", result.NotReceivedP2PEventCount/result.TotalTxs)
-	t.ctx.Outputs.SetVar("coordinated_omission_event_count_percentage", result.CoordinatedOmissionEventCount/result.TotalTxs)
+	t.ctx.Outputs.SetVar("duplicated_p2p_event_count_percentage", float64(result.DuplicatedP2PEventCount)/float64(result.TotalTxs))
+	t.ctx.Outputs.SetVar("missed_p2p_event_count_percentage", float64(result.NotReceivedP2PEventCount)/float64(result.TotalTxs))
+	t.ctx.Outputs.SetVar("coordinated_omission_event_count_percentage", float64(result.CoordinatedOmissionEventCount)/float64(result.TotalTxs))
 	t.ctx.Outputs.SetVar("hdr_plot", plot)
 
 	t.ctx.SetResult(types.TaskResultSuccess)
@@ -232,9 +232,9 @@ func (t *Task) Execute(ctx context.Context) error {
 		"duplicated_p2p_event_count":                  result.DuplicatedP2PEventCount,
 		"coordinated_omission_events_count":           result.CoordinatedOmissionEventCount,
 		"missed_p2p_event_count":                      result.NotReceivedP2PEventCount,
-		"duplicated_p2p_event_count_percentage":       result.DuplicatedP2PEventCount / result.TotalTxs,
-		"missed_p2p_event_count_percentage":           result.NotReceivedP2PEventCount / result.TotalTxs,
-		"coordinated_omission_event_count_percentage": result.CoordinatedOmissionEventCount / result.TotalTxs,
+		"duplicated_p2p_event_count_percentage":       float64(result.DuplicatedP2PEventCount) / float64(result.TotalTxs),
+		"missed_p2p_event_count_percentage":           float64(result.NotReceivedP2PEventCount) / float64(result.TotalTxs),
+		"coordinated_omission_event_count_percentage": float64(result.CoordinatedOmissionEventCount) / float64(result.TotalTxs),
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)

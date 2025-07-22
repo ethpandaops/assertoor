@@ -177,19 +177,20 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("increment_tps", t.config.IncrementTPS)
 	t.ctx.Outputs.SetVar("duration_s", t.config.DurationS)
 	t.ctx.Outputs.SetVar("total_sent_tx", totalSentTx)
-	t.ctx.Outputs.SetVar("missed_p2p_event_count_percentage", missedP2PEventCount/totalSentTx)
-	t.ctx.Outputs.SetVar("coordinated_omission_event_count_percentage", totalCoordinatedOmissionEventCount/totalSentTx)
+	t.ctx.Outputs.SetVar("missed_p2p_event_count_percentage", float64(missedP2PEventCount)/float64(totalSentTx))
+	t.ctx.Outputs.SetVar("coordinated_omission_event_count_percentage", float64(totalCoordinatedOmissionEventCount)/float64(totalSentTx))
 
 	outputs := map[string]interface{}{
-		"throughput_measures":               throughoutMeasures,
-		"missed_p2p_event_count":            missedP2PEventCount,
-		"coordinated_omission_event_count":  totalCoordinatedOmissionEventCount,
-		"starting_tps":                      t.config.StartingTPS,
-		"ending_tps":                        t.config.EndingTPS,
-		"increment_tps":                     t.config.IncrementTPS,
-		"duration_s":                        t.config.DurationS,
-		"total_sent_tx":                     totalSentTx,
-		"missed_p2p_event_count_percentage": missedP2PEventCount / totalSentTx,
+		"throughput_measures":                         throughoutMeasures,
+		"missed_p2p_event_count":                      missedP2PEventCount,
+		"coordinated_omission_event_count":            totalCoordinatedOmissionEventCount,
+		"starting_tps":                                t.config.StartingTPS,
+		"ending_tps":                                  t.config.EndingTPS,
+		"increment_tps":                               t.config.IncrementTPS,
+		"duration_s":                                  t.config.DurationS,
+		"total_sent_tx":                               totalSentTx,
+		"missed_p2p_event_count_percentage":           float64(missedP2PEventCount) / float64(totalSentTx),
+		"coordinated_omission_event_count_percentage": float64(totalCoordinatedOmissionEventCount) / float64(totalSentTx),
 	}
 
 	outputsJSON, _ := json.Marshal(outputs)
