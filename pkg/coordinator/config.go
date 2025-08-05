@@ -31,7 +31,7 @@ type Config struct {
 	ValidatorNames *names.Config `yaml:"validatorNames" json:"validatorNames"`
 
 	// Global variables
-	GlobalVars map[string]interface{} `yaml:"globalVars" json:"globalVars"`
+	GlobalVars map[string]any `yaml:"globalVars" json:"globalVars"`
 
 	// Coordinator config
 	Coordinator *CoordinatorConfig `yaml:"coordinator" json:"coordinator"`
@@ -62,7 +62,7 @@ func DefaultConfig() *Config {
 				ConsensusURL: "http://localhost:5052",
 			},
 		},
-		GlobalVars:    make(map[string]interface{}),
+		GlobalVars:    make(map[string]any),
 		Coordinator:   &CoordinatorConfig{},
 		Tests:         []*types.TestConfig{},
 		ExternalTests: []*types.ExternalTestConfig{},

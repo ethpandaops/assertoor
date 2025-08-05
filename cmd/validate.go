@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"os"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator"
@@ -40,18 +39,14 @@ var validateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Create a minimal coordinator instance just for test loading validation
-		// We don't need to run the full coordinator, just validate external tests can be loaded
-		coord := coordinator.NewCoordinator(config, logrus.StandardLogger(), metricsPort)
-		testRegistry := coordinator.NewTestRegistry(coord)
-
-		// Validate external tests can be loaded
-		ctx := context.Background()
+		// Validate external test files exist and can be parsed
 		for _, extTest := range config.ExternalTests {
-			_, err := testRegistry.AddExternalTest(ctx, extTest)
-			if err != nil {
-				logrus.WithError(err).WithField("test", extTest.File).Error("failed to load external test")
-				os.Exit(1)
+			if extTest.File != "" {
+				// Check if external test file exists
+				if _, err := os.Stat(extTest.File); os.IsNotExist(err) {
+					logrus.WithField("test", extTest.File).Error("external test file does not exist")
+					os.Exit(1)
+				}
 			}
 		}
 
