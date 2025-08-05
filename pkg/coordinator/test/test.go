@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/coordinator/db"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/logger"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/scheduler"
+	"github.com/ethpandaops/assertoor/pkg/coordinator/tasks"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/types"
 	"github.com/ethpandaops/assertoor/pkg/coordinator/vars"
 	"github.com/jmoiron/sqlx"
@@ -251,4 +253,60 @@ func (t *Test) GetTaskScheduler() types.TaskScheduler {
 
 func (t *Test) GetTestVariables() types.Variables {
 	return t.variables
+}
+
+// ValidateTestConfig validates a test configuration including its task configurations
+func ValidateTestConfig(config *types.TestConfig) error {
+	if len(config.Tasks) == 0 {
+		return fmt.Errorf("test must have at least one task")
+	}
+
+	// Import the tasks package to get access to GetTaskDescriptor
+	tasksRegistry := tasks.GetTaskDescriptor
+
+	// Validate each task configuration
+	for i, rawTask := range config.Tasks {
+		// Parse the raw task message into TaskOptions
+		var taskOptions types.TaskOptions
+		if err := rawTask.Unmarshal(&taskOptions); err != nil {
+			return fmt.Errorf("task[%d]: failed to parse task configuration: %v", i, err)
+		}
+
+		// Check if task type exists
+		taskDescriptor := tasksRegistry(taskOptions.Name)
+		if taskDescriptor == nil {
+			return fmt.Errorf("task[%d]: unknown task type '%s'", i, taskOptions.Name)
+		}
+
+		// For validation purposes, we only need to check if the config can be loaded
+		// We don't need to create the actual task instance since that requires runtime context
+		// Instead, we'll create a minimal task instance just to validate the config structure
+
+		// Check if task has a config
+		if taskOptions.Config == nil {
+			// Some tasks don't require config, that's ok
+			continue
+		}
+
+		// Create a temporary task context for validation
+		tmpCtx := &types.TaskContext{
+			Logger: logger.NewLogger(&logger.ScopeOptions{
+				Parent: logrus.StandardLogger(),
+			}),
+			Vars: vars.NewVariables(nil), // Empty variables for validation
+		}
+
+		// Try to create the task with minimal context
+		taskInst, err := taskDescriptor.NewTask(tmpCtx, &taskOptions)
+		if err != nil {
+			return fmt.Errorf("task[%d] '%s': failed to create task instance: %v", i, taskOptions.Name, err)
+		}
+
+		// Load and validate the task configuration
+		if err := taskInst.LoadConfig(); err != nil {
+			return fmt.Errorf("task[%d] '%s': %v", i, taskOptions.Name, err)
+		}
+	}
+
+	return nil
 }
