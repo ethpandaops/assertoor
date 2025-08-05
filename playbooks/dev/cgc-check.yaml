@@ -1,0 +1,46 @@
+id: cgc-check
+name: "Check consensus CGC values"
+timeout: 12h
+config:
+  clientPairNames: []
+  expectedCgcValue: 0
+  expectedNonValidating: 4
+  expectedValidating: 8
+  pollInterval: 30s
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# wait for fulu activation
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+- name: check_consensus_slot_range
+  title: "Wait for fulu activation"
+  timeout: 1h
+  configVars:
+    minEpochNumber: "tasks.get_specs.outputs.specs.FULU_FORK_EPOCH"
+
+- name: run_task_matrix
+  title: "Check CGC values for client pairs"
+  configVars:
+    matrixValues: "clientPairNames"
+  config:
+    runConcurrent: true
+    failTaskCount: 1
+    matrixVar: "checkClient"
+    task:
+      name: check_consensus_cgc
+      title: "Check CGC value for ${checkClient}"
+      configVars:
+        clientPattern: "checkClient"
+        expectedCgcValue: "expectedCgcValue"
+        expectedNonValidating: "expectedNonValidating"
+        expectedValidating: "expectedValidating"
+        pollInterval: "pollInterval"
+      config:
+        failOnCheckMiss: true
+        minClientCount: 1
