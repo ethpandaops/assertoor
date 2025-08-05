@@ -33,11 +33,11 @@ type Test struct {
 	timeout   time.Duration
 }
 
-func CreateTest(runID uint64, descriptor types.TestDescriptor, logger logrus.FieldLogger, services types.TaskServices, configOverrides map[string]any) (types.TestRunner, error) {
+func CreateTest(runID uint64, descriptor types.TestDescriptor, log logrus.FieldLogger, services types.TaskServices, configOverrides map[string]any) (types.TestRunner, error) {
 	test := &Test{
 		runID:      runID,
 		services:   services,
-		logger:     logger.WithField("RunID", runID).WithField("TestID", descriptor.ID()),
+		logger:     log.WithField("RunID", runID).WithField("TestID", descriptor.ID()),
 		descriptor: descriptor,
 		config:     descriptor.Config(),
 		status:     types.TestStatusPending,
