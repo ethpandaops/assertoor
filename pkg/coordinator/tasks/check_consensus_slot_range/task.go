@@ -100,10 +100,12 @@ func (t *Task) Execute(ctx context.Context) error {
 func (t *Task) runRangeCheck() (checkResult, isLower bool) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	genesis := consensusPool.GetBlockCache().GetGenesis()
+
 	if genesis == nil {
 		t.logger.Errorf("genesis data not available")
 		return false, true
 	}
+
 	if genesis.GenesisTime.Compare(time.Now()) >= 0 {
 		return false, true
 	}
