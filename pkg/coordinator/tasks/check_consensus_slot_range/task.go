@@ -99,7 +99,14 @@ func (t *Task) Execute(ctx context.Context) error {
 
 func (t *Task) runRangeCheck() (checkResult, isLower bool) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
-	if consensusPool.GetBlockCache().GetGenesis().GenesisTime.Compare(time.Now()) >= 0 {
+	genesis := consensusPool.GetBlockCache().GetGenesis()
+
+	if genesis == nil {
+		t.logger.Errorf("genesis data not available")
+		return false, true
+	}
+
+	if genesis.GenesisTime.Compare(time.Now()) >= 0 {
 		return false, true
 	}
 
@@ -109,7 +116,7 @@ func (t *Task) runRangeCheck() (checkResult, isLower bool) {
 		return false, true
 	}
 
-	t.ctx.Outputs.SetVar("genesisTime", consensusPool.GetBlockCache().GetGenesis().GenesisTime.Unix())
+	t.ctx.Outputs.SetVar("genesisTime", genesis.GenesisTime.Unix())
 	t.ctx.Outputs.SetVar("currentSlot", currentSlot.Number())
 	t.ctx.Outputs.SetVar("currentEpoch", currentEpoch.Number())
 
