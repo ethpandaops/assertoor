@@ -15,9 +15,9 @@ type Config struct {
 	FailOnCheckMiss bool            `yaml:"failOnCheckMiss" json:"failOnCheckMiss"`
 
 	// CGC (Custody Group Count) checks
-	ExpectCGC    *int `yaml:"expectCgc" json:"expectCgc"`
-	MinCGC       *int `yaml:"minCgc" json:"minCgc"`
-	MaxCGC       *int `yaml:"maxCgc" json:"maxCgc"`
+	ExpectCGC *int `yaml:"expectCgc" json:"expectCgc"`
+	MinCGC    *int `yaml:"minCgc" json:"minCgc"`
+	MaxCGC    *int `yaml:"maxCgc" json:"maxCgc"`
 
 	// ENR checks
 	ExpectENRField map[string]interface{} `yaml:"expectEnrField" json:"expectEnrField"`
@@ -26,8 +26,8 @@ type Config struct {
 	ExpectPeerIDPattern string `yaml:"expectPeerIdPattern" json:"expectPeerIdPattern"`
 
 	// P2P address checks
-	ExpectP2PAddressCount *int    `yaml:"expectP2pAddressCount" json:"expectP2pAddressCount"`
-	ExpectP2PAddressMatch string  `yaml:"expectP2pAddressMatch" json:"expectP2pAddressMatch"`
+	ExpectP2PAddressCount *int   `yaml:"expectP2pAddressCount" json:"expectP2pAddressCount"`
+	ExpectP2PAddressMatch string `yaml:"expectP2pAddressMatch" json:"expectP2pAddressMatch"`
 
 	// Metadata checks
 	ExpectSeqNumber *uint64 `yaml:"expectSeqNumber" json:"expectSeqNumber"`

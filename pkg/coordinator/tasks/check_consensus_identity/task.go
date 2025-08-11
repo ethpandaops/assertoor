@@ -36,18 +36,18 @@ type Task struct {
 }
 
 type IdentityCheckResult struct {
-	ClientName           string                 `json:"clientName"`
-	PeerID               string                 `json:"peerId"`
-	ENR                  string                 `json:"enr"`
-	P2PAddresses         []string               `json:"p2pAddresses"`
-	DiscoveryAddresses   []string               `json:"discoveryAddresses"`
-	SeqNumber            uint64                 `json:"seqNumber"`
-	Attnets              string                 `json:"attnets"`
-	Syncnets             string                 `json:"syncnets"`
-	CGC                  int                    `json:"cgc"`
-	ENRFields            map[string]interface{} `json:"enrFields"`
-	ChecksPassed         bool                   `json:"checksPassed"`
-	FailureReasons       []string               `json:"failureReasons"`
+	ClientName         string                 `json:"clientName"`
+	PeerID             string                 `json:"peerId"`
+	ENR                string                 `json:"enr"`
+	P2PAddresses       []string               `json:"p2pAddresses"`
+	DiscoveryAddresses []string               `json:"discoveryAddresses"`
+	SeqNumber          uint64                 `json:"seqNumber"`
+	Attnets            string                 `json:"attnets"`
+	Syncnets           string                 `json:"syncnets"`
+	CGC                int                    `json:"cgc"`
+	ENRFields          map[string]interface{} `json:"enrFields"`
+	ChecksPassed       bool                   `json:"checksPassed"`
+	FailureReasons     []string               `json:"failureReasons"`
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -121,7 +121,7 @@ func (t *Task) processCheck() {
 		t.logger.Infof("Checking identity for client: %s", client.Config.Name)
 
 		result := t.checkClientIdentity(client)
-		
+
 		// Debug output for each client
 		t.logger.Infof("Client %s identity check result:", result.ClientName)
 		t.logger.Infof("  PeerID: %s", result.PeerID)
@@ -177,7 +177,7 @@ func (t *Task) processCheck() {
 	t.logger.Infof("  Failed: %d", totalClientCount-passResultCount)
 	t.logger.Infof("  Required pass count: %d", requiredPassCount)
 	t.logger.Infof("  Overall result: %v", resultPass)
-	
+
 	if len(failedClientNames) > 0 {
 		t.logger.Infof("  Failed clients: %v", failedClientNames)
 	}
@@ -226,7 +226,7 @@ func (t *Task) checkClientIdentity(client *clients.PoolClient) *IdentityCheckRes
 		return result
 	}
 
-	t.logger.Debugf("Retrieved node identity for client %s: PeerID=%s, ENR=%s", 
+	t.logger.Debugf("Retrieved node identity for client %s: PeerID=%s, ENR=%s",
 		client.Config.Name, identity.PeerID, identity.ENR)
 
 	result.PeerID = identity.PeerID
@@ -263,19 +263,19 @@ func (t *Task) performChecks(result *IdentityCheckResult) {
 	// Check CGC expectations
 	if t.config.ExpectCGC != nil && result.CGC != *t.config.ExpectCGC {
 		result.ChecksPassed = false
-		result.FailureReasons = append(result.FailureReasons, 
+		result.FailureReasons = append(result.FailureReasons,
 			fmt.Sprintf("Expected CGC %d, got %d", *t.config.ExpectCGC, result.CGC))
 	}
 
 	if t.config.MinCGC != nil && result.CGC < *t.config.MinCGC {
 		result.ChecksPassed = false
-		result.FailureReasons = append(result.FailureReasons, 
+		result.FailureReasons = append(result.FailureReasons,
 			fmt.Sprintf("CGC %d is below minimum %d", result.CGC, *t.config.MinCGC))
 	}
 
 	if t.config.MaxCGC != nil && result.CGC > *t.config.MaxCGC {
 		result.ChecksPassed = false
-		result.FailureReasons = append(result.FailureReasons, 
+		result.FailureReasons = append(result.FailureReasons,
 			fmt.Sprintf("CGC %d is above maximum %d", result.CGC, *t.config.MaxCGC))
 	}
 
@@ -284,11 +284,11 @@ func (t *Task) performChecks(result *IdentityCheckResult) {
 		matched, err := regexp.MatchString(t.config.ExpectPeerIDPattern, result.PeerID)
 		if err != nil {
 			result.ChecksPassed = false
-			result.FailureReasons = append(result.FailureReasons, 
+			result.FailureReasons = append(result.FailureReasons,
 				fmt.Sprintf("Invalid PeerID pattern: %v", err))
 		} else if !matched {
 			result.ChecksPassed = false
-			result.FailureReasons = append(result.FailureReasons, 
+			result.FailureReasons = append(result.FailureReasons,
 				fmt.Sprintf("PeerID %s does not match pattern %s", result.PeerID, t.config.ExpectPeerIDPattern))
 		}
 	}
@@ -296,7 +296,7 @@ func (t *Task) performChecks(result *IdentityCheckResult) {
 	// Check P2P address count
 	if t.config.ExpectP2PAddressCount != nil && len(result.P2PAddresses) != *t.config.ExpectP2PAddressCount {
 		result.ChecksPassed = false
-		result.FailureReasons = append(result.FailureReasons, 
+		result.FailureReasons = append(result.FailureReasons,
 			fmt.Sprintf("Expected %d P2P addresses, got %d", *t.config.ExpectP2PAddressCount, len(result.P2PAddresses)))
 	}
 
@@ -311,7 +311,7 @@ func (t *Task) performChecks(result *IdentityCheckResult) {
 		}
 		if !found {
 			result.ChecksPassed = false
-			result.FailureReasons = append(result.FailureReasons, 
+			result.FailureReasons = append(result.FailureReasons,
 				fmt.Sprintf("No P2P address matches pattern %s", t.config.ExpectP2PAddressMatch))
 		}
 	}
@@ -319,13 +319,13 @@ func (t *Task) performChecks(result *IdentityCheckResult) {
 	// Check sequence number
 	if t.config.ExpectSeqNumber != nil && result.SeqNumber != *t.config.ExpectSeqNumber {
 		result.ChecksPassed = false
-		result.FailureReasons = append(result.FailureReasons, 
+		result.FailureReasons = append(result.FailureReasons,
 			fmt.Sprintf("Expected sequence number %d, got %d", *t.config.ExpectSeqNumber, result.SeqNumber))
 	}
 
 	if t.config.MinSeqNumber != nil && result.SeqNumber < *t.config.MinSeqNumber {
 		result.ChecksPassed = false
-		result.FailureReasons = append(result.FailureReasons, 
+		result.FailureReasons = append(result.FailureReasons,
 			fmt.Sprintf("Sequence number %d is below minimum %d", result.SeqNumber, *t.config.MinSeqNumber))
 	}
 
@@ -333,11 +333,11 @@ func (t *Task) performChecks(result *IdentityCheckResult) {
 	for expectedField, expectedValue := range t.config.ExpectENRField {
 		if actualValue, exists := result.ENRFields[expectedField]; !exists {
 			result.ChecksPassed = false
-			result.FailureReasons = append(result.FailureReasons, 
+			result.FailureReasons = append(result.FailureReasons,
 				fmt.Sprintf("Expected ENR field %s not found", expectedField))
 		} else if actualValue != expectedValue {
 			result.ChecksPassed = false
-			result.FailureReasons = append(result.FailureReasons, 
+			result.FailureReasons = append(result.FailureReasons,
 				fmt.Sprintf("ENR field %s expected %v, got %v", expectedField, expectedValue, actualValue))
 		}
 	}
@@ -385,7 +385,7 @@ func (t *Task) extractCGCFromENR(enrStr string) (int, map[string]interface{}, er
 	}
 
 	enrFields["enr_original"] = enrStr
-	
+
 	return cgc, enrFields, nil
 }
 
@@ -395,13 +395,13 @@ func (t *Task) decodeENR(raw string) (*enr.Record, error) {
 	if strings.HasPrefix(raw, "enr:") {
 		b = b[4:]
 	}
-	
+
 	dec := make([]byte, base64.RawURLEncoding.DecodedLen(len(b)))
 	n, err := base64.RawURLEncoding.Decode(dec, b)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var r enr.Record
 	err = rlp.DecodeBytes(dec[:n], &r)
 	return &r, err
@@ -424,7 +424,7 @@ func (t *Task) getKeyValuesFromENR(r *enr.Record) map[string]interface{} {
 		fmtval := t.formatENRValue(key, val)
 		fields[key] = fmtval
 	}
-	
+
 	return fields
 }
 
@@ -459,6 +459,6 @@ func (t *Task) formatENRValue(key string, val rlp.RawValue) string {
 	if err == nil {
 		return "0x" + hex.EncodeToString(content)
 	}
-	
+
 	return "0x" + hex.EncodeToString(val)
 }

@@ -498,8 +498,8 @@ func (bc *BeaconClient) SubmitProposerSlashing(ctx context.Context, slashing *ph
 }
 
 type NodeIdentity struct {
-	PeerID             string `json:"peer_id"`
-	ENR                string `json:"enr"`
+	PeerID             string   `json:"peer_id"`
+	ENR                string   `json:"enr"`
 	P2PAddresses       []string `json:"p2p_addresses"`
 	DiscoveryAddresses []string `json:"discovery_addresses"`
 	Metadata           struct {

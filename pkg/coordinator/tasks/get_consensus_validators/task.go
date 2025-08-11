@@ -30,16 +30,16 @@ type Task struct {
 }
 
 type ValidatorInfo struct {
-	Index                int    `json:"index"`
-	Pubkey              string `json:"pubkey"`
-	Balance             uint64 `json:"balance"`
-	Status              string `json:"status"`
-	EffectiveBalance    uint64 `json:"effectiveBalance"`
+	Index                 int    `json:"index"`
+	Pubkey                string `json:"pubkey"`
+	Balance               uint64 `json:"balance"`
+	Status                string `json:"status"`
+	EffectiveBalance      uint64 `json:"effectiveBalance"`
 	WithdrawalCredentials string `json:"withdrawalCredentials"`
-	ActivationEpoch     uint64 `json:"activationEpoch"`
-	ExitEpoch           uint64 `json:"exitEpoch"`
-	WithdrawableEpoch   uint64 `json:"withdrawableEpoch"`
-	Slashed             bool   `json:"slashed"`
+	ActivationEpoch       uint64 `json:"activationEpoch"`
+	ExitEpoch             uint64 `json:"exitEpoch"`
+	WithdrawableEpoch     uint64 `json:"withdrawableEpoch"`
+	Slashed               bool   `json:"slashed"`
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -94,7 +94,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	matchingValidators := []ValidatorInfo{}
-	
+
 	// Compile validator name pattern regex if provided
 	var validatorNameRegex *regexp.Regexp
 	if t.config.ValidatorNamePattern != "" {
@@ -105,7 +105,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	// Compile client pattern regex if provided  
+	// Compile client pattern regex if provided
 	var clientNameRegex *regexp.Regexp
 	if t.config.ClientPattern != "" {
 		var err error
@@ -183,15 +183,15 @@ func (t *Task) Execute(ctx context.Context) error {
 		// Create validator info
 		validatorInfo := ValidatorInfo{
 			Index:                 int(validatorIndex),
-			Pubkey:               fmt.Sprintf("0x%x", validator.Validator.PublicKey),
-			Balance:              uint64(validator.Balance),
-			Status:               validator.Status.String(),
-			EffectiveBalance:     uint64(validator.Validator.EffectiveBalance),
+			Pubkey:                fmt.Sprintf("0x%x", validator.Validator.PublicKey),
+			Balance:               uint64(validator.Balance),
+			Status:                validator.Status.String(),
+			EffectiveBalance:      uint64(validator.Validator.EffectiveBalance),
 			WithdrawalCredentials: fmt.Sprintf("0x%x", validator.Validator.WithdrawalCredentials),
-			ActivationEpoch:      uint64(validator.Validator.ActivationEpoch),
-			ExitEpoch:            uint64(validator.Validator.ExitEpoch),
-			WithdrawableEpoch:    uint64(validator.Validator.WithdrawableEpoch),
-			Slashed:              validator.Validator.Slashed,
+			ActivationEpoch:       uint64(validator.Validator.ActivationEpoch),
+			ExitEpoch:             uint64(validator.Validator.ExitEpoch),
+			WithdrawableEpoch:     uint64(validator.Validator.WithdrawableEpoch),
+			Slashed:               validator.Validator.Slashed,
 		}
 
 		matchingValidators = append(matchingValidators, validatorInfo)
