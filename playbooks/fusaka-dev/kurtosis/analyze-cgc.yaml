@@ -1,0 +1,250 @@
+id: analyze-cgc
+name: "CGC Analysis - Validate CGC vs Validator Balances"
+timeout: 30m
+
+config:
+  validatorPairNames: []
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# Matrix task to analyze each client pattern
+- name: run_task_matrix
+  title: "Analyze CGC for all client patterns"
+  id: cgc_analysis
+  timeout: 25m
+  configVars:
+    matrixValues: "validatorPairNames"
+  config:
+    runConcurrent: true
+    matrixVar: "validatorPairName"
+    task:
+      name: run_tasks
+      title: "Analyze CGC for ${validatorPairName}"
+      config:
+        tasks:
+        # Step 1: Get consensus client identity (CGC)
+        - name: check_consensus_identity
+          title: "Get CGC for clients matching ${validatorPairName}"
+          id: client_identity
+          timeout: 30s
+          config:
+            minClientCount: 1
+            failOnCheckMiss: false
+            pollInterval: 5s
+          configVars:
+            clientPattern: "validatorPairName"
+        
+        # Step 2: Get validators for these clients
+        - name: get_consensus_validators
+          title: "Get validators for clients matching ${validatorPairName}"
+          id: client_validators
+          timeout: 60s
+          config:
+            validatorStatus: ["active_ongoing", "active_exiting", "active_slashed"]
+            maxResults: 10000  # Get all validators
+            outputFormat: "full"
+          configVars:
+            clientPattern: "validatorPairName"
+        
+        # Step 3: Calculate and analyze results
+        - name: run_shell
+          title: "Calculate CGC analysis for ${validatorPairName}"
+          id: cgc_calculation
+          timeout: 30s
+          config:
+            envVars:
+              client_identity: "tasks.client_identity.outputs.matchingClients"
+              validators: "tasks.client_validators.outputs.validators"
+              client_pattern: "validatorPairName"
+            command: |
+              echo "=== CGC Analysis for ${client_pattern} ==="
+              
+              # Extract client info
+              client_count=$(echo "$client_identity" | jq -r 'length')
+              if [ "$client_count" -eq 0 ]; then
+                echo "⚠️  No clients found matching pattern: ${client_pattern}"
+                echo "::set-out-json status \"no_clients\""
+                echo "::set-out-json client_name \"${client_pattern}\""
+                exit 0
+              fi
+              
+              # Get first client's data
+              client_name=$(echo "$client_identity" | jq -r '.[0].clientName')
+              current_cgc=$(echo "$client_identity" | jq -r '.[0].cgc')
+              
+              echo "Client: $client_name"
+              echo "Current CGC: $current_cgc"
+              
+              # Calculate validator stats
+              validator_count=$(echo "$validators" | jq -r 'length')
+              echo "Validators found: $validator_count"
+              
+              if [ "$validator_count" -eq 0 ]; then
+                echo "⚠️  No validators found for client: $client_name"
+                echo "::set-out-json status \"no_validators\""
+                echo "::set-out-json client_name \"$client_name\""
+                echo "::set-out-json current_cgc $current_cgc"
+                echo "::set-out-json validator_count 0"
+                echo "::set-out-json total_effective_balance_eth 0"
+                echo "::set-out-json required_cgc 0"
+                echo "::set-out-json cgc_sufficient true"
+                exit 0
+              fi
+              
+              # Sum effective balances (in gwei)
+              total_balance_gwei=$(echo "$validators" | jq -r '[.[].effectiveBalance] | add')
+              
+              # Convert to ETH (1 ETH = 1e9 gwei)
+              total_balance_eth=$(echo "scale=6; $total_balance_gwei / 1000000000" | bc -l)
+              
+              echo "Total effective balance: ${total_balance_eth} ETH"
+              
+              # Calculate required CGC: ceil(total_balance_eth / 32)
+              # Using bc for floating point math
+              required_cgc=$(echo "scale=0; ($total_balance_gwei + 31999999999) / 32000000000" | bc -l)
+              
+              echo "Required CGC (minimum): $required_cgc"
+              echo "Current CGC: $current_cgc"
+              
+              # Check if CGC is sufficient
+              if [ "$current_cgc" -ge "$required_cgc" ]; then
+                cgc_sufficient=true
+                status="✅ CGC sufficient"
+                echo "$status"
+              else
+                cgc_sufficient=false
+                status="❌ CGC insufficient" 
+                echo "$status"
+                deficit=$((required_cgc - current_cgc))
+                echo "CGC deficit: $deficit"
+              fi
+              
+              # Set outputs
+              echo "::set-out-json status \"analyzed\""
+              echo "::set-out-json client_name \"$client_name\""
+              echo "::set-out-json current_cgc $current_cgc"
+              echo "::set-out-json validator_count $validator_count"
+              echo "::set-out-json total_effective_balance_eth $total_balance_eth"
+              echo "::set-out-json total_effective_balance_gwei $total_balance_gwei"
+              echo "::set-out-json required_cgc $required_cgc"
+              echo "::set-out-json cgc_sufficient $cgc_sufficient"
+              
+              if [ "$cgc_sufficient" = "false" ]; then
+                echo "::set-out-json cgc_deficit $((required_cgc - current_cgc))"
+              else
+                echo "::set-out-json cgc_deficit 0"
+              fi
+
+# Final summary
+- name: run_shell
+  title: "CGC Analysis Summary"
+  timeout: 1m
+  config:
+    envVars:
+      analysis_results: "| [.tasks.cgc_analysis.outputs.childScopes[]?.tasks.cgc_calculation.outputs]"
+    command: |
+      echo "======================================="
+      echo "         CGC ANALYSIS SUMMARY"
+      echo "======================================="
+      echo ""
+      
+      # Count results
+      total_clients=$(echo "$analysis_results" | jq -r 'length')
+      analyzed_count=0
+      no_clients_count=0
+      no_validators_count=0
+      sufficient_count=0
+      insufficient_count=0
+      total_balance_sum=0
+      total_validator_count=0
+      
+      echo "Analyzed $total_clients client patterns:"
+      echo ""
+      
+      for i in $(seq 0 $((total_clients - 1))); do
+        result=$(echo "$analysis_results" | jq -r ".[$i]")
+        
+        if [ "$result" != "null" ]; then
+          status=$(echo "$result" | jq -r '.status // "unknown"')
+          client_name=$(echo "$result" | jq -r '.client_name // "unknown"')
+          
+          case "$status" in
+            "analyzed")
+              analyzed_count=$((analyzed_count + 1))
+              current_cgc=$(echo "$result" | jq -r '.current_cgc')
+              validator_count=$(echo "$result" | jq -r '.validator_count')
+              balance_eth=$(echo "$result" | jq -r '.total_effective_balance_eth')
+              balance_gwei=$(echo "$result" | jq -r '.total_effective_balance_gwei')
+              required_cgc=$(echo "$result" | jq -r '.required_cgc')
+              cgc_sufficient=$(echo "$result" | jq -r '.cgc_sufficient')
+              
+              echo "📊 Client: $client_name"
+              echo "   Validators: $validator_count"
+              echo "   Total Balance: ${balance_eth} ETH"
+              echo "   Current CGC: $current_cgc"
+              echo "   Required CGC: $required_cgc"
+              
+              if [ "$cgc_sufficient" = "true" ]; then
+                echo "   Status: ✅ CGC Sufficient"
+                sufficient_count=$((sufficient_count + 1))
+              else
+                deficit=$(echo "$result" | jq -r '.cgc_deficit')
+                echo "   Status: ❌ CGC Insufficient (deficit: $deficit)"
+                insufficient_count=$((insufficient_count + 1))
+              fi
+              
+              # Add to totals (using integer math for gwei)
+              total_balance_sum=$((total_balance_sum + balance_gwei))
+              total_validator_count=$((total_validator_count + validator_count))
+              ;;
+            "no_clients")
+              no_clients_count=$((no_clients_count + 1))
+              echo "⚠️  Pattern: $client_name - No clients found"
+              ;;
+            "no_validators")
+              no_validators_count=$((no_validators_count + 1))
+              current_cgc=$(echo "$result" | jq -r '.current_cgc')
+              echo "⚠️  Client: $client_name - No validators (CGC: $current_cgc)"
+              ;;
+          esac
+          echo ""
+        fi
+      done
+      
+      echo "======================================="
+      echo "            SUMMARY STATISTICS"
+      echo "======================================="
+      echo "Total patterns analyzed: $total_clients"
+      echo "Clients analyzed: $analyzed_count"
+      echo "Patterns with no clients: $no_clients_count" 
+      echo "Clients with no validators: $no_validators_count"
+      echo ""
+      echo "CGC Status:"
+      echo "  ✅ Sufficient: $sufficient_count"
+      echo "  ❌ Insufficient: $insufficient_count"
+      echo ""
+      
+      if [ "$total_validator_count" -gt 0 ]; then
+        # Convert total balance back to ETH for display
+        total_balance_eth=$(echo "scale=6; $total_balance_sum / 1000000000" | bc -l)
+        echo "Network totals:"
+        echo "  Total validators: $total_validator_count"
+        echo "  Total effective balance: ${total_balance_eth} ETH"
+        
+        # Calculate network-wide required CGC
+        network_required_cgc=$(echo "scale=0; ($total_balance_sum + 31999999999) / 32000000000" | bc -l)
+        echo "  Network required CGC: $network_required_cgc"
+      fi
+      
+      echo ""
+      if [ "$insufficient_count" -eq 0 ]; then
+        echo "🎉 All clients have sufficient CGC!"
+      else
+        echo "⚠️  $insufficient_count clients have insufficient CGC"
+      fi
+      echo "======================================="

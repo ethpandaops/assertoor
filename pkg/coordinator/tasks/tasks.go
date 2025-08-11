@@ -8,6 +8,7 @@ import (
 	checkconsensusblockproposals "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_block_proposals"
 	checkconsensusfinality "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_finality"
 	checkconsensusforks "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_forks"
+	checkconsensusidentity "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_identity"
 	checkconsensusproposerduty "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_proposer_duty"
 	checkconsensusreorgs "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_reorgs"
 	checkconsensusslotrange "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_consensus_slot_range"
@@ -26,6 +27,7 @@ import (
 	generatetransaction "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_transaction"
 	generatewithdrawalrequests "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_withdrawal_requests"
 	getconsensusspecs "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_consensus_specs"
+	getconsensusvalidators "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_consensus_validators"
 	checkexecutionblock "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_execution_block"
 	getpubkeysfrommnemonic "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_pubkeys_from_mnemonic"
 	getrandommnemonic "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/get_random_mnemonic"
@@ -47,6 +49,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkconsensusblockproposals.TaskDescriptor,
 	checkconsensusfinality.TaskDescriptor,
 	checkconsensusforks.TaskDescriptor,
+	checkconsensusidentity.TaskDescriptor,
 	checkconsensusproposerduty.TaskDescriptor,
 	checkconsensusreorgs.TaskDescriptor,
 	checkconsensusslotrange.TaskDescriptor,
@@ -67,6 +70,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generatewithdrawalrequests.TaskDescriptor,
 	getpubkeysfrommnemonic.TaskDescriptor,
 	getconsensusspecs.TaskDescriptor,
+	getconsensusvalidators.TaskDescriptor,
 	getrandommnemonic.TaskDescriptor,
 	getwalletdetails.TaskDescriptor,
 	runcommand.TaskDescriptor,
