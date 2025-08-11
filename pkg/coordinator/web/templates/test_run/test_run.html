@@ -441,27 +441,22 @@ function TaskViewModel(data, allTasksMap, parentViewModel) {
 
   self.setChildVisibility = function(visible, recursive) {
     ko.utils.arrayForEach(self.children(), function(child) {
-      // Only hide if parent is collapsing.
-      // If parent is expanding, child visibility depends on its own expand state.
       if (!visible) {
+        // When parent is collapsing, hide all descendants regardless of their state
         child.isVisible(false);
+        if (recursive) {
+          child.setChildVisibility(false, true);
+        }
       } else {
-        // When expanding parent, make immediate children visible.
-        // Their own children visibility depends on their expanded state.
+        // When expanding parent, make immediate children visible
         child.isVisible(true);
-        // If the child itself is not expanded, its children should remain hidden.
+        // Their own children visibility depends on their expanded state
         if (recursive && child.isExpanded()) {
           child.setChildVisibility(true, true);
         } else if (recursive && !child.isExpanded()) {
           child.setChildVisibility(false, true); // Ensure grandchildren hidden
         }
       }
-
-      // // Old simpler logic:
-      // child.isVisible(visible);
-      // if (recursive) {
-      //     child.setChildVisibility(visible, true);
-      // }
     });
   };
 
@@ -726,26 +721,27 @@ function TestRunViewModel(initialData) { // Accept initial data directly
     ko.utils.arrayForEach(taskViewModels, function(task) {
       const parentIndex = ko.unwrap(task.parent_index);
       if (parentIndex && parentIndex !== 0) {
-        const parent = self.allTasksMap[parentIndex];
-        // If parent exists and is NOT expanded, hide this task and its children recursively
-        if (parent && !parent.isExpanded()) {
-          task.isVisible(false);
-          // Need to ensure setChildVisibility is robust
-          if (typeof task.setChildVisibility === 'function') {
-            task.setChildVisibility(false, true); // Hide children recursively
+        // Check if any ancestor is collapsed
+        let shouldBeVisible = true;
+        let currentParentIndex = parentIndex;
+        
+        while (currentParentIndex && currentParentIndex !== 0) {
+          const ancestor = self.allTasksMap[currentParentIndex];
+          if (ancestor && !ancestor.isExpanded()) {
+            shouldBeVisible = false;
+            break;
           }
-        } else if (parent && parent.isExpanded()) {
-          // If parent IS expanded, this task should be visible
-          task.isVisible(true);
-          // Visibility of its own children depends on its own expanded state
-          if (typeof task.setChildVisibility === 'function') {
+          currentParentIndex = ancestor ? ko.unwrap(ancestor.parent_index) : 0;
+        }
+        
+        task.isVisible(shouldBeVisible);
+        
+        // Set visibility of children based on this task's state
+        if (typeof task.setChildVisibility === 'function') {
+          if (shouldBeVisible) {
             task.setChildVisibility(task.isExpanded(), true);
-          }
-        } else if (!parent) {
-          // If parent doesn't exist (e.g., orphan), treat as root, make visible
-          task.isVisible(true);
-          if (typeof task.setChildVisibility === 'function') {
-            task.setChildVisibility(task.isExpanded(), true); // Apply to children
+          } else {
+            task.setChildVisibility(false, true); // Hide all children if this task is hidden
           }
         }
       } else {
