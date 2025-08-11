@@ -1,0 +1,335 @@
+id: cgc-validation-test
+name: "CGC Validation Test with Deposits"
+timeout: 12h
+
+config:
+  walletPrivkey: ""
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  validatorPairNames: []
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
+  depositAmount: 1024
+  validatorCount: 2
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: get_wallet_details
+  title: "Get target wallet address"
+  id: target_wallet
+  configVars:
+    privateKey: "walletPrivkey"
+
+- name: run_task_matrix
+  title: "Run CGC validation test for all validator pairs"
+  id: cgc_test
+  timeout: 90m
+  configVars:
+    matrixValues: "validatorPairNames"
+  config:
+    runConcurrent: true
+
+    matrixVar: "validatorPairName"
+    task:
+      name: run_tasks
+      title: "CGC test for ${validatorPairName}"
+      config:
+        tasks:
+        # Step 1: Find validators for this client
+        - name: get_consensus_validators
+          title: "Find 2 active validators with 0x00 withdrawal credentials for ${validatorPairName}"
+          id: validators
+          timeout: 30s
+          config:
+            validatorStatus: ["active_ongoing"]
+            withdrawalCredsPrefix: "0x00"
+            maxResults: 2
+            outputFormat: "full"
+          configVars:
+            clientPattern: "validatorPairName"
+        
+        # Step 2: Initial CGC check
+        - name: check_consensus_identity
+          title: "Check initial CGC for ${validatorPairName}"
+          id: initial_cgc
+          timeout: 30s
+          config:
+            minClientCount: 1
+            minCgc: 1
+            failOnCheckMiss: true
+            pollInterval: 5s
+          configVars:
+            clientPattern: "validatorPairName"
+        
+        # Step 2b: Check if CGC is already at maximum
+        - name: run_shell
+          title: "Check if CGC is already at maximum (128)"
+          id: cgc_check
+          timeout: 30s
+          config:
+            envVars:
+              initial_clients: "tasks.initial_cgc.outputs.matchingClients"
+              client_name: "validatorPairName"
+            command: |
+              initial_cgc=$(echo "$initial_clients" | jq -r '.[0].cgc')
+              echo "Initial CGC for $client_name: $initial_cgc"
+              
+              if [ "$initial_cgc" -eq 128 ]; then
+                echo "✅ CGC is already at maximum (128). No further action needed."
+                echo "::set-out-json isMaxCGC true"
+              else
+                echo "CGC is $initial_cgc, proceeding with credential changes and deposits..."
+                echo "::set-out-json isMaxCGC false"
+              fi
+        
+        # Step 3: Generate BLS changes to change withdrawal credentials from 0x00 to 0x01
+        - name: run_task_matrix
+          title: "Generate BLS changes for found validators (0x00 → 0x01)"
+          id: bls_changes
+          timeout: 10m
+          if: "tasks.cgc_check.outputs.isMaxCGC != true"
+          configVars:
+            matrixValues: "tasks.validators.outputs.validators"
+          config:
+            runConcurrent: true
+            matrixVar: "validator"
+            task:
+              name: run_task_background
+              title: "BLS change for validator ${{validator.index}} & track inclusion"
+              config:
+                onBackgroundComplete: failOrIgnore
+                backgroundTask:
+                  name: generate_bls_changes
+                  title: "Generate BLS change for validator ${{validator.index}}"
+                  config:
+                    limitTotal: 1
+                    limitPerSlot: 1
+                    indexCount: 1
+                    awaitReceipt: true
+                    failOnReject: true
+                  configVars:
+                    mnemonic: "validatorMnemonic"
+                    startIndex: "validator.index"
+                    targetAddress: "tasks.target_wallet.outputs.address"
+                foregroundTask:
+                  name: check_consensus_block_proposals
+                  title: "Wait for inclusion of BLS change for validator ${{validator.index}}"
+                  config:
+                    minBlsChangeCount: 1
+                  configVars:
+                    expectBlsChanges: "| [{publicKey: .validator.pubkey, address: .tasks.target_wallet.outputs.address}]"
+        
+        # Step 4: Generate self-consolidations to change withdrawal credentials from 0x01 to 0x02
+        - name: run_task_matrix
+          title: "Generate self-consolidations for found validators"
+          id: self_consolidations
+          timeout: 10m
+          if: "tasks.cgc_check.outputs.isMaxCGC != true"
+          configVars:
+            matrixValues: "tasks.validators.outputs.validators"
+          config:
+            runConcurrent: false
+            matrixVar: "validator"
+            task:
+              name: run_task_background
+              title: "Self-consolidation for validator ${{validator.index}} & track inclusion"
+              config:
+                onBackgroundComplete: failOrIgnore
+                backgroundTask:
+                  name: generate_consolidations
+                  title: "Generate self-consolidation (validator ${{validator.index}})"
+                  config:
+                    limitTotal: 1
+                    sourceIndexCount: 1
+                    awaitReceipt: true
+                    failOnReject: true
+                  configVars:
+                    sourceMnemonic: "validatorMnemonic"
+                    sourceStartIndex: "validator.index"
+                    targetPublicKey: "validator.pubkey"
+                    walletPrivkey: "walletPrivkey"
+                foregroundTask:
+                  name: check_consensus_block_proposals
+                  title: "Wait for inclusion of self-consolidation request for validator ${{validator.index}}"
+                  config:
+                    minConsolidationRequestCount: 1
+                  configVars:
+                    expectConsolidationRequests: "| [{sourceAddress: .tasks.target_wallet.outputs.address, sourcePubkey: .validator.pubkey}]"
+        
+        # Step 5: Generate top-up deposits for found validators (now with 0x02 credentials)
+        - name: run_task_matrix
+          title: "Generate top-up deposits for found validators"
+          id: deposits
+          timeout: 15m
+          if: "tasks.cgc_check.outputs.isMaxCGC != true"
+          configVars:
+            matrixValues: "tasks.validators.outputs.validators"
+          config:
+            runConcurrent: false
+            matrixVar: "validator"
+            task:
+              name: run_tasks
+              title: "Generate top-up deposits for validator ${{validator.index}}"
+              config:
+                stopChildOnResult: false
+                tasks:
+                - name: generate_deposits
+                  title: "Top-up deposit ${depositAmount} ETH to validator ${{validator.index}}"
+                  config:
+                    limitTotal: 1
+                    awaitReceipt: true
+                    failOnReject: true
+                    topUpDeposit: true
+                  configVars:
+                    walletPrivkey: "walletPrivkey"
+                    depositContract: "depositContract"
+                    depositAmount: "depositAmount"
+                    publicKey: "validator.pubkey"
+        
+        # Step 6: Wait for validator balances to increase (can take hours)
+        - name: run_task_matrix
+          title: "Wait for validator balance increases"
+          id: balance_check
+          timeout: 8h
+          if: "tasks.cgc_check.outputs.isMaxCGC != true"
+          configVars:
+            matrixValues: "tasks.validators.outputs.validators"
+          config:
+            runConcurrent: true
+            matrixVar: "validator"
+            task:
+              name: check_consensus_validator_status
+              title: "Wait for validator ${{validator.index}} balance to increase"
+              config:
+                validatorStatus:
+                - active_ongoing
+                withdrawalCredsPrefix: "0x02"
+              configVars:
+                validatorIndex: "validator.index"
+                minValidatorBalance: "| (32 + .depositAmount) * 1000000000"
+        
+        # Step 7: Final CGC check (should be higher than initial)
+        - name: run_task_options
+          title: "Wait for CGC increase for ${validatorPairName} (ignore failure)"
+          config:
+            ignoreFailure: true
+            exitOnResult: true
+            task:
+              name: check_consensus_identity
+              title: "Wait for CGC increase for ${validatorPairName}"
+              id: final_cgc
+              timeout: 1h
+              if: "tasks.cgc_check.outputs.isMaxCGC != true"
+              config:
+                minClientCount: 1
+                pollInterval: 30s
+              configVars:
+                clientPattern: "validatorPairName"
+                minCgc: "| (.tasks.initial_cgc.outputs.matchingClients[0].cgc // 0) + 1"
+        
+        # Step 8: Verify CGC results
+        - name: run_shell
+          title: "Verify CGC results for ${validatorPairName}"
+          id: cgc_results
+          timeout: 1m
+          config:
+            envVars:
+              initial_clients: "tasks.initial_cgc.outputs.matchingClients"
+              final_clients: "tasks.final_cgc.outputs.matchingClients"
+              is_max_cgc: "tasks.cgc_check.outputs.isMaxCGC"
+              client_name: "validatorPairName"
+            command: |
+              initial_cgc=$(echo "$initial_clients" | jq -r '.[0].cgc')
+              
+              if [ "$is_max_cgc" = "true" ]; then
+                echo "✅ CGC was already at maximum (128) for $client_name"
+                echo "::set-out-json cgc_initial $initial_cgc"
+                echo "::set-out-json cgc_final $initial_cgc"
+                echo "::set-out-json cgc_increase 0"
+                echo "::set-out-json was_at_max true"
+              else
+                final_cgc=$(echo "$final_clients" | jq -r '.[0].cgc')
+                
+                echo "Initial CGC: $initial_cgc"
+                echo "Final CGC: $final_cgc"
+                
+                if [ "$final_cgc" -le "$initial_cgc" ]; then
+                  echo "❌ CGC did not increase! Initial: $initial_cgc, Final: $final_cgc"
+                  exit 1
+                fi
+                
+                cgc_increase=$((final_cgc - initial_cgc))
+                echo "✅ CGC increased by $cgc_increase (from $initial_cgc to $final_cgc)"
+                
+                echo "::set-out-json cgc_initial $initial_cgc"
+                echo "::set-out-json cgc_final $final_cgc"
+                echo "::set-out-json cgc_increase $cgc_increase"
+                echo "::set-out-json was_at_max false"
+              fi
+
+# Final summary task
+- name: run_shell
+  title: "Display test summary"
+  timeout: 1m
+  config:
+    envVars:
+      validatorPairNames: "validatorPairNames"
+      results: "| [.tasks.cgc_test.outputs.childScopes[]?.tasks.cgc_results.outputs]"
+    command: |
+      echo "=== CGC Validation Test Summary ==="
+      
+      # Count validator pairs
+      pair_count=$(echo "$validatorPairNames" | jq -r 'length')
+      echo "Test completed for $pair_count validator pairs"
+      echo ""
+      
+      # Extract pair names array
+      pairs=$(echo "$validatorPairNames" | jq -r '.[]')
+      
+      # Process results with jq
+      total_increase=0
+      at_max_count=0
+      increased_count=0
+      
+      # Loop through results with index
+      for i in $(seq 0 $((pair_count - 1))); do
+        # Get pair name and result for this index
+        pair=$(echo "$validatorPairNames" | jq -r ".[$i]")
+        result=$(echo "$results" | jq -r ".[$i]")
+        
+        if [ "$result" != "null" ]; then
+          # Extract values from result
+          initial=$(echo "$result" | jq -r '.cgc_initial')
+          final=$(echo "$result" | jq -r '.cgc_final')
+          increase=$(echo "$result" | jq -r '.cgc_increase')
+          was_at_max=$(echo "$result" | jq -r '.was_at_max')
+          
+          echo "Results for $pair:"
+          echo "  Initial CGC: $initial"
+          echo "  Final CGC: $final"
+          
+          if [ "$was_at_max" = "true" ]; then
+            echo "  Status: Already at maximum (128)"
+            at_max_count=$((at_max_count + 1))
+          else
+            echo "  CGC Increase: $increase"
+            increased_count=$((increased_count + 1))
+            total_increase=$((total_increase + increase))
+          fi
+          echo ""
+        else
+          echo "Results for $pair: No data available"
+          echo ""
+        fi
+      done
+      
+      echo "=== Summary Statistics ==="
+      echo "Total validator pairs tested: $pair_count"
+      echo "Pairs already at max CGC: $at_max_count"
+      echo "Pairs with CGC increase: $increased_count"
+      echo "Total CGC increase across all pairs: $total_increase"
+      echo ""
+      echo "✅ CGC validation test completed successfully!"

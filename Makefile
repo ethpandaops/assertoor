@@ -26,7 +26,7 @@ devnet:
 	.hack/devnet/run.sh
 
 devnet-run: devnet
-	go run main.go --config .hack/devnet/generated-assertoor-config.yaml
+	go run main.go --config .hack/devnet/generated-assertoor-config.yaml --verbose
 
 devnet-run-docker: devnet
 	docker build --file ./Dockerfile-local -t assertoor:devnet-run --build-arg userid=$(CURRENT_UID) --build-arg groupid=$(CURRENT_GID) .
