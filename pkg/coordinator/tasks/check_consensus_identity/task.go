@@ -44,7 +44,7 @@ type IdentityCheckResult struct {
 	SeqNumber          uint64                 `json:"seqNumber"`
 	Attnets            string                 `json:"attnets"`
 	Syncnets           string                 `json:"syncnets"`
-	CGC                int                    `json:"cgc"`
+	CGC                uint64                 `json:"cgc"`
 	ENRFields          map[string]interface{} `json:"enrFields"`
 	ChecksPassed       bool                   `json:"checksPassed"`
 	FailureReasons     []string               `json:"failureReasons"`
@@ -118,6 +118,7 @@ func (t *Task) processCheck() {
 		}
 
 		totalClientCount++
+
 		t.logger.Infof("Checking identity for client: %s", client.Config.Name)
 
 		result := t.checkClientIdentity(client)
@@ -131,12 +132,14 @@ func (t *Task) processCheck() {
 		t.logger.Infof("  Discovery Addresses: %v", result.DiscoveryAddresses)
 		t.logger.Infof("  Sequence Number: %d", result.SeqNumber)
 		t.logger.Infof("  Checks Passed: %v", result.ChecksPassed)
+
 		if len(result.FailureReasons) > 0 {
 			t.logger.Infof("  Failure Reasons: %v", result.FailureReasons)
 		}
 
 		if result.ChecksPassed {
 			passResultCount++
+
 			matchingClients = append(matchingClients, result)
 			t.logger.Infof("✅ Client %s passed all checks", result.ClientName)
 		} else {
@@ -221,8 +224,10 @@ func (t *Task) checkClientIdentity(client *clients.PoolClient) *IdentityCheckRes
 	identity, err := client.ConsensusClient.GetRPCClient().GetNodeIdentity(ctx)
 	if err != nil {
 		t.logger.Errorf("Failed to get node identity for client %s: %v", client.Config.Name, err)
+
 		result.ChecksPassed = false
 		result.FailureReasons = append(result.FailureReasons, fmt.Sprintf("Failed to get node identity: %v", err))
+
 		return result
 	}
 
@@ -239,11 +244,14 @@ func (t *Task) checkClientIdentity(client *clients.PoolClient) *IdentityCheckRes
 
 	// Extract CGC from ENR
 	t.logger.Debugf("Extracting CGC from ENR for client %s", client.Config.Name)
+
 	cgc, enrFields, err := t.extractCGCFromENR(identity.ENR)
 	if err != nil {
 		t.logger.Errorf("Failed to parse ENR for client %s: %v", client.Config.Name, err)
+
 		result.ChecksPassed = false
 		result.FailureReasons = append(result.FailureReasons, fmt.Sprintf("Failed to parse ENR: %v", err))
+
 		return result
 	}
 
@@ -303,12 +311,14 @@ func (t *Task) performChecks(result *IdentityCheckResult) {
 	// Check P2P address match
 	if t.config.ExpectP2PAddressMatch != "" {
 		found := false
+
 		for _, addr := range result.P2PAddresses {
 			if matched, _ := regexp.MatchString(t.config.ExpectP2PAddressMatch, addr); matched {
 				found = true
 				break
 			}
 		}
+
 		if !found {
 			result.ChecksPassed = false
 			result.FailureReasons = append(result.FailureReasons,
@@ -344,7 +354,7 @@ func (t *Task) performChecks(result *IdentityCheckResult) {
 }
 
 // extractCGCFromENR extracts the Custody Group Count from ENR using proper ENR parsing
-func (t *Task) extractCGCFromENR(enrStr string) (int, map[string]interface{}, error) {
+func (t *Task) extractCGCFromENR(enrStr string) (cgc uint64, enrFields map[string]interface{}, err error) {
 	if enrStr == "" {
 		t.logger.Debugf("Empty ENR provided")
 		return 0, nil, fmt.Errorf("empty ENR")
@@ -360,10 +370,8 @@ func (t *Task) extractCGCFromENR(enrStr string) (int, map[string]interface{}, er
 	}
 
 	// Get all key-value pairs from ENR
-	enrFields := t.getKeyValuesFromENR(record)
+	enrFields = t.getKeyValuesFromENR(record)
 
-	// Extract CGC from the fields
-	cgc := 0
 	if cgcHex, ok := enrFields["cgc"]; ok {
 		// CGC is stored as hex string, parse it
 		cgcStr, ok := cgcHex.(string)
@@ -372,11 +380,12 @@ func (t *Task) extractCGCFromENR(enrStr string) (int, map[string]interface{}, er
 		} else {
 			// Remove "0x" prefix if present
 			cgcStr = strings.TrimPrefix(cgcStr, "0x")
+
 			val, err := strconv.ParseUint(cgcStr, 16, 64)
 			if err != nil {
 				t.logger.Errorf("Failed to parse CGC value %s: %v", cgcStr, err)
 			} else {
-				cgc = int(val)
+				cgc = val
 				t.logger.Debugf("Found CGC in ENR: %d", cgc)
 			}
 		}
@@ -397,6 +406,7 @@ func (t *Task) decodeENR(raw string) (*enr.Record, error) {
 	}
 
 	dec := make([]byte, base64.RawURLEncoding.DecodedLen(len(b)))
+
 	n, err := base64.RawURLEncoding.Decode(dec, b)
 	if err != nil {
 		return nil, err
@@ -404,6 +414,7 @@ func (t *Task) decodeENR(raw string) (*enr.Record, error) {
 
 	var r enr.Record
 	err = rlp.DecodeBytes(dec[:n], &r)
+
 	return &r, err
 }
 
@@ -417,8 +428,17 @@ func (t *Task) getKeyValuesFromENR(r *enr.Record) map[string]interface{} {
 	// Get all key-value pairs from the record
 	kv := r.AppendElements(nil)[1:] // Skip the sequence number
 	for i := 0; i < len(kv); i += 2 {
-		key := kv[i].(string)
-		val := kv[i+1].(rlp.RawValue)
+		key, ok := kv[i].(string)
+		if !ok {
+			t.logger.Warnf("Invalid ENR key type: %T", kv[i])
+			continue
+		}
+
+		val, ok := kv[i+1].(rlp.RawValue)
+		if !ok {
+			t.logger.Warnf("Invalid ENR value type for key %s: %T", key, kv[i+1])
+			continue
+		}
 
 		// Format the value based on the key
 		fmtval := t.formatENRValue(key, val)

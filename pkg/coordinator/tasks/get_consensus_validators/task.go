@@ -30,7 +30,7 @@ type Task struct {
 }
 
 type ValidatorInfo struct {
-	Index                 int    `json:"index"`
+	Index                 uint64 `json:"index"`
 	Pubkey                string `json:"pubkey"`
 	Balance               uint64 `json:"balance"`
 	Status                string `json:"status"`
@@ -81,7 +81,8 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
-func (t *Task) Execute(ctx context.Context) error {
+//nolint:gocyclo // ignore
+func (t *Task) Execute(_ context.Context) error {
 	// Get client pool and validator names
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	consensusPool := clientPool.GetConsensusPool()
@@ -97,9 +98,11 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// Compile validator name pattern regex if provided
 	var validatorNameRegex *regexp.Regexp
+
 	if t.config.ValidatorNamePattern != "" {
 		var err error
 		validatorNameRegex, err = regexp.Compile(t.config.ValidatorNamePattern)
+
 		if err != nil {
 			return fmt.Errorf("invalid validator name pattern: %v", err)
 		}
@@ -107,8 +110,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// Compile client pattern regex if provided
 	var clientNameRegex *regexp.Regexp
+
 	if t.config.ClientPattern != "" {
 		var err error
+
 		clientNameRegex, err = regexp.Compile(t.config.ClientPattern)
 		if err != nil {
 			return fmt.Errorf("invalid client pattern: %v", err)
@@ -125,6 +130,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		if t.config.MinValidatorIndex != nil && uint64(validatorIndex) < *t.config.MinValidatorIndex {
 			continue
 		}
+
 		if t.config.MaxValidatorIndex != nil && uint64(validatorIndex) > *t.config.MaxValidatorIndex {
 			continue
 		}
@@ -133,6 +139,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		if t.config.MinValidatorBalance != nil && uint64(validator.Balance) < *t.config.MinValidatorBalance {
 			continue
 		}
+
 		if t.config.MaxValidatorBalance != nil && uint64(validator.Balance) > *t.config.MaxValidatorBalance {
 			continue
 		}
@@ -149,12 +156,14 @@ func (t *Task) Execute(ctx context.Context) error {
 		if len(t.config.ValidatorStatus) > 0 {
 			statusMatch := false
 			validatorStatus := validator.Status.String()
+
 			for _, allowedStatus := range t.config.ValidatorStatus {
 				if validatorStatus == allowedStatus {
 					statusMatch = true
 					break
 				}
 			}
+
 			if !statusMatch {
 				continue
 			}
@@ -182,7 +191,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		// Create validator info
 		validatorInfo := ValidatorInfo{
-			Index:                 int(validatorIndex),
+			Index:                 uint64(validatorIndex),
 			Pubkey:                fmt.Sprintf("0x%x", validator.Validator.PublicKey),
 			Balance:               uint64(validator.Balance),
 			Status:                validator.Status.String(),
@@ -210,16 +219,18 @@ func (t *Task) Execute(ctx context.Context) error {
 		for i, validator := range matchingValidators {
 			pubkeys[i] = validator.Pubkey
 		}
+
 		if pubkeysData, err := vars.GeneralizeData(pubkeys); err == nil {
 			t.ctx.Outputs.SetVar("pubkeys", pubkeysData)
 		} else {
 			return fmt.Errorf("failed to generalize pubkeys data: %v", err)
 		}
 	case "indices":
-		indices := make([]int, len(matchingValidators))
+		indices := make([]uint64, len(matchingValidators))
 		for i, validator := range matchingValidators {
 			indices[i] = validator.Index
 		}
+
 		if indicesData, err := vars.GeneralizeData(indices); err == nil {
 			t.ctx.Outputs.SetVar("indices", indicesData)
 		} else {

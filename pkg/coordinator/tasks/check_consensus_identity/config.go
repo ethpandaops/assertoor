@@ -15,9 +15,9 @@ type Config struct {
 	FailOnCheckMiss bool            `yaml:"failOnCheckMiss" json:"failOnCheckMiss"`
 
 	// CGC (Custody Group Count) checks
-	ExpectCGC *int `yaml:"expectCgc" json:"expectCgc"`
-	MinCGC    *int `yaml:"minCgc" json:"minCgc"`
-	MaxCGC    *int `yaml:"maxCgc" json:"maxCgc"`
+	ExpectCGC *uint64 `yaml:"expectCgc" json:"expectCgc"`
+	MinCGC    *uint64 `yaml:"minCgc" json:"minCgc"`
+	MaxCGC    *uint64 `yaml:"maxCgc" json:"maxCgc"`
 
 	// ENR checks
 	ExpectENRField map[string]interface{} `yaml:"expectEnrField" json:"expectEnrField"`
@@ -45,18 +45,6 @@ func DefaultConfig() Config {
 func (c *Config) Validate() error {
 	if c.ClientPattern == "" {
 		return fmt.Errorf("clientPattern is required")
-	}
-
-	if c.ExpectCGC != nil && *c.ExpectCGC < 0 {
-		return fmt.Errorf("expectCgc must be >= 0")
-	}
-
-	if c.MinCGC != nil && *c.MinCGC < 0 {
-		return fmt.Errorf("minCgc must be >= 0")
-	}
-
-	if c.MaxCGC != nil && *c.MaxCGC < 0 {
-		return fmt.Errorf("maxCgc must be >= 0")
 	}
 
 	if c.MinCGC != nil && c.MaxCGC != nil && *c.MinCGC > *c.MaxCGC {
