@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -75,8 +77,14 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
+	// get task base path
+	taskBasePath, ok := t.ctx.Vars.GetVar("taskBasePath").(string)
+	if !ok {
+		t.logger.Warn("could not read taskBasePath from variables")
+	}
+
 	// load test yaml file
-	testConfig, err := t.loadTestConfig(ctx, t.config.TestFile)
+	testConfig, testBasePath, err := t.loadTestConfig(ctx, taskBasePath, t.config.TestFile)
 	if err != nil {
 		return err
 	}
@@ -84,6 +92,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	// create new variable scope for test configuration
 	testVars := t.ctx.Vars.NewScope()
 	testVars.SetVar("scopeOwner", uint64(t.ctx.Index))
+	testVars.SetVar("taskBasePath", testBasePath)
 	t.ctx.Outputs.SetSubScope("childScope", vars.NewScopeFilter(testVars))
 
 	// add default config from external test to variable scope
@@ -187,20 +196,34 @@ taskLoop:
 	return resError
 }
 
-func (t *Task) loadTestConfig(ctx context.Context, testFile string) (*types.TestConfig, error) {
+func (t *Task) loadTestConfig(ctx context.Context, basePath, testFile string) (*types.TestConfig, string, error) {
 	var reader io.Reader
 
+	var testBasePath string
+
 	if strings.HasPrefix(testFile, "http://") || strings.HasPrefix(testFile, "https://") {
+		parsedURL, err := url.Parse(testFile)
+		if err != nil {
+			return nil, "", err
+		}
+
+		// Remove the filename from the path
+		parsedURL.Path = path.Dir(parsedURL.Path)
+		parsedURL.RawQuery = ""
+		parsedURL.Fragment = ""
+
+		testBasePath = parsedURL.String()
+
 		client := &http.Client{Timeout: time.Second * 120}
 
 		req, err := http.NewRequestWithContext(ctx, "GET", testFile, http.NoBody)
 		if err != nil {
-			return nil, err
+			return nil, testBasePath, err
 		}
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return nil, err
+			return nil, testBasePath, err
 		}
 
 		defer func() {
@@ -210,14 +233,20 @@ func (t *Task) loadTestConfig(ctx context.Context, testFile string) (*types.Test
 		}()
 
 		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("error loading test config from url: %v, result: %v %v", testFile, resp.StatusCode, resp.Status)
+			return nil, testBasePath, fmt.Errorf("error loading test config from url: %v, result: %v %v", testFile, resp.StatusCode, resp.Status)
 		}
 
 		reader = resp.Body
 	} else {
+		if !path.IsAbs(testFile) && basePath != "" {
+			testFile = path.Join(basePath, testFile)
+		}
+
+		testBasePath = path.Dir(testFile)
+
 		f, err := os.Open(testFile)
 		if err != nil {
-			return nil, fmt.Errorf("error loading test config from file %v: %w", testFile, err)
+			return nil, testBasePath, fmt.Errorf("error loading test config from file %v: %w", testFile, err)
 		}
 
 		defer func() {
@@ -234,7 +263,7 @@ func (t *Task) loadTestConfig(ctx context.Context, testFile string) (*types.Test
 
 	err := decoder.Decode(testConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding external test config %v: %v", testFile, err)
+		return nil, testBasePath, fmt.Errorf("error decoding external test config %v: %v", testFile, err)
 	}
 
 	if testConfig.Config == nil {
@@ -245,5 +274,5 @@ func (t *Task) loadTestConfig(ctx context.Context, testFile string) (*types.Test
 		testConfig.ConfigVars = map[string]string{}
 	}
 
-	return testConfig, nil
+	return testConfig, testBasePath, nil
 }

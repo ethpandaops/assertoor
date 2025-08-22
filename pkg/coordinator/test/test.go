@@ -52,6 +52,10 @@ func CreateTest(runID uint64, descriptor types.TestDescriptor, log logrus.FieldL
 		test.variables.SetVar(cfgKey, cfgValue)
 	}
 
+	// set base path
+	test.variables.SetVar("testBasePath", descriptor.BasePath())
+	test.variables.SetVar("taskBasePath", descriptor.BasePath())
+
 	// add test run to database
 	configYaml, err := yaml.Marshal(test.variables.GetVarsMap(nil, false))
 	if err != nil {

@@ -21,6 +21,7 @@ type TestPage struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Source    string `json:"source"`
+	BasePath  string `json:"base_path"`
 	Config    string `json:"config"`
 	CanStart  bool   `json:"can_start"`
 	CanCancel bool   `json:"can_cancel"`
@@ -146,9 +147,10 @@ func (fh *FrontendHandler) getTestPageData(testID string, pageArgs *TestPageArgs
 
 	testConfig := testDescriptor.Config()
 	pageData := &TestPage{
-		ID:     testID,
-		Name:   testConfig.Name,
-		Source: testDescriptor.Source(),
+		ID:       testID,
+		Name:     testConfig.Name,
+		Source:   testDescriptor.Source(),
+		BasePath: testDescriptor.BasePath(),
 	}
 
 	if fh.isAPIEnabled && !fh.securityTrimmed {

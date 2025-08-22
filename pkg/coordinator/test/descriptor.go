@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -15,24 +17,31 @@ import (
 )
 
 type Descriptor struct {
-	id     string
-	source string
-	config *types.TestConfig
-	vars   types.Variables
-	err    error
+	id       string
+	source   string
+	basePath string
+	config   *types.TestConfig
+	vars     types.Variables
+	err      error
 }
 
-func NewDescriptor(testID, testSrc string, config *types.TestConfig, variables types.Variables) *Descriptor {
+func NewDescriptor(testID, testSrc, basePath string, config *types.TestConfig, variables types.Variables) *Descriptor {
 	return &Descriptor{
-		id:     testID,
-		source: testSrc,
-		config: config,
-		vars:   variables,
+		id:       testID,
+		source:   testSrc,
+		basePath: basePath,
+		config:   config,
+		vars:     variables,
 	}
 }
 
 func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localTests []*types.TestConfig, externalTests []*types.ExternalTestConfig) []types.TestDescriptor {
 	descriptors := []types.TestDescriptor{}
+
+	workingDir, err := os.Getwd()
+	if err != nil {
+		logrus.WithError(err).Warn("failed to get working directory")
+	}
 
 	// load local tests
 	for testIdx, testCfg := range localTests {
@@ -52,11 +61,12 @@ func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localT
 		err := testVars.CopyVars(globalVars, testCfg.ConfigVars)
 
 		descriptors = append(descriptors, &Descriptor{
-			id:     testID,
-			source: testSrc,
-			vars:   testVars,
-			config: localTests[testIdx],
-			err:    err,
+			id:       testID,
+			source:   testSrc,
+			basePath: workingDir,
+			vars:     testVars,
+			config:   localTests[testIdx],
+			err:      err,
 		})
 	}
 
@@ -65,7 +75,7 @@ func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localT
 		testSrc := fmt.Sprintf("external:%v", extTestCfg.File)
 		testID := ""
 
-		testConfig, testVars, err := LoadExternalTestConfig(ctx, globalVars, extTestCfg)
+		testConfig, testVars, basePath, err := LoadExternalTestConfig(ctx, globalVars, extTestCfg)
 
 		if testConfig != nil && testConfig.ID != "" {
 			testID = testConfig.ID
@@ -76,31 +86,46 @@ func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localT
 		}
 
 		descriptors = append(descriptors, &Descriptor{
-			id:     testID,
-			source: testSrc,
-			config: testConfig,
-			vars:   testVars,
-			err:    err,
+			id:       testID,
+			source:   testSrc,
+			basePath: basePath,
+			config:   testConfig,
+			vars:     testVars,
+			err:      err,
 		})
 	}
 
 	return descriptors
 }
 
-func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, extTestCfg *types.ExternalTestConfig) (*types.TestConfig, types.Variables, error) {
+func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, extTestCfg *types.ExternalTestConfig) (*types.TestConfig, types.Variables, string, error) {
 	var reader io.Reader
 
+	var basePath string
+
 	if strings.HasPrefix(extTestCfg.File, "http://") || strings.HasPrefix(extTestCfg.File, "https://") {
+		parsedURL, err := url.Parse(extTestCfg.File)
+		if err != nil {
+			return nil, nil, "", err
+		}
+
+		// Remove the filename from the path
+		parsedURL.Path = path.Dir(parsedURL.Path)
+		parsedURL.RawQuery = ""
+		parsedURL.Fragment = ""
+
+		basePath = parsedURL.String()
+
 		client := &http.Client{Timeout: time.Second * 120}
 
 		req, err := http.NewRequestWithContext(ctx, "GET", extTestCfg.File, http.NoBody)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, basePath, err
 		}
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, basePath, err
 		}
 
 		defer func() {
@@ -110,14 +135,16 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 		}()
 
 		if resp.StatusCode != http.StatusOK {
-			return nil, nil, fmt.Errorf("error loading test config from url: %v, result: %v %v", extTestCfg.File, resp.StatusCode, resp.Status)
+			return nil, nil, basePath, fmt.Errorf("error loading test config from url: %v, result: %v %v", extTestCfg.File, resp.StatusCode, resp.Status)
 		}
 
 		reader = resp.Body
 	} else {
+		basePath = path.Dir(extTestCfg.File)
+
 		f, err := os.Open(extTestCfg.File)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error loading test config from file %v: %w", extTestCfg.File, err)
+			return nil, nil, basePath, fmt.Errorf("error loading test config from file %v: %w", extTestCfg.File, err)
 		}
 
 		defer func() {
@@ -135,7 +162,7 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 
 	err := decoder.Decode(testConfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error decoding external test config %v: %v", extTestCfg.File, err)
+		return nil, nil, basePath, fmt.Errorf("error decoding external test config %v: %v", extTestCfg.File, err)
 	}
 
 	if testConfig.Config == nil {
@@ -177,10 +204,10 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 
 	err = testVars.CopyVars(testVars, testConfig.ConfigVars)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error decoding external test configVars %v: %v", extTestCfg.File, err)
+		return nil, nil, basePath, fmt.Errorf("error decoding external test configVars %v: %v", extTestCfg.File, err)
 	}
 
-	return testConfig, testVars, nil
+	return testConfig, testVars, basePath, nil
 }
 
 func (d *Descriptor) ID() string {
@@ -189,6 +216,10 @@ func (d *Descriptor) ID() string {
 
 func (d *Descriptor) Source() string {
 	return d.source
+}
+
+func (d *Descriptor) BasePath() string {
+	return d.basePath
 }
 
 func (d *Descriptor) Config() *types.TestConfig {
