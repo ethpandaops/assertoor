@@ -100,6 +100,7 @@ func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localT
 
 func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, extTestCfg *types.ExternalTestConfig) (*types.TestConfig, types.Variables, string, error) {
 	var reader io.Reader
+
 	var basePath string
 
 	if strings.HasPrefix(extTestCfg.File, "http://") || strings.HasPrefix(extTestCfg.File, "https://") {

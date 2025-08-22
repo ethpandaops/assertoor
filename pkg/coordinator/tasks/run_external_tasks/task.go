@@ -198,6 +198,7 @@ taskLoop:
 
 func (t *Task) loadTestConfig(ctx context.Context, basePath, testFile string) (*types.TestConfig, string, error) {
 	var reader io.Reader
+
 	var testBasePath string
 
 	if strings.HasPrefix(testFile, "http://") || strings.HasPrefix(testFile, "https://") {
