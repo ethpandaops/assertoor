@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -205,7 +206,12 @@ func (c *TestRegistry) AddLocalTest(testConfig *types.TestConfig) (types.TestDes
 		return nil, fmt.Errorf("failed decoding configVars: %v", err)
 	}
 
-	testDescriptor := test.NewDescriptor(testConfig.ID, "api-call", testConfig, testVars)
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed getting working directory: %v", err)
+	}
+
+	testDescriptor := test.NewDescriptor(testConfig.ID, "api-call", workingDir, testConfig, testVars)
 
 	c.testDescriptorsMutex.Lock()
 	defer c.testDescriptorsMutex.Unlock()
@@ -225,7 +231,7 @@ func (c *TestRegistry) AddLocalTest(testConfig *types.TestConfig) (types.TestDes
 }
 
 func (c *TestRegistry) AddExternalTest(ctx context.Context, extTestCfg *types.ExternalTestConfig) (types.TestDescriptor, error) {
-	testConfig, testVars, err := test.LoadExternalTestConfig(ctx, c.coordinator.GlobalVariables(), extTestCfg)
+	testConfig, testVars, basePath, err := test.LoadExternalTestConfig(ctx, c.coordinator.GlobalVariables(), extTestCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed loading test config from %v: %w", extTestCfg.File, err)
 	}
@@ -242,7 +248,7 @@ func (c *TestRegistry) AddExternalTest(ctx context.Context, extTestCfg *types.Ex
 		return nil, errors.New("test must have 1 or more tasks")
 	}
 
-	testDescriptor := test.NewDescriptor(testConfig.ID, fmt.Sprintf("external:%v", extTestCfg.File), testConfig, testVars)
+	testDescriptor := test.NewDescriptor(testConfig.ID, fmt.Sprintf("external:%v", extTestCfg.File), basePath, testConfig, testVars)
 	extTestCfg.ID = testDescriptor.ID()
 	extTestCfg.Name = testConfig.Name
 

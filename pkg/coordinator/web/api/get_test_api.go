@@ -10,6 +10,7 @@ import (
 type GetTestResponse struct {
 	ID         string              `json:"id"`
 	Source     string              `json:"source"`
+	BasePath   string              `json:"basePath"`
 	Name       string              `json:"name"`
 	Timeout    uint64              `json:"timeout"`
 	Config     map[string]any      `json:"config"`
@@ -60,6 +61,7 @@ func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
 	ah.sendOKResponse(w, r.URL.String(), &GetTestResponse{
 		ID:         testDescriptor.ID(),
 		Source:     testDescriptor.Source(),
+		BasePath:   testDescriptor.BasePath(),
 		Name:       testConfig.Name,
 		Timeout:    uint64(testConfig.Timeout.Seconds()),
 		Config:     testConfig.Config,

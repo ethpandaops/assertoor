@@ -40,6 +40,7 @@ type TestRegistryData struct {
 	TestID   string     `json:"test_id"`
 	Name     string     `json:"name"`
 	Source   string     `json:"source"`
+	BasePath string     `json:"base_path"`
 	Error    string     `json:"error"`
 	Config   string     `json:"config"`
 	RunCount int        `json:"run_count"`
@@ -186,10 +187,11 @@ func (fh *FrontendHandler) getRegistryPageData(pageArgs *RegistryPageArgs) (*Reg
 
 func (fh *FrontendHandler) getTestRegistryData(idx uint64, test types.TestDescriptor, runStats *db.TestRunStats) *TestRegistryData {
 	testData := &TestRegistryData{
-		Index:  idx,
-		TestID: test.ID(),
-		Source: test.Source(),
-		Config: "null",
+		Index:    idx,
+		TestID:   test.ID(),
+		Source:   test.Source(),
+		BasePath: test.BasePath(),
+		Config:   "null",
 	}
 
 	if testError := test.Err(); testError != nil {

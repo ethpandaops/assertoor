@@ -69,6 +69,7 @@ type TestSchedule struct {
 type TestDescriptor interface {
 	ID() string
 	Source() string
+	BasePath() string
 	Config() *TestConfig
 	Vars() Variables
 	Err() error
