@@ -19,7 +19,7 @@ require (
 	github.com/juliangruber/go-intersect v1.1.0
 	github.com/lib/pq v1.10.9
 	github.com/mashingan/smapping v0.1.19
-	github.com/pressly/goose/v3 v3.25.0
+	github.com/pressly/goose/v3 v3.26.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/protolambda/zrnt v0.34.1
 	github.com/protolambda/ztyp v0.2.2
