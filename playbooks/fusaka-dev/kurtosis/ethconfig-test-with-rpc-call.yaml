@@ -1,0 +1,22 @@
+
+id: ethconfig-test
+name: "eth_config RPC consistency test (EIP-7910)"
+timeout: 1h
+config:
+#walletPrivkey: ""
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+  - name: check_consensus_slot_range
+    title: "Wait for slot >= 10"
+    timeout: 10m
+    config:
+      minSlotNumber: 10
+  - name: check_eth_config
+    title: "Check eth_config consistency across all execution clients"
+    timeout: 5m
+    config:
+      failOnMismatch: true

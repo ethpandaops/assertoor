@@ -7,3 +7,4 @@ test-*.yaml
 
 .hack/devnet/generated-**
 .hack/devnet/custom-**
+CLAUDE.md
