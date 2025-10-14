@@ -14,6 +14,9 @@ The `check_eth_config` task verifies that all execution clients in the network r
 - **`failOnMismatch`**:
   Determines whether the task should fail if any execution client returns a different `eth_config` response. If set to `true` (default), the task fails on configuration mismatches. If set to `false`, mismatches are logged but the task continues without failure.
 
+- **`excludeSyncingClients`**:
+  When set to `true`, the task excludes execution clients that are currently syncing. If set to `false` (default), syncing clients are included in the check. This is useful for testing configuration consistency even before clients are fully synced, as `eth_config` returns configuration data that doesn't depend on sync status.
+
 ### Outputs
 
 - **`ethConfig`**:
@@ -29,6 +32,7 @@ Default settings for the `check_eth_config` task:
     clientPattern: ""
     excludeClientPattern: ""
     failOnMismatch: true
+    excludeSyncingClients: false
 ```
 
 ### Example Usage
@@ -59,6 +63,16 @@ Non-blocking check that logs mismatches but doesn't fail:
   title: "Monitor eth_config consistency"
   config:
     failOnMismatch: false
+```
+
+Only check fully synced clients:
+
+```yaml
+- name: check_eth_config
+  title: "Verify eth_config for synced clients only"
+  config:
+    excludeSyncingClients: true
+    failOnMismatch: true
 ```
 
 ### Implementation Details

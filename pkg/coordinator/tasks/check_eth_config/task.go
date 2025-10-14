@@ -79,7 +79,35 @@ func (t *Task) Execute(ctx context.Context) error {
 	var clients []*execution.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		clients = clientPool.GetExecutionPool().GetReadyEndpoints(true)
+		executionPool := clientPool.GetExecutionPool()
+		allClients := executionPool.GetAllEndpoints()
+
+		if t.config.ExcludeSyncingClients {
+			clients = executionPool.GetReadyEndpoints(true)
+		} else {
+			// Include all clients regardless of sync status
+			clients = allClients
+		}
+
+		t.logger.Infof("execution pool has %d total clients, %d clients selected (excludeSyncing=%v)", len(allClients), len(clients), t.config.ExcludeSyncingClients)
+
+		// Log details about each client
+		for i, client := range allClients {
+			statusStr := "unknown"
+
+			status := client.GetStatus()
+			switch status {
+			case execution.ClientStatusOnline:
+				statusStr = "online"
+			case execution.ClientStatusOffline:
+				statusStr = "offline"
+			case execution.ClientStatusSynchronizing:
+				statusStr = "synchronizing"
+			}
+
+			t.logger.Debugf("client %d: name=%s, status=%s", i, client.GetName(), statusStr)
+		}
+
 		if len(clients) == 0 {
 			t.logger.Error("check failed: no matching clients found")
 			t.ctx.SetResult(types.TaskResultFailure)
