@@ -58,12 +58,12 @@ tasks:
       privateKey: "walletPrivkey"
       walletSeed: "walletSeed"
 
-  # wait for electra activation
+  # wait for gloas activation
   - name: get_consensus_specs
     id: consensusSpecs
     title: "Get consensus chain specs"
   - name: check_consensus_slot_range
-    title: "Wait for electra activation"
+    title: "Wait for gloas activation"
     timeout: 1h
     configVars:
       minEpochNumber: "tasks.consensusSpecs.outputs.specs.GLOAS_FORK_EPOCH"
