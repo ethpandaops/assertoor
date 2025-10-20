@@ -1,0 +1,109 @@
+id: glamsterdam-execution-spec-tests-sequential-glamsterdam
+name: "Run execution spec tests sequentially"
+timeout: 4h
+config:
+  walletPrivkey: ""
+  walletSeed: "spectests"
+  specTestsBranch: "main"
+tasks:
+  # setup dependencies
+  - name: run_external_tasks
+    title: "Setup dependencies for execution spec tests"
+    timeout: 30m
+    config:
+      testFile: /tests/execution-spec-tests-dependencies.yaml
+
+  - name: run_shell
+    title: "Create temp dir for execution spec tests"
+    id: tempdir
+    config:
+      shell: bash
+      command: |
+        set -e
+        tmp_dir=$(mktemp -d -t execution-spec-tests-XXXXXXXXXX)
+
+        echo "============================"
+        echo "Temp dir created: ${tmp_dir}"
+        echo "============================"
+
+        echo "::set-output path ${tmp_dir}"
+
+        echo "$tmp_dir" > $ASSERTOOR_SUMMARY
+
+  - name: run_external_tasks
+    title: "Clone and prepare execution spec tests"
+    timeout: 10m
+    config:
+      testFile: /tests/execution-spec-tests-execute.yaml
+      testConfig:
+        gitRepo: https://github.com/ethereum/execution-spec-tests.git
+        runTests: false
+      testConfigVars:
+        specTestsPath: "tasks.tempdir.outputs.path"
+        gitBranch: "specTestsBranch"
+
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    id: clientCheck
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  - name: generate_child_wallet
+    id: specTestsWallet
+    title: "Generate main wallet for tests"
+    config:
+      prefundMinBalance: 1000000000000000000000000 # ensure a balance of 10000 ETH
+    configVars:
+      privateKey: "walletPrivkey"
+      walletSeed: "walletSeed"
+
+  # wait for gloas activation
+  - name: get_consensus_specs
+    id: consensusSpecs
+    title: "Get consensus chain specs"
+  - name: check_consensus_slot_range
+    title: "Wait for gloas activation"
+    timeout: 1h
+    configVars:
+      minEpochNumber: "tasks.consensusSpecs.outputs.specs.GLOAS_FORK_EPOCH"
+
+  # run execution spec tests
+  - name: run_tasks
+    title: "Run execution spec tests"
+    id: tests
+    config:
+      continueOnFailure: true
+      tasks:
+        - name: run_external_tasks
+          title: "Run execution spec tests: tests/amsterdam/eip7928_block_level_access_lists"
+          timeout: 2h
+          config:
+            testFile: /tests/execution-spec-tests-execute.yaml
+            testConfig:
+              gitRepo: https://github.com/ethereum/execution-spec-tests.git
+              testPath: ./tests/amsterdam/eip7928_block_level_access_lists
+              seedAmount: "10000000000000000000000" # 100 ETH
+              extraFlags: "--fork=Amsterdam -n 16"
+              runSetup: false
+              cleanupTestsPath: false
+            testConfigVars:
+              rpcEndpoint: "tasks.clientCheck.outputs.goodClients[0].elRpcUrl"
+              chainID: "tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID"
+              seedPrivateKey: "tasks.specTestsWallet.outputs.childWallet.privkey"
+              specTestsPath: "tasks.tempdir.outputs.path"
+              gitBranch: "specTestsBranch"
+cleanupTasks:
+  - name: run_shell
+    title: "Cleanup temp dir for execution spec tests"
+    config:
+      shell: bash
+      envVars:
+        SPEC_TESTS_PATH: specTestsPath
+      command: |
+        set -e
+        SPEC_TESTS_PATH=$(echo $SPEC_TESTS_PATH | jq -r)
+
+        if [ ! -z "$SPEC_TESTS_PATH" ]; then
+          rm -rf $SPEC_TESTS_PATH
+        fi
