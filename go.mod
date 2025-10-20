@@ -7,7 +7,7 @@ toolchain go1.24.1
 require (
 	github.com/attestantio/go-eth2-client v0.27.1
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
-	github.com/ethereum/go-ethereum v1.16.4
+	github.com/ethereum/go-ethereum v1.16.5
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
@@ -19,7 +19,7 @@ require (
 	github.com/juliangruber/go-intersect v1.1.0
 	github.com/lib/pq v1.10.9
 	github.com/mashingan/smapping v0.1.19
-	github.com/pressly/goose/v3 v3.25.0
+	github.com/pressly/goose/v3 v3.26.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/protolambda/zrnt v0.34.1
 	github.com/protolambda/ztyp v0.2.2
