@@ -429,8 +429,8 @@ func (t *Task) getCommitteeDuties(ctx context.Context, epoch uint64) ([]*v1.Beac
 }
 
 func (t *Task) generateAndSubmitAttestation(ctx context.Context, slot uint64, committeeIdx phase0.CommitteeIndex, duties []*validatorDuty) (int, error) {
-	client := t.getClient()
-	if client == nil {
+	clients := t.getClients()
+	if len(clients) == 0 {
 		return 0, fmt.Errorf("no client available")
 	}
 
@@ -438,11 +438,24 @@ func (t *Task) generateAndSubmitAttestation(ctx context.Context, slot uint64, co
 	specs := consensusPool.GetBlockCache().GetSpecs()
 	genesis := consensusPool.GetBlockCache().GetGenesis()
 
-	// Get attestation data from beacon node
-	attData, err := client.GetRPCClient().GetAttestationData(ctx, slot, uint64(committeeIdx))
-	if err != nil {
-		return 0, fmt.Errorf("failed to get attestation data: %w", err)
+	// Get attestation data from beacon node, retry with different clients if needed
+	var attData *phase0.AttestationData
+	var lastErr error
+	for _, client := range clients {
+		var err error
+		attData, err = client.GetRPCClient().GetAttestationData(ctx, slot, uint64(committeeIdx))
+		if err == nil {
+			break
+		}
+		lastErr = err
+		t.logger.Debugf("failed to get attestation data from %s: %v, trying next client", client.GetName(), err)
 	}
+	if attData == nil {
+		return 0, fmt.Errorf("failed to get attestation data from all clients: %w", lastErr)
+	}
+
+	// Use first client for remaining operations
+	client := clients[0]
 
 	// Apply static late head offset if configured (applies to all attestations in this batch)
 	if t.config.LateHead != 0 {
@@ -696,18 +709,39 @@ func (t *Task) findChildBlock(parentRoot phase0.Root) *consensus.Block {
 }
 
 func (t *Task) getClient() *consensus.Client {
-	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
-
-	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		return clientPool.GetConsensusPool().GetReadyEndpoint(consensus.AnyClient)
-	}
-
-	clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
+	clients := t.getClients()
 	if len(clients) == 0 {
 		return nil
 	}
 
-	return clients[0].ConsensusClient
+	return clients[0]
+}
+
+func (t *Task) getClients() []*consensus.Client {
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
+	consensusPool := clientPool.GetConsensusPool()
+
+	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
+		allClients := consensusPool.GetAllEndpoints()
+		clients := make([]*consensus.Client, 0, len(allClients))
+		for _, c := range allClients {
+			if consensusPool.IsClientReady(c) {
+				clients = append(clients, c)
+			}
+		}
+
+		return clients
+	}
+
+	poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
+	clients := make([]*consensus.Client, 0, len(poolClients))
+	for _, c := range poolClients {
+		if c.ConsensusClient != nil && consensusPool.IsClientReady(c.ConsensusClient) {
+			clients = append(clients, c.ConsensusClient)
+		}
+	}
+
+	return clients
 }
 
 func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {
