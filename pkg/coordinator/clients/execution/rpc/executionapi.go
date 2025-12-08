@@ -77,6 +77,7 @@ func (ec *ExecutionClient) GetEthClient() *ethclient.Client {
 
 func (ec *ExecutionClient) GetClientVersion(ctx context.Context) (string, error) {
 	var result string
+
 	err := ec.rpcClient.CallContext(ctx, &result, "web3_clientVersion")
 
 	return result, err

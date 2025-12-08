@@ -41,11 +41,11 @@ func (db *Database) UpsertTaskResult(tx *sqlx.Tx, result *TaskResult) error {
 
 func (db *Database) GetTaskResultByIndex(runID, taskID uint64, resultType string, index int) (*TaskResult, error) {
 	var result TaskResult
+
 	err := db.reader.Get(&result, `
 		SELECT * FROM task_results
 		WHERE run_id = $1 AND task_id = $2 AND result_type = $3 AND result_index = $4`,
 		runID, taskID, resultType, index)
-
 	if err != nil {
 		return nil, err
 	}
@@ -55,11 +55,11 @@ func (db *Database) GetTaskResultByIndex(runID, taskID uint64, resultType string
 
 func (db *Database) GetTaskResultByName(runID, taskID uint64, resultType, name string) (*TaskResult, error) {
 	var result TaskResult
+
 	err := db.reader.Get(&result, `
 		SELECT * FROM task_results
 		WHERE run_id = $1 AND task_id = $2 AND result_type = $3 AND name = $4`,
 		runID, taskID, resultType, name)
-
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +69,7 @@ func (db *Database) GetTaskResultByName(runID, taskID uint64, resultType, name s
 
 func (db *Database) GetTaskResults(runID, taskID uint64, summaryType string) ([]TaskResult, error) {
 	var results []TaskResult
+
 	err := db.reader.Select(&results, `
 		SELECT * FROM task_results
 		WHERE run_id = $1 AND task_id = $2 AND result_type = $3`,
@@ -79,6 +80,7 @@ func (db *Database) GetTaskResults(runID, taskID uint64, summaryType string) ([]
 
 func (db *Database) GetAllTaskResultHeaders(runID uint64) ([]TaskResultHeader, error) {
 	var headers []TaskResultHeader
+
 	err := db.reader.Select(&headers, `
 		SELECT task_id, result_type, result_index, name, size FROM task_results
 		WHERE run_id = $1`,

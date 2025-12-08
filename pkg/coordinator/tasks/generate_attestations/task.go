@@ -160,6 +160,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			if count > 0 {
 				totalAttestations += count
+
 				t.ctx.SetResult(types.TaskResultSuccess)
 				t.logger.Infof("sent %d attestations for slot %d (total: %d)", count, slot.Number(), totalAttestations)
 			}
@@ -182,6 +183,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				t.logger.Infof("processing all attestations for epoch %d", prevEpoch)
 
 				epochAttestations := 0
+
 				for slotOffset := uint64(0); slotOffset < specs.SlotsPerEpoch; slotOffset++ {
 					targetSlot := prevEpoch*specs.SlotsPerEpoch + slotOffset
 
@@ -198,6 +200,7 @@ func (t *Task) Execute(ctx context.Context) error {
 					if t.config.LimitTotal > 0 && totalAttestations >= t.config.LimitTotal {
 						t.logger.Infof("reached total attestation limit: %d", totalAttestations)
 						t.ctx.SetResult(types.TaskResultSuccess)
+
 						return nil
 					}
 				}
@@ -266,7 +269,7 @@ func (t *Task) initValidatorKeys() error {
 	return nil
 }
 
-func (t *Task) processSlot(ctx context.Context, slot uint64, startEpoch uint64) (int, error) {
+func (t *Task) processSlot(ctx context.Context, slot, startEpoch uint64) (int, error) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	specs := consensusPool.GetBlockCache().GetSpecs()
 
@@ -328,7 +331,7 @@ func (t *Task) processSlot(ctx context.Context, slot uint64, startEpoch uint64) 
 
 // processSlotForEpoch processes attestations for a specific slot in a given epoch.
 // This is used by sendAllLastEpoch mode where we know the target epoch directly.
-func (t *Task) processSlotForEpoch(ctx context.Context, slot uint64, epoch uint64) (int, error) {
+func (t *Task) processSlotForEpoch(ctx context.Context, slot, epoch uint64) (int, error) {
 	// Get committee duties for the epoch
 	duties, err := t.getCommitteeDuties(ctx, epoch)
 	if err != nil {
@@ -384,7 +387,7 @@ func (t *Task) findSlotDuties(slot uint64, duties []*v1.BeaconCommittee) []*vali
 					validatorIndex:      valIdx,
 					committeeIndex:      committee.Index,
 					committeeLength:     uint64(len(committee.Validators)),
-					positionInCommittee: uint64(position),
+					positionInCommittee: uint64(position), //nolint:gosec // position from range is always non-negative
 				})
 			}
 		}
@@ -439,16 +442,21 @@ func (t *Task) generateAndSubmitAttestation(ctx context.Context, slot uint64, co
 
 	// Get attestation data from beacon node, retry with different clients if needed
 	var attData *phase0.AttestationData
+
 	var lastErr error
+
 	for _, client := range clients {
 		var err error
+
 		attData, err = client.GetRPCClient().GetAttestationData(ctx, slot, uint64(committeeIdx))
 		if err == nil {
 			break
 		}
+
 		lastErr = err
 		t.logger.Debugf("failed to get attestation data from %s: %v, trying next client", client.GetName(), err)
 	}
+
 	if attData == nil {
 		return 0, fmt.Errorf("failed to get attestation data from all clients: %w", lastErr)
 	}
@@ -470,6 +478,7 @@ func (t *Task) generateAndSubmitAttestation(ctx context.Context, slot uint64, co
 
 	// Compute the signing domain
 	epoch := uint64(attData.Slot) / specs.SlotsPerEpoch
+
 	forkVersion := forkState.CurrentVersion
 	if epoch < uint64(forkState.Epoch) {
 		forkVersion = forkState.PreviousVersion
@@ -483,16 +492,19 @@ func (t *Task) generateAndSubmitAttestation(ctx context.Context, slot uint64, co
 
 	// Parse random late head config
 	randomMin, randomMax, randomEnabled, _ := t.config.ParseRandomLateHead()
+
 	clusterSize := t.config.LateHeadClusterSize
 	if clusterSize <= 0 {
 		clusterSize = 1 // Default: each attestation gets its own random offset
 	}
 
 	// Create SingleAttestation objects for each validator (Electra format)
-	var singleAttestations []*rpc.SingleAttestation
+	singleAttestations := make([]*rpc.SingleAttestation, 0, len(duties))
 
 	var currentClusterOffset int
+
 	var clusterAttData *phase0.AttestationData
+
 	attestationCount := 0
 
 	for _, duty := range duties {
@@ -503,9 +515,11 @@ func (t *Task) generateAndSubmitAttestation(ctx context.Context, slot uint64, co
 
 		// Apply per-attestation or per-cluster random late head if configured
 		attDataForValidator := attData
+
 		if randomEnabled {
 			// Generate new random offset at start or when cluster is full
 			if attestationCount%clusterSize == 0 {
+				//nolint:gosec // G404: not security-critical, used for test randomization
 				currentClusterOffset = randomMin + rand.Intn(randomMax-randomMin+1)
 				if currentClusterOffset != 0 {
 					clusterAttData = t.applyLateHead(attData, currentClusterOffset)
@@ -513,21 +527,22 @@ func (t *Task) generateAndSubmitAttestation(ctx context.Context, slot uint64, co
 					clusterAttData = attData
 				}
 			}
+
 			attDataForValidator = clusterAttData
 			attestationCount++
 		}
 
 		// Sign attestation data
-		msgRoot, err := attDataForValidator.HashTreeRoot()
-		if err != nil {
-			return 0, fmt.Errorf("failed to hash attestation data: %w", err)
+		msgRoot, hashErr := attDataForValidator.HashTreeRoot()
+		if hashErr != nil {
+			return 0, fmt.Errorf("failed to hash attestation data: %w", hashErr)
 		}
 
 		signingRoot := common.ComputeSigningRoot(msgRoot, dom)
 
 		var secKey hbls.SecretKey
-		if err := secKey.Deserialize(valKey.privkey.Marshal()); err != nil {
-			return 0, fmt.Errorf("failed to deserialize private key: %w", err)
+		if deserializeErr := secKey.Deserialize(valKey.privkey.Marshal()); deserializeErr != nil {
+			return 0, fmt.Errorf("failed to deserialize private key: %w", deserializeErr)
 		}
 
 		sig := secKey.SignHash(signingRoot[:])
@@ -570,6 +585,7 @@ func (t *Task) applyLateHead(attData *phase0.AttestationData, offset int) *phase
 	if newSlot < targetEpochFirstSlot {
 		t.logger.Debugf("late head offset %d would result in invalid head (slot %d < target epoch slot %d), clamping to target",
 			offset, newSlot, targetEpochFirstSlot)
+
 		newRoot = attData.Target.Root
 		newSlot = targetEpochFirstSlot
 	}
@@ -596,7 +612,7 @@ func (t *Task) applyLateHead(attData *phase0.AttestationData, offset int) *phase
 // walkBlocks walks N blocks from the given root.
 // Positive steps go backwards (using parentRoot), negative steps go forward (finding child blocks).
 // Returns the resulting root and slot. Always returns a valid slot from the last known block.
-func (t *Task) walkBlocks(startRoot phase0.Root, startSlot uint64, steps int) (phase0.Root, uint64) {
+func (t *Task) walkBlocks(startRoot phase0.Root, startSlot uint64, steps int) (resultRoot phase0.Root, resultSlot uint64) {
 	if steps > 0 {
 		return t.walkBackBlocks(startRoot, startSlot, steps)
 	} else if steps < 0 {
@@ -616,7 +632,7 @@ func (t *Task) walkBlocks(startRoot phase0.Root, startSlot uint64, steps int) (p
 }
 
 // walkBackBlocks walks back N blocks from the given root using parentRoot.
-func (t *Task) walkBackBlocks(startRoot phase0.Root, startSlot uint64, steps int) (phase0.Root, uint64) {
+func (t *Task) walkBackBlocks(startRoot phase0.Root, startSlot uint64, steps int) (resultRoot phase0.Root, resultSlot uint64) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	blockCache := consensusPool.GetBlockCache()
 
@@ -654,7 +670,7 @@ func (t *Task) walkBackBlocks(startRoot phase0.Root, startSlot uint64, steps int
 }
 
 // walkForwardBlocks walks forward N blocks from the given root by finding child blocks.
-func (t *Task) walkForwardBlocks(startRoot phase0.Root, startSlot uint64, steps int) (phase0.Root, uint64) {
+func (t *Task) walkForwardBlocks(startRoot phase0.Root, startSlot uint64, steps int) (resultRoot phase0.Root, resultSlot uint64) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	blockCache := consensusPool.GetBlockCache()
 
@@ -722,7 +738,9 @@ func (t *Task) getClients() []*consensus.Client {
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		allClients := consensusPool.GetAllEndpoints()
+
 		clients := make([]*consensus.Client, 0, len(allClients))
+
 		for _, c := range allClients {
 			if consensusPool.IsClientReady(c) {
 				clients = append(clients, c)
@@ -733,7 +751,9 @@ func (t *Task) getClients() []*consensus.Client {
 	}
 
 	poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
+
 	clients := make([]*consensus.Client, 0, len(poolClients))
+
 	for _, c := range poolClients {
 		if c.ConsensusClient != nil && consensusPool.IsClientReady(c.ConsensusClient) {
 			clients = append(clients, c.ConsensusClient)

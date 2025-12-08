@@ -67,6 +67,7 @@ func (manager *Manager) newWallet(address common.Address) *Wallet {
 
 func (wallet *Wallet) loadState() {
 	wallet.syncingMutex.Lock()
+
 	alreadySyncing := false
 
 	if wallet.isSyncing {
@@ -74,6 +75,7 @@ func (wallet *Wallet) loadState() {
 	} else {
 		wallet.isSyncing = true
 	}
+
 	wallet.syncingMutex.Unlock()
 
 	if alreadySyncing {
@@ -263,6 +265,7 @@ func (wallet *Wallet) BuildTransaction(ctx context.Context, buildFn func(ctx con
 
 	signer := types.NewPragueSigner(wallet.manager.clientPool.GetBlockCache().GetChainID())
 	nonce := wallet.pendingNonce
+
 	tx, err := buildFn(ctx, nonce, func(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
 		if !bytes.Equal(addr[:], wallet.address[:]) {
 			return nil, fmt.Errorf("cannot sign for another wallet")
@@ -275,13 +278,11 @@ func (wallet *Wallet) BuildTransaction(ctx context.Context, buildFn func(ctx con
 
 		return signedTx, nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
 	signedTx, err := types.SignTx(tx, signer, wallet.privkey)
-
 	if err != nil {
 		return nil, err
 	}

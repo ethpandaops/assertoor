@@ -129,8 +129,8 @@ func (bc *BeaconClient) postJSONWithHeaders(ctx context.Context, requrl string, 
 	}
 
 	reader := bytes.NewReader(postDataBytes)
-	req, err := nethttp.NewRequestWithContext(ctx, "POST", requrl, reader)
 
+	req, err := nethttp.NewRequestWithContext(ctx, "POST", requrl, reader)
 	if err != nil {
 		return err
 	}
@@ -509,7 +509,7 @@ type apiAttestationData struct {
 	Data *phase0.AttestationData `json:"data"`
 }
 
-func (bc *BeaconClient) GetAttestationData(ctx context.Context, slot uint64, committeeIndex uint64) (*phase0.AttestationData, error) {
+func (bc *BeaconClient) GetAttestationData(ctx context.Context, slot, committeeIndex uint64) (*phase0.AttestationData, error) {
 	var attestationData apiAttestationData
 
 	err := bc.getJSON(ctx, fmt.Sprintf("%s/eth/v1/validator/attestation_data?slot=%d&committee_index=%d", bc.endpoint, slot, committeeIndex), &attestationData)

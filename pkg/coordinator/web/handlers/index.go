@@ -91,8 +91,8 @@ func (fh *FrontendHandler) Index(w http.ResponseWriter, r *http.Request) {
 	pageArgs := fh.parseIndexPageArgs(r)
 
 	var pageError error
-	data.Data, pageError = fh.getIndexPageData(pageArgs)
 
+	data.Data, pageError = fh.getIndexPageData(pageArgs)
 	if pageError != nil {
 		fh.HandlePageError(w, r, pageError)
 		return
@@ -114,8 +114,8 @@ func (fh *FrontendHandler) IndexData(w http.ResponseWriter, r *http.Request) {
 	var pageError error
 
 	pageArgs := fh.parseIndexPageArgs(r)
-	pageData, pageError = fh.getIndexPageData(pageArgs)
 
+	pageData, pageError = fh.getIndexPageData(pageArgs)
 	if pageError != nil {
 		fh.HandlePageError(w, r, pageError)
 		return

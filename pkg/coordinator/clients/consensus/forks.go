@@ -17,6 +17,7 @@ type HeadFork struct {
 func (pool *Pool) resetHeadForkCache() {
 	pool.forkCacheMutex.Lock()
 	defer pool.forkCacheMutex.Unlock()
+
 	pool.forkCache = map[int64][]*HeadFork{}
 }
 

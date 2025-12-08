@@ -46,8 +46,8 @@ func (fh *FrontendHandler) Clients(w http.ResponseWriter, r *http.Request) {
 	data := fh.initPageData(r, "clients", "/clients", "Clients", templateFiles)
 
 	var pageError error
-	data.Data, pageError = fh.getClientsPageData()
 
+	data.Data, pageError = fh.getClientsPageData()
 	if pageError != nil {
 		fh.HandlePageError(w, r, pageError)
 		return

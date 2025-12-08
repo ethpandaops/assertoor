@@ -25,7 +25,6 @@ func (client *Client) runClientLoop() {
 
 	for {
 		err := client.checkClient()
-
 		if err == nil {
 			err = client.runClientLogic()
 		}
@@ -216,6 +215,7 @@ func (client *Client) processBlock(hash common.Hash, number uint64, block *types
 	}
 
 	client.headMutex.Lock()
+
 	if bytes.Equal(client.headHash[:], hash[:]) {
 		client.headMutex.Unlock()
 		return nil

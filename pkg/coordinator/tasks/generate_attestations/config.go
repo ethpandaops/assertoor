@@ -30,8 +30,8 @@ type Config struct {
 }
 
 // ParseRandomLateHead parses the RandomLateHead string in "min:max" or "min-max" format.
-// Returns min, max values and whether random late head is enabled.
-func (c *Config) ParseRandomLateHead() (min, max int, enabled bool, err error) {
+// Returns minVal, maxVal values and whether random late head is enabled.
+func (c *Config) ParseRandomLateHead() (minVal, maxVal int, enabled bool, err error) {
 	if c.RandomLateHead == "" {
 		return 0, 0, false, nil
 	}
@@ -48,21 +48,21 @@ func (c *Config) ParseRandomLateHead() (min, max int, enabled bool, err error) {
 		return 0, 0, false, fmt.Errorf("randomLateHead must be in 'min:max' or 'min-max' format, got: %s", c.RandomLateHead)
 	}
 
-	min, err = strconv.Atoi(strings.TrimSpace(parts[0]))
+	minVal, err = strconv.Atoi(strings.TrimSpace(parts[0]))
 	if err != nil {
 		return 0, 0, false, fmt.Errorf("invalid min value in randomLateHead: %w", err)
 	}
 
-	max, err = strconv.Atoi(strings.TrimSpace(parts[1]))
+	maxVal, err = strconv.Atoi(strings.TrimSpace(parts[1]))
 	if err != nil {
 		return 0, 0, false, fmt.Errorf("invalid max value in randomLateHead: %w", err)
 	}
 
-	if min > max {
-		return 0, 0, false, fmt.Errorf("min (%d) cannot be greater than max (%d) in randomLateHead", min, max)
+	if minVal > maxVal {
+		return 0, 0, false, fmt.Errorf("min (%d) cannot be greater than max (%d) in randomLateHead", minVal, maxVal)
 	}
 
-	return min, max, true, nil
+	return minVal, maxVal, true, nil
 }
 
 func DefaultConfig() Config {

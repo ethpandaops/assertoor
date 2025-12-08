@@ -164,7 +164,9 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 
 			depositReceiptsMtx.Lock()
+
 			depositReceipts[tx.Hash().Hex()] = receipt
+
 			depositReceiptsMtx.Unlock()
 
 			switch {
@@ -207,6 +209,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		if t.config.LimitPerSlot > 0 && perSlotCount >= t.config.LimitPerSlot {
 			// await next block
 			perSlotCount = 0
+
 			select {
 			case <-ctx.Done():
 				return nil
@@ -245,8 +248,8 @@ func (t *Task) Execute(ctx context.Context) error {
 			receiptJSON, err := json.Marshal(receipt)
 			if err == nil {
 				receiptMap = map[string]interface{}{}
-				err = json.Unmarshal(receiptJSON, &receiptMap)
 
+				err = json.Unmarshal(receiptJSON, &receiptMap)
 				if err != nil {
 					t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
 
@@ -459,7 +462,6 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		RebroadcastInterval: 30 * time.Second,
 		MaxRebroadcasts:     5,
 	})
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed sending deposit transaction: %w", err)
 	}

@@ -43,8 +43,8 @@ func (ah *APIHandler) sendErrorResponse(w http.ResponseWriter, route, message st
 	j := json.NewEncoder(w)
 	response := &Response{}
 	response.Status = "ERROR: " + message
-	err := j.Encode(response)
 
+	err := j.Encode(response)
 	if err != nil {
 		ah.logger.Errorf("error serializing json error for API %v route: %v", route, err)
 	}
@@ -56,8 +56,8 @@ func (ah *APIHandler) sendOKResponse(w http.ResponseWriter, route string, data i
 		Status: "OK",
 		Data:   data,
 	}
-	err := j.Encode(response)
 
+	err := j.Encode(response)
 	if err != nil {
 		ah.logger.Errorf("error serializing json data for API %v route: %v", route, err)
 	}

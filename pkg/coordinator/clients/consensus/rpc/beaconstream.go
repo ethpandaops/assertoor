@@ -84,6 +84,7 @@ func (bs *BeaconStream) startStream() {
 				bs.ReadyChan <- true
 			case err := <-stream.Errors:
 				logger.WithField("client", bs.client.name).Warnf("beacon block stream error: %v", err)
+
 				select {
 				case bs.ReadyChan <- false:
 				case <-bs.ctx.Done():
@@ -136,8 +137,8 @@ func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventst
 		var stream *eventstream.Stream
 
 		streamURL := fmt.Sprintf("%s/eth/v1/events?topics=%v", endpoint, topics.String())
-		req, err := http.NewRequestWithContext(bs.ctx, "GET", streamURL, http.NoBody)
 
+		req, err := http.NewRequestWithContext(bs.ctx, "GET", streamURL, http.NoBody)
 		if err == nil {
 			for headerKey, headerVal := range bs.client.headers {
 				req.Header.Set(headerKey, headerVal)
@@ -148,6 +149,7 @@ func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventst
 
 		if err != nil {
 			logger.WithField("client", bs.client.name).Warnf("Error while subscribing beacon event stream %v: %v", getRedactedURL(streamURL), err)
+
 			select {
 			case <-bs.ctx.Done():
 				return nil
@@ -163,11 +165,11 @@ func (bs *BeaconStream) processBlockEvent(evt eventsource.Event) {
 	var parsed v1.BlockEvent
 
 	err := json.Unmarshal([]byte(evt.Data()), &parsed)
-
 	if err != nil {
 		logger.WithField("client", bs.client.name).Warnf("beacon block stream failed to decode block event: %v", err)
 		return
 	}
+
 	bs.EventChan <- &BeaconStreamEvent{
 		Event: StreamBlockEvent,
 		Data:  &parsed,

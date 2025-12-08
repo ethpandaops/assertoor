@@ -119,11 +119,13 @@ func (c *TestRunner) createTestRun(descriptor types.TestDescriptor, configOverri
 	}
 
 	c.testRegistryMutex.Lock()
+
 	if !skipQueue {
 		c.testQueue = append(c.testQueue, testRef)
 	}
 
 	c.testRunMap[runID] = testRef
+
 	c.testRegistryMutex.Unlock()
 
 	return testRef, nil
@@ -142,10 +144,12 @@ runLoop:
 		var nextTest types.TestRunner
 
 		c.testRegistryMutex.Lock()
+
 		if len(c.testQueue) > 0 {
 			nextTest = c.testQueue[0]
 			c.testQueue = c.testQueue[1:]
 		}
+
 		c.testRegistryMutex.Unlock()
 
 		if nextTest != nil {
@@ -158,7 +162,9 @@ runLoop:
 
 				c.runTest(ctx, nextTest)
 			}
+
 			semaphore <- true
+
 			if ctx.Err() != nil {
 				break runLoop
 			}

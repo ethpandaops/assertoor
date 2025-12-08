@@ -98,12 +98,14 @@ func (lh *logDBWriter) flushDelayed() {
 
 		lh.bufMtx.Lock()
 		defer lh.bufMtx.Unlock()
+
 		lh.flushToDB()
 	}()
 }
 
 func (lh *logDBWriter) flushToDB() {
 	lh.flushMtx.Lock()
+
 	defer func() {
 		lh.flushMtx.Unlock()
 	}()
@@ -126,7 +128,6 @@ func (lh *logDBWriter) flushToDB() {
 
 		return nil
 	})
-
 	if err != nil {
 		lh.logger.logger.Errorf("failed to write log entries to db: %v", err)
 		return

@@ -72,6 +72,7 @@ func NewBlockCache(ctx context.Context, logger logrus.FieldLogger, followDistanc
 				logger.WithError(err2).Errorf("uncaught panic in BlockCache.runCacheCleanup subroutine: %v, stack: %v", err, string(debug.Stack()))
 			}
 		}()
+
 		cache.runCacheCleanup(ctx)
 	}()
 
@@ -202,6 +203,7 @@ func (cache *BlockCache) GetWallclock() *ethwallclock.EthereumBeaconChain {
 
 func (cache *BlockCache) SetFinalizedCheckpoint(finalizedEpoch phase0.Epoch, finalizedRoot phase0.Root) {
 	cache.finalizedMutex.Lock()
+
 	if finalizedEpoch <= cache.finalizedEpoch {
 		cache.finalizedMutex.Unlock()
 		return

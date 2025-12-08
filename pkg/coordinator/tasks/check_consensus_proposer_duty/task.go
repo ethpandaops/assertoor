@@ -118,7 +118,6 @@ func (t *Task) loadEpochDuties(ctx context.Context, epoch uint64) {
 	}
 
 	proposerDuties, err := client.GetRPCClient().GetProposerDuties(ctx, epoch)
-
 	if err != nil {
 		t.logger.Errorf("error while fetching epoch duties: %v", err.Error())
 		return
@@ -158,8 +157,8 @@ func (t *Task) runProposerDutyCheck(slot uint64) bool {
 
 		if t.config.ValidatorNamePattern != "" {
 			validatorName := t.ctx.Scheduler.GetServices().ValidatorNames().GetValidatorName(uint64(duty.ValidatorIndex))
-			matched, err := regexp.MatchString(t.config.ValidatorNamePattern, validatorName)
 
+			matched, err := regexp.MatchString(t.config.ValidatorNamePattern, validatorName)
 			if err != nil {
 				t.logger.Errorf("slot %v check failed: validator name pattern invalid: %v", slot, err)
 				return false

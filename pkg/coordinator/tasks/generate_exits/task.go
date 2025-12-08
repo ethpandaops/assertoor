@@ -135,6 +135,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		if t.config.LimitPerSlot > 0 && perSlotCount >= t.config.LimitPerSlot {
 			// await next block
 			perSlotCount = 0
+
 			select {
 			case <-ctx.Done():
 				return nil

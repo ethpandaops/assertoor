@@ -15,6 +15,7 @@ type Dispatcher[T interface{}] struct {
 func (d *Dispatcher[T]) Subscribe(capacity int) *Subscription[T] {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
+
 	subscription := &Subscription[T]{
 		channel:    make(chan T, capacity),
 		dispatcher: d,

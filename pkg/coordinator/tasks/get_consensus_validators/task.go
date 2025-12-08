@@ -101,8 +101,8 @@ func (t *Task) Execute(_ context.Context) error {
 
 	if t.config.ValidatorNamePattern != "" {
 		var err error
-		validatorNameRegex, err = regexp.Compile(t.config.ValidatorNamePattern)
 
+		validatorNameRegex, err = regexp.Compile(t.config.ValidatorNamePattern)
 		if err != nil {
 			return fmt.Errorf("invalid validator name pattern: %v", err)
 		}
