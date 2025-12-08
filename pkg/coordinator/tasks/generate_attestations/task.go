@@ -43,8 +43,7 @@ type Task struct {
 	validatorKeys map[phase0.ValidatorIndex]*validatorKey
 
 	// Cache for committee duties per epoch
-	dutiesCache      map[uint64][]*v1.BeaconCommittee
-	dutiesCacheEpoch uint64
+	dutiesCache map[uint64][]*v1.BeaconCommittee
 }
 
 type validatorKey struct {
