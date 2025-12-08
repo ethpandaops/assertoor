@@ -17,6 +17,7 @@ import (
 	checkethcall "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_eth_call"
 	checkethconfig "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_eth_config"
 	checkexecutionsyncstatus "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/check_execution_sync_status"
+	generateattestations "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_attestations"
 	generateblobtransactions "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_blob_transactions"
 	generateblschanges "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_bls_changes"
 	generatechildwallet "github.com/ethpandaops/assertoor/pkg/coordinator/tasks/generate_child_wallet"
@@ -60,6 +61,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkethcall.TaskDescriptor,
 	checkethconfig.TaskDescriptor,
 	checkexecutionsyncstatus.TaskDescriptor,
+	generateattestations.TaskDescriptor,
 	generateblobtransactions.TaskDescriptor,
 	generateblschanges.TaskDescriptor,
 	generatechildwallet.TaskDescriptor,
