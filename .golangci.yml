@@ -27,7 +27,7 @@ linters:
     - unparam
     - unused
     - whitespace
-    - wsl
+    - wsl_v5
   settings:
     errcheck:
       check-type-assertions: true
@@ -47,6 +47,10 @@ linters:
     nolintlint:
       require-explanation: true
       require-specific: true
+    wsl_v5:
+      allow-first-in-block: true
+      allow-whole-block: false
+      branch-max-lines: 2
   exclusions:
     generated: lax
     presets:
@@ -58,6 +62,11 @@ linters:
       - third_party$
       - builtin$
       - examples$
+    rules:
+      - linters:
+          - revive
+        text: "var-naming: avoid meaningless package names"
+        path: "pkg/coordinator/(types|web/types|web/utils|web/api)/"
 formatters:
   enable:
     - gofmt

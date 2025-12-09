@@ -171,8 +171,8 @@ func (t *Task) runValidatorStatusCheck() bool {
 			validatorJSON, err := json.Marshal(validator)
 			if err == nil {
 				validatorMap := map[string]interface{}{}
-				err = json.Unmarshal(validatorJSON, &validatorMap)
 
+				err = json.Unmarshal(validatorJSON, &validatorMap)
 				if err == nil {
 					t.ctx.Vars.SetVar(t.config.ValidatorInfoResultVar, validatorMap)
 				} else {

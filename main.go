@@ -19,6 +19,7 @@ func main() {
 	runChan := make(chan bool)
 
 	var execErr error
+
 	go func() {
 		execErr = cmd.Execute(ctx)
 
@@ -31,6 +32,7 @@ func main() {
 	case sig := <-signalChan:
 		log.Printf("Caught signal: %v, shutdown gracefully...", sig)
 		cancel()
+
 		select {
 		case <-runChan:
 			// graceful shutdown completed

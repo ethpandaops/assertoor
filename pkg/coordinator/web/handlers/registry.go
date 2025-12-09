@@ -89,8 +89,8 @@ func (fh *FrontendHandler) Registry(w http.ResponseWriter, r *http.Request) {
 	pageArgs := fh.parseRegistryPageArgs(r)
 
 	var pageError error
-	data.Data, pageError = fh.getRegistryPageData(pageArgs)
 
+	data.Data, pageError = fh.getRegistryPageData(pageArgs)
 	if pageError != nil {
 		fh.HandlePageError(w, r, pageError)
 		return
@@ -112,8 +112,8 @@ func (fh *FrontendHandler) RegistryData(w http.ResponseWriter, r *http.Request) 
 	var pageError error
 
 	pageArgs := fh.parseRegistryPageArgs(r)
-	pageData, pageError = fh.getRegistryPageData(pageArgs)
 
+	pageData, pageError = fh.getRegistryPageData(pageArgs)
 	if pageError != nil {
 		fh.HandlePageError(w, r, pageError)
 		return

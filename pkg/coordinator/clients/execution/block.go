@@ -40,6 +40,7 @@ func (block *Block) GetSeenBy() []*Client {
 func (block *Block) SetSeenBy(client *Client) {
 	block.seenMutex.Lock()
 	defer block.seenMutex.Unlock()
+
 	block.seenMap[client.clientIdx] = client
 
 	if block.seenChan != nil {

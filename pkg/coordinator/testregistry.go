@@ -158,7 +158,6 @@ func (c *TestRegistry) LoadTests(ctx context.Context, local []*types.TestConfig,
 
 			return nil
 		})
-
 		if err != nil {
 			c.coordinator.Logger().Errorf("error adding new test configs to db: %v", err)
 		}
@@ -260,7 +259,6 @@ func (c *TestRegistry) AddExternalTest(ctx context.Context, extTestCfg *types.Ex
 	err = c.coordinator.Database().RunTransaction(func(tx *sqlx.Tx) error {
 		return c.coordinator.Database().InsertTestConfig(tx, dbTestCfg)
 	})
-
 	if err != nil {
 		c.coordinator.Logger().Errorf("error adding new test configs to db: %v", err)
 	}
@@ -327,6 +325,7 @@ func (c *TestRegistry) externalTestCfgToDB(cfgExternalTest *types.ExternalTestCo
 
 func (c *TestRegistry) DeleteTest(testID string) error {
 	c.testDescriptorsMutex.Lock()
+
 	if _, ok := c.testDescriptors[testID]; !ok {
 		c.testDescriptorsMutex.Unlock()
 		return nil

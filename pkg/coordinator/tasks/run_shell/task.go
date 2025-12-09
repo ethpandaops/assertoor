@@ -185,6 +185,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	var execErr error
 
 	waitChan := make(chan bool)
+
 	go func() {
 		defer close(waitChan)
 

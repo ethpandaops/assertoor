@@ -71,8 +71,8 @@ func (pool *Pool) GetBlockCache() *BlockCache {
 func (pool *Pool) AddEndpoint(endpoint *ClientConfig) (*Client, error) {
 	clientIdx := pool.clientCounter
 	pool.clientCounter++
-	client, err := pool.newPoolClient(clientIdx, endpoint)
 
+	client, err := pool.newPoolClient(clientIdx, endpoint)
 	if err != nil {
 		return nil, err
 	}

@@ -225,6 +225,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		if t.config.LimitPerBlock > 0 && perBlockCount >= t.config.LimitPerBlock {
 			// await next block
 			perBlockCount = 0
+
 			select {
 			case <-ctx.Done():
 				return nil
@@ -379,6 +380,7 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 				t.logger.WithFields(logrus.Fields{
 					"client": client.GetName(),
 				}).Warnf("error sending tx %v: %v", transactionIdx, err)
+
 				return
 			}
 
@@ -399,7 +401,6 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		RebroadcastInterval: 30 * time.Second,
 		MaxRebroadcasts:     5,
 	})
-
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "nonce") {
 			txWallet.ResyncState()

@@ -182,6 +182,7 @@ func (stream *Stream) receiveEvents(r io.ReadCloser) {
 		ev, err := dec.Decode()
 
 		stream.closeMutex.Lock()
+
 		if stream.isClosed {
 			stream.closeMutex.Unlock()
 			return
@@ -189,6 +190,7 @@ func (stream *Stream) receiveEvents(r io.ReadCloser) {
 
 		if err != nil {
 			stream.Errors <- err
+
 			stream.closeMutex.Unlock()
 
 			return
@@ -209,6 +211,7 @@ func (stream *Stream) receiveEvents(r io.ReadCloser) {
 		}
 
 		stream.Events <- pub
+
 		stream.closeMutex.Unlock()
 	}
 }
@@ -237,11 +240,14 @@ func (stream *Stream) retryRestartStream() {
 		}
 
 		stream.closeMutex.Lock()
+
 		if stream.isClosed {
 			stream.closeMutex.Unlock()
 			return
 		}
+
 		stream.Errors <- err
+
 		stream.closeMutex.Unlock()
 
 		backoff = 10 * time.Second

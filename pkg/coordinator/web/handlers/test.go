@@ -109,8 +109,8 @@ func (fh *FrontendHandler) TestPageData(w http.ResponseWriter, r *http.Request) 
 
 	vars := mux.Vars(r)
 	pageArgs := fh.parseTestPageArgs(r)
-	pageData, pageError = fh.getTestPageData(vars["testId"], pageArgs)
 
+	pageData, pageError = fh.getTestPageData(vars["testId"], pageArgs)
 	if pageError != nil {
 		fh.HandlePageError(w, r, pageError)
 		return

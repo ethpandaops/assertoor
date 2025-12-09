@@ -49,6 +49,7 @@ func NewBlockCache(ctx context.Context, logger logrus.FieldLogger, followDistanc
 				logger.WithError(err2).Errorf("uncaught panic in BlockCache.runCacheCleanup subroutine: %v, stack: %v", err, string(debug.Stack()))
 			}
 		}()
+
 		cache.runCacheCleanup(ctx)
 	}()
 

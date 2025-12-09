@@ -176,6 +176,7 @@ func (v *Variables) GetVarsMap(varsMap map[string]any, skipParent bool) map[stri
 	}
 
 	v.varsMutex.RLock()
+
 	for scopeName, subScope := range v.subScopes {
 		_, exists := varsMap[scopeName]
 		if exists {
@@ -193,6 +194,7 @@ func (v *Variables) GetVarsMap(varsMap map[string]any, skipParent bool) map[stri
 
 		varsMap[varName] = varData.value
 	}
+
 	v.varsMutex.RUnlock()
 
 	if v.parentScope != nil && !skipParent {
@@ -200,6 +202,7 @@ func (v *Variables) GetVarsMap(varsMap map[string]any, skipParent bool) map[stri
 	}
 
 	v.varsMutex.RLock()
+
 	for varName, varData := range v.defaultsMap {
 		_, exists := varsMap[varName]
 		if exists {
@@ -208,6 +211,7 @@ func (v *Variables) GetVarsMap(varsMap map[string]any, skipParent bool) map[stri
 
 		varsMap[varName] = varData.value
 	}
+
 	v.varsMutex.RUnlock()
 
 	return varsMap

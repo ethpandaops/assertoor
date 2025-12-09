@@ -150,9 +150,10 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 
 			receiptsMapMutex.Lock()
-			withdrawalReceipts[tx.Hash().Hex()] = receipt
-			receiptsMapMutex.Unlock()
 
+			withdrawalReceipts[tx.Hash().Hex()] = receipt
+
+			receiptsMapMutex.Unlock()
 			pendingWg.Done()
 
 			switch {
@@ -188,6 +189,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		if t.config.LimitPerSlot > 0 && perSlotCount >= t.config.LimitPerSlot {
 			// await next block
 			perSlotCount = 0
+
 			select {
 			case <-ctx.Done():
 				return nil
@@ -219,8 +221,8 @@ func (t *Task) Execute(ctx context.Context) error {
 			receiptJSON, err := json.Marshal(receipt)
 			if err == nil {
 				receiptMap = map[string]interface{}{}
-				err = json.Unmarshal(receiptJSON, &receiptMap)
 
+				err = json.Unmarshal(receiptJSON, &receiptMap)
 				if err != nil {
 					t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
 
@@ -374,6 +376,7 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConf
 				t.logger.WithFields(logrus.Fields{
 					"client": client.GetName(),
 				}).Warnf("error sending withdrawal tx %v: %v", accountIdx, err)
+
 				return
 			}
 
@@ -394,7 +397,6 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onConf
 		RebroadcastInterval: 30 * time.Second,
 		MaxRebroadcasts:     5,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed sending withdrawal transaction: %w", err)
 	}

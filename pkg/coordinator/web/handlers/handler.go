@@ -234,8 +234,8 @@ func (fh *FrontendHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name := path.Clean(upath)
-	f, err := fh.rootFileSys.Open(name)
 
+	f, err := fh.rootFileSys.Open(name)
 	if err != nil {
 		fh.handleHTTPError(err, fh.HandleNotFound, w, r)
 		return

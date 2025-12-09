@@ -117,6 +117,10 @@ func (bc *BeaconClient) getJSON(ctx context.Context, requrl string, returnValue 
 }
 
 func (bc *BeaconClient) postJSON(ctx context.Context, requrl string, postData, returnValue interface{}) error {
+	return bc.postJSONWithHeaders(ctx, requrl, postData, returnValue, nil)
+}
+
+func (bc *BeaconClient) postJSONWithHeaders(ctx context.Context, requrl string, postData, returnValue interface{}, extraHeaders map[string]string) error {
 	logurl := getRedactedURL(requrl)
 
 	postDataBytes, err := json.Marshal(postData)
@@ -125,8 +129,8 @@ func (bc *BeaconClient) postJSON(ctx context.Context, requrl string, postData, r
 	}
 
 	reader := bytes.NewReader(postDataBytes)
-	req, err := nethttp.NewRequestWithContext(ctx, "POST", requrl, reader)
 
+	req, err := nethttp.NewRequestWithContext(ctx, "POST", requrl, reader)
 	if err != nil {
 		return err
 	}
@@ -134,6 +138,10 @@ func (bc *BeaconClient) postJSON(ctx context.Context, requrl string, postData, r
 	req.Header.Set("Content-Type", "application/json")
 
 	for headerKey, headerVal := range bc.headers {
+		req.Header.Set(headerKey, headerVal)
+	}
+
+	for headerKey, headerVal := range extraHeaders {
 		req.Header.Set(headerKey, headerVal)
 	}
 
@@ -490,6 +498,42 @@ func (bc *BeaconClient) SubmitAttesterSlashing(ctx context.Context, slashing *ph
 
 func (bc *BeaconClient) SubmitProposerSlashing(ctx context.Context, slashing *phase0.ProposerSlashing) error {
 	err := bc.postJSON(ctx, fmt.Sprintf("%s/eth/v1/beacon/pool/proposer_slashings", bc.endpoint), slashing, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type apiAttestationData struct {
+	Data *phase0.AttestationData `json:"data"`
+}
+
+func (bc *BeaconClient) GetAttestationData(ctx context.Context, slot, committeeIndex uint64) (*phase0.AttestationData, error) {
+	var attestationData apiAttestationData
+
+	err := bc.getJSON(ctx, fmt.Sprintf("%s/eth/v1/validator/attestation_data?slot=%d&committee_index=%d", bc.endpoint, slot, committeeIndex), &attestationData)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving attestation data: %v", err)
+	}
+
+	return attestationData.Data, nil
+}
+
+// SingleAttestation represents the Electra single attestation format for the v2 API.
+type SingleAttestation struct {
+	CommitteeIndex uint64                  `json:"committee_index,string"`
+	AttesterIndex  uint64                  `json:"attester_index,string"`
+	Data           *phase0.AttestationData `json:"data"`
+	Signature      string                  `json:"signature"`
+}
+
+func (bc *BeaconClient) SubmitAttestations(ctx context.Context, attestations []*SingleAttestation) error {
+	headers := map[string]string{
+		"Eth-Consensus-Version": "electra",
+	}
+
+	err := bc.postJSONWithHeaders(ctx, fmt.Sprintf("%s/eth/v2/beacon/pool/attestations", bc.endpoint), attestations, nil, headers)
 	if err != nil {
 		return err
 	}

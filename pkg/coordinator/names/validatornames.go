@@ -107,8 +107,8 @@ func (vn *ValidatorNames) parseNamesMap(names map[string]string) int {
 
 	for idxStr, name := range names {
 		rangeParts := strings.Split(idxStr, "-")
-		minIdx, err := strconv.ParseUint(rangeParts[0], 10, 64)
 
+		minIdx, err := strconv.ParseUint(rangeParts[0], 10, 64)
 		if err != nil {
 			continue
 		}
@@ -138,8 +138,8 @@ func (vn *ValidatorNames) loadFromRangesAPI(apiURL string) error {
 	vn.logger.Debugf("Loading validator names from inventory: %v", apiURL)
 
 	client := &http.Client{Timeout: time.Second * 120}
-	resp, err := client.Get(apiURL)
 
+	resp, err := client.Get(apiURL)
 	if err != nil {
 		return fmt.Errorf("could not fetch inventory (%v): %v", getRedactedURL(apiURL), err)
 	}

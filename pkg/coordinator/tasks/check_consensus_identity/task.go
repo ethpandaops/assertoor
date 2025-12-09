@@ -413,6 +413,7 @@ func (t *Task) decodeENR(raw string) (*enr.Record, error) {
 	}
 
 	var r enr.Record
+
 	err = rlp.DecodeBytes(dec[:n], &r)
 
 	return &r, err

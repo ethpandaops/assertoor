@@ -106,6 +106,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.logger.Infof("current epoch: %v, starting attestation aggregation at epoch %v", lastCheckedEpoch, lastCheckedEpoch+1)
 
 	t.attesterDutyMap = map[uint64]map[phase0.Root]*attesterDuties{}
+
 	defer func() {
 		t.attesterDutyMap = nil
 	}()

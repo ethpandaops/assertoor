@@ -141,6 +141,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	completeChan := make(chan bool)
+
 	go func() {
 		taskWaitGroup.Wait()
 		time.Sleep(100 * time.Millisecond)

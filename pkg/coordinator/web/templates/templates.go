@@ -43,10 +43,12 @@ func (t *Templates) GetTemplate(files ...string) *template.Template {
 	name := strings.Join(files, "-")
 
 	t.cacheMux.RLock()
+
 	if t.cache[name] != nil {
 		defer t.cacheMux.RUnlock()
 		return t.cache[name]
 	}
+
 	t.cacheMux.RUnlock()
 
 	tmpl := template.New(name).Funcs(t.funcs)

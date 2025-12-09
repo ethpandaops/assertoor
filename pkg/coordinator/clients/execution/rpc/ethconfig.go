@@ -35,8 +35,8 @@ func (ec *ExecutionClient) GetEthConfig(ctx context.Context) (*EthConfigResponse
 	defer reqCtxCancel()
 
 	var result json.RawMessage
-	err := ec.rpcClient.CallContext(reqCtx, &result, "eth_config")
 
+	err := ec.rpcClient.CallContext(reqCtx, &result, "eth_config")
 	if err != nil {
 		return nil, err
 	}

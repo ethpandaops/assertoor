@@ -186,7 +186,6 @@ func (pool *WalletPool) EnsureFunding(ctx context.Context, minBalance, refillAmo
 
 		go func(tx *types.Transaction) {
 			_, err := pool.rootWallet.AwaitTransaction(ctx, tx)
-
 			if err != nil {
 				pool.logger.Warnf("failed awaiting child wallet refill tx: %v", err)
 				refillError = err

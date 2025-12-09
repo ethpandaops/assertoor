@@ -299,6 +299,7 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 	}
 
 	client.headMutex.Lock()
+
 	if bytes.Equal(client.headRoot[:], root[:]) {
 		client.headMutex.Unlock()
 		return nil
@@ -316,6 +317,7 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 
 func (client *Client) setFinalizedHead(epoch phase0.Epoch, root phase0.Root) error {
 	client.headMutex.Lock()
+
 	if bytes.Equal(client.finalizedRoot[:], root[:]) {
 		client.headMutex.Unlock()
 		return nil
