@@ -2,7 +2,7 @@ id: execution-spec-tests-execute
 name: "Run 'execute' on execution spec tests"
 timeout: 1h
 config:
-  gitRepo: https://github.com/ethereum/execution-spec-tests.git
+  gitRepo: https://github.com/ethereum/execution-specs.git
   gitBranch: main
   testPath: ""
   chainID: "0"
@@ -158,7 +158,7 @@ tasks:
         echo "Running test: ${TEST_PATH}"
         echo "============================"
         uv run execute remote "${TEST_PATH}" \
-          --rpc-chain-id=${CHAIN_ID} \
+          --chain-id=${CHAIN_ID} \
           --rpc-endpoint=${RPC_ENDPOINT} \
           --rpc-seed-key=${PRIVATE_KEY} \
           --seed-account-sweep-amount=${SEED_AMOUNT} \

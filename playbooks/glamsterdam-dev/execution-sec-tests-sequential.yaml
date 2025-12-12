@@ -36,7 +36,7 @@ tasks:
     config:
       testFile: /tests/execution-spec-tests-execute.yaml
       testConfig:
-        gitRepo: https://github.com/ethereum/execution-spec-tests.git
+        gitRepo: https://github.com/ethereum/execution-spec.git
         runTests: false
       testConfigVars:
         specTestsPath: "tasks.tempdir.outputs.path"
@@ -81,7 +81,7 @@ tasks:
           config:
             testFile: /tests/execution-spec-tests-execute.yaml
             testConfig:
-              gitRepo: https://github.com/ethereum/execution-spec-tests.git
+              gitRepo: https://github.com/ethereum/execution-specs.git
               testPath: ./tests/amsterdam/eip7928_block_level_access_lists
               seedAmount: "10000000000000000000000" # 100 ETH
               extraFlags: "--fork=Amsterdam -n 16"
