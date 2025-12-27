@@ -302,6 +302,13 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 			Sidecar:    blobSidecar,
 		}
 
+		if !t.config.LegacyBlobTx {
+			err = blobSidecar.ToV1()
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		return ethtypes.NewTx(txObj), nil
 	})
 	if err != nil {
