@@ -30,6 +30,7 @@ type Config struct {
 	BlobData      string   `yaml:"blobData" json:"blobData"`
 	RandomAmount  bool     `yaml:"randomAmount" json:"randomAmount"`
 	Amount        *big.Int `yaml:"amount" json:"amount"`
+	LegacyBlobTx  bool     `yaml:"legacyBlobTx" json:"legacyBlobTx"`
 
 	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
 	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
