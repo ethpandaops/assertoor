@@ -3,8 +3,8 @@ package cmd
 import (
 	"context"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator"
-	"github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo"
+	"github.com/ethpandaops/assertoor/pkg/assertoor"
+	"github.com/ethpandaops/assertoor/pkg/buildinfo"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +21,7 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		config, err := coordinator.NewConfig(cfgFile)
+		config, err := assertoor.NewConfig(cfgFile)
 		if err != nil {
 			logr.Fatal(err)
 		}
@@ -44,7 +44,7 @@ var rootCmd = &cobra.Command{
 			logr.SetLevel(logrus.DebugLevel)
 		}
 
-		coord := coordinator.NewCoordinator(config, logr, metricsPort)
+		coord := assertoor.NewCoordinator(config, logr, metricsPort)
 
 		if err := coord.Run(cmd.Context()); err != nil {
 			logr.Fatal(err)

@@ -1,0 +1,1381 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API for querying information about Assertoor tests",
+        "title": "Assertoor API Documentation",
+        "contact": {},
+        "version": "1.0"
+    },
+    "paths": {
+        "/api/v1/test/{testId}": {
+            "get": {
+                "description": "Returns the test definition with given ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Get test definition by test ID",
+                "operationId": "getTest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test definition to get details for",
+                        "name": "testId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.GetTestResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_run/{runId}": {
+            "get": {
+                "description": "Returns the run details with given ID. Includes a summary and a list of task with limited details",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get test run by run ID",
+                "operationId": "getTestRun",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run to get details for",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.GetTestRunResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_run/{runId}/cancel": {
+            "post": {
+                "description": "Returns the test/run id \u0026 status of the cancelled test.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Cancel test run by test ID",
+                "operationId": "postTestRunCancel",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run to cancel",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Test cancellation options",
+                        "name": "cancelOptions",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/web_api.PostTestRunCancelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.PostTestRunCancelResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_run/{runId}/details": {
+            "get": {
+                "description": "Returns the run details with given ID. Includes a summary and a list of task with all details (incl. logs \u0026 task configurations)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get detailed test run by run ID",
+                "operationId": "getTestRunDetails",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run to get details for",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.GetTestRunDetailsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_run/{runId}/status": {
+            "get": {
+                "description": "Returns the run status with given ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get test run status by run ID",
+                "operationId": "getTestRunStatus",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run to get the status for",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_run/{runId}/task/{taskIndex}/details": {
+            "get": {
+                "description": "Returns the task details with given run ID and task index. Includes full log, configuration and result variables (unless security trimmed).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get detailed task of a given test run",
+                "operationId": "getTestRunTaskDetails",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Index of the task to get details for",
+                        "name": "taskIndex",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.GetTestRunDetailedTask"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_run/{runId}/task/{taskIndex}/result/{resultType}/{fileId}": {
+            "get": {
+                "description": "Returns a specific result file from a task",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get task result file",
+                "operationId": "getTaskResult",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID of the task",
+                        "name": "taskId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Type of file to return (summary, result, ...)",
+                        "name": "resultType",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Index or name of the result file",
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_runs": {
+            "get": {
+                "description": "Returns a list of all test runs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get list of test runs",
+                "operationId": "getTestRuns",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Return test runs for this test ID only",
+                        "name": "test_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/web_api.GetTestRunsResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_runs/delete": {
+            "post": {
+                "description": "Deletes test runs",
+                "consumes": [
+                    "application/json",
+                    "application/yaml"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Delete test runs",
+                "operationId": "postTestRunsDelete",
+                "parameters": [
+                    {
+                        "description": "Test configuration (json or yaml)",
+                        "name": "testConfig",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/web_api.PostTestRunsDeleteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.PostTestRunsDeleteResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_runs/schedule": {
+            "post": {
+                "description": "Returns the test \u0026 run id of the scheduled test execution.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Schedule new test run by test ID",
+                "operationId": "postTestRunsSchedule",
+                "parameters": [
+                    {
+                        "description": "Rest run options",
+                        "name": "runOptions",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/web_api.PostTestRunsScheduleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.PostTestRunsScheduleResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tests": {
+            "get": {
+                "description": "Returns the list of test definitions. These test definitions can be used to create new test runs and are supplied via the assertoor configuration.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Get list of test definitions",
+                "operationId": "getTests",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/web_api.GetTestsResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tests/delete": {
+            "post": {
+                "description": "Deletes tests",
+                "consumes": [
+                    "application/json",
+                    "application/yaml"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Delete tests",
+                "operationId": "postTestsDelete",
+                "parameters": [
+                    {
+                        "description": "Test configuration (json or yaml)",
+                        "name": "testConfig",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/web_api.PostTestsDeleteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.PostTestsDeleteResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tests/register": {
+            "post": {
+                "description": "Returns the test id and name of the added test.",
+                "consumes": [
+                    "application/json",
+                    "application/yaml"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Register new test via yaml configuration",
+                "operationId": "postTestsRegister",
+                "parameters": [
+                    {
+                        "description": "Test configuration (json or yaml)",
+                        "name": "testConfig",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/web_api.PostTestsRegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.PostTestsRegisterResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tests/register_external": {
+            "post": {
+                "description": "Returns the test id and name of the added test.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Register new test via external test configuration",
+                "operationId": "postTestsRegisterExternal",
+                "parameters": [
+                    {
+                        "description": "Test configuration (json or yaml)",
+                        "name": "externalTestConfig",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/web_api.PostTestsRegisterExternalRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.PostTestsRegisterExternalResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "helper.RawMessage": {
+            "type": "object"
+        },
+        "types.TestSchedule": {
+            "type": "object",
+            "properties": {
+                "cron": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "skipQueue": {
+                    "type": "boolean"
+                },
+                "startup": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "types.TestStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "success",
+                "failure",
+                "skipped",
+                "aborted"
+            ],
+            "x-enum-varnames": [
+                "TestStatusPending",
+                "TestStatusRunning",
+                "TestStatusSuccess",
+                "TestStatusFailure",
+                "TestStatusSkipped",
+                "TestStatusAborted"
+            ]
+        },
+        "web_api.GetTestResponse": {
+            "type": "object",
+            "properties": {
+                "basePath": {
+                    "type": "string"
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "configVars": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/types.TestSchedule"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "timeout": {
+                    "type": "integer"
+                }
+            }
+        },
+        "web_api.GetTestRunDetailedTask": {
+            "type": "object",
+            "properties": {
+                "completed": {
+                    "type": "boolean"
+                },
+                "config_yaml": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "log": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/web_api.GetTestRunDetailedTaskLog"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_index": {
+                    "type": "integer"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "result_error": {
+                    "type": "string"
+                },
+                "result_yaml": {
+                    "type": "string"
+                },
+                "runtime": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "started": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetTestRunDetailedTaskLog": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "datalen": {
+                    "type": "integer"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetTestRunDetailsResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.TestStatus"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/web_api.GetTestRunDetailedTask"
+                    }
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetTestRunResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.TestStatus"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/web_api.GetTestRunTask"
+                    }
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetTestRunTask": {
+            "type": "object",
+            "properties": {
+                "completed": {
+                    "type": "boolean"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_index": {
+                    "type": "integer"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "result_error": {
+                    "type": "string"
+                },
+                "result_files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/web_api.GetTestRunTaskResult"
+                    }
+                },
+                "runtime": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "started": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetTestRunTaskResult": {
+            "type": "object",
+            "properties": {
+                "index": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetTestRunsResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.TestStatus"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetTestsResponse": {
+            "type": "object",
+            "properties": {
+                "basePath": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.PostTestRunCancelRequest": {
+            "type": "object",
+            "properties": {
+                "skip_cleanup": {
+                    "type": "boolean"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.PostTestRunCancelResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.PostTestRunsDeleteRequest": {
+            "type": "object",
+            "properties": {
+                "test_runs": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "web_api.PostTestRunsDeleteResponse": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "web_api.PostTestRunsScheduleRequest": {
+            "type": "object",
+            "properties": {
+                "allow_duplicate": {
+                    "type": "boolean"
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "skip_queue": {
+                    "type": "boolean"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.PostTestRunsScheduleResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.PostTestsDeleteRequest": {
+            "type": "object",
+            "properties": {
+                "tests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "web_api.PostTestsDeleteResponse": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "web_api.PostTestsRegisterExternalRequest": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "configVars": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "file": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/types.TestSchedule"
+                },
+                "timeout": {
+                    "type": "integer"
+                }
+            }
+        },
+        "web_api.PostTestsRegisterExternalResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.PostTestsRegisterRequest": {
+            "type": "object",
+            "properties": {
+                "cleanupTasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helper.RawMessage"
+                    }
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "configVars": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/types.TestSchedule"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helper.RawMessage"
+                    }
+                },
+                "timeout": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.PostTestsRegisterResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.Response": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "status": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "description": "All endpoints related to test definitions",
+            "name": "Test"
+        },
+        {
+            "description": "All endpoints related to test runs",
+            "name": "TestRun"
+        }
+    ]
+}

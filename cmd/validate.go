@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/ethpandaops/assertoor/pkg/coordinator"
+	"github.com/ethpandaops/assertoor/pkg/assertoor"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +27,7 @@ var validateCmd = &cobra.Command{
 		}
 
 		// Load configuration
-		config, err := coordinator.NewConfig(cfgFile)
+		config, err := assertoor.NewConfig(cfgFile)
 		if err != nil {
 			logrus.WithError(err).Error("failed to load configuration")
 			os.Exit(1)
