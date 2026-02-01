@@ -20,6 +20,9 @@ The `check_consensus_slot_range` task verifies that the current wall clock time 
 - **`failIfLower`**:\
   A flag that determines the task's behavior if the current wall clock time is below the specified minimum slot or epoch number. If `true`, the task will fail in such cases; if `false`, it will continue without failing.
 
+- **`continueOnPass`**:\
+  When set to `false` (default), the task exits immediately upon the slot/epoch being within range. When set to `true`, the task continues running after success, allowing it to be used for continuous monitoring within concurrent task execution.
+
 ### Defaults
 
 These are the default settings for the `check_consensus_slot_range` task:
@@ -32,4 +35,5 @@ These are the default settings for the `check_consensus_slot_range` task:
     minEpochNumber: 0
     maxEpochNumber: 18446744073709551615
     failIfLower: false
+    continueOnPass: false
 ```

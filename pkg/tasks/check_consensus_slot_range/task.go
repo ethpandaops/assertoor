@@ -98,7 +98,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	for {
 		checkCount++
-		t.processCheck(checkCount)
+
+		if done, err := t.processCheck(checkCount); done {
+			return err
+		}
 
 		select {
 		case slot := <-wallclockSubscription.Channel():
@@ -109,19 +112,29 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 }
 
-func (t *Task) processCheck(checkCount int) {
+func (t *Task) processCheck(checkCount int) (bool, error) {
 	checkResult, isLower := t.runRangeCheck()
 
 	switch {
 	case checkResult:
 		t.ctx.SetResult(types.TaskResultSuccess)
 		t.ctx.ReportProgress(100, "Slot range check passed")
+
+		if !t.config.ContinueOnPass {
+			return true, nil
+		}
+
+		return false, nil
 	case !isLower || t.config.FailIfLower:
 		t.ctx.SetResult(types.TaskResultFailure)
 		t.ctx.ReportProgress(0, "Slot range check failed")
+
+		return true, fmt.Errorf("slot range check failed")
 	default:
 		t.ctx.SetResult(types.TaskResultNone)
 		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for slot range... (attempt %d)", checkCount))
+
+		return false, nil
 	}
 }
 

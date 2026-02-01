@@ -7,16 +7,17 @@ import (
 )
 
 type Config struct {
-	Task *helper.RawMessageMasked `yaml:"task" json:"tasks"`
+	Task             *helper.RawMessageMasked `yaml:"task" json:"task"`
+	NewVariableScope bool                     `yaml:"newVariableScope" json:"newVariableScope"`
 
-	PropagateResult  bool `yaml:"propagateResult" json:"propagateResult"`
-	ExitOnResult     bool `yaml:"exitOnResult" json:"exitOnResult"`
-	InvertResult     bool `yaml:"invertResult" json:"invertResult"`
-	ExpectFailure    bool `yaml:"expectFailure" json:"expectFailure"`
-	IgnoreFailure    bool `yaml:"ignoreFailure" json:"ignoreFailure"`
-	RetryOnFailure   bool `yaml:"retryOnFailure" json:"retryOnFailure"`
-	MaxRetryCount    uint `yaml:"maxRetryCount" json:"maxRetryCount"`
-	NewVariableScope bool `yaml:"newVariableScope" json:"newVariableScope"`
+	// Retry behavior
+	RetryOnFailure bool `yaml:"retryOnFailure" json:"retryOnFailure"`
+	MaxRetryCount  uint `yaml:"maxRetryCount" json:"maxRetryCount"`
+
+	// Result transformation
+	InvertResult  bool `yaml:"invertResult" json:"invertResult"`
+	IgnoreResult  bool `yaml:"ignoreResult" json:"ignoreResult"`
+	ExpectFailure bool `yaml:"expectFailure" json:"expectFailure"` // Alias for invertResult
 }
 
 func DefaultConfig() Config {

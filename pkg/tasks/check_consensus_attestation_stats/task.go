@@ -179,7 +179,10 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 
 			checkCount++
-			t.runAttestationStatsCheck(ctx, checkEpoch, checkCount)
+
+			if done, err := t.runAttestationStatsCheck(ctx, checkEpoch, checkCount); done {
+				return err
+			}
 
 			lastCheckedEpoch = checkEpoch
 
@@ -263,7 +266,7 @@ func (t *Task) processBlock(ctx context.Context, block *consensus.Block) {
 	t.attesterDutyMap[currentBlockEpoch][parentBlock.Root] = attesterDuties
 }
 
-func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64, checkCount int) {
+func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64, checkCount int) (bool, error) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	canonicalFork := consensusPool.GetCanonicalFork(1)
 
@@ -283,6 +286,12 @@ func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64, check
 			if t.passedEpochs >= t.config.MinCheckedEpochs {
 				t.ctx.SetResult(types.TaskResultSuccess)
 				t.ctx.ReportProgress(100, fmt.Sprintf("Attestation stats check passed for epoch %d", epoch))
+
+				t.logger.Infof("epoch %v attestation check result: %v. passed checks: %v, want: %v", epoch, result, t.passedEpochs, t.config.MinCheckedEpochs)
+
+				if !t.config.ContinueOnPass {
+					return true, nil
+				}
 			} else {
 				t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for attestation stats... %d/%d (attempt %d)", t.passedEpochs, t.config.MinCheckedEpochs, checkCount))
 			}
@@ -291,16 +300,22 @@ func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64, check
 			if t.config.FailOnCheckMiss {
 				t.ctx.SetResult(types.TaskResultFailure)
 				t.ctx.ReportProgress(0, fmt.Sprintf("Attestation stats check failed for epoch %d (attempt %d)", epoch, checkCount))
-			} else {
-				t.ctx.SetResult(types.TaskResultNone)
-				t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for attestation stats... (attempt %d)", checkCount))
+
+				t.logger.Infof("epoch %v attestation check result: %v. passed checks: %v, want: %v", epoch, result, t.passedEpochs, t.config.MinCheckedEpochs)
+
+				return true, fmt.Errorf("attestation stats check failed for epoch %d", epoch)
 			}
+
+			t.ctx.SetResult(types.TaskResultNone)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for attestation stats... (attempt %d)", checkCount))
 		}
 
 		t.logger.Infof("epoch %v attestation check result: %v. passed checks: %v, want: %v", epoch, result, t.passedEpochs, t.config.MinCheckedEpochs)
 
 		break
 	}
+
+	return false, nil
 }
 
 func (t *Task) checkEpochVotes(epoch uint64, epochVote *epochVotes) bool {

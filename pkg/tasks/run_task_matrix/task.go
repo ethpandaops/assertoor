@@ -173,15 +173,10 @@ func (t *Task) Execute(ctx context.Context) error {
 	}()
 
 	// watch result updates
-	successLimit := t.config.SucceedTaskCount
-	if successLimit == 0 {
-		successLimit = uint64(len(t.tasks))
-	}
-
-	failureLimit := t.config.FailTaskCount
-	if failureLimit == 0 {
-		failureLimit = uint64(len(t.tasks))
-	}
+	// When threshold is 0, don't apply threshold logic - only evaluate at completion
+	// When threshold > 0, use that value as the limit
+	successLimit := t.config.SuccessThreshold
+	failureLimit := t.config.FailureThreshold
 
 	var successCount, failureCount, pendingCount uint64
 
@@ -211,18 +206,24 @@ func (t *Task) Execute(ctx context.Context) error {
 				}
 			}
 
-			if successCount >= successLimit {
-				t.logger.Infof("success limit reached (%v success, %v failure)", successCount, failureCount)
+			// Only check success threshold if explicitly configured (> 0)
+			if successLimit > 0 && successCount >= successLimit {
+				t.logger.Infof("success threshold reached (%v success, %v failure)", successCount, failureCount)
 				t.ctx.SetResult(types.TaskResultSuccess)
 
-				taskComplete = true
+				if t.config.StopOnThreshold {
+					taskComplete = true
+				}
 			}
 
-			if !taskComplete && failureCount >= failureLimit {
-				t.logger.Infof("failure limit reached (%v success, %v failure)", successCount, failureCount)
+			// Only check failure threshold if explicitly configured (> 0)
+			if !taskComplete && failureLimit > 0 && failureCount >= failureLimit {
+				t.logger.Infof("failure threshold reached (%v success, %v failure)", successCount, failureCount)
 				t.ctx.SetResult(types.TaskResultFailure)
 
-				taskComplete = true
+				if t.config.StopOnThreshold {
+					taskComplete = true
+				}
 			}
 
 			if !taskComplete {
@@ -238,7 +239,9 @@ func (t *Task) Execute(ctx context.Context) error {
 			if !taskComplete {
 				taskComplete = true
 
-				if t.config.FailOnUndecided && len(t.tasks) > 0 {
+				// All tasks completed - determine final result
+				// If any task failed, the result is failure; otherwise success
+				if failureCount > 0 {
 					t.ctx.SetResult(types.TaskResultFailure)
 				} else {
 					t.ctx.SetResult(types.TaskResultSuccess)
@@ -255,6 +258,28 @@ func (t *Task) Execute(ctx context.Context) error {
 	// cancel child context and wait for child tasks
 	cancelFn()
 	taskWaitGroup.Wait()
+
+	// Apply result transformation
+	taskResult := t.ctx.Scheduler.GetTaskState(t.ctx.Index).GetTaskStatus().Result
+
+	if t.config.IgnoreResult {
+		return nil
+	}
+
+	if t.config.InvertResult {
+		if taskResult == types.TaskResultFailure {
+			t.ctx.SetResult(types.TaskResultSuccess)
+			return nil
+		}
+
+		t.ctx.SetResult(types.TaskResultFailure)
+
+		return fmt.Errorf("all tasks succeeded, but failure was expected")
+	}
+
+	if taskResult == types.TaskResultFailure {
+		return fmt.Errorf("matrix task execution failed (%d failures)", failureCount)
+	}
 
 	return nil
 }

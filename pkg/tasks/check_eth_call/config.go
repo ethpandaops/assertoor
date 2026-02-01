@@ -10,6 +10,10 @@ type Config struct {
 
 	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
 	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
+	// ContinueOnPass keeps the task running after the check passes.
+	// When false (default), the task exits immediately on success.
+	// When true, the task continues monitoring and may report failure if eth_call results change.
+	ContinueOnPass bool `yaml:"continueOnPass" json:"continueOnPass"`
 }
 
 func DefaultConfig() Config {

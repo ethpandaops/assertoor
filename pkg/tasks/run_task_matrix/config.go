@@ -7,31 +7,32 @@ import (
 )
 
 type Config struct {
-	// matrix variable name
+	Task         *helper.RawMessageMasked `yaml:"task" json:"task"`
+	MatrixVar    string                   `yaml:"matrixVar" json:"matrixVar"`
+	MatrixValues []any                    `yaml:"matrixValues" json:"matrixValues"`
+
+	// Whether to run tasks concurrently (default: false - sequential)
 	RunConcurrent bool `yaml:"runConcurrent" json:"runConcurrent"`
 
-	// number of successful child tasks to make this task succeed (0 = all tasks)
-	SucceedTaskCount uint64 `yaml:"succeedTaskCount" json:"succeedTaskCount"`
+	// Threshold behavior:
+	// - 0 (default): No threshold - only evaluate result when ALL tasks complete
+	// - >0: Set result when threshold is reached (but continue until all complete unless StopOnThreshold=true)
+	SuccessThreshold uint64 `yaml:"successThreshold" json:"successThreshold"`
+	FailureThreshold uint64 `yaml:"failureThreshold" json:"failureThreshold"`
 
-	// number of failed child tasks to make this task fail (0 = all tasks)
-	FailTaskCount uint64 `yaml:"failTaskCount" json:"failTaskCount"`
+	// Early termination - if true, stop immediately when a threshold is reached
+	// Default: false - always wait for all tasks to complete
+	StopOnThreshold bool `yaml:"stopOnThreshold" json:"stopOnThreshold"`
 
-	// fail task if neither succeedTaskCount nor failTaskCount is reached, but all tasks completed
-	FailOnUndecided bool `yaml:"failOnUndecided" json:"failOnUndecided"`
-
-	// matrix variable name
-	MatrixValues []interface{} `yaml:"matrixValues" json:"matrixValues"`
-
-	// matrix variable name
-	MatrixVar string `yaml:"matrixVar" json:"matrixVar"`
-
-	// child task
-	Task *helper.RawMessageMasked `yaml:"task" json:"task"`
+	// Result transformation
+	InvertResult bool `yaml:"invertResult" json:"invertResult"`
+	IgnoreResult bool `yaml:"ignoreResult" json:"ignoreResult"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		FailOnUndecided: true,
+		FailureThreshold: 1,
+		StopOnThreshold:  true,
 	}
 }
 

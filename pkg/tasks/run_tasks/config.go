@@ -7,18 +7,20 @@ import (
 )
 
 type Config struct {
-	Tasks []helper.RawMessageMasked `yaml:"tasks" json:"tasks"`
+	Tasks            []helper.RawMessageMasked `yaml:"tasks" json:"tasks"`
+	NewVariableScope bool                      `yaml:"newVariableScope" json:"newVariableScope"`
 
-	StopChildOnResult bool `yaml:"stopChildOnResult" json:"stopChildOnResult"`
-	ExpectFailure     bool `yaml:"expectFailure" json:"expectFailure"`
+	// Failure handling (default: stop on first failure)
 	ContinueOnFailure bool `yaml:"continueOnFailure" json:"continueOnFailure"`
-	NewVariableScope  bool `yaml:"newVariableScope" json:"newVariableScope"`
+
+	// Result transformation
+	InvertResult bool `yaml:"invertResult" json:"invertResult"` // Swap success/failure
+	IgnoreResult bool `yaml:"ignoreResult" json:"ignoreResult"` // Always succeed
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Tasks:             []helper.RawMessageMasked{},
-		StopChildOnResult: true,
+		Tasks: []helper.RawMessageMasked{},
 	}
 }
 

@@ -2,6 +2,12 @@
 
 This task checks consensus client node identity information by querying the `/eth/v1/node/identity` API endpoint. It can verify various aspects of the node identity including CGC (Custody Group Count) extracted from ENR (Ethereum Node Record).
 
+## Task Behavior
+
+- The task polls clients at regular intervals to check their identity information.
+- By default, the task returns immediately when the identity criteria are met.
+- Use `continueOnPass: true` to keep monitoring even after success.
+
 ## Configuration
 
 ### Required Parameters
@@ -12,6 +18,7 @@ This task checks consensus client node identity information by querying the `/et
 - **`minClientCount`** *(int)*: Minimum number of clients that must pass checks (default: `1`)
 - **`maxFailCount`** *(int)*: Maximum number of clients that can fail (-1 for no limit, default: `-1`)
 - **`failOnCheckMiss`** *(bool)*: Whether to fail the task when checks don't pass (default: `false`)
+- **`continueOnPass`** *(bool)*: Keep monitoring even after success (default: `false`)
 
 ### CGC (Custody Group Count) Checks
 - **`expectCgc`** *(int)*: Expect exact CGC value
@@ -77,6 +84,17 @@ Each client result includes:
     failOnCheckMiss: true
 ```
 
+### Continuous Monitoring
+```yaml
+- name: monitor_identity
+  task: check_consensus_identity
+  config:
+    clientPattern: "*"
+    minCgc: 4
+    continueOnPass: true
+    timeout: 30m
+```
+
 ### Comprehensive Identity Check
 ```yaml
 - name: full_identity_check
@@ -90,22 +108,6 @@ Each client result includes:
     minSeqNumber: 1
     pollInterval: 30s
     failOnCheckMiss: true
-```
-
-### Using Outputs in Subsequent Tasks
-```yaml
-- name: check_identity
-  task: check_consensus_identity
-  config:
-    clientPattern: "*"
-    expectCgc: 8
-
-- name: verify_results
-  task: run_shell
-  config:
-    command: |
-      echo "Found ${check_identity.matchingCount} matching clients"
-      echo "Total CGC sum: $(echo '${check_identity.matchingClients}' | jq '[.[] | .cgc] | add')"
 ```
 
 ## Use Cases

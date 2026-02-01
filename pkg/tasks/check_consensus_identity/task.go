@@ -122,17 +122,20 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	for {
 		checkCount++
-		t.processCheck(checkCount)
+
+		if done, err := t.processCheck(checkCount); done {
+			return err
+		}
 
 		select {
 		case <-time.After(t.config.PollInterval.Duration):
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		}
 	}
 }
 
-func (t *Task) processCheck(checkCount int) {
+func (t *Task) processCheck(checkCount int) (bool, error) {
 	passResultCount := 0
 	totalClientCount := 0
 	matchingClients := []*IdentityCheckResult{}
@@ -222,25 +225,39 @@ func (t *Task) processCheck(checkCount int) {
 			t.logger.Infof("Setting result to FAILURE (too many failures: %d > %d)", len(failedClients), t.config.MaxFailCount)
 			t.ctx.SetResult(types.TaskResultFailure)
 			t.ctx.ReportProgress(0, fmt.Sprintf("Too many failures: %d (attempt %d)", len(failedClients), checkCount))
-		} else {
-			t.logger.Infof("Setting result to PENDING (too many failures but failOnCheckMiss=false)")
-			t.ctx.SetResult(types.TaskResultNone)
-			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for identity check... %d/%d (attempt %d)", passResultCount, requiredPassCount, checkCount))
+
+			return true, fmt.Errorf("too many identity check failures: %d", len(failedClients))
 		}
+
+		t.logger.Infof("Setting result to PENDING (too many failures but failOnCheckMiss=false)")
+		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for identity check... %d/%d (attempt %d)", passResultCount, requiredPassCount, checkCount))
+
+		return false, nil
 	case resultPass:
 		t.logger.Infof("Setting result to SUCCESS (requirements met)")
 		t.ctx.SetResult(types.TaskResultSuccess)
 		t.ctx.ReportProgress(100, fmt.Sprintf("Identity check passed: %d/%d clients", passResultCount, totalClientCount))
+
+		if !t.config.ContinueOnPass {
+			return true, nil
+		}
+
+		return false, nil
 	default:
 		if t.config.FailOnCheckMiss {
 			t.logger.Infof("Setting result to FAILURE (requirements not met and failOnCheckMiss=true)")
 			t.ctx.SetResult(types.TaskResultFailure)
 			t.ctx.ReportProgress(0, fmt.Sprintf("Identity check failed: %d/%d (attempt %d)", passResultCount, requiredPassCount, checkCount))
-		} else {
-			t.logger.Infof("Setting result to PENDING (requirements not met but failOnCheckMiss=false)")
-			t.ctx.SetResult(types.TaskResultNone)
-			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for identity check... %d/%d (attempt %d)", passResultCount, requiredPassCount, checkCount))
+
+			return true, fmt.Errorf("identity check failed: %d/%d", passResultCount, requiredPassCount)
 		}
+
+		t.logger.Infof("Setting result to PENDING (requirements not met but failOnCheckMiss=false)")
+		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for identity check... %d/%d (attempt %d)", passResultCount, requiredPassCount, checkCount))
+
+		return false, nil
 	}
 }
 

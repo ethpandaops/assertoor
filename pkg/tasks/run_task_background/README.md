@@ -19,21 +19,21 @@ The `run_task_background` task facilitates the concurrent execution of a foregro
 - **`backgroundTask`**:\
   The task that runs in the background concurrently with the foreground task. It is also defined following the standard task definition format.
 
+- **`newVariableScope`**:\
+  Determines if a new variable scope should be created for the foreground task. If `false`, the current scope is passed through. The background task always operates in a new variable scope, which inherits from the parent but does not propagate changes upwards. Default: `false`.
+
 - **`exitOnForegroundSuccess`**:\
-  If set to `true`, the `run_task_background` task will exit with a success result when the foreground task's result is set to "success". Note that this does not necessarily mean the foreground task has completed. If still running, both the background and foreground tasks will be cancelled.
+  If set to `true`, the `run_task_background` task will exit with a success result when the foreground task's result is set to "success". Note that this does not necessarily mean the foreground task has completed. If still running, both the background and foreground tasks will be cancelled. Default: `false`.
 
 - **`exitOnForegroundFailure`**:\
-  If `true`, the task exits with a failure result when the foreground task's result is set to "failure". This does not imply the foreground task's completion. Both the background and foreground tasks will be cancelled if they are still running.
+  If `true`, the task exits with a failure result when the foreground task's result is set to "failure". This does not imply the foreground task's completion. Both the background and foreground tasks will be cancelled if they are still running. Default: `false`.
 
 - **`onBackgroundComplete`**:\
-  Specifies the action to take when the background task completes. Options are:
-  - `ignore`: No action is taken.
+  Specifies the action to take when the background task completes first. Options are:
+  - `ignore` (default): No action is taken.
   - `fail`: Exits the task with a failure result.
-  - `succeed`: Exits the task with a success result.
+  - `succeed` / `success`: Exits the task with a success result.
   - `failOrIgnore`: Exits with a failure result if the background task fails, otherwise no action is taken.
-
-- **`newVariableScope`**:\
-  Determines if a new variable scope should be created for the foreground task. If `false`, the current scope is passed through. The background task always operates in a new variable scope, which inherits from the parent but does not propagate changes upwards.
 
 ### Defaults
 
@@ -44,8 +44,12 @@ Default settings for the `run_task_background` task:
   config:
     foregroundTask: {}
     backgroundTask: {}
+    newVariableScope: false
     exitOnForegroundSuccess: false
     exitOnForegroundFailure: false
     onBackgroundComplete: "ignore"
-    newVariableScope: false
 ```
+
+### Outputs
+
+This task does not produce any outputs.

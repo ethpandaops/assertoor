@@ -100,25 +100,17 @@ func (t *Task) LoadConfig() error {
 func (t *Task) Execute(ctx context.Context) error {
 	totalTasks := len(t.tasks)
 
-	for i, task := range t.tasks {
-		err := t.ctx.Scheduler.ExecuteTask(ctx, task, func(ctx context.Context, cancelFn context.CancelFunc, task types.TaskIndex) {
-			if t.config.StopChildOnResult {
-				t.ctx.Scheduler.WatchTaskPass(ctx, cancelFn, task)
-			}
-		})
+	var taskErr error
 
-		switch {
-		case t.config.ExpectFailure:
-			if err == nil {
-				return fmt.Errorf("child task #%v succeeded, but should have failed", i+1)
-			}
-		case t.config.ContinueOnFailure:
-			if err != nil {
-				t.logger.Warnf("child task #%v failed: %w", i+1, err)
-			}
-		default:
-			if err != nil {
-				return fmt.Errorf("child task #%v failed: %w", i+1, err)
+	for i, task := range t.tasks {
+		err := t.ctx.Scheduler.ExecuteTask(ctx, task, nil)
+
+		if err != nil {
+			if t.config.ContinueOnFailure {
+				t.logger.Warnf("child task #%v failed: %v", i+1, err)
+			} else {
+				taskErr = fmt.Errorf("child task #%v failed: %w", i+1, err)
+				break
 			}
 		}
 
@@ -128,5 +120,18 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.ctx.ReportProgress(progress, fmt.Sprintf("Task %d/%d completed", completedTasks, totalTasks))
 	}
 
-	return nil
+	// Apply result transformation
+	if t.config.IgnoreResult {
+		return nil
+	}
+
+	if t.config.InvertResult {
+		if taskErr != nil {
+			return nil
+		}
+
+		return fmt.Errorf("all tasks succeeded, but failure was expected")
+	}
+
+	return taskErr
 }

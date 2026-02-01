@@ -5,27 +5,26 @@ The `run_tasks` task executes a series of specified tasks sequentially. This is 
 
 #### Task Behavior
 - The task starts the child tasks one after the other in the order they are listed.
-- It continuously monitors the result of the currently running child task. As soon as the child task returns a "success" or "failure" result, the execution of that task is stopped.
-- After cancelling the current task, the `run_tasks` task then initiates the next task in the sequence.
-
-An important aspect of this task is that it cancels tasks once they return a result. This is particularly significant for check tasks, which, by their nature, would continue running indefinitely according to their logic. In this sequential setup, however, they are stopped once they achieve a result, allowing the sequence to proceed.
+- Each child task runs until it completes naturally (returns success or failure).
+- After a child task completes, the `run_tasks` task initiates the next task in the sequence.
+- By default, the sequence stops if any child task fails. Use `continueOnFailure` to continue despite failures.
 
 ### Configuration Parameters
 
 - **`tasks`**:\
   An array of tasks to be executed one after the other. Each task is defined according to the standard task structure.
 
-- **`stopChildOnResult`**:\
-  If set to `true`, each child task in the sequence is stopped as soon as it sets a result (either "success" or "failure"). This ensures that once a task has reached a outcome, it does not continue to run unnecessarily, allowing the next task in the sequence to commence.
-
-- **`expectFailure`**:\
-  If set to `true`, this option expects each task in the sequence to fail. The task sequence stops with a "failure" result if any task does not fail as expected.
-
 - **`continueOnFailure`**:\
-  When `true`, the sequence of tasks continues even if individual tasks fail, allowing the entire sequence to be executed regardless of individual task outcomes.
+  When `true`, the sequence of tasks continues even if individual tasks fail, allowing the entire sequence to be executed regardless of individual task outcomes. Default: `false`.
+
+- **`invertResult`**:\
+  If set to `true`, the final result is inverted: success becomes failure and failure becomes success. Useful when you expect all tasks to fail. Default: `false`.
+
+- **`ignoreResult`**:\
+  If set to `true`, the task always returns success regardless of child task outcomes. Default: `false`.
 
 - **`newVariableScope`**:\
-  Determines whether to create a new variable scope for the child tasks. If `false`, the current scope is passed through, allowing the child tasks to share the same variable context as the `run_tasks` task.
+  Determines whether to create a new variable scope for the child tasks. If `false`, the current scope is passed through, allowing the child tasks to share the same variable context as the `run_tasks` task. Default: `false`.
 
 ### Defaults
 
@@ -35,8 +34,12 @@ Default settings for the `run_tasks` task:
 - name: run_tasks
   config:
     tasks: []
-    stopChildOnResult: true
-    expectFailure: false
     continueOnFailure: false
+    invertResult: false
+    ignoreResult: false
     newVariableScope: false
 ```
+
+### Outputs
+
+This task does not produce any outputs.

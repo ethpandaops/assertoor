@@ -16,6 +16,10 @@ type Config struct {
 	ExpectMaxPercent        float64         `yaml:"expectMaxPercent" json:"expectMaxPercent"`
 	MinSlotHeight           int             `yaml:"minSlotHeight" json:"minSlotHeight"`
 	WaitForChainProgression bool            `yaml:"waitForChainProgression" json:"waitForChainProgression"`
+	// ContinueOnPass keeps the task running after the check passes.
+	// When false (default), the task exits immediately on success.
+	// When true, the task continues monitoring and may report failure if sync status changes.
+	ContinueOnPass bool `yaml:"continueOnPass" json:"continueOnPass"`
 }
 
 func DefaultConfig() Config {

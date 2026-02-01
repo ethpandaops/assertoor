@@ -102,14 +102,17 @@ func (t *Task) Execute(ctx context.Context) error {
 		select {
 		case <-blockSubscription.Channel():
 			checkCount++
-			t.processCheck(checkCount)
+
+			if done, err := t.processCheck(checkCount); done {
+				return err
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-func (t *Task) processCheck(checkCount int) {
+func (t *Task) processCheck(checkCount int) (bool, error) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	headForks := consensusPool.GetHeadForks(t.config.MaxForkDistance)
 	headForkInfo := make([]*ForkInfo, len(headForks))
@@ -148,7 +151,7 @@ func (t *Task) processCheck(checkCount int) {
 		t.ctx.SetResult(types.TaskResultFailure)
 		t.ctx.ReportProgress(0, fmt.Sprintf("Too many forks: %d (attempt %d)", len(headForks)-1, checkCount))
 
-		return
+		return true, fmt.Errorf("too many forks: %d", len(headForks)-1)
 	}
 
 	_, currentEpoch, err := consensusPool.GetBlockCache().GetWallclock().Now()
@@ -157,7 +160,7 @@ func (t *Task) processCheck(checkCount int) {
 		t.ctx.SetResult(types.TaskResultNone)
 		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for fork check... (attempt %d)", checkCount))
 
-		return
+		return false, nil
 	}
 
 	epochCount := currentEpoch.Number() - t.startEpoch
@@ -167,9 +170,15 @@ func (t *Task) processCheck(checkCount int) {
 		t.ctx.SetResult(types.TaskResultNone)
 		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for fork check... %d/%d epochs (attempt %d)", epochCount, t.config.MinCheckEpochCount, checkCount))
 
-		return
+		return false, nil
 	}
 
 	t.ctx.SetResult(types.TaskResultSuccess)
 	t.ctx.ReportProgress(100, fmt.Sprintf("Fork check passed after %d epochs", epochCount))
+
+	if !t.config.ContinueOnPass {
+		return true, nil
+	}
+
+	return false, nil
 }

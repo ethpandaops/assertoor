@@ -9,6 +9,10 @@ type Config struct {
 	MaxTotalPercent  uint64 `yaml:"maxTotalPercent" json:"maxTotalPercent"`
 	FailOnCheckMiss  bool   `yaml:"failOnCheckMiss" json:"failOnCheckMiss"`
 	MinCheckedEpochs uint64 `yaml:"minCheckedEpochs" json:"minCheckedEpochs"`
+	// ContinueOnPass keeps the task running after the check passes.
+	// When false (default), the task exits immediately on success.
+	// When true, the task continues monitoring and may report failure if attestation stats change.
+	ContinueOnPass bool `yaml:"continueOnPass" json:"continueOnPass"`
 }
 
 func DefaultConfig() Config {

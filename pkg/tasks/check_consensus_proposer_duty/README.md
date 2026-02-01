@@ -20,6 +20,9 @@ The `check_consensus_proposer_duty` task is designed to check for a specific pro
 - **`failOnCheckMiss`**:\
   This parameter specifies the task's behavior if a matching proposer duty is not found within the `maxSlotDistance`. If set to `false`, the task continues running until it either finds a matching proposer duty or reaches its timeout. If `true`, the task will fail immediately upon not finding a matching duty.
 
+- **`continueOnPass`**:\
+  When set to `false` (default), the task exits immediately upon finding a matching proposer duty. When set to `true`, the task continues running after success, allowing it to be used for continuous monitoring within concurrent task execution.
+
 ### Defaults
 
 These are the default settings for the `check_consensus_proposer_duty` task:
@@ -31,4 +34,5 @@ These are the default settings for the `check_consensus_proposer_duty` task:
     validatorIndex: null
     maxSlotDistance: 0
     failOnCheckMiss: false
+    continueOnPass: false
 ```

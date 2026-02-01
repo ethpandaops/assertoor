@@ -107,9 +107,15 @@ func (t *Task) Execute(ctx context.Context) error {
 		case checkResult:
 			t.ctx.SetResult(types.TaskResultSuccess)
 			t.ctx.ReportProgress(100, "Finality check passed")
+
+			if !t.config.ContinueOnPass {
+				return nil
+			}
 		case t.config.FailOnCheckMiss:
 			t.ctx.SetResult(types.TaskResultFailure)
 			t.ctx.ReportProgress(0, fmt.Sprintf("Finality check failed (attempt %d)", checkCount))
+
+			return fmt.Errorf("finality check failed")
 		default:
 			t.ctx.SetResult(types.TaskResultNone)
 			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for finality... (attempt %d)", checkCount))

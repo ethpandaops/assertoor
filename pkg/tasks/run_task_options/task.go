@@ -98,39 +98,17 @@ func (t *Task) Execute(ctx context.Context) error {
 			return fmt.Errorf("failed initializing child task: %w", err)
 		}
 
-		// execute task
-		taskErr = t.ctx.Scheduler.ExecuteTask(ctx, t.task, func(ctx context.Context, cancelFn context.CancelFunc, _ types.TaskIndex) {
-			t.watchTaskResult(ctx, cancelFn)
-		})
+		// execute task (tasks self-complete now)
+		taskErr = t.ctx.Scheduler.ExecuteTask(ctx, t.task, nil)
 
-		switch {
-		case t.config.RetryOnFailure && retryCount < t.config.MaxRetryCount:
-			if taskErr != nil {
-				retryCount++
+		// Handle retry logic
+		if t.config.RetryOnFailure && taskErr != nil && retryCount < t.config.MaxRetryCount {
+			retryCount++
 
-				t.logger.Warnf("child task failed: %w (retrying)", taskErr)
-				t.ctx.ReportProgress(0, fmt.Sprintf("Retrying child task (attempt %d/%d)...", retryCount+1, t.config.MaxRetryCount+1))
+			t.logger.Warnf("child task failed: %v (retrying)", taskErr)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Retrying child task (attempt %d/%d)...", retryCount+1, t.config.MaxRetryCount+1))
 
-				continue
-			}
-		case t.config.ExpectFailure:
-			if taskErr == nil {
-				t.ctx.SetResult(types.TaskResultFailure)
-				return fmt.Errorf("child task succeeded, but should have failed")
-			}
-
-			t.ctx.SetResult(types.TaskResultSuccess)
-		case t.config.IgnoreFailure:
-			if taskErr != nil {
-				t.logger.Warnf("child task failed: %w", taskErr)
-			}
-
-			t.ctx.SetResult(types.TaskResultSuccess)
-		default:
-			if taskErr != nil {
-				t.ctx.SetResult(types.TaskResultFailure)
-				return fmt.Errorf("child task failed: %w", taskErr)
-			}
+			continue
 		}
 
 		break
@@ -138,51 +116,19 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.ctx.ReportProgress(100, "Task completed")
 
-	return taskErr
-}
-
-func (t *Task) watchTaskResult(ctx context.Context, cancelFn context.CancelFunc) {
-	taskState := t.ctx.Scheduler.GetTaskState(t.task)
-	currentResult := types.TaskResultNone
-
-	for {
-		updateChan := taskState.GetTaskResultUpdateChan(currentResult)
-		if updateChan != nil {
-			select {
-			case <-ctx.Done():
-				return
-			case <-updateChan:
-			}
-		}
-
-		taskStatus := taskState.GetTaskStatus()
-		if taskStatus.Result == currentResult {
-			continue
-		}
-
-		currentResult = taskStatus.Result
-
-		taskResult := currentResult
-		if t.config.InvertResult {
-			switch taskResult {
-			case types.TaskResultNone:
-				taskResult = types.TaskResultSuccess
-			case types.TaskResultSuccess:
-				taskResult = types.TaskResultNone
-			case types.TaskResultFailure:
-				if t.config.ExpectFailure || t.config.IgnoreFailure {
-					taskResult = types.TaskResultSuccess
-				}
-			}
-		}
-
-		if t.config.PropagateResult {
-			t.ctx.SetResult(taskResult)
-		}
-
-		if t.config.ExitOnResult {
-			cancelFn()
-			return
-		}
+	// Apply result transformation
+	if t.config.IgnoreResult {
+		return nil
 	}
+
+	// ExpectFailure is an alias for InvertResult
+	if t.config.ExpectFailure || t.config.InvertResult {
+		if taskErr != nil {
+			return nil
+		}
+
+		return fmt.Errorf("child task succeeded, but failure was expected")
+	}
+
+	return taskErr
 }

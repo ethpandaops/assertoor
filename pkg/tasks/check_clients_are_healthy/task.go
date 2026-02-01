@@ -111,17 +111,20 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	for {
 		checkCount++
-		t.processCheck(checkCount)
+
+		if done, err := t.processCheck(checkCount); done {
+			return err
+		}
 
 		select {
 		case <-time.After(t.config.PollInterval.Duration):
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		}
 	}
 }
 
-func (t *Task) processCheck(checkCount int) {
+func (t *Task) processCheck(checkCount int) (bool, error) {
 	expectedResult := !t.config.ExpectUnhealthy
 	passResultCount := 0
 	totalClientCount := 0
@@ -181,22 +184,32 @@ func (t *Task) processCheck(checkCount int) {
 		if t.config.FailOnCheckMiss {
 			t.ctx.SetResult(types.TaskResultFailure)
 			t.ctx.ReportProgress(0, fmt.Sprintf("Too many unhealthy clients: %d (attempt %d)", len(failedClients), checkCount))
-		} else {
-			t.ctx.SetResult(types.TaskResultNone)
-			t.ctx.ReportProgress(0, fmt.Sprintf("Too many unhealthy clients: %d (attempt %d)", len(failedClients), checkCount))
+
+			return true, fmt.Errorf("too many unhealthy clients: %d", len(failedClients))
 		}
+
+		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Too many unhealthy clients: %d (attempt %d)", len(failedClients), checkCount))
 	case resultPass:
 		t.ctx.SetResult(types.TaskResultSuccess)
 		t.ctx.ReportProgress(100, fmt.Sprintf("All clients healthy: %d/%d", passResultCount, totalClientCount))
+
+		if !t.config.ContinueOnPass {
+			return true, nil
+		}
 	default:
 		if t.config.FailOnCheckMiss {
 			t.ctx.SetResult(types.TaskResultFailure)
 			t.ctx.ReportProgress(0, fmt.Sprintf("Unhealthy clients: %v (attempt %d)", failedClientNames, checkCount))
-		} else {
-			t.ctx.SetResult(types.TaskResultNone)
-			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for healthy clients... %d/%d (attempt %d)", passResultCount, totalClientCount, checkCount))
+
+			return true, fmt.Errorf("unhealthy clients: %v", failedClientNames)
 		}
+
+		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for healthy clients... %d/%d (attempt %d)", passResultCount, totalClientCount, checkCount))
 	}
+
+	return false, nil
 }
 
 func (t *Task) getClientInfo(client *clients.PoolClient) *ClientInfo {

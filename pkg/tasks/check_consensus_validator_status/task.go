@@ -97,20 +97,26 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// load current epoch duties
 	checkCount++
-	t.processCheck(checkCount)
+
+	if done, err := t.processCheck(checkCount); done {
+		return err
+	}
 
 	for {
 		select {
 		case <-wallclockEpochSubscription.Channel():
 			checkCount++
-			t.processCheck(checkCount)
+
+			if done, err := t.processCheck(checkCount); done {
+				return err
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-func (t *Task) processCheck(checkCount int) {
+func (t *Task) processCheck(checkCount int) (bool, error) {
 	checkResult := t.runValidatorStatusCheck()
 
 	_, epoch, _ := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().GetWallclock().Now()
@@ -120,12 +126,22 @@ func (t *Task) processCheck(checkCount int) {
 	case checkResult:
 		t.ctx.SetResult(types.TaskResultSuccess)
 		t.ctx.ReportProgress(100, fmt.Sprintf("Validator status check passed at epoch %d", epoch.Number()))
+
+		if !t.config.ContinueOnPass {
+			return true, nil
+		}
+
+		return false, nil
 	case t.config.FailOnCheckMiss:
 		t.ctx.SetResult(types.TaskResultFailure)
 		t.ctx.ReportProgress(0, fmt.Sprintf("Validator status check failed at epoch %d", epoch.Number()))
+
+		return true, fmt.Errorf("validator status check failed at epoch %d", epoch.Number())
 	default:
 		t.ctx.SetResult(types.TaskResultNone)
 		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for validator status... (attempt %d)", checkCount))
+
+		return false, nil
 	}
 }
 

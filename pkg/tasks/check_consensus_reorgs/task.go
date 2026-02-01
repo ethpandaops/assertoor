@@ -114,7 +114,10 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 
 			checkCount++
-			t.processCheck(checkCount)
+
+			if done, err := t.processCheck(checkCount); done {
+				return err
+			}
 
 			lastBlock = block
 		case <-ctx.Done():
@@ -123,18 +126,26 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 }
 
-func (t *Task) processCheck(checkCount int) {
+func (t *Task) processCheck(checkCount int) (bool, error) {
 	result := t.runCheck()
 	t.ctx.SetResult(result)
 
 	switch result {
 	case types.TaskResultSuccess:
 		t.ctx.ReportProgress(100, fmt.Sprintf("Reorg check passed (reorgs: %d, max distance: %d)", t.totalReorgs, t.maxReorgDistance))
+
+		if !t.config.ContinueOnPass {
+			return true, nil
+		}
 	case types.TaskResultFailure:
 		t.ctx.ReportProgress(0, fmt.Sprintf("Reorg check failed (reorgs: %d, max distance: %d)", t.totalReorgs, t.maxReorgDistance))
+
+		return true, fmt.Errorf("reorg check failed (reorgs: %d, max distance: %d)", t.totalReorgs, t.maxReorgDistance)
 	case types.TaskResultNone:
 		t.ctx.ReportProgress(0, fmt.Sprintf("Checking for reorgs... (attempt %d)", checkCount))
 	}
+
+	return false, nil
 }
 
 func (t *Task) runCheck() types.TaskResult {

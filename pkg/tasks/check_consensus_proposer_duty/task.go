@@ -100,26 +100,39 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		case currentSlot := <-wallclockSlotSubscription.Channel():
 			checkCount++
-			t.processCheck(currentSlot.Number(), checkCount)
+
+			if done, err := t.processCheck(currentSlot.Number(), checkCount); done {
+				return err
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-func (t *Task) processCheck(slot uint64, checkCount int) {
+func (t *Task) processCheck(slot uint64, checkCount int) (bool, error) {
 	checkResult := t.runProposerDutyCheck(slot)
 
 	switch {
 	case checkResult:
 		t.ctx.SetResult(types.TaskResultSuccess)
 		t.ctx.ReportProgress(100, fmt.Sprintf("Proposer duty check passed at slot %d", slot))
+
+		if !t.config.ContinueOnPass {
+			return true, nil
+		}
+
+		return false, nil
 	case t.config.FailOnCheckMiss:
 		t.ctx.SetResult(types.TaskResultFailure)
 		t.ctx.ReportProgress(0, fmt.Sprintf("Proposer duty check failed at slot %d", slot))
+
+		return true, fmt.Errorf("proposer duty check failed at slot %d", slot)
 	default:
 		t.ctx.SetResult(types.TaskResultNone)
 		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for proposer duty... (attempt %d)", checkCount))
+
+		return false, nil
 	}
 }
 

@@ -7,20 +7,21 @@ import (
 )
 
 type Config struct {
-	ForegroundTask *helper.RawMessageMasked `yaml:"foregroundTask" json:"foregroundTask"`
-	BackgroundTask *helper.RawMessageMasked `yaml:"backgroundTask" json:"backgroundTask"`
+	ForegroundTask   *helper.RawMessageMasked `yaml:"foregroundTask" json:"foregroundTask"`
+	BackgroundTask   *helper.RawMessageMasked `yaml:"backgroundTask" json:"backgroundTask"`
+	NewVariableScope bool                     `yaml:"newVariableScope" json:"newVariableScope"`
 
+	// When to complete (based on foreground task result)
+	// These allow early exit even if foreground task hasn't returned yet
 	ExitOnForegroundSuccess bool `yaml:"exitOnForegroundSuccess" json:"exitOnForegroundSuccess"`
 	ExitOnForegroundFailure bool `yaml:"exitOnForegroundFailure" json:"exitOnForegroundFailure"`
 
-	// action when background task stops
-	// "ignore" - do nothing (default)
+	// What happens if background task completes first
+	// "ignore" (default) - do nothing
 	// "fail" - exit with failure
-	// "succeed" - exit with success
+	// "succeed" / "success" - exit with success
 	// "failOrIgnore" - exit with failure if background task failed, ignore on success
 	OnBackgroundComplete string `yaml:"onBackgroundComplete" json:"onBackgroundComplete"`
-
-	NewVariableScope bool `yaml:"newVariableScope" json:"newVariableScope"`
 }
 
 func DefaultConfig() Config {

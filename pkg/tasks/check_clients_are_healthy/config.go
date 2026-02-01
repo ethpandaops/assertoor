@@ -17,6 +17,10 @@ type Config struct {
 	FailOnCheckMiss       bool            `yaml:"failOnCheckMiss" json:"failOnCheckMiss"`
 	ExecutionRPCResultVar string          `yaml:"executionRpcResultVar" json:"executionRpcResultVar"`
 	ConsensusRPCResultVar string          `yaml:"consensusRpcResultVar" json:"consensusRpcResultVar"`
+	// ContinueOnPass keeps the task running after the check passes.
+	// When false (default), the task exits immediately on success.
+	// When true, the task continues monitoring and may report failure if clients become unhealthy.
+	ContinueOnPass bool `yaml:"continueOnPass" json:"continueOnPass"`
 }
 
 func DefaultConfig() Config {

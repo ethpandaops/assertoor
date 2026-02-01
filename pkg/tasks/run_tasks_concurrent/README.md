@@ -3,22 +3,34 @@
 ### Description
 The `run_tasks_concurrent` task allows for the parallel execution of multiple tasks. This task is crucial in scenarios where tasks need to be run simultaneously, such as in testing environments that require concurrent processes or operations.
 
+#### Task Behavior
+- All child tasks are started concurrently.
+- By default, the task waits for all children to complete.
+- The result is failure if any child task fails, success if all succeed.
+- Use `stopOnThreshold` to cancel remaining tasks when success/failure threshold is reached.
+
 ### Configuration Parameters
-
-- **`succeedTaskCount`**:\
-  The minimum number of child tasks that need to complete with a "success" result for the `run_tasks_concurrent` task to stop and return a success result. A value of 0 indicates that all child tasks need to succeed for the overall task to be considered successful.
-
-- **`failTaskCount`**:\
-  The minimum number of child tasks that need to complete with a "failure" result for the `run_tasks_concurrent` task to stop and return a failure result. A value of 1 means the overall task will fail as soon as one child task fails.
-
-- **`failOnUndecided`**:\
-  If set to true, the `run_tasks_concurrent` task will fail if neither the `succeedTaskCount` nor the `failTaskCount` is reached.
-
-- **`newVariableScope`**:\
-  If set to true, a new variable scope will be created for the child tasks, if not, the child tasks will use the same variable scope as the parent task.
 
 - **`tasks`**:\
   An array of child tasks to be executed concurrently. Each task in this array should be defined according to the standard task structure.
+
+- **`successThreshold`**:\
+  The minimum number of child tasks that need to complete with a "success" result for the task to be considered successful. A value of `0` (default) means all child tasks must succeed.
+
+- **`failureThreshold`**:\
+  The number of child tasks that need to fail before the task is considered failed. Default: `1` (any single failure causes overall failure).
+
+- **`stopOnThreshold`**:\
+  If set to `true`, remaining child tasks are cancelled when either the success or failure threshold is reached. If `false` (default), the task waits for all children to complete before determining the result.
+
+- **`invertResult`**:\
+  If set to `true`, the final result is inverted: success becomes failure and failure becomes success. Default: `false`.
+
+- **`ignoreResult`**:\
+  If set to `true`, the task always returns success regardless of child task outcomes. Default: `false`.
+
+- **`newVariableScope`**:\
+  If set to `true`, a new variable scope will be created for each child task. If `false`, the child tasks will use the same variable scope as the parent task. Default: `true`.
 
 ### Defaults
 
@@ -27,9 +39,15 @@ Default settings for the `run_tasks_concurrent` task:
 ```yaml
 - name: run_tasks_concurrent
   config:
-    succeedTaskCount: 0
-    failTaskCount: 1
-    failOnUndecided: false
-    newVariableScope: true
     tasks: []
+    successThreshold: 0
+    failureThreshold: 1
+    stopOnThreshold: false
+    invertResult: false
+    ignoreResult: false
+    newVariableScope: true
 ```
+
+### Outputs
+
+This task does not produce any outputs.

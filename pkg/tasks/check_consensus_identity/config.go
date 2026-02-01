@@ -32,6 +32,10 @@ type Config struct {
 	// Metadata checks
 	ExpectSeqNumber *uint64 `yaml:"expectSeqNumber" json:"expectSeqNumber"`
 	MinSeqNumber    *uint64 `yaml:"minSeqNumber" json:"minSeqNumber"`
+	// ContinueOnPass keeps the task running after the check passes.
+	// When false (default), the task exits immediately on success.
+	// When true, the task continues monitoring and may report failure if identity changes.
+	ContinueOnPass bool `yaml:"continueOnPass" json:"continueOnPass"`
 }
 
 func DefaultConfig() Config {

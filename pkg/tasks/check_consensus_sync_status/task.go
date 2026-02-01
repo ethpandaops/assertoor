@@ -99,17 +99,20 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	for {
 		checkCount++
-		t.processCheck(ctx, checkCount)
+
+		if done := t.processCheck(ctx, checkCount); done {
+			return nil
+		}
 
 		select {
 		case <-time.After(t.config.PollInterval.Duration):
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		}
 	}
 }
 
-func (t *Task) processCheck(ctx context.Context, checkCount int) {
+func (t *Task) processCheck(ctx context.Context, checkCount int) bool {
 	allResultsPass := true
 	goodClients := []*ClientInfo{}
 	failedClients := []*ClientInfo{}
@@ -122,7 +125,7 @@ func (t *Task) processCheck(ctx context.Context, checkCount int) {
 		syncStatus, err := client.ConsensusClient.GetRPCClient().GetNodeSyncStatus(ctx)
 
 		if ctx.Err() != nil {
-			return
+			return false
 		}
 
 		if err != nil {
@@ -160,10 +163,14 @@ func (t *Task) processCheck(ctx context.Context, checkCount int) {
 	if allResultsPass {
 		t.ctx.SetResult(types.TaskResultSuccess)
 		t.ctx.ReportProgress(100, fmt.Sprintf("All clients synced: %d", len(goodClients)))
-	} else {
-		t.ctx.SetResult(types.TaskResultNone)
-		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for sync... %d/%d (attempt %d)", len(goodClients), len(goodClients)+len(failedClients), checkCount))
+
+		return !t.config.ContinueOnPass
 	}
+
+	t.ctx.SetResult(types.TaskResultNone)
+	t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for sync... %d/%d (attempt %d)", len(goodClients), len(goodClients)+len(failedClients), checkCount))
+
+	return false
 }
 
 func (t *Task) processClientCheck(client *clients.PoolClient, syncStatus *rpc.SyncStatus, checkLogger logrus.FieldLogger) bool {

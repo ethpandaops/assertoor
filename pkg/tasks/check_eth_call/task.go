@@ -110,13 +110,17 @@ func (t *Task) Execute(ctx context.Context) error {
 	if latestBlock != nil {
 		if t.config.BlockNumber == 0 {
 			checkCount++
-			t.runCheck(ctx, latestBlock.Number, latestBlock, checkCount)
+
+			if done, err := t.runCheck(ctx, latestBlock.Number, latestBlock, checkCount); done {
+				return err
+			}
 		} else if latestBlock.Number >= t.config.BlockNumber {
 			// if the block we're looking for already passed, run the check immediately and return
 			checkCount++
-			t.runCheck(ctx, t.config.BlockNumber, nil, checkCount)
 
-			return nil
+			_, err := t.runCheck(ctx, t.config.BlockNumber, nil, checkCount)
+
+			return err
 		}
 	}
 
@@ -129,7 +133,9 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			if t.config.BlockNumber == 0 {
 				// Run the check for all blocks
-				t.runCheck(ctx, block.Number, block, checkCount)
+				if done, err := t.runCheck(ctx, block.Number, block, checkCount); done {
+					return err
+				}
 			} else if block.Number >= t.config.BlockNumber {
 				// Run the check once for the block we're looking for
 				if block.Number != t.config.BlockNumber {
@@ -137,9 +143,9 @@ func (t *Task) Execute(ctx context.Context) error {
 					block = nil
 				}
 
-				t.runCheck(ctx, t.config.BlockNumber, block, checkCount)
+				_, err := t.runCheck(ctx, t.config.BlockNumber, block, checkCount)
 
-				return nil
+				return err
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -147,7 +153,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 }
 
-func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *execution.Block, checkCount int) {
+func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *execution.Block, checkCount int) (bool, error) {
 	// Set up the call message
 	address := common.HexToAddress(t.config.CallAddress)
 	callMsg := &ethereum.CallMsg{
@@ -167,7 +173,7 @@ func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *executio
 			t.logger.Error("check failed: no matching clients found")
 			t.ctx.SetResult(types.TaskResultFailure)
 
-			return
+			return true, fmt.Errorf("no matching clients found")
 		}
 	} else {
 		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
@@ -175,7 +181,7 @@ func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *executio
 			t.logger.Error("check failed: no matching clients found with pattern %v", t.config.ClientPattern)
 			t.ctx.SetResult(types.TaskResultFailure)
 
-			return
+			return true, fmt.Errorf("no matching clients found with pattern %v", t.config.ClientPattern)
 		}
 
 		clients = make([]*execution.Client, len(poolClients))
@@ -212,7 +218,7 @@ func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *executio
 			t.logger.WithField("client", client.GetName()).Errorf("RPC error when sending eth_call %v: %v", callMsg, err)
 			t.ctx.SetResult(types.TaskResultFailure)
 
-			return
+			return true, fmt.Errorf("RPC error when sending eth_call: %w", err)
 		}
 
 		ignoreResult := t.ignoreResult(fetchedResult)
@@ -230,12 +236,14 @@ func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *executio
 
 			if t.config.FailOnMismatch && !ignoreResult {
 				t.ctx.SetResult(types.TaskResultFailure)
-			} else {
-				t.ctx.SetResult(types.TaskResultNone)
-				t.ctx.ReportProgress(0, fmt.Sprintf("result mismatch (attempt %d)", checkCount))
+
+				return true, fmt.Errorf("eth_call results mismatch against other client")
 			}
 
-			return
+			t.ctx.SetResult(types.TaskResultNone)
+			t.ctx.ReportProgress(0, fmt.Sprintf("result mismatch (attempt %d)", checkCount))
+
+			return false, nil
 		}
 
 		// Check if the fetched result is the expected result
@@ -250,12 +258,14 @@ func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *executio
 
 				if t.config.FailOnMismatch && !ignoreResult {
 					t.ctx.SetResult(types.TaskResultFailure)
-				} else {
-					t.ctx.SetResult(types.TaskResultNone)
-					t.ctx.ReportProgress(0, fmt.Sprintf("expected result mismatch (attempt %d)", checkCount))
+
+					return true, fmt.Errorf("eth_call results mismatch against expected result")
 				}
 
-				return
+				t.ctx.SetResult(types.TaskResultNone)
+				t.ctx.ReportProgress(0, fmt.Sprintf("expected result mismatch (attempt %d)", checkCount))
+
+				return false, nil
 			}
 		}
 
@@ -267,7 +277,13 @@ func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *executio
 	if checkedClients > 0 {
 		t.ctx.SetResult(types.TaskResultSuccess)
 		t.ctx.ReportProgress(100, fmt.Sprintf("eth_call successful on %d clients", checkedClients))
+
+		if !t.config.ContinueOnPass {
+			return true, nil
+		}
 	}
+
+	return false, nil
 }
 
 func (t *Task) ignoreResult(result []byte) bool {
