@@ -8,11 +8,20 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/logger"
 )
 
+// TaskOutputDefinition describes an output that a task can produce.
+type TaskOutputDefinition struct {
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+}
+
 type TaskDescriptor struct {
 	Name        string
 	Aliases     []string
 	Description string
-	Config      interface{}
+	Category    string
+	Config      any
+	Outputs     []TaskOutputDefinition
 	NewTask     func(ctx *TaskContext, options *TaskOptions) (Task, error)
 }
 
@@ -43,7 +52,7 @@ const (
 )
 
 type Task interface {
-	Config() interface{}
+	Config() any
 	Timeout() time.Duration
 
 	LoadConfig() error
@@ -57,7 +66,7 @@ type TaskState interface {
 	Name() string
 	Title() string
 	Description() string
-	Config() interface{}
+	Config() any
 	Timeout() time.Duration
 	GetTaskStatus() *TaskStatus
 	GetTaskStatusVars() Variables
@@ -66,24 +75,28 @@ type TaskState interface {
 }
 
 type TaskStatus struct {
-	Index       TaskIndex
-	ParentIndex TaskIndex
-	IsStarted   bool
-	IsRunning   bool
-	IsSkipped   bool
-	StartTime   time.Time
-	StopTime    time.Time
-	Result      TaskResult
-	Error       error
-	Logger      logger.LogReader
+	Index           TaskIndex
+	ParentIndex     TaskIndex
+	IsStarted       bool
+	IsRunning       bool
+	IsSkipped       bool
+	StartTime       time.Time
+	StopTime        time.Time
+	Result          TaskResult
+	Error           error
+	Logger          logger.LogReader
+	Progress        float64
+	ProgressMessage string
 }
 
 type TaskContext struct {
-	Scheduler TaskSchedulerRunner
-	Index     TaskIndex
-	Vars      Variables
-	Outputs   Variables
-	Logger    *logger.LogScope
-	NewTask   func(options *TaskOptions, variables Variables) (TaskIndex, error)
-	SetResult func(result TaskResult)
+	Scheduler      TaskSchedulerRunner
+	Index          TaskIndex
+	Vars           Variables
+	Outputs        Variables
+	Logger         *logger.LogScope
+	NewTask        func(options *TaskOptions, variables Variables) (TaskIndex, error)
+	SetResult      func(result TaskResult)
+	ReportProgress func(percent float64, message string)
+	EmitEvent      func(eventType string, data any)
 }

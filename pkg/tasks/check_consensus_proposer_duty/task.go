@@ -17,7 +17,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Check consensus chain proposer duties.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -89,25 +91,35 @@ func (t *Task) Execute(ctx context.Context) error {
 	// load current epoch duties
 	t.loadEpochDuties(ctx, currentEpoch.Number())
 
+	checkCount := 0
+
 	for {
 		select {
 		case currentEpoch := <-wallclockEpochSubscription.Channel():
 			t.loadEpochDuties(ctx, currentEpoch.Number())
 
 		case currentSlot := <-wallclockSlotSubscription.Channel():
-			checkResult := t.runProposerDutyCheck(currentSlot.Number())
-
-			switch {
-			case checkResult:
-				t.ctx.SetResult(types.TaskResultSuccess)
-			case t.config.FailOnCheckMiss:
-				t.ctx.SetResult(types.TaskResultFailure)
-			default:
-				t.ctx.SetResult(types.TaskResultNone)
-			}
+			checkCount++
+			t.processCheck(currentSlot.Number(), checkCount)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+}
+
+func (t *Task) processCheck(slot uint64, checkCount int) {
+	checkResult := t.runProposerDutyCheck(slot)
+
+	switch {
+	case checkResult:
+		t.ctx.SetResult(types.TaskResultSuccess)
+		t.ctx.ReportProgress(100, fmt.Sprintf("Proposer duty check passed at slot %d", slot))
+	case t.config.FailOnCheckMiss:
+		t.ctx.SetResult(types.TaskResultFailure)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Proposer duty check failed at slot %d", slot))
+	default:
+		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for proposer duty... (attempt %d)", checkCount))
 	}
 }
 

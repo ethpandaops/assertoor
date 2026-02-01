@@ -24,8 +24,26 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Check for consensus block proposals that meet specific criteria.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "matchingBlockRoots",
+				Type:        "array",
+				Description: "Array of block roots that match the criteria.",
+			},
+			{
+				Name:        "matchingBlockHeaders",
+				Type:        "array",
+				Description: "Array of block headers that match the criteria.",
+			},
+			{
+				Name:        "matchingBlockBodies",
+				Type:        "array",
+				Description: "Array of block bodies that match the criteria.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -86,8 +104,11 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	totalMatches := 0
 	matchingBlocks := []*consensus.Block{}
+	checkCount := 0
 
 	checkBlockMatch := func(block *consensus.Block) bool {
+		checkCount++
+
 		matches := t.checkBlock(ctx, block)
 		if matches {
 			matchingBlocks = append(matchingBlocks, block)
@@ -100,14 +121,19 @@ func (t *Task) Execute(ctx context.Context) error {
 			if totalMatches >= t.config.BlockCount {
 				t.setMatchingBlocksOutput(matchingBlocks)
 				t.ctx.SetResult(types.TaskResultSuccess)
+				t.ctx.ReportProgress(100, fmt.Sprintf("Found %d matching blocks", totalMatches))
 
 				return true
 			}
+
+			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for block proposals... %d/%d (attempt %d)", totalMatches, t.config.BlockCount, checkCount))
 		} else {
 			if matches {
 				t.ctx.SetResult(types.TaskResultSuccess)
+				t.ctx.ReportProgress(100, fmt.Sprintf("Found matching block at slot %d", block.Slot))
 			} else {
 				t.ctx.SetResult(types.TaskResultNone)
+				t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for matching block... (attempt %d)", checkCount))
 			}
 		}
 

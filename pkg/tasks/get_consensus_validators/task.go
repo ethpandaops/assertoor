@@ -17,8 +17,31 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Retrieves validators from the consensus layer matching specified criteria.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "validators",
+				Type:        "array",
+				Description: "Array of validator info objects (when outputFormat is 'full').",
+			},
+			{
+				Name:        "pubkeys",
+				Type:        "array",
+				Description: "Array of validator public keys (when outputFormat is 'pubkeys').",
+			},
+			{
+				Name:        "indices",
+				Type:        "array",
+				Description: "Array of validator indices (when outputFormat is 'indices').",
+			},
+			{
+				Name:        "count",
+				Type:        "int",
+				Description: "Number of matching validators found.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -248,6 +271,8 @@ func (t *Task) Execute(_ context.Context) error {
 	} else {
 		t.ctx.SetResult(types.TaskResultNone)
 	}
+
+	t.ctx.ReportProgress(100, fmt.Sprintf("Retrieved %d validators", len(matchingValidators)))
 
 	return nil
 }

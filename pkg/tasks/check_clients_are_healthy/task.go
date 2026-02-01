@@ -18,8 +18,36 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Checks if clients are healthy.",
+		Category:    "utility",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "goodClients",
+				Type:        "array",
+				Description: "Array of healthy client info objects.",
+			},
+			{
+				Name:        "failedClients",
+				Type:        "array",
+				Description: "Array of unhealthy client info objects.",
+			},
+			{
+				Name:        "totalCount",
+				Type:        "int",
+				Description: "Total number of clients checked.",
+			},
+			{
+				Name:        "failedCount",
+				Type:        "int",
+				Description: "Number of clients that failed health check.",
+			},
+			{
+				Name:        "goodCount",
+				Type:        "int",
+				Description: "Number of clients that passed health check.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -79,19 +107,21 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	t.processCheck()
+	checkCount := 0
 
 	for {
+		checkCount++
+		t.processCheck(checkCount)
+
 		select {
 		case <-time.After(t.config.PollInterval.Duration):
-			t.processCheck()
 		case <-ctx.Done():
 			return nil
 		}
 	}
 }
 
-func (t *Task) processCheck() {
+func (t *Task) processCheck(checkCount int) {
 	expectedResult := !t.config.ExpectUnhealthy
 	passResultCount := 0
 	totalClientCount := 0
@@ -150,16 +180,21 @@ func (t *Task) processCheck() {
 	case t.config.MaxUnhealthyCount > -1 && len(failedClients) > t.config.MaxUnhealthyCount:
 		if t.config.FailOnCheckMiss {
 			t.ctx.SetResult(types.TaskResultFailure)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Too many unhealthy clients: %d (attempt %d)", len(failedClients), checkCount))
 		} else {
 			t.ctx.SetResult(types.TaskResultNone)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Too many unhealthy clients: %d (attempt %d)", len(failedClients), checkCount))
 		}
 	case resultPass:
 		t.ctx.SetResult(types.TaskResultSuccess)
+		t.ctx.ReportProgress(100, fmt.Sprintf("All clients healthy: %d/%d", passResultCount, totalClientCount))
 	default:
 		if t.config.FailOnCheckMiss {
 			t.ctx.SetResult(types.TaskResultFailure)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Unhealthy clients: %v (attempt %d)", failedClientNames, checkCount))
 		} else {
 			t.ctx.SetResult(types.TaskResultNone)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for healthy clients... %d/%d (attempt %d)", passResultCount, totalClientCount, checkCount))
 		}
 	}
 }

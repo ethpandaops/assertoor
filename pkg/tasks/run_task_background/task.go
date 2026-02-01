@@ -16,7 +16,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Runs foreground and background task with configurable dependencies.",
+		Category:    "flow-control",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -122,8 +124,12 @@ func (t *Task) Execute(ctx context.Context) error {
 	childCtx, cancel := context.WithCancel(ctx)
 
 	if t.backgroundTask != 0 {
+		t.ctx.ReportProgress(0, "Starting background task...")
+
 		go t.execBackgroundTask(childCtx)
 	}
+
+	t.ctx.ReportProgress(0, "Running foreground task...")
 
 	go t.execForegroundTask(childCtx)
 
@@ -136,6 +142,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	cancel()
 
 	<-t.foregroundChan
+
+	t.ctx.ReportProgress(100, "Task completed")
 
 	return result.err
 }

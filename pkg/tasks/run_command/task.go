@@ -15,8 +15,21 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Runs a shell command.",
+		Category:    "utility",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "stdout",
+				Type:        "string",
+				Description: "The combined stdout/stderr output from the command.",
+			},
+			{
+				Name:        "error",
+				Type:        "string",
+				Description: "The error message if the command failed.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -71,6 +84,7 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	if len(t.config.Command) == 0 {
+		t.ctx.ReportProgress(100, "No command to run")
 		return nil
 	}
 
@@ -82,6 +96,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	t.logger.WithField("cmd", com).WithField("args", args).WithField("allowed_to_failed", t.config.AllowedToFail).Info("running command")
+	t.ctx.ReportProgress(0, "Running command...")
 
 	command := exec.CommandContext(ctx, com, args...)
 
@@ -100,6 +115,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	t.logger.WithField("stdout", string(stdOut)).Info("command run successfully")
+	t.ctx.ReportProgress(100, "Command completed")
 
 	return nil
 }

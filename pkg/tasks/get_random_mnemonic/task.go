@@ -16,8 +16,16 @@ var (
 		Name:        TaskName,
 		Aliases:     []string{"generate_random_mnemonic"},
 		Description: "Get random mnemonic.",
+		Category:    "utility",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "mnemonic",
+				Type:        "string",
+				Description: "The randomly generated mnemonic.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -88,6 +96,8 @@ func (t *Task) Execute(_ context.Context) error {
 	}
 
 	t.ctx.Outputs.SetVar("mnemonic", mnemonic)
+
+	t.ctx.ReportProgress(100, "Random mnemonic generated")
 
 	return nil
 }

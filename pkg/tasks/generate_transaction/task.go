@@ -28,8 +28,36 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Generates normal transaction, sends it to the network and checks the receipt",
+		Category:    "transaction",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "transaction",
+				Type:        "object",
+				Description: "The generated transaction object.",
+			},
+			{
+				Name:        "transactionHex",
+				Type:        "string",
+				Description: "The transaction encoded as hex.",
+			},
+			{
+				Name:        "transactionHash",
+				Type:        "string",
+				Description: "The transaction hash.",
+			},
+			{
+				Name:        "contractAddress",
+				Type:        "string",
+				Description: "The deployed contract address (if contract deployment).",
+			},
+			{
+				Name:        "receipt",
+				Type:        "object",
+				Description: "The transaction receipt (if awaitReceipt is enabled).",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -132,6 +160,8 @@ func (t *Task) LoadConfig() error {
 
 //nolint:gocyclo // ignore
 func (t *Task) Execute(ctx context.Context) error {
+	t.ctx.ReportProgress(0, "Preparing wallet...")
+
 	err := t.wallet.AwaitReady(ctx)
 	if err != nil {
 		return fmt.Errorf("cannot load wallet state: %w", err)
@@ -147,6 +177,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
+
+	t.ctx.ReportProgress(0, "Generating transaction...")
 
 	tx, err := t.generateTransaction(ctx)
 	if err != nil {
@@ -286,6 +318,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		// resync nonces of authorization wallets (might be increased by more than one, so we need to resync)
 		authorizationWallet.ResyncState()
 	}
+
+	t.ctx.ReportProgress(100, fmt.Sprintf("Transaction completed: %s", tx.Hash().Hex()))
 
 	return nil
 }

@@ -28,7 +28,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Generates valid attestations and sends them to the network",
+		Category:    "validator",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -140,6 +142,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	totalAttestations := 0
 	processedEpochs := 0
 
+	t.ctx.ReportProgress(0, "Generating attestations...")
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -163,11 +167,25 @@ func (t *Task) Execute(ctx context.Context) error {
 
 				t.ctx.SetResult(types.TaskResultSuccess)
 				t.logger.Infof("sent %d attestations for slot %d (total: %d)", count, slot.Number(), totalAttestations)
+
+				// Report progress based on limits
+				switch {
+				case t.config.LimitTotal > 0:
+					progress := float64(totalAttestations) / float64(t.config.LimitTotal) * 100
+					t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d attestations", totalAttestations, t.config.LimitTotal))
+				case t.config.LimitEpochs > 0:
+					progress := float64(processedEpochs) / float64(t.config.LimitEpochs) * 100
+					t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d attestations (%d/%d epochs)", totalAttestations, processedEpochs, t.config.LimitEpochs))
+				default:
+					t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d attestations", totalAttestations))
+				}
 			}
 
 			// Check limits
 			if t.config.LimitTotal > 0 && totalAttestations >= t.config.LimitTotal {
 				t.logger.Infof("reached total attestation limit: %d", totalAttestations)
+				t.ctx.ReportProgress(100, fmt.Sprintf("Completed: generated %d attestations", totalAttestations))
+
 				return nil
 			}
 
@@ -214,9 +232,23 @@ func (t *Task) Execute(ctx context.Context) error {
 			processedEpochs++
 			t.logger.Infof("completed epoch %d, processed epochs: %d", epochNum-1, processedEpochs)
 
+			// Report progress based on limits
+			switch {
+			case t.config.LimitTotal > 0:
+				progress := float64(totalAttestations) / float64(t.config.LimitTotal) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d attestations", totalAttestations, t.config.LimitTotal))
+			case t.config.LimitEpochs > 0:
+				progress := float64(processedEpochs) / float64(t.config.LimitEpochs) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d attestations (%d/%d epochs)", totalAttestations, processedEpochs, t.config.LimitEpochs))
+			default:
+				t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d attestations (%d epochs)", totalAttestations, processedEpochs))
+			}
+
 			// Check epoch limit
 			if t.config.LimitEpochs > 0 && processedEpochs >= t.config.LimitEpochs {
 				t.logger.Infof("reached epoch limit: %d", processedEpochs)
+				t.ctx.ReportProgress(100, fmt.Sprintf("Completed: generated %d attestations", totalAttestations))
+
 				return nil
 			}
 		}

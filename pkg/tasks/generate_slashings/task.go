@@ -27,7 +27,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Generates slashable attestations / proposals and sends them to the network",
+		Category:    "validator",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -112,6 +114,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	perSlotCount := 0
 	totalCount := 0
 
+	t.ctx.ReportProgress(0, "Generating slashings...")
+
 	for {
 		accountIdx := t.nextIndex
 		t.nextIndex++
@@ -124,6 +128,19 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			perSlotCount++
 			totalCount++
+
+			// Report progress based on total limit or index count
+			switch {
+			case t.config.LimitTotal > 0:
+				progress := float64(totalCount) / float64(t.config.LimitTotal) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d slashings", totalCount, t.config.LimitTotal))
+			case t.lastIndex > 0:
+				indexTotal := t.lastIndex - uint64(t.config.StartIndex) //nolint:gosec // no overflow possible
+				progress := float64(totalCount) / float64(indexTotal) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d slashings", totalCount, indexTotal))
+			default:
+				t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d slashings", totalCount))
+			}
 		}
 
 		if t.lastIndex > 0 && t.nextIndex >= t.lastIndex {
@@ -147,6 +164,8 @@ func (t *Task) Execute(ctx context.Context) error {
 			return err
 		}
 	}
+
+	t.ctx.ReportProgress(100, fmt.Sprintf("Completed: generated %d slashings", totalCount))
 
 	return nil
 }

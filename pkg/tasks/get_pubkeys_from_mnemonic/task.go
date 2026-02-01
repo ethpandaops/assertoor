@@ -18,8 +18,16 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Get public keys from mnemonic",
+		Category:    "validator",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "pubkeys",
+				Type:        "array",
+				Description: "Array of generated public keys.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -98,6 +106,8 @@ func (t *Task) Execute(_ context.Context) error {
 	}
 
 	t.ctx.Outputs.SetVar("pubkeys", pubkeys)
+
+	t.ctx.ReportProgress(100, fmt.Sprintf("Generated %d public keys", len(pubkeys)))
 
 	return nil
 }

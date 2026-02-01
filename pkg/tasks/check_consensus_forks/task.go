@@ -15,8 +15,16 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Check for consensus layer forks.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "forks",
+				Type:        "array",
+				Description: "Array of fork info objects with head slot, root, and clients.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -88,18 +96,20 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	t.startEpoch = currentEpoch.Number()
+	checkCount := 0
 
 	for {
 		select {
 		case <-blockSubscription.Channel():
-			t.ctx.SetResult(t.runCheck())
+			checkCount++
+			t.processCheck(checkCount)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-func (t *Task) runCheck() types.TaskResult {
+func (t *Task) processCheck(checkCount int) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	headForks := consensusPool.GetHeadForks(t.config.MaxForkDistance)
 	headForkInfo := make([]*ForkInfo, len(headForks))
@@ -135,21 +145,31 @@ func (t *Task) runCheck() types.TaskResult {
 			t.logger.Infof("Fork #%v: %v [0x%x] (%v clients: [%v])", idx, fork.Slot, fork.Root, len(fork.AllClients), clients)
 		}
 
-		return types.TaskResultFailure
+		t.ctx.SetResult(types.TaskResultFailure)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Too many forks: %d (attempt %d)", len(headForks)-1, checkCount))
+
+		return
 	}
 
 	_, currentEpoch, err := consensusPool.GetBlockCache().GetWallclock().Now()
 	if err != nil {
 		t.logger.Warnf("check missed: could not get current epoch from wall clock")
-		return types.TaskResultNone
+		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for fork check... (attempt %d)", checkCount))
+
+		return
 	}
 
 	epochCount := currentEpoch.Number() - t.startEpoch
 
 	if t.config.MinCheckEpochCount > 0 && epochCount < t.config.MinCheckEpochCount {
 		t.logger.Warnf("Check missed: checked %v epochs, but need >= %v", epochCount, t.config.MinCheckEpochCount)
-		return types.TaskResultNone
+		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for fork check... %d/%d epochs (attempt %d)", epochCount, t.config.MinCheckEpochCount, checkCount))
+
+		return
 	}
 
-	return types.TaskResultSuccess
+	t.ctx.SetResult(types.TaskResultSuccess)
+	t.ctx.ReportProgress(100, fmt.Sprintf("Fork check passed after %d epochs", epochCount))
 }

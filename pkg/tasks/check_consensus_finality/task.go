@@ -14,8 +14,26 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Check finality status for consensus chain.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "finalizedEpoch",
+				Type:        "uint64",
+				Description: "The latest finalized epoch number.",
+			},
+			{
+				Name:        "finalizedRoot",
+				Type:        "string",
+				Description: "The root hash of the finalized checkpoint.",
+			},
+			{
+				Name:        "unfinalizedEpochs",
+				Type:        "uint64",
+				Description: "Number of epochs since the last finalized checkpoint.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -79,16 +97,22 @@ func (t *Task) Execute(ctx context.Context) error {
 	checkpointSubscription := consensusPool.GetBlockCache().SubscribeFinalizedEvent(10)
 	defer checkpointSubscription.Unsubscribe()
 
+	checkCount := 0
+
 	for {
+		checkCount++
 		checkResult := t.runFinalityCheck()
 
 		switch {
 		case checkResult:
 			t.ctx.SetResult(types.TaskResultSuccess)
+			t.ctx.ReportProgress(100, "Finality check passed")
 		case t.config.FailOnCheckMiss:
 			t.ctx.SetResult(types.TaskResultFailure)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Finality check failed (attempt %d)", checkCount))
 		default:
 			t.ctx.SetResult(types.TaskResultNone)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for finality... (attempt %d)", checkCount))
 		}
 
 		select {

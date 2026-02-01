@@ -27,8 +27,21 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Generates bls changes and sends them to the network",
+		Category:    "validator",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "blsChanges",
+				Type:        "array",
+				Description: "Array of generated BLS change operations.",
+			},
+			{
+				Name:        "latestBlsChange",
+				Type:        "object",
+				Description: "The most recently generated BLS change operation.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -114,6 +127,16 @@ func (t *Task) Execute(ctx context.Context) error {
 	totalCount := 0
 	blsChangesList := []interface{}{}
 
+	// Calculate target count for progress reporting
+	targetCount := 0
+	if t.config.LimitTotal > 0 {
+		targetCount = t.config.LimitTotal
+	} else if t.lastIndex > 0 {
+		targetCount = int(t.lastIndex - t.nextIndex) //nolint:gosec // no overflow possible
+	}
+
+	t.ctx.ReportProgress(0, "Starting BLS change generation")
+
 	for {
 		accountIdx := t.nextIndex
 		t.nextIndex++
@@ -128,6 +151,14 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			perSlotCount++
 			totalCount++
+
+			// Report progress
+			if targetCount > 0 {
+				progress := float64(totalCount) / float64(targetCount) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d BLS changes", totalCount, targetCount))
+			} else {
+				t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d BLS changes", totalCount))
+			}
 		}
 
 		if t.lastIndex > 0 && t.nextIndex >= t.lastIndex {
@@ -153,6 +184,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	t.ctx.Outputs.SetVar("blsChanges", blsChangesList)
+
+	t.ctx.ReportProgress(100, fmt.Sprintf("Completed generating %d BLS changes", totalCount))
 
 	return nil
 }

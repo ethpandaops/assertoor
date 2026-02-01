@@ -22,8 +22,16 @@ type ScopeOptions struct {
 	BufferSize uint64
 	FlushDelay time.Duration
 	Database   *db.Database
+	EventBus   EventBusPublisher
 	TestRunID  uint64
 	TaskID     uint64
+	TaskName   string
+	TaskRefID  string
+}
+
+// EventBusPublisher defines the interface for publishing log events.
+type EventBusPublisher interface {
+	PublishTaskLog(testRunID, taskIndex uint64, taskName, taskID, level, message string, fields map[string]any)
 }
 
 type logForwarder struct {
@@ -62,6 +70,10 @@ func NewLogger(options *ScopeOptions) *LogScope {
 	} else {
 		logger.memBuffer = newLogMemBuffer(logger, options.BufferSize)
 		logger.logger.AddHook(logger.memBuffer)
+	}
+
+	if options.EventBus != nil {
+		logger.logger.AddHook(newLogEventBusHook(logger, options.EventBus))
 	}
 
 	return logger

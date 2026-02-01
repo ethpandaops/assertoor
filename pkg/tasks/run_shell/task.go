@@ -24,7 +24,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Runs commands in a shell.",
+		Category:    "utility",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -81,6 +83,7 @@ func (t *Task) LoadConfig() error {
 func (t *Task) Execute(ctx context.Context) error {
 	cmdLogger := t.logger.WithField("shell", t.config.Shell)
 	cmdLogger.Info("running command")
+	t.ctx.ReportProgress(0, "Running shell command...")
 
 	// create temp dir for task
 	taskDir, err := os.MkdirTemp(os.TempDir(), fmt.Sprintf("assertoor_%v_%v_", t.ctx.Scheduler.GetTestRunID(), t.ctx.Index))
@@ -240,6 +243,7 @@ cmdloop:
 	}
 
 	cmdLogger.Info("command run successfully")
+	t.ctx.ReportProgress(100, "Shell command completed")
 
 	return nil
 }

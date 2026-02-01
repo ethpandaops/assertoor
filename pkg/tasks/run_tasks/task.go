@@ -14,7 +14,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Run tasks sequentially.",
+		Category:    "flow-control",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -96,6 +98,8 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
+	totalTasks := len(t.tasks)
+
 	for i, task := range t.tasks {
 		err := t.ctx.Scheduler.ExecuteTask(ctx, task, func(ctx context.Context, cancelFn context.CancelFunc, task types.TaskIndex) {
 			if t.config.StopChildOnResult {
@@ -117,6 +121,11 @@ func (t *Task) Execute(ctx context.Context) error {
 				return fmt.Errorf("child task #%v failed: %w", i+1, err)
 			}
 		}
+
+		// Report progress after each task completes
+		completedTasks := i + 1
+		progress := float64(completedTasks) / float64(totalTasks) * 100
+		t.ctx.ReportProgress(progress, fmt.Sprintf("Task %d/%d completed", completedTasks, totalTasks))
 	}
 
 	return nil

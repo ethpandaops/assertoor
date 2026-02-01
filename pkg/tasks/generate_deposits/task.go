@@ -38,8 +38,26 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Generates deposits and sends them to the network",
+		Category:    "validator",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "validatorPubkeys",
+				Type:        "array",
+				Description: "Array of validator public keys for the deposits.",
+			},
+			{
+				Name:        "depositTransactions",
+				Type:        "array",
+				Description: "Array of deposit transaction hashes.",
+			},
+			{
+				Name:        "depositReceipts",
+				Type:        "array",
+				Description: "Array of deposit transaction receipts.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -139,6 +157,16 @@ func (t *Task) Execute(ctx context.Context) error {
 	perSlotCount := 0
 	totalCount := 0
 
+	// Calculate target count for progress reporting
+	targetCount := 0
+	if t.config.LimitTotal > 0 {
+		targetCount = t.config.LimitTotal
+	} else if t.lastIndex > 0 {
+		targetCount = int(t.lastIndex - t.nextIndex) //nolint:gosec // no overflow possible
+	}
+
+	t.ctx.ReportProgress(0, "Starting deposit generation")
+
 	depositTransactions := []string{}
 	validatorPubkeys := []string{}
 	depositReceipts := map[string]*ethtypes.Receipt{}
@@ -196,6 +224,14 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			validatorPubkeys = append(validatorPubkeys, pubkey.String())
 			depositTransactions = append(depositTransactions, tx.Hash().Hex())
+
+			// Report progress
+			if targetCount > 0 {
+				progress := float64(totalCount) / float64(targetCount) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d deposits", totalCount, targetCount))
+			} else {
+				t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d deposits", totalCount))
+			}
 		}
 
 		if t.lastIndex > 0 && t.nextIndex >= t.lastIndex {
@@ -268,6 +304,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	t.ctx.Outputs.SetVar("depositReceipts", receiptList)
+
+	t.ctx.ReportProgress(100, fmt.Sprintf("Completed generating %d deposits", totalCount))
 
 	if t.config.FailOnReject {
 		for _, txhash := range depositTransactions {

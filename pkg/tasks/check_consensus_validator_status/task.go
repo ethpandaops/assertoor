@@ -20,8 +20,21 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Check validator status on consensus chain.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "validator",
+				Type:        "object",
+				Description: "The validator information object.",
+			},
+			{
+				Name:        "pubkey",
+				Type:        "string",
+				Description: "The validator's public key.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -80,20 +93,24 @@ func (t *Task) Execute(ctx context.Context) error {
 	wallclockEpochSubscription := consensusPool.GetBlockCache().SubscribeWallclockEpochEvent(10)
 	defer wallclockEpochSubscription.Unsubscribe()
 
+	checkCount := 0
+
 	// load current epoch duties
-	t.runCheck()
+	checkCount++
+	t.processCheck(checkCount)
 
 	for {
 		select {
 		case <-wallclockEpochSubscription.Channel():
-			t.runCheck()
+			checkCount++
+			t.processCheck(checkCount)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-func (t *Task) runCheck() {
+func (t *Task) processCheck(checkCount int) {
 	checkResult := t.runValidatorStatusCheck()
 
 	_, epoch, _ := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().GetWallclock().Now()
@@ -102,10 +119,13 @@ func (t *Task) runCheck() {
 	switch {
 	case checkResult:
 		t.ctx.SetResult(types.TaskResultSuccess)
+		t.ctx.ReportProgress(100, fmt.Sprintf("Validator status check passed at epoch %d", epoch.Number()))
 	case t.config.FailOnCheckMiss:
 		t.ctx.SetResult(types.TaskResultFailure)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Validator status check failed at epoch %d", epoch.Number()))
 	default:
 		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for validator status... (attempt %d)", checkCount))
 	}
 }
 

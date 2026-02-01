@@ -14,7 +14,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Sleeps for a specified duration.",
+		Category:    "utility",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -69,10 +71,40 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	select {
-	case <-time.After(t.config.Duration.Duration):
+	duration := t.config.Duration.Duration
+	if duration <= 0 {
 		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+	}
+
+	startTime := time.Now()
+	ticker := time.NewTicker(1 * time.Second)
+
+	defer ticker.Stop()
+
+	t.ctx.ReportProgress(0, fmt.Sprintf("Sleeping for %v", duration))
+
+	for {
+		select {
+		case <-ticker.C:
+			elapsed := time.Since(startTime)
+			progress := float64(elapsed) / float64(duration) * 100
+
+			if progress > 100 {
+				progress = 100
+			}
+
+			remaining := duration - elapsed
+			if remaining < 0 {
+				remaining = 0
+			}
+
+			t.ctx.ReportProgress(progress, fmt.Sprintf("Sleeping... %v remaining", remaining.Round(time.Second)))
+		case <-time.After(time.Until(startTime.Add(duration))):
+			t.ctx.ReportProgress(100, "Sleep completed")
+
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }

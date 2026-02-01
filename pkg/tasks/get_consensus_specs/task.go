@@ -14,8 +14,16 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Get consensus chain specs.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "specs",
+				Type:        "object",
+				Description: "The consensus chain specs object.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -86,6 +94,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	t.ctx.Outputs.SetVar("specs", specs)
+
+	t.ctx.ReportProgress(100, "Consensus specs retrieved")
 
 	return nil
 }

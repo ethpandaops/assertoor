@@ -34,6 +34,9 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 		taskLogger.Errorf("task state update on db failed: %v", err)
 	}
 
+	// emit task started event
+	ts.emitTaskStarted(taskState)
+
 	defer func() {
 		taskState.isRunning = false
 		taskState.stopTime = time.Now()
@@ -88,6 +91,18 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 		},
 		SetResult: func(result types.TaskResult) {
 			taskState.setTaskResult(result, true)
+		},
+		ReportProgress: func(percent float64, message string) {
+			taskState.SetProgress(percent, message)
+			ts.emitTaskProgress(taskState, percent, message)
+		},
+		EmitEvent: func(eventType string, data any) {
+			if eventBus := ts.services.EventBus(); eventBus != nil {
+				event, err := ts.services.EventBus().NewCustomEvent(eventType, ts.testRunID, uint64(taskState.index), data)
+				if err == nil {
+					eventBus.Publish(event)
+				}
+			}
 		},
 	}
 
@@ -174,12 +189,89 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 
 	if taskState.taskResult == types.TaskResultFailure {
 		taskLogger.Warnf("task failed with failure result: %v", taskState.taskError)
+		ts.emitTaskFailed(taskState)
+
 		return fmt.Errorf("task failed: %w", taskState.taskError)
 	}
 
 	taskLogger.Infof("task completed")
+	ts.emitTaskCompleted(taskState)
 
 	return nil
+}
+
+func (ts *TaskScheduler) emitTaskStarted(taskState *taskState) {
+	eventBus := ts.services.EventBus()
+	if eventBus == nil {
+		return
+	}
+
+	eventBus.PublishTaskStarted(
+		ts.testRunID,
+		uint64(taskState.index),
+		taskState.options.Name,
+		taskState.Title(),
+		taskState.options.ID,
+	)
+}
+
+func (ts *TaskScheduler) emitTaskCompleted(taskState *taskState) {
+	eventBus := ts.services.EventBus()
+	if eventBus == nil {
+		return
+	}
+
+	resultStr := "success"
+	if taskState.taskResult == types.TaskResultNone {
+		resultStr = "none"
+	}
+
+	eventBus.PublishTaskCompleted(
+		ts.testRunID,
+		uint64(taskState.index),
+		taskState.options.Name,
+		taskState.Title(),
+		taskState.options.ID,
+		resultStr,
+	)
+}
+
+func (ts *TaskScheduler) emitTaskFailed(taskState *taskState) {
+	eventBus := ts.services.EventBus()
+	if eventBus == nil {
+		return
+	}
+
+	errMsg := ""
+	if taskState.taskError != nil {
+		errMsg = taskState.taskError.Error()
+	}
+
+	eventBus.PublishTaskFailed(
+		ts.testRunID,
+		uint64(taskState.index),
+		taskState.options.Name,
+		taskState.Title(),
+		taskState.options.ID,
+		errMsg,
+	)
+}
+
+func (ts *TaskScheduler) emitTaskProgress(taskState *taskState, percent float64, message string) {
+	eventBus := ts.services.EventBus()
+	if eventBus == nil {
+		return
+	}
+
+	eventBus.PublishTaskProgress(
+		ts.testRunID,
+		uint64(taskState.index),
+		taskState.options.Name,
+		taskState.Title(),
+		taskState.options.ID,
+		percent,
+		message,
+	)
 }
 
 func (ts *TaskScheduler) WatchTaskPass(ctx context.Context, cancelFn context.CancelFunc, taskIndex types.TaskIndex) {

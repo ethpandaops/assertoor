@@ -17,8 +17,31 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Get wallet details.",
+		Category:    "wallet",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "address",
+				Type:        "string",
+				Description: "The wallet address.",
+			},
+			{
+				Name:        "balance",
+				Type:        "string",
+				Description: "The wallet balance in wei as a string.",
+			},
+			{
+				Name:        "nonce",
+				Type:        "uint64",
+				Description: "The current nonce of the wallet.",
+			},
+			{
+				Name:        "summary",
+				Type:        "object",
+				Description: "Summary object with wallet details.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -98,6 +121,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("balance", wal.GetBalance().String())
 	t.ctx.Outputs.SetVar("nonce", wal.GetNonce())
 	t.ctx.Outputs.SetVar("summary", wal.GetSummary())
+
+	t.ctx.ReportProgress(100, "Wallet details retrieved")
 
 	return nil
 }

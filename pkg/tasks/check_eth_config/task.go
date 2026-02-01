@@ -17,8 +17,16 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Checks that all execution clients return the same eth_config (EIP-7910)",
+		Category:    "execution",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "ethConfig",
+				Type:        "string",
+				Description: "The eth_config JSON returned by clients.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -230,6 +238,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			t.ctx.SetResult(types.TaskResultFailure)
 		} else {
 			t.ctx.SetResult(types.TaskResultNone)
+			t.ctx.ReportProgress(0, "eth_config mismatch detected")
 		}
 
 		return nil
@@ -240,6 +249,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Infof("all %d clients returned consistent eth_config", len(results))
 		t.logger.Debugf("consistent eth_config:\n%s", referenceConfig)
 		t.ctx.SetResult(types.TaskResultSuccess)
+		t.ctx.ReportProgress(100, fmt.Sprintf("eth_config consistent on %d clients", len(results)))
 	}
 
 	return nil

@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/clients"
 	"github.com/ethpandaops/assertoor/pkg/db"
+	"github.com/ethpandaops/assertoor/pkg/events"
 	"github.com/ethpandaops/assertoor/pkg/logger"
 	"github.com/ethpandaops/assertoor/pkg/names"
 	"github.com/ethpandaops/assertoor/pkg/wallet"
@@ -20,6 +21,7 @@ type Coordinator interface {
 	ValidatorNames() *names.ValidatorNames
 	GlobalVariables() Variables
 	TestRegistry() TestRegistry
+	EventBus() *events.EventBus
 
 	GetTestByRunID(runID uint64) Test
 	GetTestQueue() []Test

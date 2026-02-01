@@ -16,7 +16,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Check for consensus layer reorgs.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -88,6 +90,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	var lastBlock *consensus.Block
 
+	checkCount := 0
+
 	for {
 		select {
 		case block := <-blockSubscription.Channel():
@@ -102,18 +106,34 @@ func (t *Task) Execute(ctx context.Context) error {
 
 				if t.config.MaxReorgDistance > 0 && t.maxReorgDistance > t.config.MaxReorgDistance {
 					t.ctx.SetResult(types.TaskResultFailure)
+					t.ctx.ReportProgress(0, fmt.Sprintf("Max reorg distance exceeded: %d", t.maxReorgDistance))
 					t.logger.Infof("task failed: max reorg distance (%v) exceeded, reorg distance around slot %v: %v", t.config.MaxReorgDistance, block.Slot, t.maxReorgDistance)
 
 					return fmt.Errorf("max reorg distance (%v) exceeded:  %v -> %v (%v)", t.config.MaxReorgDistance, lastBlock.Root.String(), block.Root.String(), t.maxReorgDistance)
 				}
 			}
 
-			t.ctx.SetResult(t.runCheck())
+			checkCount++
+			t.processCheck(checkCount)
 
 			lastBlock = block
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+}
+
+func (t *Task) processCheck(checkCount int) {
+	result := t.runCheck()
+	t.ctx.SetResult(result)
+
+	switch result {
+	case types.TaskResultSuccess:
+		t.ctx.ReportProgress(100, fmt.Sprintf("Reorg check passed (reorgs: %d, max distance: %d)", t.totalReorgs, t.maxReorgDistance))
+	case types.TaskResultFailure:
+		t.ctx.ReportProgress(0, fmt.Sprintf("Reorg check failed (reorgs: %d, max distance: %d)", t.totalReorgs, t.maxReorgDistance))
+	case types.TaskResultNone:
+		t.ctx.ReportProgress(0, fmt.Sprintf("Checking for reorgs... (attempt %d)", checkCount))
 	}
 }
 

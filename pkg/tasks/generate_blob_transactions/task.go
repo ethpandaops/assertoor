@@ -24,7 +24,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Generates blob transactions and sends them to the network",
+		Category:    "transaction",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -159,6 +161,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	perBlockCount := 0
 	totalCount := 0
 
+	t.ctx.ReportProgress(0, "Generating blob transactions...")
+
 	for {
 		txIndex := t.txIndex
 		t.txIndex++
@@ -194,9 +198,18 @@ func (t *Task) Execute(ctx context.Context) error {
 		} else {
 			perBlockCount++
 			totalCount++
+
+			if t.config.LimitTotal > 0 {
+				progress := float64(totalCount) / float64(t.config.LimitTotal) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d blob transactions", totalCount, t.config.LimitTotal))
+			} else {
+				t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d blob transactions", totalCount))
+			}
 		}
 
 		if t.config.LimitTotal > 0 && totalCount >= t.config.LimitTotal {
+			t.ctx.ReportProgress(100, fmt.Sprintf("Completed: generated %d blob transactions", totalCount))
+
 			break
 		}
 

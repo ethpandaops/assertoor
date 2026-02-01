@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/clients"
 	"github.com/ethpandaops/assertoor/pkg/db"
+	"github.com/ethpandaops/assertoor/pkg/events"
 	"github.com/ethpandaops/assertoor/pkg/helper"
 	"github.com/ethpandaops/assertoor/pkg/names"
 	"github.com/ethpandaops/assertoor/pkg/wallet"
@@ -33,4 +34,5 @@ type TaskServices interface {
 	ClientPool() *clients.ClientPool
 	WalletManager() *wallet.Manager
 	ValidatorNames() *names.ValidatorNames
+	EventBus() *events.EventBus
 }

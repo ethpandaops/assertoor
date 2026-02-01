@@ -25,7 +25,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Generates voluntary exits and sends them to the network",
+		Category:    "validator",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -110,6 +112,16 @@ func (t *Task) Execute(ctx context.Context) error {
 	perSlotCount := 0
 	totalCount := 0
 
+	// Calculate target count for progress reporting
+	targetCount := 0
+	if t.config.LimitTotal > 0 {
+		targetCount = t.config.LimitTotal
+	} else if t.lastIndex > 0 {
+		targetCount = int(t.lastIndex - t.nextIndex) //nolint:gosec // no overflow possible
+	}
+
+	t.ctx.ReportProgress(0, "Starting voluntary exit generation")
+
 	for {
 		accountIdx := t.nextIndex
 		t.nextIndex++
@@ -122,6 +134,14 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			perSlotCount++
 			totalCount++
+
+			// Report progress
+			if targetCount > 0 {
+				progress := float64(totalCount) / float64(targetCount) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d voluntary exits", totalCount, targetCount))
+			} else {
+				t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d voluntary exits", totalCount))
+			}
 		}
 
 		if t.lastIndex > 0 && t.nextIndex >= t.lastIndex {
@@ -149,6 +169,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	if totalCount == 0 {
 		t.ctx.SetResult(types.TaskResultFailure)
 	}
+
+	t.ctx.ReportProgress(100, fmt.Sprintf("Completed generating %d voluntary exits", totalCount))
 
 	return nil
 }

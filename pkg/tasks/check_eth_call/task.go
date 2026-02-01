@@ -20,8 +20,16 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Checks the response of an eth_call transaction",
+		Category:    "execution",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "callResult",
+				Type:        "string",
+				Description: "The result of the eth_call as a hex string.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -96,13 +104,18 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
+	checkCount := 0
+
 	// Run the check with the latest block
 	if latestBlock != nil {
 		if t.config.BlockNumber == 0 {
-			t.runCheck(ctx, latestBlock.Number, latestBlock)
+			checkCount++
+			t.runCheck(ctx, latestBlock.Number, latestBlock, checkCount)
 		} else if latestBlock.Number >= t.config.BlockNumber {
 			// if the block we're looking for already passed, run the check immediately and return
-			t.runCheck(ctx, t.config.BlockNumber, nil)
+			checkCount++
+			t.runCheck(ctx, t.config.BlockNumber, nil, checkCount)
+
 			return nil
 		}
 	}
@@ -112,9 +125,11 @@ func (t *Task) Execute(ctx context.Context) error {
 	for {
 		select {
 		case block := <-blockSubscription.Channel():
+			checkCount++
+
 			if t.config.BlockNumber == 0 {
 				// Run the check for all blocks
-				t.runCheck(ctx, block.Number, block)
+				t.runCheck(ctx, block.Number, block, checkCount)
 			} else if block.Number >= t.config.BlockNumber {
 				// Run the check once for the block we're looking for
 				if block.Number != t.config.BlockNumber {
@@ -122,7 +137,7 @@ func (t *Task) Execute(ctx context.Context) error {
 					block = nil
 				}
 
-				t.runCheck(ctx, t.config.BlockNumber, block)
+				t.runCheck(ctx, t.config.BlockNumber, block, checkCount)
 
 				return nil
 			}
@@ -132,7 +147,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 }
 
-func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *execution.Block) {
+func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *execution.Block, checkCount int) {
 	// Set up the call message
 	address := common.HexToAddress(t.config.CallAddress)
 	callMsg := &ethereum.CallMsg{
@@ -217,6 +232,7 @@ func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *executio
 				t.ctx.SetResult(types.TaskResultFailure)
 			} else {
 				t.ctx.SetResult(types.TaskResultNone)
+				t.ctx.ReportProgress(0, fmt.Sprintf("result mismatch (attempt %d)", checkCount))
 			}
 
 			return
@@ -236,6 +252,7 @@ func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *executio
 					t.ctx.SetResult(types.TaskResultFailure)
 				} else {
 					t.ctx.SetResult(types.TaskResultNone)
+					t.ctx.ReportProgress(0, fmt.Sprintf("expected result mismatch (attempt %d)", checkCount))
 				}
 
 				return
@@ -249,6 +266,7 @@ func (t *Task) runCheck(ctx context.Context, blockNumber uint64, block *executio
 
 	if checkedClients > 0 {
 		t.ctx.SetResult(types.TaskResultSuccess)
+		t.ctx.ReportProgress(100, fmt.Sprintf("eth_call successful on %d clients", checkedClients))
 	}
 }
 

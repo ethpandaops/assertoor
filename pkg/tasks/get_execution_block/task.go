@@ -17,8 +17,16 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Gets the latest execution block.",
+		Category:    "execution",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "header",
+				Type:        "object",
+				Description: "The execution block header.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -92,6 +100,8 @@ func (t *Task) Execute(_ context.Context) error {
 	} else {
 		t.ctx.Outputs.SetVar("header", headerData)
 	}
+
+	t.ctx.ReportProgress(100, fmt.Sprintf("Execution block %v retrieved", block.Number()))
 
 	return nil
 }

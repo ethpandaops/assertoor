@@ -33,7 +33,7 @@ type taskState struct {
 	startTime time.Time
 	stopTime  time.Time
 
-	taskConfig     interface{}
+	taskConfig     any
 	taskOutputs    types.Variables
 	taskStatusVars types.Variables
 
@@ -42,6 +42,9 @@ type taskState struct {
 	taskError        error
 	resultNotifyChan chan bool
 	resultMutex      sync.RWMutex
+
+	progress        float64
+	progressMessage string
 
 	dbTaskState *db.TaskState
 }
@@ -78,8 +81,11 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 			Parent:     ts.logger.WithField("task", options.Name).WithField("taskidx", taskIdx),
 			BufferSize: 1000,
 			Database:   ts.services.Database(),
+			EventBus:   ts.services.EventBus(),
 			TestRunID:  ts.testRunID,
 			TaskID:     uint64(taskIdx),
+			TaskName:   options.Name,
+			TaskRefID:  options.ID,
 		}),
 		taskOutputs:    vars.NewVariables(nil),
 		taskStatusVars: vars.NewVariables(nil),
@@ -265,22 +271,35 @@ func (ts *taskState) setTaskResult(result types.TaskResult, setUpdated bool) {
 
 func (ts *taskState) GetTaskStatus() *types.TaskStatus {
 	taskStatus := &types.TaskStatus{
-		Index:       ts.index,
-		ParentIndex: 0,
-		IsStarted:   ts.isStarted,
-		IsRunning:   ts.isRunning,
-		IsSkipped:   ts.isSkipped,
-		StartTime:   ts.startTime,
-		StopTime:    ts.stopTime,
-		Result:      ts.taskResult,
-		Error:       ts.taskError,
-		Logger:      ts.logger,
+		Index:           ts.index,
+		ParentIndex:     0,
+		IsStarted:       ts.isStarted,
+		IsRunning:       ts.isRunning,
+		IsSkipped:       ts.isSkipped,
+		StartTime:       ts.startTime,
+		StopTime:        ts.stopTime,
+		Result:          ts.taskResult,
+		Error:           ts.taskError,
+		Logger:          ts.logger,
+		Progress:        ts.progress,
+		ProgressMessage: ts.progressMessage,
 	}
+
 	if ts.parentState != nil {
 		taskStatus.ParentIndex = ts.parentState.index
 	}
 
 	return taskStatus
+}
+
+func (ts *taskState) SetProgress(percent float64, message string) {
+	ts.resultMutex.Lock()
+	defer ts.resultMutex.Unlock()
+
+	ts.progress = percent
+	ts.progressMessage = message
+	ts.taskStatusVars.SetVar("progress", percent)
+	ts.taskStatusVars.SetVar("progressMessage", message)
 }
 
 func (ts *taskState) GetTaskStatusVars() types.Variables {
@@ -343,7 +362,7 @@ func (ts *taskState) Description() string {
 	return ts.descriptor.Description
 }
 
-func (ts *taskState) Config() interface{} {
+func (ts *taskState) Config() any {
 	if ts.task != nil {
 		return ts.task.Config()
 	}

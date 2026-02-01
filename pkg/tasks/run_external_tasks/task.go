@@ -22,7 +22,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Run external test playbook.",
+		Category:    "flow-control",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -77,6 +79,8 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
+	t.ctx.ReportProgress(0, "Loading external test configuration...")
+
 	// get task base path
 	taskBasePath, ok := t.ctx.Vars.GetVar("taskBasePath").(string)
 	if !ok {
@@ -152,11 +156,16 @@ func (t *Task) Execute(ctx context.Context) error {
 	// execute child tasks
 	var resError error
 
+	totalTasks := len(tasks)
+
 taskLoop:
 	for i, task := range tasks {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+
+		progress := float64(i) / float64(totalTasks) * 100
+		t.ctx.ReportProgress(progress, fmt.Sprintf("Executing task %d/%d...", i+1, totalTasks))
 
 		err := t.ctx.Scheduler.ExecuteTask(ctx, task, t.ctx.Scheduler.WatchTaskPass)
 
@@ -190,8 +199,12 @@ taskLoop:
 			return fmt.Errorf("test should have failed, but succeeded")
 		}
 
+		t.ctx.ReportProgress(100, "External tasks completed (expected failure)")
+
 		return nil
 	}
+
+	t.ctx.ReportProgress(100, "External tasks completed")
 
 	return resError
 }

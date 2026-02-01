@@ -32,8 +32,21 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Generates withdrawal requests and sends them to the network",
+		Category:    "validator",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "transactionHashes",
+				Type:        "array",
+				Description: "Array of withdrawal transaction hashes.",
+			},
+			{
+				Name:        "transactionReceipts",
+				Type:        "array",
+				Description: "Array of withdrawal transaction receipts.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -126,6 +139,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	perSlotCount := 0
 	totalCount := 0
 
+	t.ctx.ReportProgress(0, "Generating withdrawal requests...")
+
 	withdrawalTransactions := []string{}
 	receiptsMapMutex := sync.Mutex{}
 	withdrawalReceipts := map[string]*ethtypes.Receipt{}
@@ -180,6 +195,14 @@ func (t *Task) Execute(ctx context.Context) error {
 			totalCount++
 
 			withdrawalTransactions = append(withdrawalTransactions, tx.Hash().Hex())
+
+			// Report progress based on total limit
+			if t.config.LimitTotal > 0 {
+				progress := float64(totalCount) / float64(t.config.LimitTotal) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d withdrawal requests", totalCount, t.config.LimitTotal))
+			} else {
+				t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d withdrawal requests", totalCount))
+			}
 		}
 
 		if t.config.LimitTotal > 0 && totalCount >= t.config.LimitTotal {
@@ -203,6 +226,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	if t.config.AwaitReceipt {
 		pendingWg.Wait()
 	}
+
+	t.ctx.ReportProgress(100, fmt.Sprintf("Completed: generated %d withdrawal requests", totalCount))
 
 	t.ctx.Outputs.SetVar("transactionHashes", withdrawalTransactions)
 

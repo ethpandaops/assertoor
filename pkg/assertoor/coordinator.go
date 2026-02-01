@@ -15,6 +15,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/clients"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/db"
+	"github.com/ethpandaops/assertoor/pkg/events"
 	"github.com/ethpandaops/assertoor/pkg/logger"
 	"github.com/ethpandaops/assertoor/pkg/names"
 	"github.com/ethpandaops/assertoor/pkg/test"
@@ -41,6 +42,7 @@ type Coordinator struct {
 	validatorNames  *names.ValidatorNames
 	globalVars      types.Variables
 	metricsPort     int
+	eventBus        *events.EventBus
 
 	registry *TestRegistry
 	runner   *TestRunner
@@ -146,6 +148,19 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		c.globalVars.SetVar(name, value)
 	}
 
+	// init event bus
+	c.eventBus = events.NewEventBus(c.log.GetLogger())
+
+	err = c.eventBus.Start(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start event bus: %w", err)
+	}
+
+	defer func() {
+		//nolint:errcheck // ignore error on shutdown
+		c.eventBus.Stop()
+	}()
+
 	// init webserver
 	if c.Config.Web != nil {
 		if c.Config.Web.Server != nil {
@@ -154,7 +169,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				return err
 			}
 
-			err = c.webserver.ConfigureRoutes(c.Config.Web.Frontend, c.Config.Web.API, c, false)
+			err = c.webserver.ConfigureRoutesWithEventBus(c.Config.Web.Frontend, c.Config.Web.API, c, false, c.eventBus)
 			if err != nil {
 				return err
 			}
@@ -166,7 +181,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				return err
 			}
 
-			err = c.publicWebserver.ConfigureRoutes(c.Config.Web.Frontend, nil, c, true)
+			err = c.publicWebserver.ConfigureRoutesWithEventBus(c.Config.Web.Frontend, nil, c, true, nil)
 			if err != nil {
 				return err
 			}
@@ -235,6 +250,10 @@ func (c *Coordinator) GlobalVariables() types.Variables {
 
 func (c *Coordinator) TestRegistry() types.TestRegistry {
 	return c.registry
+}
+
+func (c *Coordinator) EventBus() *events.EventBus {
+	return c.eventBus
 }
 
 func (c *Coordinator) GetTestByRunID(runID uint64) types.Test {

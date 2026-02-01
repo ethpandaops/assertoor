@@ -16,7 +16,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Run a task multiple times based on an input array.",
+		Category:    "flow-control",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -225,6 +227,12 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			if !taskComplete {
 				t.logger.Debugf("result update (%v success, %v failure)", successCount, failureCount)
+
+				// Report progress based on completed tasks
+				completedTasks := successCount + failureCount
+				totalTasks := uint64(len(t.tasks))
+				progress := float64(completedTasks) / float64(totalTasks) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Task %d/%d completed", completedTasks, totalTasks))
 			}
 		case <-completeChan:
 			if !taskComplete {
@@ -237,6 +245,9 @@ func (t *Task) Execute(ctx context.Context) error {
 				}
 
 				t.logger.Infof("all child tasks completed (%v success, %v failure)", successCount, failureCount)
+
+				// Report 100% progress when all tasks complete
+				t.ctx.ReportProgress(100, fmt.Sprintf("All %d tasks completed", len(t.tasks)))
 			}
 		}
 	}

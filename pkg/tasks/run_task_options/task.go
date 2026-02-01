@@ -15,7 +15,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Runs task with configurable behaviour.",
+		Category:    "flow-control",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -75,6 +77,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	retryCount := uint(0)
 
+	t.ctx.ReportProgress(0, "Running child task...")
+
 	for {
 		// init child task
 		taskOpts, err := t.ctx.Scheduler.ParseTaskOptions(t.config.Task)
@@ -105,6 +109,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				retryCount++
 
 				t.logger.Warnf("child task failed: %w (retrying)", taskErr)
+				t.ctx.ReportProgress(0, fmt.Sprintf("Retrying child task (attempt %d/%d)...", retryCount+1, t.config.MaxRetryCount+1))
 
 				continue
 			}
@@ -130,6 +135,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		break
 	}
+
+	t.ctx.ReportProgress(100, "Task completed")
 
 	return taskErr
 }

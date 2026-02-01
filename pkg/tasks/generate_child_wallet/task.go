@@ -18,8 +18,16 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Generates a funded child wallet.",
+		Category:    "wallet",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "childWallet",
+				Type:        "object",
+				Description: "Summary of the generated child wallet including address and balance.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -85,12 +93,15 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
+	t.ctx.ReportProgress(0, "Waiting for root wallet...")
+
 	err := t.wallet.AwaitReady(ctx)
 	if err != nil {
 		return err
 	}
 
 	t.logger.Infof("root wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
+	t.ctx.ReportProgress(25, "Generating child wallet...")
 
 	walletSeed := t.config.WalletSeed
 	if t.config.RandomSeed {
@@ -101,6 +112,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	t.ctx.ReportProgress(50, "Ensuring wallet funding...")
 
 	err = walletPool.EnsureFunding(ctx, t.config.PrefundMinBalance, t.config.PrefundAmount, t.config.PrefundFeeCap, t.config.PrefundTipCap, 1)
 	if err != nil {
@@ -124,6 +137,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	if t.config.WalletPrivateKeyResultVar != "" {
 		t.ctx.Vars.SetVar(t.config.WalletPrivateKeyResultVar, fmt.Sprintf("%x", crypto.FromECDSA(childWallet.GetPrivateKey())))
 	}
+
+	t.ctx.ReportProgress(100, "Child wallet generated")
 
 	return ctx.Err()
 }

@@ -23,8 +23,36 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Checks consensus client node identity information including CGC extraction from ENR.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "matchingClients",
+				Type:        "array",
+				Description: "List of clients that passed identity checks.",
+			},
+			{
+				Name:        "failedClients",
+				Type:        "array",
+				Description: "List of clients that failed identity checks.",
+			},
+			{
+				Name:        "totalCount",
+				Type:        "int",
+				Description: "Total number of clients checked.",
+			},
+			{
+				Name:        "matchingCount",
+				Type:        "int",
+				Description: "Number of clients that passed checks.",
+			},
+			{
+				Name:        "failedCount",
+				Type:        "int",
+				Description: "Number of clients that failed checks.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -90,19 +118,21 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	t.processCheck()
+	checkCount := 0
 
 	for {
+		checkCount++
+		t.processCheck(checkCount)
+
 		select {
 		case <-time.After(t.config.PollInterval.Duration):
-			t.processCheck()
 		case <-ctx.Done():
 			return nil
 		}
 	}
 }
 
-func (t *Task) processCheck() {
+func (t *Task) processCheck(checkCount int) {
 	passResultCount := 0
 	totalClientCount := 0
 	matchingClients := []*IdentityCheckResult{}
@@ -191,20 +221,25 @@ func (t *Task) processCheck() {
 		if t.config.FailOnCheckMiss {
 			t.logger.Infof("Setting result to FAILURE (too many failures: %d > %d)", len(failedClients), t.config.MaxFailCount)
 			t.ctx.SetResult(types.TaskResultFailure)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Too many failures: %d (attempt %d)", len(failedClients), checkCount))
 		} else {
 			t.logger.Infof("Setting result to PENDING (too many failures but failOnCheckMiss=false)")
 			t.ctx.SetResult(types.TaskResultNone)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for identity check... %d/%d (attempt %d)", passResultCount, requiredPassCount, checkCount))
 		}
 	case resultPass:
 		t.logger.Infof("Setting result to SUCCESS (requirements met)")
 		t.ctx.SetResult(types.TaskResultSuccess)
+		t.ctx.ReportProgress(100, fmt.Sprintf("Identity check passed: %d/%d clients", passResultCount, totalClientCount))
 	default:
 		if t.config.FailOnCheckMiss {
 			t.logger.Infof("Setting result to FAILURE (requirements not met and failOnCheckMiss=true)")
 			t.ctx.SetResult(types.TaskResultFailure)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Identity check failed: %d/%d (attempt %d)", passResultCount, requiredPassCount, checkCount))
 		} else {
 			t.logger.Infof("Setting result to PENDING (requirements not met but failOnCheckMiss=false)")
 			t.ctx.SetResult(types.TaskResultNone)
+			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for identity check... %d/%d (attempt %d)", passResultCount, requiredPassCount, checkCount))
 		}
 	}
 }

@@ -14,8 +14,26 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Check if consensus wallclock is in a specific range.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "genesisTime",
+				Type:        "int64",
+				Description: "The genesis timestamp in Unix seconds.",
+			},
+			{
+				Name:        "currentSlot",
+				Type:        "uint64",
+				Description: "The current wallclock slot number.",
+			},
+			{
+				Name:        "currentEpoch",
+				Type:        "uint64",
+				Description: "The current wallclock epoch number.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -76,17 +94,11 @@ func (t *Task) Execute(ctx context.Context) error {
 	wallclockSubscription := consensusPool.GetBlockCache().SubscribeWallclockSlotEvent(10)
 	defer wallclockSubscription.Unsubscribe()
 
-	for {
-		checkResult, isLower := t.runRangeCheck()
+	checkCount := 0
 
-		switch {
-		case checkResult:
-			t.ctx.SetResult(types.TaskResultSuccess)
-		case !isLower || t.config.FailIfLower:
-			t.ctx.SetResult(types.TaskResultFailure)
-		default:
-			t.ctx.SetResult(types.TaskResultNone)
-		}
+	for {
+		checkCount++
+		t.processCheck(checkCount)
 
 		select {
 		case slot := <-wallclockSubscription.Channel():
@@ -94,6 +106,22 @@ func (t *Task) Execute(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+}
+
+func (t *Task) processCheck(checkCount int) {
+	checkResult, isLower := t.runRangeCheck()
+
+	switch {
+	case checkResult:
+		t.ctx.SetResult(types.TaskResultSuccess)
+		t.ctx.ReportProgress(100, "Slot range check passed")
+	case !isLower || t.config.FailIfLower:
+		t.ctx.SetResult(types.TaskResultFailure)
+		t.ctx.ReportProgress(0, "Slot range check failed")
+	default:
+		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for slot range... (attempt %d)", checkCount))
 	}
 }
 

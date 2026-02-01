@@ -5,8 +5,10 @@ import (
 	"html/template"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"github.com/ethpandaops/assertoor/pkg/events"
 	coordinator_types "github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/ethpandaops/assertoor/pkg/web/api"
 	"github.com/ethpandaops/assertoor/pkg/web/handlers"
@@ -74,6 +76,10 @@ func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*Serve
 }
 
 func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfig *types.APIConfig, coordinator coordinator_types.Coordinator, securityTrimmed bool) error {
+	return ws.ConfigureRoutesWithEventBus(frontendConfig, apiConfig, coordinator, securityTrimmed, nil)
+}
+
+func (ws *Server) ConfigureRoutesWithEventBus(frontendConfig *types.FrontendConfig, apiConfig *types.APIConfig, coordinator coordinator_types.Coordinator, securityTrimmed bool, eventBus *events.EventBus) error {
 	isAPIEnabled := apiConfig != nil && apiConfig.Enabled
 	if isAPIEnabled {
 		// register api routes
@@ -85,6 +91,25 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 		ws.router.HandleFunc("/api/v1/test_runs", apiHandler.GetTestRuns).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}", apiHandler.GetTestRun).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/status", apiHandler.GetTestRunStatus).Methods("GET")
+		ws.router.HandleFunc("/api/v1/task_descriptors", apiHandler.GetTaskDescriptors).Methods("GET")
+		ws.router.HandleFunc("/api/v1/task_descriptor/{name}", apiHandler.GetTaskDescriptor).Methods("GET")
+
+		// SSE event stream endpoints
+		if eventBus != nil {
+			sseHandler := events.NewSSEHandler(ws.logger.WithField("module", "sse"), eventBus)
+			ws.router.HandleFunc("/api/v1/events/stream", sseHandler.HandleGlobalStream).Methods("GET")
+			ws.router.HandleFunc("/api/v1/test_run/{runId}/events", func(w http.ResponseWriter, r *http.Request) {
+				vars := mux.Vars(r)
+
+				runID, err := strconv.ParseUint(vars["runId"], 10, 64)
+				if err != nil {
+					http.Error(w, "Invalid run ID", http.StatusBadRequest)
+					return
+				}
+
+				sseHandler.HandleTestRunStream(w, r, runID)
+			}).Methods("GET")
+		}
 
 		// private apis
 		if !securityTrimmed {

@@ -24,7 +24,9 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Generates normal eoa transactions and sends them to the network",
+		Category:    "transaction",
 		Config:      DefaultConfig(),
+		Outputs:     []types.TaskOutputDefinition{},
 		NewTask:     NewTask,
 	}
 )
@@ -165,6 +167,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	revertCount := 0
 	unknownCount := 0
 
+	t.ctx.ReportProgress(0, "Generating EOA transactions...")
+
 	for {
 		txIndex := t.txIndex
 		t.txIndex++
@@ -216,9 +220,18 @@ func (t *Task) Execute(ctx context.Context) error {
 		} else {
 			perBlockCount++
 			totalCount++
+
+			if t.config.LimitTotal > 0 {
+				progress := float64(totalCount) / float64(t.config.LimitTotal) * 100
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d EOA transactions", totalCount, t.config.LimitTotal))
+			} else {
+				t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d EOA transactions", totalCount))
+			}
 		}
 
 		if t.config.LimitTotal > 0 && totalCount >= t.config.LimitTotal {
+			t.ctx.ReportProgress(100, fmt.Sprintf("Completed: generated %d EOA transactions", totalCount))
+
 			break
 		}
 

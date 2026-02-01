@@ -17,8 +17,21 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Checks consensus clients for their sync status.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "goodClients",
+				Type:        "array",
+				Description: "Array of clients that meet sync criteria.",
+			},
+			{
+				Name:        "failedClients",
+				Type:        "array",
+				Description: "Array of clients that do not meet sync criteria.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -82,19 +95,21 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	t.processCheck(ctx)
+	checkCount := 0
 
 	for {
+		checkCount++
+		t.processCheck(ctx, checkCount)
+
 		select {
 		case <-time.After(t.config.PollInterval.Duration):
-			t.processCheck(ctx)
 		case <-ctx.Done():
 			return nil
 		}
 	}
 }
 
-func (t *Task) processCheck(ctx context.Context) {
+func (t *Task) processCheck(ctx context.Context, checkCount int) {
 	allResultsPass := true
 	goodClients := []*ClientInfo{}
 	failedClients := []*ClientInfo{}
@@ -144,8 +159,10 @@ func (t *Task) processCheck(ctx context.Context) {
 
 	if allResultsPass {
 		t.ctx.SetResult(types.TaskResultSuccess)
+		t.ctx.ReportProgress(100, fmt.Sprintf("All clients synced: %d", len(goodClients)))
 	} else {
 		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for sync... %d/%d (attempt %d)", len(goodClients), len(goodClients)+len(failedClients), checkCount))
 	}
 }
 

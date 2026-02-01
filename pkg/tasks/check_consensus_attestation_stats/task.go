@@ -19,8 +19,56 @@ var (
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
 		Description: "Check attestation stats for consensus chain.",
+		Category:    "consensus",
 		Config:      DefaultConfig(),
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "lastCheckedEpoch",
+				Type:        "uint64",
+				Description: "The last epoch that was checked for attestation stats.",
+			},
+			{
+				Name:        "validatorCount",
+				Type:        "uint64",
+				Description: "Number of active validators in the epoch.",
+			},
+			{
+				Name:        "validatorBalance",
+				Type:        "uint64",
+				Description: "Total effective balance of active validators.",
+			},
+			{
+				Name:        "targetVotes",
+				Type:        "uint64",
+				Description: "Number of correct target votes.",
+			},
+			{
+				Name:        "targetVotesPercent",
+				Type:        "float64",
+				Description: "Percentage of correct target votes.",
+			},
+			{
+				Name:        "headVotes",
+				Type:        "uint64",
+				Description: "Number of correct head votes.",
+			},
+			{
+				Name:        "headVotesPercent",
+				Type:        "float64",
+				Description: "Percentage of correct head votes.",
+			},
+			{
+				Name:        "totalVotes",
+				Type:        "uint64",
+				Description: "Total number of attestation votes.",
+			},
+			{
+				Name:        "totalVotesPercent",
+				Type:        "float64",
+				Description: "Percentage of total attestation participation.",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -115,6 +163,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	specs := consensusPool.GetBlockCache().GetSpecs()
 	consensusPool.GetBlockCache().SetMinFollowDistance(specs.SlotsPerEpoch * 4)
 
+	checkCount := 0
+
 	for {
 		select {
 		case block := <-blockSubscription.Channel():
@@ -128,7 +178,8 @@ func (t *Task) Execute(ctx context.Context) error {
 				break
 			}
 
-			t.runAttestationStatsCheck(ctx, checkEpoch)
+			checkCount++
+			t.runAttestationStatsCheck(ctx, checkEpoch, checkCount)
 
 			lastCheckedEpoch = checkEpoch
 
@@ -212,7 +263,7 @@ func (t *Task) processBlock(ctx context.Context, block *consensus.Block) {
 	t.attesterDutyMap[currentBlockEpoch][parentBlock.Root] = attesterDuties
 }
 
-func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64) {
+func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64, checkCount int) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 	canonicalFork := consensusPool.GetCanonicalFork(1)
 
@@ -231,13 +282,18 @@ func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64) {
 			t.passedEpochs++
 			if t.passedEpochs >= t.config.MinCheckedEpochs {
 				t.ctx.SetResult(types.TaskResultSuccess)
+				t.ctx.ReportProgress(100, fmt.Sprintf("Attestation stats check passed for epoch %d", epoch))
+			} else {
+				t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for attestation stats... %d/%d (attempt %d)", t.passedEpochs, t.config.MinCheckedEpochs, checkCount))
 			}
 		} else {
 			t.passedEpochs = 0
 			if t.config.FailOnCheckMiss {
 				t.ctx.SetResult(types.TaskResultFailure)
+				t.ctx.ReportProgress(0, fmt.Sprintf("Attestation stats check failed for epoch %d (attempt %d)", epoch, checkCount))
 			} else {
 				t.ctx.SetResult(types.TaskResultNone)
+				t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for attestation stats... (attempt %d)", checkCount))
 			}
 		}
 
