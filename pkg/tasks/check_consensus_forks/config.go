@@ -1,13 +1,10 @@
 package checkconsensusforks
 
 type Config struct {
-	MinCheckEpochCount uint64 `yaml:"minCheckEpochCount" json:"minCheckEpochCount"`
-	MaxForkDistance    int64  `yaml:"maxForkDistance" json:"maxForkDistance"`
-	MaxForkCount       uint64 `yaml:"maxForkCount" json:"maxForkCount"`
-	// ContinueOnPass keeps the task running after the check passes.
-	// When false (default), the task exits immediately on success.
-	// When true, the task continues monitoring and may report failure if forks occur.
-	ContinueOnPass bool `yaml:"continueOnPass" json:"continueOnPass"`
+	MinCheckEpochCount uint64 `yaml:"minCheckEpochCount" json:"minCheckEpochCount" desc:"Minimum number of epochs to monitor before evaluating fork conditions."`
+	MaxForkDistance    int64  `yaml:"maxForkDistance" json:"maxForkDistance" desc:"Maximum allowed fork distance (depth) in slots."`
+	MaxForkCount       uint64 `yaml:"maxForkCount" json:"maxForkCount" desc:"Maximum number of forks allowed during monitoring."`
+	ContinueOnPass     bool   `yaml:"continueOnPass" json:"continueOnPass" desc:"If true, continue monitoring after the check passes instead of completing immediately."`
 }
 
 func DefaultConfig() Config {

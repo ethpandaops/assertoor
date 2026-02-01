@@ -29,6 +29,16 @@ The `generate_exits` task is designed to create and send voluntary exit transact
 - **`excludeClientPattern`**:\
   A regex pattern to exclude certain client endpoints from being used for exit transactions. This parameter adds a layer of control by allowing the exclusion of specific clients, which can be useful for testing under various network scenarios.
 
+- **`awaitInclusion`**:\
+  If set to `true`, the task waits for all submitted voluntary exits to be included in beacon blocks before completing. The task monitors new blocks and checks for the presence of the submitted exit operations.
+
+### Outputs
+
+- **`exitedValidators`**:\
+  Array of validator indices that were submitted for exit.
+
+- **`includedExits`**:\
+  Number of exits confirmed on-chain (only populated when `awaitInclusion` is enabled).
 
 ### Defaults
 
@@ -45,4 +55,5 @@ Default settings for the `generate_exits` task:
     exitEpoch: -1
     clientPattern: ""
     excludeClientPattern: ""
+    awaitInclusion: false
 ```

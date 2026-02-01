@@ -3,10 +3,10 @@ package runshell
 import "errors"
 
 type Config struct {
-	Shell     string            `yaml:"shell" json:"shell"`
-	ShellArgs []string          `yaml:"shellArgs" json:"shellArgs"`
-	EnvVars   map[string]string `yaml:"envVars" json:"envVars"`
-	Command   string            `yaml:"command" json:"command"`
+	Shell     string            `yaml:"shell" json:"shell" desc:"Shell interpreter to use (e.g., bash, sh, zsh)."`
+	ShellArgs []string          `yaml:"shellArgs" json:"shellArgs" desc:"Additional arguments to pass to the shell."`
+	EnvVars   map[string]string `yaml:"envVars" json:"envVars" desc:"Environment variables to set for the shell command."`
+	Command   string            `yaml:"command" json:"command" desc:"The shell command to execute."`
 }
 
 func DefaultConfig() Config {

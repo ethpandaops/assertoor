@@ -120,8 +120,10 @@ func generateSchemaFromType(t reflect.Type) *JSONSchema {
 			// Generate schema for field type
 			fieldSchema := generateSchemaFromType(field.Type)
 
-			// Add description from yaml tag or field name
-			if yamlTag := field.Tag.Get("yaml"); yamlTag != "" {
+			// Add description from desc tag, falling back to yaml tag
+			if descTag := field.Tag.Get("desc"); descTag != "" {
+				fieldSchema.Description = descTag
+			} else if yamlTag := field.Tag.Get("yaml"); yamlTag != "" {
 				parts := strings.Split(yamlTag, ",")
 				if len(parts) > 0 && parts[0] != "" {
 					fieldSchema.Description = "Config field: " + parts[0]

@@ -6,25 +6,25 @@ import (
 )
 
 type Config struct {
-	LimitPerSlot              int      `yaml:"limitPerSlot" json:"limitPerSlot"`
-	LimitTotal                int      `yaml:"limitTotal" json:"limitTotal"`
-	LimitPending              int      `yaml:"limitPending" json:"limitPending"`
-	SourcePubkey              string   `yaml:"sourcePubkey" json:"sourcePubkey"`
-	SourceMnemonic            string   `yaml:"sourceMnemonic" json:"sourceMnemonic"`
-	SourceStartIndex          int      `yaml:"sourceStartIndex" json:"sourceStartIndex"`
-	SourceStartValidatorIndex *uint64  `yaml:"sourceStartValidatorIndex" json:"sourceStartValidatorIndex"`
-	SourceIndexCount          int      `yaml:"sourceIndexCount" json:"sourceIndexCount"`
-	WithdrawAmount            uint64   `yaml:"withdrawAmount" json:"withdrawAmount"`
-	WalletPrivkey             string   `yaml:"walletPrivkey" json:"walletPrivkey"`
-	WithdrawalContract        string   `yaml:"withdrawalContract" json:"withdrawalContract"`
-	TxAmount                  *big.Int `yaml:"txAmount" json:"txAmount"`
-	TxFeeCap                  *big.Int `yaml:"txFeeCap" json:"txFeeCap"`
-	TxTipCap                  *big.Int `yaml:"txTipCap" json:"txTipCap"`
-	TxGasLimit                uint64   `yaml:"txGasLimit" json:"txGasLimit"`
-	ClientPattern             string   `yaml:"clientPattern" json:"clientPattern"`
-	ExcludeClientPattern      string   `yaml:"excludeClientPattern" json:"excludeClientPattern"`
-	AwaitReceipt              bool     `yaml:"awaitReceipt" json:"awaitReceipt"`
-	FailOnReject              bool     `yaml:"failOnReject" json:"failOnReject"`
+	LimitPerSlot              int      `yaml:"limitPerSlot" json:"limitPerSlot" desc:"Maximum number of withdrawal requests to generate per slot."`
+	LimitTotal                int      `yaml:"limitTotal" json:"limitTotal" desc:"Total limit on the number of withdrawal requests to generate."`
+	LimitPending              int      `yaml:"limitPending" json:"limitPending" desc:"Maximum number of pending withdrawal requests to allow before waiting."`
+	SourcePubkey              string   `yaml:"sourcePubkey" json:"sourcePubkey" desc:"Public key of the validator to withdraw from."`
+	SourceMnemonic            string   `yaml:"sourceMnemonic" json:"sourceMnemonic" desc:"Mnemonic phrase to derive validator keys for withdrawal."`
+	SourceStartIndex          int      `yaml:"sourceStartIndex" json:"sourceStartIndex" desc:"Index within the mnemonic from which to start deriving keys."`
+	SourceStartValidatorIndex *uint64  `yaml:"sourceStartValidatorIndex" json:"sourceStartValidatorIndex" desc:"Starting validator index for withdrawal requests."`
+	SourceIndexCount          int      `yaml:"sourceIndexCount" json:"sourceIndexCount" desc:"Number of validators to generate withdrawal requests for."`
+	WithdrawAmount            uint64   `yaml:"withdrawAmount" json:"withdrawAmount" desc:"Amount of ETH to withdraw from each validator."`
+	WalletPrivkey             string   `yaml:"walletPrivkey" json:"walletPrivkey" desc:"Private key of the wallet used to send withdrawal request transactions."`
+	WithdrawalContract        string   `yaml:"withdrawalContract" json:"withdrawalContract" desc:"Address of the withdrawal request contract."`
+	TxAmount                  *big.Int `yaml:"txAmount" json:"txAmount" desc:"Amount of ETH to send with the withdrawal request transaction."`
+	TxFeeCap                  *big.Int `yaml:"txFeeCap" json:"txFeeCap" desc:"Maximum fee cap (in wei) for withdrawal request transactions."`
+	TxTipCap                  *big.Int `yaml:"txTipCap" json:"txTipCap" desc:"Maximum priority tip (in wei) for withdrawal request transactions."`
+	TxGasLimit                uint64   `yaml:"txGasLimit" json:"txGasLimit" desc:"Gas limit for withdrawal request transactions."`
+	ClientPattern             string   `yaml:"clientPattern" json:"clientPattern" desc:"Regex pattern to select specific client endpoints for submitting transactions."`
+	ExcludeClientPattern      string   `yaml:"excludeClientPattern" json:"excludeClientPattern" desc:"Regex pattern to exclude certain client endpoints."`
+	AwaitReceipt              bool     `yaml:"awaitReceipt" json:"awaitReceipt" desc:"Wait for transaction receipts before completing."`
+	FailOnReject              bool     `yaml:"failOnReject" json:"failOnReject" desc:"Fail the task if any transaction is rejected."`
 }
 
 func DefaultConfig() Config {

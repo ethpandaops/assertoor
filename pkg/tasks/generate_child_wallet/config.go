@@ -6,17 +6,17 @@ import (
 )
 
 type Config struct {
-	PrivateKey string `yaml:"privateKey" json:"privateKey"`
-	WalletSeed string `yaml:"walletSeed" json:"walletSeed"`
-	RandomSeed bool   `yaml:"randomSeed" json:"randomSeed"`
+	PrivateKey string `yaml:"privateKey" json:"privateKey" desc:"Private key of the parent wallet used to fund the child wallet."`
+	WalletSeed string `yaml:"walletSeed" json:"walletSeed" desc:"Seed used to derive the child wallet address deterministically."`
+	RandomSeed bool   `yaml:"randomSeed" json:"randomSeed" desc:"If true, generate a random seed for the child wallet."`
 
-	PrefundFeeCap     *big.Int `yaml:"prefundFeeCap" json:"prefundFeeCap"`
-	PrefundTipCap     *big.Int `yaml:"prefundTipCap" json:"prefundTipCap"`
-	PrefundAmount     *big.Int `yaml:"prefundAmount" json:"prefundAmount"`
-	PrefundMinBalance *big.Int `yaml:"prefundMinBalance" json:"prefundMinBalance"`
+	PrefundFeeCap     *big.Int `yaml:"prefundFeeCap" json:"prefundFeeCap" desc:"Maximum fee cap (in wei) for the prefunding transaction."`
+	PrefundTipCap     *big.Int `yaml:"prefundTipCap" json:"prefundTipCap" desc:"Maximum priority tip (in wei) for the prefunding transaction."`
+	PrefundAmount     *big.Int `yaml:"prefundAmount" json:"prefundAmount" desc:"Amount (in wei) to transfer to the child wallet."`
+	PrefundMinBalance *big.Int `yaml:"prefundMinBalance" json:"prefundMinBalance" desc:"Minimum balance (in wei) before triggering a prefund."`
 
-	WalletAddressResultVar    string `yaml:"walletAddressResultVar" json:"walletAddressResultVar"`
-	WalletPrivateKeyResultVar string `yaml:"walletPrivateKeyResultVar" json:"walletPrivateKeyResultVar"`
+	WalletAddressResultVar    string `yaml:"walletAddressResultVar" json:"walletAddressResultVar" desc:"Variable name to store the child wallet address."`
+	WalletPrivateKeyResultVar string `yaml:"walletPrivateKeyResultVar" json:"walletPrivateKeyResultVar" desc:"Variable name to store the child wallet private key."`
 }
 
 func DefaultConfig() Config {

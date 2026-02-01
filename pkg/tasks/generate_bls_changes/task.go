@@ -11,6 +11,7 @@ import (
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/capella"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/ethpandaops/assertoor/pkg/vars"
@@ -39,6 +40,11 @@ var (
 				Name:        "latestBlsChange",
 				Type:        "object",
 				Description: "The most recently generated BLS change operation.",
+			},
+			{
+				Name:        "includedBlsChanges",
+				Type:        "number",
+				Description: "Number of BLS changes included on-chain (when awaitInclusion is enabled).",
 			},
 		},
 		NewTask: NewTask,
@@ -125,7 +131,10 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	perSlotCount := 0
 	totalCount := 0
-	blsChangesList := []interface{}{}
+	blsChangesList := []any{}
+
+	// Track submitted validator indices for awaitInclusion
+	pendingValidators := make(map[phase0.ValidatorIndex]bool)
 
 	// Calculate target count for progress reporting
 	targetCount := 0
@@ -141,13 +150,18 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		blsChange, err := t.generateBlsChange(ctx, accountIdx)
+		blsChange, validatorIndex, err := t.generateBlsChange(ctx, accountIdx)
 		if err != nil {
 			t.logger.Errorf("error generating bls change: %v", err.Error())
 		} else {
 			blsChangesList = append(blsChangesList, blsChange)
 			t.ctx.Outputs.SetVar("blsChanges", blsChangesList)
-			t.ctx.SetResult(types.TaskResultSuccess)
+
+			if t.config.AwaitInclusion {
+				pendingValidators[validatorIndex] = true
+			} else {
+				t.ctx.SetResult(types.TaskResultSuccess)
+			}
 
 			perSlotCount++
 			totalCount++
@@ -185,18 +199,79 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.ctx.Outputs.SetVar("blsChanges", blsChangesList)
 
-	t.ctx.ReportProgress(100, fmt.Sprintf("Completed generating %d BLS changes", totalCount))
+	// Await inclusion in blocks if configured
+	if t.config.AwaitInclusion && len(pendingValidators) > 0 {
+		err := t.awaitInclusion(ctx, pendingValidators, totalCount)
+		if err != nil {
+			return err
+		}
+	} else {
+		t.ctx.ReportProgress(100, fmt.Sprintf("Completed generating %d BLS changes", totalCount))
+	}
 
 	return nil
 }
 
-func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) (interface{}, error) {
+func (t *Task) awaitInclusion(ctx context.Context, pendingValidators map[phase0.ValidatorIndex]bool, totalCount int) error {
+	blockSubscription := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
+	defer blockSubscription.Unsubscribe()
+
+	includedCount := 0
+	t.ctx.Outputs.SetVar("includedBlsChanges", includedCount)
+
+	t.logger.Infof("waiting for %d BLS changes to be included in blocks", len(pendingValidators))
+	t.ctx.ReportProgress(50, fmt.Sprintf("Awaiting inclusion: 0/%d BLS changes included", len(pendingValidators)))
+
+	for len(pendingValidators) > 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case block := <-blockSubscription.Channel():
+			blockData := block.AwaitBlock(ctx, 2*time.Second)
+			if blockData == nil {
+				continue
+			}
+
+			blsChanges, err := blockData.BLSToExecutionChanges()
+			if err != nil {
+				t.logger.Warnf("could not get BLS changes from block %v: %v", block.Slot, err)
+				continue
+			}
+
+			for _, blsChange := range blsChanges {
+				if !pendingValidators[blsChange.Message.ValidatorIndex] {
+					continue
+				}
+
+				delete(pendingValidators, blsChange.Message.ValidatorIndex)
+
+				includedCount++
+
+				t.ctx.Outputs.SetVar("includedBlsChanges", includedCount)
+				t.logger.Infof("BLS change for validator %d included in block %d (%d/%d)",
+					blsChange.Message.ValidatorIndex, block.Slot, includedCount, totalCount)
+
+				// Calculate progress: 50% for generation + 50% for inclusion
+				inclusionProgress := float64(includedCount) / float64(totalCount) * 50
+				t.ctx.ReportProgress(50+inclusionProgress,
+					fmt.Sprintf("Awaiting inclusion: %d/%d BLS changes included", includedCount, totalCount))
+			}
+		}
+	}
+
+	t.ctx.SetResult(types.TaskResultSuccess)
+	t.ctx.ReportProgress(100, fmt.Sprintf("All %d BLS changes included on-chain", totalCount))
+
+	return nil
+}
+
+func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) (any, phase0.ValidatorIndex, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
 	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, validatorKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
+		return nil, 0, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 	}
 
 	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
@@ -215,18 +290,18 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) (interf
 	}
 
 	if validator == nil {
-		return nil, fmt.Errorf("validator not found")
+		return nil, 0, fmt.Errorf("validator not found")
 	}
 
 	if validator.Validator.WithdrawalCredentials[0] != 0x00 {
-		return nil, fmt.Errorf("validator %v does not have 0x00 withdrawal creds", validator.Index)
+		return nil, 0, fmt.Errorf("validator %v does not have 0x00 withdrawal creds", validator.Index)
 	}
 
 	withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
 
 	withdr, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, withdrAccPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
+		return nil, 0, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err)
 	}
 
 	var withdrPub common.BLSPubkey
@@ -245,7 +320,7 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) (interf
 
 	err = secKey.Deserialize(withdr.Marshal())
 	if err != nil {
-		return nil, fmt.Errorf("failed converting validator priv key: %w", err)
+		return nil, 0, fmt.Errorf("failed converting validator priv key: %w", err)
 	}
 
 	msgRoot := msg.HashTreeRoot(tree.GetHashFn())
@@ -261,10 +336,10 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) (interf
 
 	signedChangeJSON, err := json.Marshal(&signedMsg)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	var blsChangeRes interface{}
+	var blsChangeRes any
 	if blsc, err2 := vars.GeneralizeData(signedMsg); err2 == nil {
 		blsChangeRes = blsc
 	} else {
@@ -278,12 +353,12 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) (interf
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		client = clientPool.GetConsensusPool().AwaitReadyEndpoint(ctx, consensus.AnyClient)
 		if client == nil {
-			return nil, ctx.Err()
+			return nil, 0, ctx.Err()
 		}
 	} else {
 		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(clients) == 0 {
-			return nil, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+			return nil, 0, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
 
 		client = clients[0].ConsensusClient
@@ -293,17 +368,17 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) (interf
 
 	err = json.Unmarshal(signedChangeJSON, blsChange)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	t.logger.WithField("client", client.GetName()).Infof("sending bls change for validator %v", validator.Index)
 
 	err = client.GetRPCClient().SubmitBLSToExecutionChanges(ctx, []*capella.SignedBLSToExecutionChange{blsChange})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return blsChangeRes, nil
+	return blsChangeRes, validator.Index, nil
 }
 
 func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {

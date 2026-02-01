@@ -56,6 +56,11 @@ var (
 				Type:        "array",
 				Description: "Array of deposit transaction receipts.",
 			},
+			{
+				Name:        "includedDeposits",
+				Type:        "number",
+				Description: "Number of deposits included on beacon chain (when awaitInclusion is enabled).",
+			},
 		},
 		NewTask: NewTask,
 	}
@@ -324,6 +329,74 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 		}
 	}
+
+	// Await inclusion in beacon blocks if configured
+	if t.config.AwaitInclusion && len(validatorPubkeys) > 0 {
+		err := t.awaitInclusion(ctx, validatorPubkeys, totalCount)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *Task) awaitInclusion(ctx context.Context, validatorPubkeys []string, totalCount int) error {
+	blockSubscription := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
+	defer blockSubscription.Unsubscribe()
+
+	// Create a map of pending pubkeys for faster lookup
+	pendingPubkeys := make(map[string]bool, len(validatorPubkeys))
+	for _, pubkey := range validatorPubkeys {
+		pendingPubkeys[pubkey] = true
+	}
+
+	includedCount := 0
+	t.ctx.Outputs.SetVar("includedDeposits", includedCount)
+
+	t.logger.Infof("waiting for %d deposits to be included in beacon blocks", len(pendingPubkeys))
+	t.ctx.ReportProgress(50, fmt.Sprintf("Awaiting inclusion: 0/%d deposits included", len(pendingPubkeys)))
+
+	for len(pendingPubkeys) > 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case block := <-blockSubscription.Channel():
+			blockData := block.AwaitBlock(ctx, 2*time.Second)
+			if blockData == nil {
+				continue
+			}
+
+			deposits, err := blockData.Deposits()
+			if err != nil {
+				t.logger.Warnf("could not get deposits from block %v: %v", block.Slot, err)
+				continue
+			}
+
+			for _, deposit := range deposits {
+				pubkeyStr := deposit.Data.PublicKey.String()
+				if !pendingPubkeys[pubkeyStr] {
+					continue
+				}
+
+				delete(pendingPubkeys, pubkeyStr)
+
+				includedCount++
+
+				t.ctx.Outputs.SetVar("includedDeposits", includedCount)
+				t.logger.Infof("Deposit for validator %s included in block %d (%d/%d)",
+					pubkeyStr, block.Slot, includedCount, totalCount)
+
+				// Calculate progress: 50% for generation + 50% for inclusion
+				inclusionProgress := float64(includedCount) / float64(totalCount) * 50
+				t.ctx.ReportProgress(50+inclusionProgress,
+					fmt.Sprintf("Awaiting inclusion: %d/%d deposits included", includedCount, totalCount))
+			}
+		}
+	}
+
+	t.ctx.SetResult(types.TaskResultSuccess)
+	t.ctx.ReportProgress(100, fmt.Sprintf("All %d deposits included on beacon chain", totalCount))
 
 	return nil
 }

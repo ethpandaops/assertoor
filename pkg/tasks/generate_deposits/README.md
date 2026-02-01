@@ -54,10 +54,13 @@ The `generate_deposits` task focuses on creating deposit transactions and sendin
   A regex pattern to exclude certain clients from being used for deposit transactions. This parameter adds an extra layer of control over client selection.
 
 - **`awaitReceipt`**:\
-  If set to `true`, the task waits for a receipt for each deposit transaction, ensuring they are confirmed on the network.
+  If set to `true`, the task waits for a receipt for each deposit transaction, ensuring they are confirmed on the execution layer.
 
 - **`failOnReject`**:\
   Determines whether the task should fail if any deposit transaction is rejected by the network.
+
+- **`awaitInclusion`**:\
+  If set to `true`, the task waits for all deposits to be included in beacon blocks before completing. This is different from `awaitReceipt` which only waits for execution layer transaction inclusion. The task monitors beacon blocks and checks for the presence of the submitted deposit pubkeys.
 
 - **`depositTransactionsResultVar`**:\
   The variable where the hashes of the generated deposit transactions will be stored.
@@ -68,6 +71,19 @@ The `generate_deposits` task focuses on creating deposit transactions and sendin
 - **`validatorPubkeysResultVar`**:\
   The variable where the public keys of the validators associated with the generated deposits will be stored.
 
+### Outputs
+
+- **`validatorPubkeys`**:\
+  Array of validator public keys for the deposits.
+
+- **`depositTransactions`**:\
+  Array of deposit transaction hashes.
+
+- **`depositReceipts`**:\
+  Array of deposit transaction receipts.
+
+- **`includedDeposits`**:\
+  Number of deposits confirmed on the beacon chain (only populated when `awaitInclusion` is enabled).
 
 ### Defaults
 
@@ -94,6 +110,7 @@ Default settings for the `generate_deposits` task:
     excludeClientPattern: ""
     awaitReceipt: false
     failOnReject: false
+    awaitInclusion: false
     depositTransactionsResultVar: ""
     depositReceiptsResultVar: ""
     validatorPubkeysResultVar: ""

@@ -29,6 +29,19 @@ The `generate_bls_changes` task is responsible for generating BLS changes and se
 - **`excludeClientPattern`**:\
   A regex pattern to exclude certain client endpoints from being utilized for BLS change operations. This parameter allows for excluding specific clients from the task, offering finer control over client selection.
 
+- **`awaitInclusion`**:\
+  If set to `true`, the task waits for all submitted BLS changes to be included in beacon blocks before completing. The task monitors new blocks and checks for the presence of the submitted operations.
+
+### Outputs
+
+- **`blsChanges`**:\
+  Array of generated BLS change operations.
+
+- **`latestBlsChange`**:\
+  The most recently generated BLS change operation.
+
+- **`includedBlsChanges`**:\
+  Number of BLS changes confirmed on-chain (only populated when `awaitInclusion` is enabled).
 
 ### Defaults
 
@@ -45,4 +58,5 @@ Default settings for the `generate_bls_changes` task:
     targetAddress: ""
     clientPattern: ""
     excludeClientPattern: ""
+    awaitInclusion: false
 ```

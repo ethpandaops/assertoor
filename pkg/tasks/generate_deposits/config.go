@@ -5,28 +5,29 @@ import (
 )
 
 type Config struct {
-	LimitPerSlot          int    `yaml:"limitPerSlot" json:"limitPerSlot"`
-	LimitTotal            int    `yaml:"limitTotal" json:"limitTotal"`
-	LimitPending          int    `yaml:"limitPending" json:"limitPending"`
-	Mnemonic              string `yaml:"mnemonic" json:"mnemonic"`
-	StartIndex            int    `yaml:"startIndex" json:"startIndex"`
-	IndexCount            int    `yaml:"indexCount" json:"indexCount"`
-	PublicKey             string `yaml:"publicKey" json:"publicKey"`
-	WalletPrivkey         string `yaml:"walletPrivkey" json:"walletPrivkey"`
-	DepositContract       string `yaml:"depositContract" json:"depositContract"`
-	DepositAmount         uint64 `yaml:"depositAmount" json:"depositAmount"`
-	DepositTxFeeCap       int64  `yaml:"depositTxFeeCap" json:"depositTxFeeCap"`
-	DepositTxTipCap       int64  `yaml:"depositTxTipCap" json:"depositTxTipCap"`
-	WithdrawalCredentials string `yaml:"withdrawalCredentials" json:"withdrawalCredentials"`
-	TopUpDeposit          bool   `yaml:"topUpDeposit" json:"topUpDeposit"`
-	ClientPattern         string `yaml:"clientPattern" json:"clientPattern"`
-	ExcludeClientPattern  string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
-	AwaitReceipt          bool   `yaml:"awaitReceipt" json:"awaitReceipt"`
-	FailOnReject          bool   `yaml:"failOnReject" json:"failOnReject"`
+	LimitPerSlot          int    `yaml:"limitPerSlot" json:"limitPerSlot" desc:"Maximum number of deposit operations to generate per slot."`
+	LimitTotal            int    `yaml:"limitTotal" json:"limitTotal" desc:"Total limit on the number of deposit operations to generate."`
+	LimitPending          int    `yaml:"limitPending" json:"limitPending" desc:"Maximum number of pending deposits to allow before waiting."`
+	Mnemonic              string `yaml:"mnemonic" json:"mnemonic" desc:"Mnemonic phrase used to generate validator keys."`
+	StartIndex            int    `yaml:"startIndex" json:"startIndex" desc:"Index within the mnemonic from which to start generating validator keys."`
+	IndexCount            int    `yaml:"indexCount" json:"indexCount" desc:"Number of validator keys to generate from the mnemonic."`
+	PublicKey             string `yaml:"publicKey" json:"publicKey" desc:"Public key of an existing validator for top-up deposits (requires topUpDeposit)."`
+	WalletPrivkey         string `yaml:"walletPrivkey" json:"walletPrivkey" desc:"Private key of the wallet used to fund deposit transactions."`
+	DepositContract       string `yaml:"depositContract" json:"depositContract" desc:"Address of the deposit contract on the execution layer."`
+	DepositAmount         uint64 `yaml:"depositAmount" json:"depositAmount" desc:"Amount of ETH to deposit per validator."`
+	DepositTxFeeCap       int64  `yaml:"depositTxFeeCap" json:"depositTxFeeCap" desc:"Maximum fee cap (in wei) for deposit transactions."`
+	DepositTxTipCap       int64  `yaml:"depositTxTipCap" json:"depositTxTipCap" desc:"Maximum priority tip (in wei) for deposit transactions."`
+	WithdrawalCredentials string `yaml:"withdrawalCredentials" json:"withdrawalCredentials" desc:"Custom withdrawal credentials to use for deposits."`
+	TopUpDeposit          bool   `yaml:"topUpDeposit" json:"topUpDeposit" desc:"If true, add to existing validator balance instead of creating new validators."`
+	ClientPattern         string `yaml:"clientPattern" json:"clientPattern" desc:"Regex pattern to select specific client endpoints for submitting transactions."`
+	ExcludeClientPattern  string `yaml:"excludeClientPattern" json:"excludeClientPattern" desc:"Regex pattern to exclude certain client endpoints."`
+	AwaitReceipt          bool   `yaml:"awaitReceipt" json:"awaitReceipt" desc:"Wait for transaction receipts on the execution layer before completing."`
+	FailOnReject          bool   `yaml:"failOnReject" json:"failOnReject" desc:"Fail the task if any deposit transaction is rejected."`
+	AwaitInclusion        bool   `yaml:"awaitInclusion" json:"awaitInclusion" desc:"Wait for deposits to be included in beacon blocks before completing."`
 
-	DepositTransactionsResultVar string `yaml:"depositTransactionsResultVar" json:"depositTransactionsResultVar"`
-	DepositReceiptsResultVar     string `yaml:"depositReceiptsResultVar" json:"depositReceiptsResultVar"`
-	ValidatorPubkeysResultVar    string `yaml:"validatorPubkeysResultVar" json:"validatorPubkeysResultVar"`
+	DepositTransactionsResultVar string `yaml:"depositTransactionsResultVar" json:"depositTransactionsResultVar" desc:"Variable name to store the list of deposit transaction hashes."`
+	DepositReceiptsResultVar     string `yaml:"depositReceiptsResultVar" json:"depositReceiptsResultVar" desc:"Variable name to store the list of deposit transaction receipts."`
+	ValidatorPubkeysResultVar    string `yaml:"validatorPubkeysResultVar" json:"validatorPubkeysResultVar" desc:"Variable name to store the list of validator public keys."`
 }
 
 func DefaultConfig() Config {

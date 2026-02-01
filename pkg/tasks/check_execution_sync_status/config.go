@@ -8,17 +8,14 @@ import (
 )
 
 type Config struct {
-	ClientPattern           string          `yaml:"clientPattern" json:"clientPattern"`
-	PollInterval            helper.Duration `yaml:"pollInterval" json:"pollInterval"`
-	ExpectSyncing           bool            `yaml:"expectSyncing" json:"expectSyncing"`
-	ExpectMinPercent        float64         `yaml:"expectMinPercent" json:"expectMinPercent"`
-	ExpectMaxPercent        float64         `yaml:"expectMaxPercent" json:"expectMaxPercent"`
-	MinBlockHeight          int             `yaml:"minBlockHeight" json:"minBlockHeight"`
-	WaitForChainProgression bool            `yaml:"waitForChainProgression" json:"waitForChainProgression"`
-	// ContinueOnPass keeps the task running after the check passes.
-	// When false (default), the task exits immediately on success.
-	// When true, the task continues monitoring and may report failure if sync status changes.
-	ContinueOnPass bool `yaml:"continueOnPass" json:"continueOnPass"`
+	ClientPattern           string          `yaml:"clientPattern" json:"clientPattern" desc:"Regex pattern to select specific client endpoints for sync status checking."`
+	PollInterval            helper.Duration `yaml:"pollInterval" json:"pollInterval" desc:"Interval between sync status polls (e.g., '5s', '1m')."`
+	ExpectSyncing           bool            `yaml:"expectSyncing" json:"expectSyncing" desc:"If true, expect clients to be syncing."`
+	ExpectMinPercent        float64         `yaml:"expectMinPercent" json:"expectMinPercent" desc:"Minimum percentage of clients expected to match the sync condition."`
+	ExpectMaxPercent        float64         `yaml:"expectMaxPercent" json:"expectMaxPercent" desc:"Maximum percentage of clients expected to match the sync condition."`
+	MinBlockHeight          int             `yaml:"minBlockHeight" json:"minBlockHeight" desc:"Minimum block height required before checking sync status."`
+	WaitForChainProgression bool            `yaml:"waitForChainProgression" json:"waitForChainProgression" desc:"If true, wait for the chain to progress before checking."`
+	ContinueOnPass          bool            `yaml:"continueOnPass" json:"continueOnPass" desc:"If true, continue monitoring after the check passes instead of completing immediately."`
 }
 
 func DefaultConfig() Config {

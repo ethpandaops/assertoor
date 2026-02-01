@@ -8,46 +8,46 @@ import (
 )
 
 type Config struct {
-	PrivateKey string `yaml:"privateKey" json:"privateKey"`
+	PrivateKey string `yaml:"privateKey" json:"privateKey" desc:"Private key of the wallet used to send the transaction."`
 
-	LegacyTxType       bool           `yaml:"legacyTxType" json:"legacyTxType"`
-	BlobTxType         bool           `yaml:"blobTxType" json:"blobTxType"`
-	SetCodeTxType      bool           `yaml:"setCodeTxType" json:"setCodeTxType"`
-	BlobFeeCap         *helper.BigInt `yaml:"blobFeeCap" json:"blobFeeCap"`
-	FeeCap             *helper.BigInt `yaml:"feeCap" json:"feeCap"`
-	TipCap             *helper.BigInt `yaml:"tipCap" json:"tipCap"`
-	GasLimit           uint64         `yaml:"gasLimit" json:"gasLimit"`
-	TargetAddress      string         `yaml:"targetAddress" json:"targetAddress"`
-	RandomTarget       bool           `yaml:"randomTarget" json:"randomTarget"`
-	ContractDeployment bool           `yaml:"contractDeployment" json:"contractDeployment"`
-	CallData           string         `yaml:"callData" json:"callData"`
-	BlobData           string         `yaml:"blobData" json:"blobData"`
-	RandomAmount       bool           `yaml:"randomAmount" json:"randomAmount"`
-	Amount             *helper.BigInt `yaml:"amount" json:"amount"`
-	Nonce              *uint64        `yaml:"nonce" json:"nonce"`
+	LegacyTxType       bool           `yaml:"legacyTxType" json:"legacyTxType" desc:"If true, use legacy transaction type instead of EIP-1559."`
+	BlobTxType         bool           `yaml:"blobTxType" json:"blobTxType" desc:"If true, send a blob transaction (EIP-4844)."`
+	SetCodeTxType      bool           `yaml:"setCodeTxType" json:"setCodeTxType" desc:"If true, send a set code transaction (EIP-7702)."`
+	BlobFeeCap         *helper.BigInt `yaml:"blobFeeCap" json:"blobFeeCap" desc:"Maximum blob fee cap (in wei) for blob transactions."`
+	FeeCap             *helper.BigInt `yaml:"feeCap" json:"feeCap" desc:"Maximum fee cap (in wei) for the transaction."`
+	TipCap             *helper.BigInt `yaml:"tipCap" json:"tipCap" desc:"Maximum priority tip (in wei) for the transaction."`
+	GasLimit           uint64         `yaml:"gasLimit" json:"gasLimit" desc:"Gas limit for the transaction."`
+	TargetAddress      string         `yaml:"targetAddress" json:"targetAddress" desc:"Target address to send the transaction to."`
+	RandomTarget       bool           `yaml:"randomTarget" json:"randomTarget" desc:"If true, send transaction to a random address."`
+	ContractDeployment bool           `yaml:"contractDeployment" json:"contractDeployment" desc:"If true, deploy a contract instead of sending to an address."`
+	CallData           string         `yaml:"callData" json:"callData" desc:"Hex-encoded call data to include in the transaction."`
+	BlobData           string         `yaml:"blobData" json:"blobData" desc:"Hex-encoded blob data to use in blob sidecars."`
+	RandomAmount       bool           `yaml:"randomAmount" json:"randomAmount" desc:"If true, use a random amount for the transaction."`
+	Amount             *helper.BigInt `yaml:"amount" json:"amount" desc:"Amount (in wei) to send in the transaction."`
+	Nonce              *uint64        `yaml:"nonce" json:"nonce" desc:"Custom nonce to use for the transaction."`
 	Authorizations     []struct {
-		ChainID       uint64  `yaml:"chainId" json:"chainId"`
-		Nonce         *uint64 `yaml:"nonce" json:"nonce"`
-		CodeAddress   string  `yaml:"codeAddress" json:"codeAddress"`
-		SignerPrivkey string  `yaml:"signerPrivkey" json:"signerPrivkey"`
-	} `yaml:"authorizations" json:"authorizations"`
+		ChainID       uint64  `yaml:"chainId" json:"chainId" desc:"Chain ID for the authorization."`
+		Nonce         *uint64 `yaml:"nonce" json:"nonce" desc:"Nonce for the authorization."`
+		CodeAddress   string  `yaml:"codeAddress" json:"codeAddress" desc:"Code address for the authorization."`
+		SignerPrivkey string  `yaml:"signerPrivkey" json:"signerPrivkey" desc:"Private key of the signer for the authorization."`
+	} `yaml:"authorizations" json:"authorizations" desc:"List of authorizations for EIP-7702 set code transactions."`
 
-	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
-	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
+	ClientPattern        string `yaml:"clientPattern" json:"clientPattern" desc:"Regex pattern to select specific client endpoints for submitting the transaction."`
+	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern" desc:"Regex pattern to exclude certain client endpoints."`
 
-	AwaitReceipt  bool `yaml:"awaitReceipt" json:"awaitReceipt"`
-	FailOnReject  bool `yaml:"failOnReject" json:"failOnReject"`
-	FailOnSuccess bool `yaml:"failOnSuccess" json:"failOnSuccess"`
+	AwaitReceipt  bool `yaml:"awaitReceipt" json:"awaitReceipt" desc:"Wait for the transaction receipt before completing."`
+	FailOnReject  bool `yaml:"failOnReject" json:"failOnReject" desc:"Fail the task if the transaction is rejected."`
+	FailOnSuccess bool `yaml:"failOnSuccess" json:"failOnSuccess" desc:"Fail the task if the transaction succeeds (for negative testing)."`
 	ExpectEvents  []struct {
-		Topic0 string `yaml:"topic0" json:"topic0"`
-		Topic1 string `yaml:"topic1" json:"topic1"`
-		Topic2 string `yaml:"topic2" json:"topic2"`
-		Data   string `yaml:"data" json:"data"`
-	} `yaml:"expectEvents" json:"expectEvents"`
+		Topic0 string `yaml:"topic0" json:"topic0" desc:"Expected value for event topic 0 (event signature)."`
+		Topic1 string `yaml:"topic1" json:"topic1" desc:"Expected value for event topic 1."`
+		Topic2 string `yaml:"topic2" json:"topic2" desc:"Expected value for event topic 2."`
+		Data   string `yaml:"data" json:"data" desc:"Expected event data."`
+	} `yaml:"expectEvents" json:"expectEvents" desc:"List of events expected to be emitted by the transaction."`
 
-	TransactionHashResultVar    string `yaml:"transactionHashResultVar" json:"transactionHashResultVar"`
-	TransactionReceiptResultVar string `yaml:"transactionReceiptResultVar" json:"transactionReceiptResultVar"`
-	ContractAddressResultVar    string `yaml:"contractAddressResultVar" json:"contractAddressResultVar"`
+	TransactionHashResultVar    string `yaml:"transactionHashResultVar" json:"transactionHashResultVar" desc:"Variable name to store the transaction hash."`
+	TransactionReceiptResultVar string `yaml:"transactionReceiptResultVar" json:"transactionReceiptResultVar" desc:"Variable name to store the transaction receipt."`
+	ContractAddressResultVar    string `yaml:"contractAddressResultVar" json:"contractAddressResultVar" desc:"Variable name to store the deployed contract address."`
 }
 
 func DefaultConfig() Config {

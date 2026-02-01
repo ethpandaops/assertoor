@@ -27,8 +27,19 @@ var (
 		Description: "Generates voluntary exits and sends them to the network",
 		Category:    "validator",
 		Config:      DefaultConfig(),
-		Outputs:     []types.TaskOutputDefinition{},
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "exitedValidators",
+				Type:        "array",
+				Description: "Array of validator indices that were submitted for exit.",
+			},
+			{
+				Name:        "includedExits",
+				Type:        "number",
+				Description: "Number of exits included on-chain (when awaitInclusion is enabled).",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -112,6 +123,10 @@ func (t *Task) Execute(ctx context.Context) error {
 	perSlotCount := 0
 	totalCount := 0
 
+	// Track submitted validator indices for awaitInclusion
+	pendingValidators := make(map[phase0.ValidatorIndex]bool)
+	exitedValidators := []uint64{}
+
 	// Calculate target count for progress reporting
 	targetCount := 0
 	if t.config.LimitTotal > 0 {
@@ -126,11 +141,18 @@ func (t *Task) Execute(ctx context.Context) error {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateVoluntaryExit(ctx, accountIdx, fork)
+		validatorIndex, err := t.generateVoluntaryExit(ctx, accountIdx, fork)
 		if err != nil {
 			t.logger.Errorf("error generating voluntary exit for index %v: %v", accountIdx, err.Error())
 		} else {
-			t.ctx.SetResult(types.TaskResultSuccess)
+			exitedValidators = append(exitedValidators, uint64(validatorIndex))
+			t.ctx.Outputs.SetVar("exitedValidators", exitedValidators)
+
+			if t.config.AwaitInclusion {
+				pendingValidators[validatorIndex] = true
+			} else {
+				t.ctx.SetResult(types.TaskResultSuccess)
+			}
 
 			perSlotCount++
 			totalCount++
@@ -168,9 +190,72 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	if totalCount == 0 {
 		t.ctx.SetResult(types.TaskResultFailure)
+
+		return nil
 	}
 
-	t.ctx.ReportProgress(100, fmt.Sprintf("Completed generating %d voluntary exits", totalCount))
+	// Await inclusion in blocks if configured
+	if t.config.AwaitInclusion && len(pendingValidators) > 0 {
+		err := t.awaitInclusion(ctx, pendingValidators, totalCount)
+		if err != nil {
+			return err
+		}
+	} else {
+		t.ctx.ReportProgress(100, fmt.Sprintf("Completed generating %d voluntary exits", totalCount))
+	}
+
+	return nil
+}
+
+func (t *Task) awaitInclusion(ctx context.Context, pendingValidators map[phase0.ValidatorIndex]bool, totalCount int) error {
+	blockSubscription := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
+	defer blockSubscription.Unsubscribe()
+
+	includedCount := 0
+	t.ctx.Outputs.SetVar("includedExits", includedCount)
+
+	t.logger.Infof("waiting for %d voluntary exits to be included in blocks", len(pendingValidators))
+	t.ctx.ReportProgress(50, fmt.Sprintf("Awaiting inclusion: 0/%d exits included", len(pendingValidators)))
+
+	for len(pendingValidators) > 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case block := <-blockSubscription.Channel():
+			blockData := block.AwaitBlock(ctx, 2*time.Second)
+			if blockData == nil {
+				continue
+			}
+
+			exits, err := blockData.VoluntaryExits()
+			if err != nil {
+				t.logger.Warnf("could not get voluntary exits from block %v: %v", block.Slot, err)
+				continue
+			}
+
+			for _, exit := range exits {
+				if !pendingValidators[exit.Message.ValidatorIndex] {
+					continue
+				}
+
+				delete(pendingValidators, exit.Message.ValidatorIndex)
+
+				includedCount++
+
+				t.ctx.Outputs.SetVar("includedExits", includedCount)
+				t.logger.Infof("Voluntary exit for validator %d included in block %d (%d/%d)",
+					exit.Message.ValidatorIndex, block.Slot, includedCount, totalCount)
+
+				// Calculate progress: 50% for generation + 50% for inclusion
+				inclusionProgress := float64(includedCount) / float64(totalCount) * 50
+				t.ctx.ReportProgress(50+inclusionProgress,
+					fmt.Sprintf("Awaiting inclusion: %d/%d exits included", includedCount, totalCount))
+			}
+		}
+	}
+
+	t.ctx.SetResult(types.TaskResultSuccess)
+	t.ctx.ReportProgress(100, fmt.Sprintf("All %d voluntary exits included on-chain", totalCount))
 
 	return nil
 }
@@ -189,12 +274,12 @@ func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, error) {
 	return fork, nil
 }
 
-func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, fork *phase0.Fork) error {
+func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, fork *phase0.Fork) (phase0.ValidatorIndex, error) {
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
 	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, validatorKeyPath)
 	if err != nil {
-		return fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
+		return 0, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 	}
 
 	// select validator
@@ -210,11 +295,11 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 
 	// check validator status
 	if validator == nil {
-		return fmt.Errorf("validator not found: 0x%x", validatorPubkey)
+		return 0, fmt.Errorf("validator not found: 0x%x", validatorPubkey)
 	}
 
 	if validator.Validator.ExitEpoch != 18446744073709551615 {
-		return fmt.Errorf("validator %v is already exited", validator.Index)
+		return 0, fmt.Errorf("validator %v is already exited", validator.Index)
 	}
 
 	// select client
@@ -226,7 +311,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	} else {
 		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(clients) == 0 {
-			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+			return 0, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
 
 		client = clients[0].ConsensusClient
@@ -247,14 +332,14 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 
 	root, err := operation.HashTreeRoot()
 	if err != nil {
-		return fmt.Errorf("failed to generate root for exit operation: %w", err)
+		return 0, fmt.Errorf("failed to generate root for exit operation: %w", err)
 	}
 
 	var secKey hbls.SecretKey
 
 	err = secKey.Deserialize(validatorPrivkey.Marshal())
 	if err != nil {
-		return fmt.Errorf("failed converting validator priv key: %w", err)
+		return 0, fmt.Errorf("failed converting validator priv key: %w", err)
 	}
 
 	forkVersion := fork.CurrentVersion
@@ -276,10 +361,10 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 
 	err = client.GetRPCClient().SubmitVoluntaryExits(ctx, &signedMsg)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	return validator.Index, nil
 }
 
 func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {

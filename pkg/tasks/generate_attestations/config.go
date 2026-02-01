@@ -9,24 +9,24 @@ import (
 
 type Config struct {
 	// Key configuration
-	Mnemonic   string `yaml:"mnemonic" json:"mnemonic"`
-	StartIndex int    `yaml:"startIndex" json:"startIndex"`
-	IndexCount int    `yaml:"indexCount" json:"indexCount"`
+	Mnemonic   string `yaml:"mnemonic" json:"mnemonic" desc:"Mnemonic phrase used to derive validator keys."`
+	StartIndex int    `yaml:"startIndex" json:"startIndex" desc:"Index within the mnemonic from which to start deriving keys."`
+	IndexCount int    `yaml:"indexCount" json:"indexCount" desc:"Number of validator keys to use for generating attestations."`
 
 	// Limit configuration
-	LimitTotal  int `yaml:"limitTotal" json:"limitTotal"`
-	LimitEpochs int `yaml:"limitEpochs" json:"limitEpochs"`
+	LimitTotal  int `yaml:"limitTotal" json:"limitTotal" desc:"Total limit on the number of attestations to generate."`
+	LimitEpochs int `yaml:"limitEpochs" json:"limitEpochs" desc:"Number of epochs to generate attestations for."`
 
 	// Client selection
-	ClientPattern        string `yaml:"clientPattern" json:"clientPattern"`
-	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern"`
+	ClientPattern        string `yaml:"clientPattern" json:"clientPattern" desc:"Regex pattern to select specific client endpoints for submitting attestations."`
+	ExcludeClientPattern string `yaml:"excludeClientPattern" json:"excludeClientPattern" desc:"Regex pattern to exclude certain client endpoints."`
 
 	// Advanced settings
-	LastEpochAttestations bool   `yaml:"lastEpochAttestations" json:"lastEpochAttestations"`
-	SendAllLastEpoch      bool   `yaml:"sendAllLastEpoch" json:"sendAllLastEpoch"`
-	LateHead              int    `yaml:"lateHead" json:"lateHead"`
-	RandomLateHead        string `yaml:"randomLateHead" json:"randomLateHead"`
-	LateHeadClusterSize   int    `yaml:"lateHeadClusterSize" json:"lateHeadClusterSize"`
+	LastEpochAttestations bool   `yaml:"lastEpochAttestations" json:"lastEpochAttestations" desc:"If true, generate attestations referencing the last epoch instead of current."`
+	SendAllLastEpoch      bool   `yaml:"sendAllLastEpoch" json:"sendAllLastEpoch" desc:"If true, send all attestations with last epoch data."`
+	LateHead              int    `yaml:"lateHead" json:"lateHead" desc:"Number of slots to delay the head vote in attestations."`
+	RandomLateHead        string `yaml:"randomLateHead" json:"randomLateHead" desc:"Random late head range in 'min:max' or 'min-max' format."`
+	LateHeadClusterSize   int    `yaml:"lateHeadClusterSize" json:"lateHeadClusterSize" desc:"Size of validator clusters that share the same late head delay."`
 }
 
 // ParseRandomLateHead parses the RandomLateHead string in "min:max" or "min-max" format.

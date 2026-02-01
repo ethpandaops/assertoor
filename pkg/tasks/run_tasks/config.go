@@ -7,15 +7,15 @@ import (
 )
 
 type Config struct {
-	Tasks            []helper.RawMessageMasked `yaml:"tasks" json:"tasks"`
-	NewVariableScope bool                      `yaml:"newVariableScope" json:"newVariableScope"`
+	Tasks            []helper.RawMessageMasked `yaml:"tasks" json:"tasks" desc:"List of tasks to execute sequentially."`
+	NewVariableScope bool                      `yaml:"newVariableScope" json:"newVariableScope" desc:"If true, create a new variable scope for child tasks."`
 
 	// Failure handling (default: stop on first failure)
-	ContinueOnFailure bool `yaml:"continueOnFailure" json:"continueOnFailure"`
+	ContinueOnFailure bool `yaml:"continueOnFailure" json:"continueOnFailure" desc:"If true, continue executing remaining tasks even if one fails."`
 
 	// Result transformation
-	InvertResult bool `yaml:"invertResult" json:"invertResult"` // Swap success/failure
-	IgnoreResult bool `yaml:"ignoreResult" json:"ignoreResult"` // Always succeed
+	InvertResult bool `yaml:"invertResult" json:"invertResult" desc:"If true, swap success and failure results."`
+	IgnoreResult bool `yaml:"ignoreResult" json:"ignoreResult" desc:"If true, always report success regardless of child task results."`
 }
 
 func DefaultConfig() Config {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
+	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
@@ -29,8 +30,19 @@ var (
 		Description: "Generates slashable attestations / proposals and sends them to the network",
 		Category:    "validator",
 		Config:      DefaultConfig(),
-		Outputs:     []types.TaskOutputDefinition{},
-		NewTask:     NewTask,
+		Outputs: []types.TaskOutputDefinition{
+			{
+				Name:        "slashedValidators",
+				Type:        "array",
+				Description: "Array of validator indices that were submitted for slashing.",
+			},
+			{
+				Name:        "includedSlashings",
+				Type:        "number",
+				Description: "Number of slashings included on-chain (when awaitInclusion is enabled).",
+			},
+		},
+		NewTask: NewTask,
 	}
 )
 
@@ -114,17 +126,28 @@ func (t *Task) Execute(ctx context.Context) error {
 	perSlotCount := 0
 	totalCount := 0
 
+	// Track submitted validator indices for awaitInclusion
+	pendingValidators := make(map[phase0.ValidatorIndex]bool)
+	slashedValidators := []uint64{}
+
 	t.ctx.ReportProgress(0, "Generating slashings...")
 
 	for {
 		accountIdx := t.nextIndex
 		t.nextIndex++
 
-		err := t.generateSlashing(ctx, accountIdx, forkState)
+		validatorIndex, err := t.generateSlashing(ctx, accountIdx, forkState)
 		if err != nil {
 			t.logger.Errorf("error generating slashing: %v", err.Error())
 		} else {
-			t.ctx.SetResult(types.TaskResultSuccess)
+			slashedValidators = append(slashedValidators, uint64(validatorIndex))
+			t.ctx.Outputs.SetVar("slashedValidators", slashedValidators)
+
+			if t.config.AwaitInclusion {
+				pendingValidators[validatorIndex] = true
+			} else {
+				t.ctx.SetResult(types.TaskResultSuccess)
+			}
 
 			perSlotCount++
 			totalCount++
@@ -165,9 +188,121 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	t.ctx.ReportProgress(100, fmt.Sprintf("Completed: generated %d slashings", totalCount))
+	// Await inclusion in blocks if configured
+	if t.config.AwaitInclusion && len(pendingValidators) > 0 {
+		err := t.awaitInclusion(ctx, pendingValidators, totalCount)
+		if err != nil {
+			return err
+		}
+	} else {
+		t.ctx.ReportProgress(100, fmt.Sprintf("Completed: generated %d slashings", totalCount))
+	}
 
 	return nil
+}
+
+func (t *Task) awaitInclusion(ctx context.Context, pendingValidators map[phase0.ValidatorIndex]bool, totalCount int) error {
+	blockSubscription := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
+	defer blockSubscription.Unsubscribe()
+
+	includedCount := 0
+	t.ctx.Outputs.SetVar("includedSlashings", includedCount)
+
+	t.logger.Infof("waiting for %d slashings to be included in blocks", len(pendingValidators))
+	t.ctx.ReportProgress(50, fmt.Sprintf("Awaiting inclusion: 0/%d slashings included", len(pendingValidators)))
+
+	for len(pendingValidators) > 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case block := <-blockSubscription.Channel():
+			blockData := block.AwaitBlock(ctx, 2*time.Second)
+			if blockData == nil {
+				continue
+			}
+
+			// Check attester slashings
+			attSlashings, err := blockData.AttesterSlashings()
+			if err == nil {
+				for _, slashing := range attSlashings {
+					t.checkAttesterSlashing(slashing, pendingValidators, &includedCount, totalCount, block.Slot)
+				}
+			}
+
+			// Check proposer slashings
+			propSlashings, err := blockData.ProposerSlashings()
+			if err == nil {
+				for _, slashing := range propSlashings {
+					if !pendingValidators[slashing.SignedHeader1.Message.ProposerIndex] {
+						continue
+					}
+
+					delete(pendingValidators, slashing.SignedHeader1.Message.ProposerIndex)
+
+					includedCount++
+
+					t.ctx.Outputs.SetVar("includedSlashings", includedCount)
+					t.logger.Infof("Proposer slashing for validator %d included in block %d (%d/%d)",
+						slashing.SignedHeader1.Message.ProposerIndex, block.Slot, includedCount, totalCount)
+
+					inclusionProgress := float64(includedCount) / float64(totalCount) * 50
+					t.ctx.ReportProgress(50+inclusionProgress,
+						fmt.Sprintf("Awaiting inclusion: %d/%d slashings included", includedCount, totalCount))
+				}
+			}
+		}
+	}
+
+	t.ctx.SetResult(types.TaskResultSuccess)
+	t.ctx.ReportProgress(100, fmt.Sprintf("All %d slashings included on-chain", totalCount))
+
+	return nil
+}
+
+func (t *Task) checkAttesterSlashing(slashing spec.VersionedAttesterSlashing, pendingValidators map[phase0.ValidatorIndex]bool, includedCount *int, totalCount int, slot phase0.Slot) {
+	att1, err1 := slashing.Attestation1()
+	att2, err2 := slashing.Attestation2()
+
+	if err1 != nil || err2 != nil {
+		return
+	}
+
+	att1Indices, err1 := att1.AttestingIndices()
+	att2Indices, err2 := att2.AttestingIndices()
+
+	if err1 != nil || err2 != nil {
+		return
+	}
+
+	// Create a map from att1 indices for faster lookup
+	att1Map := make(map[uint64]bool, len(att1Indices))
+	for _, idx := range att1Indices {
+		att1Map[idx] = true
+	}
+
+	// Find intersection
+	for _, idx := range att2Indices {
+		if !att1Map[idx] {
+			continue
+		}
+
+		valIdx := phase0.ValidatorIndex(idx)
+		if !pendingValidators[valIdx] {
+			continue
+		}
+
+		delete(pendingValidators, valIdx)
+
+		*includedCount++
+
+		t.ctx.Outputs.SetVar("includedSlashings", *includedCount)
+		t.logger.Infof("Attester slashing for validator %d included in block %d (%d/%d)",
+			valIdx, slot, *includedCount, totalCount)
+
+		inclusionProgress := float64(*includedCount) / float64(totalCount) * 50
+		t.ctx.ReportProgress(50+inclusionProgress,
+			fmt.Sprintf("Awaiting inclusion: %d/%d slashings included", *includedCount, totalCount))
+	}
 }
 
 func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, error) {
@@ -184,13 +319,13 @@ func (t *Task) loadChainState(ctx context.Context) (*phase0.Fork, error) {
 	return forkState, nil
 }
 
-func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkState *phase0.Fork) error {
+func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkState *phase0.Fork) (phase0.ValidatorIndex, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
 	validatorPrivkey, err := util.PrivateKeyFromSeedAndPath(t.withdrSeed, validatorKeyPath)
 	if err != nil {
-		return fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
+		return 0, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 	}
 
 	var validator *v1.Validator
@@ -204,11 +339,11 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkStat
 	}
 
 	if validator == nil {
-		return fmt.Errorf("validator not found")
+		return 0, fmt.Errorf("validator not found")
 	}
 
 	if validator.Status != v1.ValidatorStateActiveOngoing {
-		return fmt.Errorf("validator %v is not active", validator.Index)
+		return 0, fmt.Errorf("validator %v is not active", validator.Index)
 	}
 
 	var attesterSlashing *phase0.AttesterSlashing
@@ -221,15 +356,15 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkStat
 	case "proposer":
 		proposerSlashing, err = t.generateProposerSlashing(uint64(validator.Index), validatorPrivkey, forkState)
 	default:
-		return fmt.Errorf("unknown slashing type: %v", t.config.SlashingType)
+		return 0, fmt.Errorf("unknown slashing type: %v", t.config.SlashingType)
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed generating slashing: %v", err)
+		return 0, fmt.Errorf("failed generating slashing: %v", err)
 	}
 
 	if attesterSlashing == nil && proposerSlashing == nil {
-		return fmt.Errorf("no slashing generated")
+		return 0, fmt.Errorf("no slashing generated")
 	}
 
 	var client *consensus.Client
@@ -239,7 +374,7 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkStat
 	} else {
 		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(clients) == 0 {
-			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+			return 0, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
 
 		client = clients[0].ConsensusClient
@@ -250,7 +385,7 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkStat
 
 		err = client.GetRPCClient().SubmitAttesterSlashing(ctx, attesterSlashing)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
@@ -259,11 +394,11 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkStat
 
 		err = client.GetRPCClient().SubmitProposerSlashing(ctx, proposerSlashing)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
-	return nil
+	return validator.Index, nil
 }
 
 func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {

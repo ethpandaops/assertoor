@@ -28,9 +28,19 @@ It's important to note that while the slashing operations are sent to the networ
   - **`clientPattern`**:\
   A regex pattern for selecting specific client endpoints to send the slashing operations. If not specified, the task will use any available endpoint.
 
-- **`excludeClientPattern`**:
+- **`excludeClientPattern`**:\
   A regex pattern to exclude certain clients from being used for slashing operations. This feature provides an additional layer of control by allowing the exclusion of specific clients, which can be useful for testing under various network conditions.
 
+- **`awaitInclusion`**:\
+  If set to `true`, the task waits for all submitted slashing proofs to be included in beacon blocks before completing. The task monitors new blocks and checks for both attester and proposer slashings matching the submitted validator indices.
+
+### Outputs
+
+- **`slashedValidators`**:\
+  Array of validator indices that were submitted for slashing.
+
+- **`includedSlashings`**:\
+  Number of slashings confirmed on-chain (only populated when `awaitInclusion` is enabled).
 
 ### Defaults
 
@@ -47,4 +57,5 @@ Default settings for the `generate_slashings` task:
     indexCount: 0
     clientPattern: ""
     excludeClientPattern: ""
+    awaitInclusion: false
 ```
