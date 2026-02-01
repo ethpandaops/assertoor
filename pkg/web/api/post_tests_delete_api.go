@@ -32,6 +32,11 @@ type PostTestsDeleteResponse struct {
 func (ah *APIHandler) PostTestsDelete(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
+	if !ah.checkAuth(r) {
+		ah.sendUnauthorizedResponse(w, r.URL.String())
+		return
+	}
+
 	// parse request body
 	req := &PostTestsDeleteRequest{}
 

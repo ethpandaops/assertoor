@@ -41,6 +41,11 @@ type PostTestsRegisterExternalResponse struct {
 func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
+	if !ah.checkAuth(r) {
+		ah.sendUnauthorizedResponse(w, r.URL.String())
+		return
+	}
+
 	// parse request body
 	req := &PostTestsRegisterExternalRequest{}
 

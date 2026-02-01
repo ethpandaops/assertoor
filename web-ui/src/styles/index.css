@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f9fafb;
+  --color-bg-tertiary: #f3f4f6;
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #6b7280;
+  --color-border: #e5e7eb;
+}
+
+.dark {
+  --color-bg-primary: #111827;
+  --color-bg-secondary: #1f2937;
+  --color-bg-tertiary: #374151;
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-tertiary: #9ca3af;
+  --color-border: #374151;
+}
+
+body {
+  @apply bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] antialiased;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Status colors */
+.status-pending {
+  @apply text-gray-500 bg-gray-100 dark:bg-gray-800;
+}
+
+.status-running {
+  @apply text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30;
+}
+
+.status-success {
+  @apply text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30;
+}
+
+.status-failure {
+  @apply text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30;
+}
+
+.status-skipped {
+  @apply text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30;
+}
+
+.status-aborted {
+  @apply text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30;
+}
+
+.status-complete {
+  @apply text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30;
+}
+
+/* Card styles */
+.card {
+  @apply bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg shadow-sm;
+}
+
+.card-header {
+  @apply px-3 py-2 border-b border-[var(--color-border)] font-medium text-sm;
+}
+
+.card-body {
+  @apply p-3;
+}
+
+/* Button styles */
+.btn {
+  @apply inline-flex items-center justify-center px-3 py-1.5 rounded-md font-medium text-sm transition-colors duration-150;
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+
+.btn-primary {
+  @apply bg-primary-600 text-white hover:bg-primary-700;
+  @apply focus:ring-primary-500;
+}
+
+.btn-secondary {
+  @apply bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] hover:bg-gray-300 dark:hover:bg-gray-600;
+  @apply focus:ring-gray-500;
+}
+
+.btn-danger {
+  @apply bg-error-600 text-white hover:bg-error-700;
+  @apply focus:ring-error-500;
+}
+
+.btn-sm {
+  @apply px-2.5 py-1 text-xs;
+}
+
+/* Table styles */
+.table {
+  @apply w-full text-sm;
+}
+
+.table th {
+  @apply px-3 py-2 text-left text-xs font-medium text-[var(--color-text-secondary)] bg-[var(--color-bg-tertiary)];
+}
+
+.table td {
+  @apply px-3 py-2 text-sm border-t border-[var(--color-border)];
+}
+
+.table tbody tr:hover {
+  @apply bg-[var(--color-bg-tertiary)];
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-[var(--color-bg-secondary)];
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 dark:bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500 dark:bg-gray-500;
+}

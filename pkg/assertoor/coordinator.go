@@ -161,6 +161,9 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		c.eventBus.Stop()
 	}()
 
+	// Hook event bus into client pool for client update events
+	c.clientPool.SetEventBus(c.eventBus)
+
 	// init webserver
 	if c.Config.Web != nil {
 		if c.Config.Web.Server != nil {
@@ -169,7 +172,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				return err
 			}
 
-			err = c.webserver.ConfigureRoutesWithEventBus(c.Config.Web.Frontend, c.Config.Web.API, c, false, c.eventBus)
+			err = c.webserver.ConfigureRoutes(c.Config.Web.Frontend, c.Config.Web.API, c, false, c.eventBus)
 			if err != nil {
 				return err
 			}
@@ -181,7 +184,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				return err
 			}
 
-			err = c.publicWebserver.ConfigureRoutesWithEventBus(c.Config.Web.Frontend, nil, c, true, nil)
+			err = c.publicWebserver.ConfigureRoutes(c.Config.Web.Frontend, nil, c, true, nil)
 			if err != nil {
 				return err
 			}

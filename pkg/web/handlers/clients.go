@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/clients"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
+	"github.com/sirupsen/logrus"
 )
 
 type ClientsPage struct {
@@ -37,6 +39,12 @@ type ClientsPageClient struct {
 
 // Clients will return the "clients" page using a go template
 func (fh *FrontendHandler) Clients(w http.ResponseWriter, r *http.Request) {
+	urlArgs := r.URL.Query()
+	if urlArgs.Has("json") {
+		fh.ClientsData(w, r)
+		return
+	}
+
 	templateFiles := LayoutTemplateFiles
 	templateFiles = append(templateFiles,
 		"clients/clients.html",
@@ -57,6 +65,28 @@ func (fh *FrontendHandler) Clients(w http.ResponseWriter, r *http.Request) {
 
 	if fh.handleTemplateError(w, r, "clients.go", "Clients", pageTemplate.ExecuteTemplate(w, "layout", data)) != nil {
 		return // an error has occurred and was processed
+	}
+}
+
+func (fh *FrontendHandler) ClientsData(w http.ResponseWriter, r *http.Request) {
+	var pageData *ClientsPage
+
+	var pageError error
+
+	pageData, pageError = fh.getClientsPageData()
+	if pageError != nil {
+		fh.HandlePageError(w, r, pageError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	err := json.NewEncoder(w).Encode(pageData)
+	if err != nil {
+		logrus.WithError(err).Error("error encoding clients data")
+
+		//nolint:gocritic // ignore
+		http.Error(w, "Internal server error", http.StatusServiceUnavailable)
 	}
 }
 

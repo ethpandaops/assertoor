@@ -27,6 +27,11 @@ import (
 func (ah *APIHandler) GetTestRunTaskDetails(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
+	if !ah.checkAuth(r) {
+		ah.sendUnauthorizedResponse(w, r.URL.String())
+		return
+	}
+
 	vars := mux.Vars(r)
 
 	runID, err := strconv.ParseUint(vars["runId"], 10, 64)
@@ -70,7 +75,13 @@ func (ah *APIHandler) GetTestRunTaskDetails(w http.ResponseWriter, r *http.Reque
 		Title:       taskState.Title(),
 		Started:     taskStatus.IsStarted,
 		Completed:   taskStatus.IsStarted && !taskStatus.IsRunning,
-		Timeout:     uint64(taskState.Timeout().Seconds()),
+	}
+
+	timeout := taskState.Timeout().Milliseconds()
+	if timeout < 0 {
+		taskData.Timeout = 0
+	} else {
+		taskData.Timeout = uint64(timeout)
 	}
 
 	switch {
@@ -115,7 +126,7 @@ func (ah *APIHandler) GetTestRunTaskDetails(w http.ResponseWriter, r *http.Reque
 	for i, log := range taskLog {
 		logData := &GetTestRunDetailedTaskLog{
 			Time:    time.Unix(0, log.LogTime*int64(time.Millisecond)),
-			Level:   uint64(log.LogLevel),
+			Level:   mapLogLevelToUI(log.LogLevel),
 			Message: log.LogMessage,
 			Data:    map[string]string{},
 		}

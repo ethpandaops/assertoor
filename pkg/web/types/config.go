@@ -16,6 +16,9 @@ type ServerConfig struct {
 	ReadTimeout  time.Duration `yaml:"readTimeout" envconfig:"WEB_SERVER_READ_TIMEOUT"`
 	WriteTimeout time.Duration `yaml:"writeTimeout" envconfig:"WEB_SERVER_WRITE_TIMEOUT"`
 	IdleTimeout  time.Duration `yaml:"idleTimeout" envconfig:"WEB_SERVER_IDLE_TIMEOUT"`
+
+	AuthHeader string `yaml:"authHeader" envconfig:"WEB_SERVER_AUTH_HEADER"`
+	TokenKey   string `yaml:"tokenKey" envconfig:"WEB_SERVER_TOKEN_KEY"`
 }
 
 type FrontendConfig struct {
@@ -27,5 +30,6 @@ type FrontendConfig struct {
 }
 
 type APIConfig struct {
-	Enabled bool `yaml:"enabled" envconfig:"WEB_API_ENABLED"`
+	Enabled     bool `yaml:"enabled" envconfig:"WEB_API_ENABLED"`
+	DisableAuth bool `yaml:"disableAuth" envconfig:"WEB_API_DISABLE_AUTH"`
 }

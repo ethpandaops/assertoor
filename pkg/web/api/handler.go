@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ethpandaops/assertoor/pkg/types"
+	"github.com/ethpandaops/assertoor/pkg/web/auth"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,21 +22,47 @@ const contentTypeYAML = "application/yaml"
 const contentTypeJSON = "application/json"
 
 type Response struct {
-	Status string      `json:"status"`
-	Data   interface{} `json:"data"`
+	Status string `json:"status"`
+	Data   any    `json:"data"`
 }
 
 //nolint:revive // ignore
 type APIHandler struct {
 	logger      logrus.FieldLogger
 	coordinator types.Coordinator
+	authHandler *auth.Handler
+	disableAuth bool
 }
 
-func NewAPIHandler(logger logrus.FieldLogger, coordinator types.Coordinator) *APIHandler {
+func NewAPIHandler(logger logrus.FieldLogger, coordinator types.Coordinator, authHandler *auth.Handler, disableAuth bool) *APIHandler {
 	return &APIHandler{
 		logger:      logger,
 		coordinator: coordinator,
+		authHandler: authHandler,
+		disableAuth: disableAuth,
 	}
+}
+
+func (ah *APIHandler) checkAuth(r *http.Request) bool {
+	// If auth is disabled, allow all requests
+	if ah.disableAuth {
+		return true
+	}
+
+	if ah.authHandler == nil {
+		return true // No auth handler configured, allow all
+	}
+
+	token := ah.authHandler.CheckAuthToken(r.Header.Get("Authorization"))
+	if token == nil || !token.Valid {
+		return false
+	}
+
+	return true
+}
+
+func (ah *APIHandler) sendUnauthorizedResponse(w http.ResponseWriter, route string) {
+	ah.sendErrorResponse(w, route, "unauthorized", http.StatusUnauthorized)
 }
 
 func (ah *APIHandler) sendErrorResponse(w http.ResponseWriter, route, message string, errorcode int) {
@@ -50,7 +77,7 @@ func (ah *APIHandler) sendErrorResponse(w http.ResponseWriter, route, message st
 	}
 }
 
-func (ah *APIHandler) sendOKResponse(w http.ResponseWriter, route string, data interface{}) {
+func (ah *APIHandler) sendOKResponse(w http.ResponseWriter, route string, data any) {
 	j := json.NewEncoder(w)
 	response := &Response{
 		Status: "OK",

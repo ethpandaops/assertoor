@@ -7,20 +7,38 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"
 )
 
+// AuthTokenChecker is a function that validates an authorization token.
+type AuthTokenChecker func(tokenStr string) *jwt.Token
+
 // SSEHandler handles Server-Sent Events connections.
 type SSEHandler struct {
-	logger   logrus.FieldLogger
-	eventBus *EventBus
+	logger         logrus.FieldLogger
+	eventBus       *EventBus
+	authChecker    AuthTokenChecker
+	requireAuthLog bool
 }
 
 // NewSSEHandler creates a new SSE handler.
 func NewSSEHandler(logger logrus.FieldLogger, eventBus *EventBus) *SSEHandler {
 	return &SSEHandler{
-		logger:   logger.WithField("component", "sse"),
-		eventBus: eventBus,
+		logger:         logger.WithField("component", "sse"),
+		eventBus:       eventBus,
+		authChecker:    nil,
+		requireAuthLog: false,
+	}
+}
+
+// NewSSEHandlerWithAuth creates a new SSE handler with authentication support.
+func NewSSEHandlerWithAuth(logger logrus.FieldLogger, eventBus *EventBus, authChecker AuthTokenChecker, requireAuthLog bool) *SSEHandler {
+	return &SSEHandler{
+		logger:         logger.WithField("component", "sse"),
+		eventBus:       eventBus,
+		authChecker:    authChecker,
+		requireAuthLog: requireAuthLog,
 	}
 }
 
@@ -43,6 +61,9 @@ func (h *SSEHandler) handleSSE(w http.ResponseWriter, r *http.Request, filter Fi
 		http.Error(w, "SSE not supported", http.StatusInternalServerError)
 		return
 	}
+
+	// Check authentication for log events
+	isAuthenticated := h.checkAuth(r)
 
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -103,6 +124,11 @@ func (h *SSEHandler) handleSSE(w http.ResponseWriter, r *http.Request, filter Fi
 				continue
 			}
 
+			// Filter out log events for unauthenticated clients
+			if h.requireAuthLog && !isAuthenticated && event.Type == EventTaskLog {
+				continue
+			}
+
 			h.sendEvent(w, flusher, event)
 
 		case <-ticker.C:
@@ -110,6 +136,30 @@ func (h *SSEHandler) handleSSE(w http.ResponseWriter, r *http.Request, filter Fi
 			h.sendKeepAlive(w, flusher)
 		}
 	}
+}
+
+// checkAuth checks if the request has a valid authentication token.
+func (h *SSEHandler) checkAuth(r *http.Request) bool {
+	if h.authChecker == nil {
+		return true // No auth checker, allow all
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		// Also check query parameter for SSE connections
+		authHeader = r.URL.Query().Get("token")
+		if authHeader != "" {
+			authHeader = "Bearer " + authHeader
+		}
+	}
+
+	if authHeader == "" {
+		return false
+	}
+
+	token := h.authChecker(authHeader)
+
+	return token != nil && token.Valid
 }
 
 // sendEvent sends an SSE event to the client.
@@ -300,4 +350,78 @@ func (eb *EventBus) PublishTaskLog(
 	}
 
 	eb.Publish(event)
+}
+
+// PublishTaskCreated publishes a task created event.
+func (eb *EventBus) PublishTaskCreated(
+	testRunID, taskIndex uint64,
+	taskName, taskTitle, taskID string,
+	parentIndex uint64,
+) {
+	event, err := NewEvent(EventTaskCreated, testRunID, taskIndex, &TaskCreatedData{
+		TaskName:    taskName,
+		TaskTitle:   taskTitle,
+		TaskID:      taskID,
+		ParentIndex: parentIndex,
+	})
+	if err != nil {
+		return
+	}
+
+	eb.Publish(event)
+}
+
+// PublishClientHeadUpdate publishes a client head update event.
+func (eb *EventBus) PublishClientHeadUpdate(
+	clientIndex int,
+	clientName string,
+	clHeadSlot uint64,
+	clHeadRoot string,
+	elHeadNumber uint64,
+	elHeadHash string,
+) {
+	event, err := NewEvent(EventClientHeadUpdate, 0, 0, &ClientHeadUpdateData{
+		ClientIndex:  clientIndex,
+		ClientName:   clientName,
+		CLHeadSlot:   clHeadSlot,
+		CLHeadRoot:   clHeadRoot,
+		ELHeadNumber: elHeadNumber,
+		ELHeadHash:   elHeadHash,
+	})
+	if err != nil {
+		return
+	}
+
+	eb.Publish(event)
+}
+
+// PublishClientStatusUpdate publishes a client status update event.
+func (eb *EventBus) PublishClientStatusUpdate(
+	clientIndex int,
+	clientName string,
+	clStatus string,
+	clReady bool,
+	elStatus string,
+	elReady bool,
+) {
+	event, err := NewEvent(EventClientStatusUpdate, 0, 0, &ClientStatusUpdateData{
+		ClientIndex: clientIndex,
+		ClientName:  clientName,
+		CLStatus:    clStatus,
+		CLReady:     clReady,
+		ELStatus:    elStatus,
+		ELReady:     elReady,
+	})
+	if err != nil {
+		return
+	}
+
+	eb.Publish(event)
+}
+
+// HandleClientStream handles the client events stream endpoint.
+func (h *SSEHandler) HandleClientStream(w http.ResponseWriter, r *http.Request) {
+	// Filter for client events only
+	filter := CreateEventTypeFilter(EventClientHeadUpdate, EventClientStatusUpdate)
+	h.handleSSE(w, r, filter)
 }

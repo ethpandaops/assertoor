@@ -11,6 +11,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/events"
 	coordinator_types "github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/ethpandaops/assertoor/pkg/web/api"
+	"github.com/ethpandaops/assertoor/pkg/web/auth"
 	"github.com/ethpandaops/assertoor/pkg/web/handlers"
 	"github.com/ethpandaops/assertoor/pkg/web/types"
 	"github.com/gorilla/mux"
@@ -75,15 +76,24 @@ func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*Serve
 	return ws, nil
 }
 
-func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfig *types.APIConfig, coordinator coordinator_types.Coordinator, securityTrimmed bool) error {
-	return ws.ConfigureRoutesWithEventBus(frontendConfig, apiConfig, coordinator, securityTrimmed, nil)
-}
-
-func (ws *Server) ConfigureRoutesWithEventBus(frontendConfig *types.FrontendConfig, apiConfig *types.APIConfig, coordinator coordinator_types.Coordinator, securityTrimmed bool, eventBus *events.EventBus) error {
+func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfig *types.APIConfig, coordinator coordinator_types.Coordinator, securityTrimmed bool, eventBus *events.EventBus) error {
 	isAPIEnabled := apiConfig != nil && apiConfig.Enabled
+	isFrontendEnabled := frontendConfig != nil && frontendConfig.Enabled
+
+	// Create auth handler for protected endpoints
+	var authHandler *auth.Handler
+	if isFrontendEnabled || isAPIEnabled {
+		authHandler = auth.NewAuthHandler(ws.serverConfig.TokenKey, ws.serverConfig.AuthHeader)
+		ws.router.HandleFunc("/auth/token", authHandler.GetToken).Methods("GET")
+		ws.router.HandleFunc("/auth/login", authHandler.GetLogin).Methods("GET")
+	}
+
 	if isAPIEnabled {
+		// Check if authentication is disabled for protected APIs (auth is required by default)
+		disableAuth := apiConfig.DisableAuth
+
 		// register api routes
-		apiHandler := api.NewAPIHandler(ws.logger.WithField("module", "api"), coordinator)
+		apiHandler := api.NewAPIHandler(ws.logger.WithField("module", "api"), coordinator, authHandler, disableAuth)
 
 		// public apis
 		ws.router.HandleFunc("/api/v1/tests", apiHandler.GetTests).Methods("GET")
@@ -93,11 +103,25 @@ func (ws *Server) ConfigureRoutesWithEventBus(frontendConfig *types.FrontendConf
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/status", apiHandler.GetTestRunStatus).Methods("GET")
 		ws.router.HandleFunc("/api/v1/task_descriptors", apiHandler.GetTaskDescriptors).Methods("GET")
 		ws.router.HandleFunc("/api/v1/task_descriptor/{name}", apiHandler.GetTaskDescriptor).Methods("GET")
+		ws.router.HandleFunc("/api/v1/clients", apiHandler.GetClients).Methods("GET")
 
 		// SSE event stream endpoints
 		if eventBus != nil {
-			sseHandler := events.NewSSEHandler(ws.logger.WithField("module", "sse"), eventBus)
+			// Create SSE handler with auth support for log filtering
+			var sseHandler *events.SSEHandler
+			if authHandler != nil {
+				sseHandler = events.NewSSEHandlerWithAuth(
+					ws.logger.WithField("module", "sse"),
+					eventBus,
+					authHandler.CheckAuthToken,
+					!disableAuth, // Require auth for log events when API auth is not disabled
+				)
+			} else {
+				sseHandler = events.NewSSEHandler(ws.logger.WithField("module", "sse"), eventBus)
+			}
+
 			ws.router.HandleFunc("/api/v1/events/stream", sseHandler.HandleGlobalStream).Methods("GET")
+			ws.router.HandleFunc("/api/v1/events/clients", sseHandler.HandleClientStream).Methods("GET")
 			ws.router.HandleFunc("/api/v1/test_run/{runId}/events", func(w http.ResponseWriter, r *http.Request) {
 				vars := mux.Vars(r)
 
@@ -111,19 +135,17 @@ func (ws *Server) ConfigureRoutesWithEventBus(frontendConfig *types.FrontendConf
 			}).Methods("GET")
 		}
 
-		// private apis
-		if !securityTrimmed {
-			ws.router.HandleFunc("/api/v1/tests/register", apiHandler.PostTestsRegister).Methods("POST")
-			ws.router.HandleFunc("/api/v1/tests/register_external", apiHandler.PostTestsRegisterExternal).Methods("POST")
-			ws.router.HandleFunc("/api/v1/tests/delete", apiHandler.PostTestsDelete).Methods("POST")
-			ws.router.HandleFunc("/api/v1/test_run", apiHandler.PostTestRunsSchedule).Methods("POST") // legacy
-			ws.router.HandleFunc("/api/v1/test_runs/schedule", apiHandler.PostTestRunsSchedule).Methods("POST")
-			ws.router.HandleFunc("/api/v1/test_runs/delete", apiHandler.PostTestRunsDelete).Methods("POST")
-			ws.router.HandleFunc("/api/v1/test_run/{runId}/cancel", apiHandler.PostTestRunCancel).Methods("POST")
-			ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
-			ws.router.HandleFunc("/api/v1/test_run/{runId}/task/{taskIndex}/details", apiHandler.GetTestRunTaskDetails).Methods("GET")
-			ws.router.HandleFunc("/api/v1/test_run/{runId}/task/{taskId}/result/{resultType}/{fileId:.*}", apiHandler.GetTaskResult).Methods("GET")
-		}
+		// protected apis (require authentication)
+		ws.router.HandleFunc("/api/v1/tests/register", apiHandler.PostTestsRegister).Methods("POST")
+		ws.router.HandleFunc("/api/v1/tests/register_external", apiHandler.PostTestsRegisterExternal).Methods("POST")
+		ws.router.HandleFunc("/api/v1/tests/delete", apiHandler.PostTestsDelete).Methods("POST")
+		ws.router.HandleFunc("/api/v1/test_run", apiHandler.PostTestRunsSchedule).Methods("POST") // legacy
+		ws.router.HandleFunc("/api/v1/test_runs/schedule", apiHandler.PostTestRunsSchedule).Methods("POST")
+		ws.router.HandleFunc("/api/v1/test_runs/delete", apiHandler.PostTestRunsDelete).Methods("POST")
+		ws.router.HandleFunc("/api/v1/test_run/{runId}/cancel", apiHandler.PostTestRunCancel).Methods("POST")
+		ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test_run/{runId}/task/{taskIndex}/details", apiHandler.GetTestRunTaskDetails).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test_run/{runId}/task/{taskId}/result/{resultType}/{fileId:.*}", apiHandler.GetTaskResult).Methods("GET")
 	}
 
 	if frontendConfig != nil {
@@ -133,29 +155,53 @@ func (ws *Server) ConfigureRoutesWithEventBus(frontendConfig *types.FrontendConf
 		}
 
 		if frontendConfig.Enabled {
-			frontendHandler := handlers.NewFrontendHandler(
-				coordinator,
-				ws.logger.WithField("module", "web-frontend"),
-				frontendConfig.SiteName,
-				frontendConfig.Minify,
-				frontendConfig.Debug,
-				securityTrimmed,
-				isAPIEnabled,
-			)
+			// Create SPA handler for React frontend
+			spaHandler, err := handlers.NewSPAHandler(ws.logger.WithField("module", "web-spa"))
+			if err != nil {
+				ws.logger.WithError(err).Warn("failed to create SPA handler, falling back to legacy frontend")
 
-			ws.router.HandleFunc("/", frontendHandler.Index).Methods("GET")
-			ws.router.HandleFunc("/registry", frontendHandler.Registry).Methods("GET")
-			ws.router.HandleFunc("/test/{testId}", frontendHandler.TestPage).Methods("GET")
-			ws.router.HandleFunc("/run/{runId}", frontendHandler.TestRun).Methods("GET")
-			ws.router.HandleFunc("/clients", frontendHandler.Clients).Methods("GET")
-			ws.router.HandleFunc("/logs/{since}", frontendHandler.LogsData).Methods("GET")
+				// Fall back to legacy frontend
+				frontendHandler := handlers.NewFrontendHandler(
+					coordinator,
+					ws.logger.WithField("module", "web-frontend"),
+					frontendConfig.SiteName,
+					frontendConfig.Minify,
+					frontendConfig.Debug,
+					securityTrimmed,
+					isAPIEnabled,
+				)
 
-			if isAPIEnabled {
-				// add swagger handler
-				ws.router.PathPrefix("/api/docs/").Handler(ws.getSwaggerHandler(ws.logger, frontendHandler))
+				ws.router.HandleFunc("/", frontendHandler.Index).Methods("GET")
+				ws.router.HandleFunc("/registry", frontendHandler.Registry).Methods("GET")
+				ws.router.HandleFunc("/test/{testId}", frontendHandler.TestPage).Methods("GET")
+				ws.router.HandleFunc("/run/{runId}", frontendHandler.TestRun).Methods("GET")
+				ws.router.HandleFunc("/clients", frontendHandler.Clients).Methods("GET")
+				ws.router.HandleFunc("/logs/{since}", frontendHandler.LogsData).Methods("GET")
+
+				if isAPIEnabled {
+					ws.router.PathPrefix("/api/docs/").Handler(ws.getSwaggerHandler(ws.logger, frontendHandler))
+				}
+
+				ws.router.PathPrefix("/").Handler(frontendHandler)
+			} else {
+				// Use React SPA for all frontend routes
+				if isAPIEnabled {
+					// Swagger docs still need special handling
+					frontendHandler := handlers.NewFrontendHandler(
+						coordinator,
+						ws.logger.WithField("module", "web-frontend"),
+						frontendConfig.SiteName,
+						frontendConfig.Minify,
+						frontendConfig.Debug,
+						securityTrimmed,
+						isAPIEnabled,
+					)
+					ws.router.PathPrefix("/api/docs/").Handler(ws.getSwaggerHandler(ws.logger, frontendHandler))
+				}
+
+				// SPA handles all other routes
+				ws.router.PathPrefix("/").Handler(spaHandler)
 			}
-
-			ws.router.PathPrefix("/").Handler(frontendHandler)
 		}
 	}
 

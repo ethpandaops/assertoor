@@ -139,6 +139,23 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 		}
 	}
 
+	// Emit task.created event
+	if eventBus := ts.services.EventBus(); eventBus != nil {
+		parentIdx := uint64(0)
+		if parentState != nil {
+			parentIdx = uint64(parentState.index)
+		}
+
+		eventBus.PublishTaskCreated(
+			ts.testRunID,
+			uint64(taskIdx),
+			taskState.options.Name,
+			taskState.Title(),
+			taskState.options.ID,
+			parentIdx,
+		)
+	}
+
 	return taskState, nil
 }
 

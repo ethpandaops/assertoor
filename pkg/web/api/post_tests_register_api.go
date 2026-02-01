@@ -42,6 +42,11 @@ type PostTestsRegisterResponse struct {
 func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
+	if !ah.checkAuth(r) {
+		ah.sendUnauthorizedResponse(w, r.URL.String())
+		return
+	}
+
 	// parse request body
 	req := &PostTestsRegisterRequest{}
 

@@ -22,27 +22,29 @@ type GetTestRunDetailsResponse struct {
 }
 
 type GetTestRunDetailedTask struct {
-	Index       uint64                       `json:"index"`
-	ParentIndex uint64                       `json:"parent_index"`
-	Name        string                       `json:"name"`
-	Title       string                       `json:"title"`
-	Started     bool                         `json:"started"`
-	Completed   bool                         `json:"completed"`
-	StartTime   int64                        `json:"start_time"`
-	StopTime    int64                        `json:"stop_time"`
-	Timeout     uint64                       `json:"timeout"`
-	RunTime     uint64                       `json:"runtime"`
-	Status      string                       `json:"status"`
-	Result      string                       `json:"result"`
-	ResultError string                       `json:"result_error"`
-	Log         []*GetTestRunDetailedTaskLog `json:"log"`
-	ConfigYaml  string                       `json:"config_yaml"`
-	ResultYaml  string                       `json:"result_yaml"`
+	Index           uint64                       `json:"index"`
+	ParentIndex     uint64                       `json:"parent_index"`
+	Name            string                       `json:"name"`
+	Title           string                       `json:"title"`
+	Started         bool                         `json:"started"`
+	Completed       bool                         `json:"completed"`
+	StartTime       int64                        `json:"start_time"`
+	StopTime        int64                        `json:"stop_time"`
+	Timeout         uint64                       `json:"timeout"`
+	RunTime         uint64                       `json:"runtime"`
+	Status          string                       `json:"status"`
+	Result          string                       `json:"result"`
+	ResultError     string                       `json:"result_error"`
+	Progress        float64                      `json:"progress"`
+	ProgressMessage string                       `json:"progress_message"`
+	Log             []*GetTestRunDetailedTaskLog `json:"log"`
+	ConfigYaml      string                       `json:"config_yaml"`
+	ResultYaml      string                       `json:"result_yaml"`
 }
 
 type GetTestRunDetailedTaskLog struct {
 	Time    time.Time         `json:"time"`
-	Level   uint64            `json:"level"`
+	Level   string            `json:"level"`
 	Message string            `json:"msg"`
 	DataLen uint64            `json:"datalen"`
 	Data    map[string]string `json:"data"`
@@ -61,6 +63,11 @@ type GetTestRunDetailedTaskLog struct {
 // @Router /api/v1/test_run/{runId}/details [get]
 func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
+
+	if !ah.checkAuth(r) {
+		ah.GetTestRun(w, r)
+		return
+	}
 
 	vars := mux.Vars(r)
 
@@ -157,6 +164,9 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 				taskData.ResultError = taskStatus.Error.Error()
 			}
 
+			taskData.Progress = taskStatus.Progress
+			taskData.ProgressMessage = taskStatus.ProgressMessage
+
 			logCount := taskStatus.Logger.GetLogEntryCount()
 			logStart := uint64(0)
 			logLimit := uint64(100)
@@ -171,7 +181,7 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 			for i, log := range taskLog {
 				logData := &GetTestRunDetailedTaskLog{
 					Time:    time.Unix(0, log.LogTime*int64(time.Millisecond)),
-					Level:   uint64(log.LogLevel),
+					Level:   mapLogLevelToUI(log.LogLevel),
 					Message: log.LogMessage,
 					Data:    map[string]string{},
 				}

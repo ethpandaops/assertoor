@@ -17,11 +17,18 @@ const (
 
 // Event types for task lifecycle.
 const (
+	EventTaskCreated   EventType = "task.created"
 	EventTaskStarted   EventType = "task.started"
 	EventTaskProgress  EventType = "task.progress"
 	EventTaskCompleted EventType = "task.completed"
 	EventTaskFailed    EventType = "task.failed"
 	EventTaskLog       EventType = "task.log"
+)
+
+// Event types for client updates.
+const (
+	EventClientHeadUpdate   EventType = "client.head_update"
+	EventClientStatusUpdate EventType = "client.status_update"
 )
 
 // Event represents a single event in the system.
@@ -94,6 +101,34 @@ type TaskLogData struct {
 	Message   string         `json:"message"`
 	Fields    map[string]any `json:"fields,omitempty"`
 	Timestamp time.Time      `json:"timestamp"`
+}
+
+// TaskCreatedData contains data for task.created events.
+type TaskCreatedData struct {
+	TaskName    string `json:"taskName"`
+	TaskTitle   string `json:"taskTitle"`
+	TaskID      string `json:"taskId,omitempty"`
+	ParentIndex uint64 `json:"parentIndex"`
+}
+
+// ClientHeadUpdateData contains data for client.head_update events.
+type ClientHeadUpdateData struct {
+	ClientIndex  int    `json:"clientIndex"`
+	ClientName   string `json:"clientName"`
+	CLHeadSlot   uint64 `json:"clHeadSlot"`
+	CLHeadRoot   string `json:"clHeadRoot"`
+	ELHeadNumber uint64 `json:"elHeadNumber"`
+	ELHeadHash   string `json:"elHeadHash"`
+}
+
+// ClientStatusUpdateData contains data for client.status_update events.
+type ClientStatusUpdateData struct {
+	ClientIndex int    `json:"clientIndex"`
+	ClientName  string `json:"clientName"`
+	CLStatus    string `json:"clStatus"`
+	CLReady     bool   `json:"clReady"`
+	ELStatus    string `json:"elStatus"`
+	ELReady     bool   `json:"elReady"`
 }
 
 // NewEvent creates a new event with the given type and data.
