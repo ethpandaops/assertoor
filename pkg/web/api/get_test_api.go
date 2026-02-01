@@ -16,6 +16,7 @@ type GetTestResponse struct {
 	Config     map[string]any      `json:"config"`
 	ConfigVars map[string]string   `json:"configVars"`
 	Schedule   *types.TestSchedule `json:"schedule"`
+	Vars       map[string]any      `json:"vars,omitempty"` // Config with global vars merged in
 }
 
 // GetTest godoc
@@ -58,7 +59,7 @@ func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
 
 	testConfig := testDescriptor.Config()
 
-	ah.sendOKResponse(w, r.URL.String(), &GetTestResponse{
+	response := &GetTestResponse{
 		ID:         testDescriptor.ID(),
 		Source:     testDescriptor.Source(),
 		BasePath:   testDescriptor.BasePath(),
@@ -67,5 +68,22 @@ func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
 		Config:     testConfig.Config,
 		ConfigVars: testConfig.ConfigVars,
 		Schedule:   testConfig.Schedule,
-	})
+	}
+
+	// Include vars with global variables merged in (only for authenticated users)
+	// Start with config defaults, overlay with resolved values from variable scope
+	if ah.checkAuth(r) && len(testConfig.Config) > 0 {
+		resolvedVars := make(map[string]any, len(testConfig.Config))
+		for key, defaultValue := range testConfig.Config {
+			if resolved := testDescriptor.Vars().GetVar(key); resolved != nil {
+				resolvedVars[key] = resolved
+			} else {
+				resolvedVars[key] = defaultValue
+			}
+		}
+
+		response.Vars = resolvedVars
+	}
+
+	ah.sendOKResponse(w, r.URL.String(), response)
 }

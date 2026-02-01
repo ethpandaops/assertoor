@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useMatch } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme';
 import { UserDisplay } from '../auth/UserDisplay';
 
@@ -11,6 +11,7 @@ const navItems = [
 function Layout() {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const isTestRunPage = useMatch('/run/:runId');
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -67,7 +68,7 @@ function Layout() {
 
       {/* Main content */}
       <main className="flex-1">
-        <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-6 py-6">
+        <div className={`mx-auto px-3 sm:px-4 lg:px-6 py-6 ${isTestRunPage ? '' : 'max-w-screen-2xl'}`}>
           <Outlet />
         </div>
       </main>

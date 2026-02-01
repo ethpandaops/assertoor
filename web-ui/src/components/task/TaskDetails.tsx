@@ -99,8 +99,8 @@ function OverviewTab({ task }: { task: TaskState }) {
 
       {task.result_error && (
         <div>
-          <h4 className="text-sm font-medium text-error-600">Error</h4>
-          <p className="mt-1 text-error-600 font-mono text-xs bg-error-50 dark:bg-error-900/20 p-2 rounded-sm">
+          <h4 className="text-sm font-medium text-error-600 dark:text-error-400">Error</h4>
+          <p className="mt-1 text-error-700 dark:text-error-300 font-mono text-xs bg-error-50 dark:bg-error-900/30 p-2 rounded-sm border border-error-200 dark:border-error-800">
             {task.result_error}
           </p>
         </div>
@@ -193,7 +193,7 @@ function ConfigTab({ yaml }: { yaml?: string }) {
   }
 
   return (
-    <pre className="bg-[var(--color-bg-tertiary)] p-2 rounded-sm text-xs overflow-x-auto font-mono whitespace-pre-wrap">
+    <pre className="bg-[var(--color-bg-tertiary)] p-2 rounded-sm text-xs overflow-x-auto font-mono whitespace-pre">
       {yaml}
     </pre>
   );
@@ -207,7 +207,7 @@ function ResultTab({ yaml }: { yaml?: string }) {
   }
 
   return (
-    <pre className="bg-[var(--color-bg-tertiary)] p-2 rounded-sm text-xs overflow-x-auto font-mono whitespace-pre-wrap">
+    <pre className="bg-[var(--color-bg-tertiary)] p-2 rounded-sm text-xs overflow-x-auto font-mono whitespace-pre">
       {yaml}
     </pre>
   );

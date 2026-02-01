@@ -7,6 +7,7 @@ interface SplitPaneProps {
   minLeftWidth?: number; // percentage
   maxLeftWidth?: number; // percentage
   storageKey?: string;
+  maxHeight?: string; // CSS max-height value (e.g., '95vh', '600px')
 }
 
 function SplitPane({
@@ -16,6 +17,7 @@ function SplitPane({
   minLeftWidth = 20,
   maxLeftWidth = 80,
   storageKey,
+  maxHeight,
 }: SplitPaneProps) {
   const [leftWidth, setLeftWidth] = useState(() => {
     if (storageKey) {
@@ -75,23 +77,25 @@ function SplitPane({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  const heightStyle = maxHeight ? { maxHeight, height: maxHeight } : { minHeight: '400px' };
+
   return (
     <>
       {/* Mobile: Stacked layout */}
       <div className="lg:hidden space-y-4">
-        <div>{left}</div>
-        <div>{right}</div>
+        <div className="max-h-[50vh] overflow-auto">{left}</div>
+        <div className="max-h-[50vh] overflow-auto">{right}</div>
       </div>
 
       {/* Desktop: Split pane layout */}
       <div
         ref={containerRef}
-        className="hidden lg:flex h-full"
-        style={{ minHeight: '400px' }}
+        className="hidden lg:flex"
+        style={heightStyle}
       >
         {/* Left panel */}
         <div
-          className="overflow-hidden"
+          className="overflow-auto"
           style={{ width: `${leftWidth}%`, flexShrink: 0 }}
         >
           {left}
@@ -115,7 +119,7 @@ function SplitPane({
         </div>
 
         {/* Right panel */}
-        <div className="flex-1 overflow-hidden pl-1">
+        <div className="flex-1 overflow-auto pl-1">
           {right}
         </div>
       </div>

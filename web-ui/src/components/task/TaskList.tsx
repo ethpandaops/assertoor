@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import type { TaskState } from '../../types/api';
 import StatusBadge from '../common/StatusBadge';
 
@@ -16,6 +16,7 @@ interface ProcessedTask extends TaskState {
 
 function TaskList({ tasks, selectedIndex, onSelect }: TaskListProps) {
   const [collapsedTasks, setCollapsedTasks] = useState<Set<number>>(new Set());
+  const initialCollapseApplied = useRef(false);
 
   // Build tree structure with hierarchical ordering
   const { processedTasks, childrenMap } = useMemo(() => {
@@ -81,6 +82,21 @@ function TaskList({ tasks, selectedIndex, onSelect }: TaskListProps) {
 
     return { processedTasks: result, childrenMap };
   }, [tasks]);
+
+  // Auto-collapse succeeded tasks with children on initial load
+  useEffect(() => {
+    if (initialCollapseApplied.current || processedTasks.length === 0) return;
+
+    const succeededWithChildren = processedTasks
+      .filter((t) => t.hasChildren && t.result === 'success')
+      .map((t) => t.index);
+
+    if (succeededWithChildren.length > 0) {
+      setCollapsedTasks(new Set(succeededWithChildren));
+    }
+
+    initialCollapseApplied.current = true;
+  }, [processedTasks]);
 
   // Filter out tasks whose ancestors are collapsed
   const visibleTasks = useMemo(() => {
@@ -255,7 +271,7 @@ function TaskListItem({ task, depth, isSelected, isCollapsed, onClick, onToggleC
           )}
         </div>
         <div className="shrink-0 flex flex-col items-end gap-0.5">
-          <StatusBadge status={displayStatus} size="sm" />
+          <StatusBadge status={displayStatus} size="sm" progress={isRunning ? task.progress : undefined} />
           <TaskRuntime task={task} />
         </div>
       </div>

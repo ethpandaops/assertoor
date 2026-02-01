@@ -114,6 +114,7 @@ export function useEventStream(options: UseEventStreamOptions = {}) {
       'test.started',
       'test.completed',
       'test.failed',
+      'task.created',
       'task.started',
       'task.progress',
       'task.completed',

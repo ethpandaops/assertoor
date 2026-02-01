@@ -2,6 +2,26 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTests, useTestDetails, useScheduleTestRun } from '../../hooks/useApi';
 import Modal from '../common/Modal';
 import yaml from 'js-yaml';
+import CodeMirror from '@uiw/react-codemirror';
+import { yaml as yamlLang } from '@codemirror/lang-yaml';
+import { githubLight, githubDark } from '@uiw/codemirror-theme-github';
+
+// Hook to detect dark mode
+function useDarkMode() {
+  const [isDark, setIsDark] = useState(() =>
+    document.documentElement.classList.contains('dark')
+  );
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  return isDark;
+}
 
 interface StartTestModalProps {
   isOpen: boolean;
@@ -24,6 +44,8 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
   const [allowDuplicate, setAllowDuplicate] = useState(false);
   const [skipQueue, setSkipQueue] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isDarkMode = useDarkMode();
+  const cmTheme = isDarkMode ? githubDark : githubLight;
 
   const { data: tests, isLoading: testsLoading } = useTests();
   const { data: testDetails, isLoading: detailsLoading } = useTestDetails(selectedTestId, {
@@ -51,10 +73,12 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
   }, [isOpen, initialTestId]);
 
   // Initialize config when test details are loaded
+  // Use vars (which includes global vars merged in) when available, fall back to raw config
   useEffect(() => {
-    if (testDetails?.config) {
+    const configSource = testDetails?.vars || testDetails?.config;
+    if (configSource) {
       const initialConfig: ConfigFormValues = {};
-      for (const [key, value] of Object.entries(testDetails.config)) {
+      for (const [key, value] of Object.entries(configSource)) {
         initialConfig[key] = value as ConfigValue;
       }
       setFormConfig(initialConfig);
@@ -125,7 +149,21 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
         }
       } else {
         if (Object.keys(formConfig).length > 0) {
-          config = formConfig as Record<string, unknown>;
+          // Parse any YAML strings for object/array fields
+          config = {};
+          for (const [key, value] of Object.entries(formConfig)) {
+            if (typeof value === 'string' && configSource && typeof configSource[key] === 'object') {
+              // This was an object/array field stored as YAML string
+              try {
+                config[key] = yaml.load(value);
+              } catch (err) {
+                setError(`Invalid YAML in field "${key}": ${err instanceof Error ? err.message : 'Parse error'}`);
+                return;
+              }
+            } else {
+              config[key] = value;
+            }
+          }
         }
       }
 
@@ -151,7 +189,9 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
     return tests?.find((t) => t.id === selectedTestId);
   }, [tests, selectedTestId]);
 
-  const hasConfig = testDetails?.config && Object.keys(testDetails.config).length > 0;
+  // Use vars (with global vars merged) when available, fall back to raw config
+  const configSource = testDetails?.vars || testDetails?.config;
+  const hasConfig = configSource && Object.keys(configSource).length > 0;
 
   const handleClose = () => {
     onClose();
@@ -272,25 +312,36 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
 
                   {editMode === 'form' ? (
                     <div className="space-y-3">
-                      {testDetails?.config &&
-                        Object.entries(testDetails.config).map(([key, defaultValue]) => (
+                      {configSource &&
+                        Object.entries(configSource).map(([key, defaultValue]) => (
                           <ConfigField
                             key={key}
                             name={key}
                             defaultValue={defaultValue as ConfigValue}
                             value={formConfig[key]}
                             onChange={(value) => updateFormValue(key, value)}
+                            theme={cmTheme}
                           />
                         ))}
                     </div>
                   ) : (
                     <div>
-                      <textarea
-                        value={yamlConfig}
-                        onChange={(e) => setYamlConfig(e.target.value)}
-                        className="w-full h-48 px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-sm font-mono text-sm focus:outline-hidden focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                        placeholder="# Enter configuration in YAML format"
-                      />
+                      <div className="border border-[var(--color-border)] rounded-sm overflow-hidden">
+                        <CodeMirror
+                          value={yamlConfig}
+                          height="200px"
+                          extensions={[yamlLang()]}
+                          theme={cmTheme}
+                          onChange={(value) => setYamlConfig(value)}
+                          placeholder="# Enter configuration in YAML format"
+                          basicSetup={{
+                            lineNumbers: true,
+                            foldGutter: true,
+                            highlightActiveLine: true,
+                          }}
+                          className="text-sm"
+                        />
+                      </div>
                       <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
                         Edit configuration variables in YAML format
                       </p>
@@ -353,9 +404,10 @@ interface ConfigFieldProps {
   defaultValue: ConfigValue;
   value: ConfigValue;
   onChange: (value: ConfigValue) => void;
+  theme: typeof githubLight | typeof githubDark;
 }
 
-function ConfigField({ name, defaultValue, value, onChange }: ConfigFieldProps) {
+function ConfigField({ name, defaultValue, value, onChange, theme }: ConfigFieldProps) {
   const valueType = getValueType(defaultValue);
   const currentValue = value ?? defaultValue;
 
@@ -389,20 +441,32 @@ function ConfigField({ name, defaultValue, value, onChange }: ConfigFieldProps) 
 
       case 'object':
       case 'array':
+        // Render as YAML using CodeMirror for proper editing experience
+        // Store raw YAML string - parsing happens at form submission
+        const yamlValue = typeof currentValue === 'string'
+          ? currentValue
+          : yaml.dump(currentValue, { indent: 2, lineWidth: -1 });
         return (
-          <textarea
-            value={typeof currentValue === 'string' ? currentValue : JSON.stringify(currentValue, null, 2)}
-            onChange={(e) => {
-              try {
-                onChange(JSON.parse(e.target.value));
-              } catch {
-                // Keep as string if JSON parse fails
-                onChange(e.target.value);
-              }
-            }}
-            className="w-full h-24 px-3 py-1.5 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-sm text-sm font-mono focus:outline-hidden focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-            placeholder={JSON.stringify(defaultValue, null, 2)}
-          />
+          <div className="border border-[var(--color-border)] rounded-sm overflow-hidden">
+            <CodeMirror
+              value={yamlValue}
+              height="auto"
+              minHeight="80px"
+              maxHeight="200px"
+              extensions={[yamlLang()]}
+              theme={theme}
+              onChange={(value) => {
+                // Store raw YAML string, don't parse here
+                onChange(value);
+              }}
+              basicSetup={{
+                lineNumbers: false,
+                foldGutter: false,
+                highlightActiveLine: false,
+              }}
+              className="text-sm"
+            />
+          </div>
         );
 
       case 'string':
@@ -460,7 +524,7 @@ function getValueType(value: ConfigValue): 'string' | 'number' | 'boolean' | 'ob
 
 function formatDefaultValue(value: ConfigValue): string {
   if (value === null || value === undefined) return 'null';
-  if (typeof value === 'object') return JSON.stringify(value);
+  if (typeof value === 'object') return yaml.dump(value, { flowLevel: 1 }).trim();
   return String(value);
 }
 

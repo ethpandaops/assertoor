@@ -7,17 +7,31 @@ import StatusBadge from '../components/common/StatusBadge';
 import SplitPane from '../components/common/SplitPane';
 import TaskList from '../components/task/TaskList';
 import TaskDetails from '../components/task/TaskDetails';
+import { TaskGraph } from '../components/graph';
 import { formatDuration, formatRelativeTime } from '../utils/time';
 import * as api from '../api/client';
 import type { SSEEvent, TaskDetails as TaskDetailsType, TaskLogEntry, TestRunDetails } from '../types/api';
+
+type ViewMode = 'list' | 'graph';
+
+const VIEW_MODE_STORAGE_KEY = 'testrun-view-mode';
 
 function TestRun() {
   const { runId } = useParams<{ runId: string }>();
   const runIdNum = parseInt(runId || '0', 10);
   const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    return (stored === 'list' || stored === 'graph') ? stored : 'list';
+  });
   const queryClient = useQueryClient();
   const pendingTaskRefreshRef = useRef<Set<number>>(new Set());
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Persist view mode preference
+  useEffect(() => {
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+  }, [viewMode]);
 
   const flushTaskRefresh = useCallback(async () => {
     if (refreshTimerRef.current) {
@@ -317,15 +331,27 @@ function TestRun() {
         defaultLeftWidth={40}
         minLeftWidth={25}
         maxLeftWidth={70}
+        maxHeight="calc(95vh - 200px)"
         left={
           <div className="card overflow-hidden h-full flex flex-col">
-            <div className="card-header">Tasks</div>
+            <div className="card-header flex items-center justify-between">
+              <span>Tasks</span>
+              <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+            </div>
             <div className="flex-1 overflow-hidden">
-              <TaskList
-                tasks={details.tasks}
-                selectedIndex={selectedTaskIndex}
-                onSelect={setSelectedTaskIndex}
-              />
+              {viewMode === 'list' ? (
+                <TaskList
+                  tasks={details.tasks}
+                  selectedIndex={selectedTaskIndex}
+                  onSelect={setSelectedTaskIndex}
+                />
+              ) : (
+                <TaskGraph
+                  tasks={details.tasks}
+                  selectedIndex={selectedTaskIndex}
+                  onSelect={setSelectedTaskIndex}
+                />
+              )}
             </div>
           </div>
         }
@@ -379,6 +405,64 @@ function mapLogLevelToUI(level?: string): string {
     return l === 'warning' ? 'warn' : l;
   }
   return 'info';
+}
+
+interface ViewModeToggleProps {
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+}
+
+function ViewModeToggle({ viewMode, onViewModeChange }: ViewModeToggleProps) {
+  return (
+    <div className="flex items-center gap-1 bg-[var(--color-bg-tertiary)] rounded-md p-0.5">
+      <button
+        onClick={() => onViewModeChange('list')}
+        className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+          viewMode === 'list'
+            ? 'bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] shadow-sm'
+            : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+        }`}
+        title="List view"
+      >
+        <ListIcon className="size-3.5" />
+        <span className="hidden sm:inline">List</span>
+      </button>
+      <button
+        onClick={() => onViewModeChange('graph')}
+        className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+          viewMode === 'graph'
+            ? 'bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] shadow-sm'
+            : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+        }`}
+        title="Graph view"
+      >
+        <GraphIcon className="size-3.5" />
+        <span className="hidden sm:inline">Graph</span>
+      </button>
+    </div>
+  );
+}
+
+function ListIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+function GraphIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+      />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10v4M17 10v4M10 7h4" />
+    </svg>
+  );
 }
 
 export default TestRun;

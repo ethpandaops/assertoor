@@ -77,6 +77,7 @@ export interface TestDetails {
   config: Record<string, unknown>;
   configVars: Record<string, string>;
   schedule: TestSchedule | null;
+  vars?: Record<string, unknown>; // Config with global vars merged in (only for authenticated users)
 }
 
 // Test schedule configuration

@@ -20,17 +20,6 @@ module.exports = (env, argv) => {
         keep: (asset) => {
           // Keep existing static assets that are part of legacy UI
           const keepPatterns = [
-            /^css\/bootstrap/,
-            /^css\/fontawesome/,
-            /^css\/layout\.css$/,
-            /^js\/jquery/,
-            /^js\/bootstrap/,
-            /^js\/clipboard/,
-            /^js\/color-modes/,
-            /^js\/assertoor\.js$/,
-            /^js\/yaml/,
-            /^js\/ace/,
-            /^webfonts\//,
             /^favicon\.ico$/,
             /^embed\.go$/,
           ];
@@ -124,15 +113,55 @@ module.exports = (env, argv) => {
       ],
       splitChunks: {
         chunks: 'all',
+        maxInitialRequests: 25,
+        minSize: 10000,
         cacheGroups: {
+          // React and React DOM - core libraries loaded on every page
+          react: {
+            test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+            name: 'react',
+            chunks: 'all',
+            priority: 40,
+          },
+          // React Router - needed for navigation
+          router: {
+            test: /[\\/]node_modules[\\/](react-router|react-router-dom)[\\/]/,
+            name: 'router',
+            chunks: 'all',
+            priority: 35,
+          },
+          // React Query - data fetching
+          query: {
+            test: /[\\/]node_modules[\\/](@tanstack)[\\/]/,
+            name: 'query',
+            chunks: 'all',
+            priority: 30,
+          },
+          // ReactFlow - only loaded on TestRun page with graph view
+          reactflow: {
+            test: /[\\/]node_modules[\\/](reactflow|@reactflow|d3-[^/]+|zustand)[\\/]/,
+            name: 'reactflow',
+            chunks: 'async',
+            priority: 25,
+          },
+          // CodeMirror - only loaded on pages with YAML editor
+          codemirror: {
+            test: /[\\/]node_modules[\\/](@codemirror|@uiw|@lezer|codemirror|crelt|style-mod|w3c-keyname)[\\/]/,
+            name: 'codemirror',
+            chunks: 'async',
+            priority: 24,
+          },
+          // DnD Kit - only loaded on pages with drag and drop
+          dndkit: {
+            test: /[\\/]node_modules[\\/](@dnd-kit)[\\/]/,
+            name: 'dndkit',
+            chunks: 'async',
+            priority: 23,
+          },
+          // Other vendor libraries
           vendor: {
             test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all',
-          },
-          reactflow: {
-            test: /[\\/]node_modules[\\/](reactflow|@reactflow)[\\/]/,
-            name: 'reactflow',
+            name: 'vendor',
             chunks: 'all',
             priority: 10,
           },

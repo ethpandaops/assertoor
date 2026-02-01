@@ -80,9 +80,9 @@ export async function getTests(): Promise<Test[]> {
   return fetchApi<Test[]>('/tests');
 }
 
-// Test details
+// Test details (uses auth to get vars with global variables merged in)
 export async function getTestDetails(testId: string): Promise<TestDetails> {
-  return fetchApi<TestDetails>(`/test/${encodeURIComponent(testId)}`);
+  return fetchApiWithAuth<TestDetails>(`/test/${encodeURIComponent(testId)}`);
 }
 
 // Clients list
