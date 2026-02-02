@@ -15,6 +15,133 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/clients": {
+            "get": {
+                "description": "Returns the list of configured consensus and execution layer clients with their current status.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Client"
+                ],
+                "summary": "Get list of configured clients",
+                "operationId": "getClients",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.GetClientsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/task_descriptor/{name}": {
+            "get": {
+                "description": "Returns a single task descriptor by name with its JSON schema",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Task"
+                ],
+                "summary": "Get a specific task descriptor",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/tasks.TaskDescriptorAPI"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/task_descriptors": {
+            "get": {
+                "description": "Returns a list of all available task descriptors with their JSON schemas",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Task"
+                ],
+                "summary": "Get all task descriptors",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/tasks.TaskDescriptorAPI"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/test/{testId}": {
             "get": {
                 "description": "Returns the test definition with given ID.",
@@ -834,6 +961,52 @@ const docTemplate = `{
         "helper.RawMessage": {
             "type": "object"
         },
+        "tasks.TaskDescriptorAPI": {
+            "type": "object",
+            "properties": {
+                "aliases": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category": {
+                    "type": "string"
+                },
+                "configSchema": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "outputs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.TaskOutputDefinition"
+                    }
+                }
+            }
+        },
+        "types.TaskOutputDefinition": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "types.TestSchedule": {
             "type": "object",
             "properties": {
@@ -870,6 +1043,79 @@ const docTemplate = `{
                 "TestStatusAborted"
             ]
         },
+        "web_api.ClientResponse": {
+            "type": "object",
+            "properties": {
+                "cl_error": {
+                    "type": "string"
+                },
+                "cl_head_root": {
+                    "type": "string"
+                },
+                "cl_head_slot": {
+                    "type": "integer"
+                },
+                "cl_ready": {
+                    "type": "boolean"
+                },
+                "cl_refresh": {
+                    "type": "string"
+                },
+                "cl_status": {
+                    "type": "string"
+                },
+                "cl_type": {
+                    "type": "integer"
+                },
+                "cl_version": {
+                    "type": "string"
+                },
+                "el_error": {
+                    "type": "string"
+                },
+                "el_head_hash": {
+                    "type": "string"
+                },
+                "el_head_number": {
+                    "type": "integer"
+                },
+                "el_ready": {
+                    "type": "boolean"
+                },
+                "el_refresh": {
+                    "type": "string"
+                },
+                "el_status": {
+                    "type": "string"
+                },
+                "el_type": {
+                    "type": "integer"
+                },
+                "el_version": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetClientsResponse": {
+            "type": "object",
+            "properties": {
+                "client_count": {
+                    "type": "integer"
+                },
+                "clients": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/web_api.ClientResponse"
+                    }
+                }
+            }
+        },
         "web_api.GetTestResponse": {
             "type": "object",
             "properties": {
@@ -900,6 +1146,11 @@ const docTemplate = `{
                 },
                 "timeout": {
                     "type": "integer"
+                },
+                "vars": {
+                    "description": "Config with global vars merged in",
+                    "type": "object",
+                    "additionalProperties": {}
                 }
             }
         },
@@ -926,6 +1177,12 @@ const docTemplate = `{
                 },
                 "parent_index": {
                     "type": "integer"
+                },
+                "progress": {
+                    "type": "number"
+                },
+                "progress_message": {
+                    "type": "string"
                 },
                 "result": {
                     "type": "string"
@@ -972,7 +1229,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "level": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "msg": {
                     "type": "string"

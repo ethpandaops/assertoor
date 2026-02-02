@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethpandaops/assertoor/pkg/txmgr"
 	"github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/ethpandaops/assertoor/pkg/vars"
-	"github.com/ethpandaops/assertoor/pkg/wallet"
+	"github.com/ethpandaops/spamoor/spamoor"
+	"github.com/holiman/uint256"
 	"github.com/sirupsen/logrus"
 )
 
@@ -36,7 +38,14 @@ type Task struct {
 	options *types.TaskOptions
 	config  Config
 	logger  logrus.FieldLogger
-	wallet  *wallet.Wallet
+}
+
+type Summary struct {
+	Address        string `json:"address"`
+	PrivKey        string `json:"privkey"`
+	PendingNonce   uint64 `json:"pendingNonce"`
+	ConfirmedNonce uint64 `json:"confirmedNonce"`
+	Balance        string `json:"balance"`
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -76,31 +85,31 @@ func (t *Task) LoadConfig() error {
 		return err2
 	}
 
-	// Load root wallet
-	privKey, err := crypto.HexToECDSA(config.PrivateKey)
-	if err != nil {
-		return err
-	}
-
-	t.wallet, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
-	if err != nil {
-		return fmt.Errorf("cannot initialize wallet: %w", err)
-	}
-
 	t.config = config
 
 	return nil
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	t.ctx.ReportProgress(0, "Waiting for root wallet...")
+	t.ctx.ReportProgress(0, "Preparing root wallet...")
 
-	err := t.wallet.AwaitReady(ctx)
+	// Load root wallet
+	privKey, err := crypto.HexToECDSA(t.config.PrivateKey)
 	if err != nil {
 		return err
 	}
 
-	t.logger.Infof("root wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
+	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
+
+	// Use test run context for wallet operations so they don't get cancelled when this task completes
+	testRunCtx := t.ctx.Scheduler.GetTestRunCtx()
+
+	rootWallet, err := walletMgr.GetWalletByPrivkey(testRunCtx, privKey)
+	if err != nil {
+		return fmt.Errorf("cannot initialize wallet: %w", err)
+	}
+
+	t.logger.Infof("root wallet: %v [nonce: %v]  %v ETH", rootWallet.GetAddress().Hex(), rootWallet.GetNonce(), rootWallet.GetReadableBalance(18, 0, 4, false, false))
 	t.ctx.ReportProgress(25, "Generating child wallet...")
 
 	walletSeed := t.config.WalletSeed
@@ -108,22 +117,34 @@ func (t *Task) Execute(ctx context.Context) error {
 		walletSeed = t.randStringBytes(20)
 	}
 
-	walletPool, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletPoolByPrivkey(t.wallet.GetPrivateKey(), 1, walletSeed)
+	walletPool, err := walletMgr.GetWalletPoolByPrivkey(testRunCtx, t.logger, privKey, &txmgr.WalletPoolConfig{
+		WalletCount:   1,
+		WalletSeed:    walletSeed,
+		RefillAmount:  uint256.MustFromBig(t.config.PrefundAmount),
+		RefillBalance: uint256.MustFromBig(t.config.PrefundMinBalance),
+	})
 	if err != nil {
 		return err
 	}
 
-	t.ctx.ReportProgress(50, "Ensuring wallet funding...")
+	t.ctx.ReportProgress(75, "Child wallet funded...")
 
-	err = walletPool.EnsureFunding(ctx, t.config.PrefundMinBalance, t.config.PrefundAmount, t.config.PrefundFeeCap, t.config.PrefundTipCap, 1)
-	if err != nil {
-		return err
+	// Stop the funding loop if keepFunding is not enabled
+	if !t.config.KeepFunding {
+		walletPool.StopFunding()
 	}
 
-	childWallet := walletPool.GetNextChildWallet()
+	childWallet := walletPool.GetWallet(spamoor.SelectWalletByIndex, 0)
 	t.logger.Infof("child wallet: %v [nonce: %v]  %v ETH", childWallet.GetAddress().Hex(), childWallet.GetNonce(), childWallet.GetReadableBalance(18, 0, 4, false, false))
 
-	walletSummary := childWallet.GetSummary()
+	walletSummary := &Summary{
+		Address:        childWallet.GetAddress().String(),
+		PrivKey:        fmt.Sprintf("%x", crypto.FromECDSA(childWallet.GetPrivateKey())),
+		PendingNonce:   childWallet.GetNonce(),
+		ConfirmedNonce: childWallet.GetConfirmedNonce(),
+		Balance:        childWallet.GetBalance().String(),
+	}
+
 	if walletSummaryData, err := vars.GeneralizeData(walletSummary); err == nil {
 		t.ctx.Outputs.SetVar("childWallet", walletSummaryData)
 	} else {

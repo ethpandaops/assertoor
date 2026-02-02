@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/types"
-	"github.com/ethpandaops/assertoor/pkg/wallet"
+	"github.com/ethpandaops/spamoor/spamoor"
 	"github.com/sirupsen/logrus"
 )
 
@@ -50,6 +50,14 @@ type Task struct {
 	options *types.TaskOptions
 	config  Config
 	logger  logrus.FieldLogger
+}
+
+type Summary struct {
+	Address        string `json:"address"`
+	PrivKey        string `json:"privKey"`
+	PendingNonce   uint64 `json:"pendingNonce"`
+	ConfirmedNonce uint64 `json:"confirmedNonce"`
+	Balance        string `json:"balance"`
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -95,7 +103,7 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	var wal *wallet.Wallet
+	var wal *spamoor.Wallet
 
 	if t.config.PrivateKey != "" {
 		privKey, err := crypto.HexToECDSA(t.config.PrivateKey)
@@ -103,24 +111,29 @@ func (t *Task) Execute(ctx context.Context) error {
 			return err
 		}
 
-		wal, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
+		wal, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.ctx.Scheduler.GetTestRunCtx(), privKey)
 		if err != nil {
 			return fmt.Errorf("cannot initialize wallet: %w", err)
 		}
 	} else {
+		var err error
 		address := common.HexToAddress(t.config.Address)
-		wal = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByAddress(address)
-	}
-
-	err := wal.AwaitReady(ctx)
-	if err != nil {
-		return err
+		wal, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByAddress(t.ctx.Scheduler.GetTestRunCtx(), address)
+		if err != nil {
+			return fmt.Errorf("cannot initialize wallet: %w", err)
+		}
 	}
 
 	t.ctx.Outputs.SetVar("address", wal.GetAddress())
 	t.ctx.Outputs.SetVar("balance", wal.GetBalance().String())
 	t.ctx.Outputs.SetVar("nonce", wal.GetNonce())
-	t.ctx.Outputs.SetVar("summary", wal.GetSummary())
+	t.ctx.Outputs.SetVar("summary", &Summary{
+		Address:        wal.GetAddress().String(),
+		PrivKey:        fmt.Sprintf("%x", crypto.FromECDSA(wal.GetPrivateKey())),
+		PendingNonce:   wal.GetNonce(),
+		ConfirmedNonce: wal.GetConfirmedNonce(),
+		Balance:        wal.GetBalance().String(),
+	})
 
 	t.ctx.ReportProgress(100, "Wallet details retrieved")
 

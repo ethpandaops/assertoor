@@ -5,19 +5,19 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/db"
 	"github.com/ethpandaops/assertoor/pkg/events"
 	"github.com/ethpandaops/assertoor/pkg/names"
+	"github.com/ethpandaops/assertoor/pkg/txmgr"
 	"github.com/ethpandaops/assertoor/pkg/types"
-	"github.com/ethpandaops/assertoor/pkg/wallet"
 )
 
 type servicesProvider struct {
 	database       *db.Database
 	clientPool     *clients.ClientPool
-	walletManager  *wallet.Manager
+	walletManager  *txmgr.Spamoor
 	validatorNames *names.ValidatorNames
 	eventBus       *events.EventBus
 }
 
-func NewServicesProvider(database *db.Database, clientPool *clients.ClientPool, walletManager *wallet.Manager, validatorNames *names.ValidatorNames, eventBus *events.EventBus) types.TaskServices {
+func NewServicesProvider(database *db.Database, clientPool *clients.ClientPool, walletManager *txmgr.Spamoor, validatorNames *names.ValidatorNames, eventBus *events.EventBus) types.TaskServices {
 	return &servicesProvider{
 		database:       database,
 		clientPool:     clientPool,
@@ -35,7 +35,7 @@ func (p *servicesProvider) ClientPool() *clients.ClientPool {
 	return p.clientPool
 }
 
-func (p *servicesProvider) WalletManager() *wallet.Manager {
+func (p *servicesProvider) WalletManager() *txmgr.Spamoor {
 	return p.walletManager
 }
 

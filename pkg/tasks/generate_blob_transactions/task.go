@@ -5,16 +5,17 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
+	"github.com/ethpandaops/assertoor/pkg/txmgr"
 	"github.com/ethpandaops/assertoor/pkg/types"
-	"github.com/ethpandaops/assertoor/pkg/wallet"
-	"github.com/ethpandaops/assertoor/pkg/wallet/blobtx"
+	"github.com/ethpandaops/spamoor/spamoor"
+	"github.com/ethpandaops/spamoor/txbuilder"
 	"github.com/holiman/uint256"
 	"github.com/sirupsen/logrus"
 )
@@ -37,8 +38,8 @@ type Task struct {
 	config     Config
 	logger     logrus.FieldLogger
 	txIndex    uint64
-	wallet     *wallet.Wallet
-	walletPool *wallet.WalletPool
+	wallet     *spamoor.Wallet
+	walletPool *spamoor.WalletPool
 
 	targetAddr      common.Address
 	transactionData []byte
@@ -81,24 +82,6 @@ func (t *Task) LoadConfig() error {
 		return valerr
 	}
 
-	// load wallets
-	privKey, err := crypto.HexToECDSA(config.PrivateKey)
-	if err != nil {
-		return err
-	}
-
-	if config.ChildWallets == 0 {
-		t.wallet, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
-		if err != nil {
-			return fmt.Errorf("cannot initialize wallet: %w", err)
-		}
-	} else {
-		t.walletPool, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletPoolByPrivkey(privKey, config.ChildWallets, config.WalletSeed)
-		if err != nil {
-			return fmt.Errorf("cannot initialize wallet pool: %w", err)
-		}
-	}
-
 	// parse target addr
 	if config.TargetAddress != "" {
 		err = t.targetAddr.UnmarshalText([]byte(config.TargetAddress))
@@ -118,35 +101,42 @@ func (t *Task) LoadConfig() error {
 }
 
 func (t *Task) Execute(ctx context.Context) error {
-	if t.walletPool != nil {
-		err := t.walletPool.GetRootWallet().AwaitReady(ctx)
+	// load wallets
+	privKey, err := crypto.HexToECDSA(t.config.PrivateKey)
+	if err != nil {
+		return err
+	}
+
+	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
+
+	if t.config.ChildWallets == 0 {
+		t.wallet, err = walletMgr.GetWalletByPrivkey(ctx, privKey)
 		if err != nil {
-			return err
-		}
-
-		t.logger.Infof("funding wallet: %v [nonce: %v]  %v ETH", t.walletPool.GetRootWallet().GetAddress().Hex(), t.walletPool.GetRootWallet().GetNonce(), t.walletPool.GetRootWallet().GetReadableBalance(18, 0, 4, false, false))
-
-		err = t.ensureChildWalletFunding(ctx)
-		if err != nil {
-			t.logger.Infof("failed ensuring child wallet funding: %v", err)
-			return err
-		}
-
-		for idx, wallet := range t.walletPool.GetChildWallets() {
-			t.logger.Infof("wallet #%v: %v [nonce: %v]  %v ETH", idx, wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
-		}
-
-		go t.runChildWalletFundingRoutine(ctx)
-	} else {
-		err := t.wallet.AwaitReady(ctx)
-		if err != nil {
-			return err
+			return fmt.Errorf("cannot initialize wallet: %w", err)
 		}
 
 		t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
+	} else {
+		t.walletPool, err = walletMgr.GetWalletPoolByPrivkey(ctx, t.logger, privKey, &txmgr.WalletPoolConfig{
+			WalletCount:   t.config.ChildWallets,
+			WalletSeed:    t.config.WalletSeed,
+			RefillAmount:  uint256.MustFromBig(t.config.RefillAmount),
+			RefillBalance: uint256.MustFromBig(t.config.RefillMinBalance),
+		})
+		if err != nil {
+			return fmt.Errorf("cannot initialize wallet pool: %w", err)
+		}
+
+		rootWallet := t.walletPool.GetRootWallet().GetWallet()
+		t.logger.Infof("funding wallet: %v [nonce: %v]  %v ETH", rootWallet.GetAddress().Hex(), rootWallet.GetNonce(), rootWallet.GetReadableBalance(18, 0, 4, false, false))
+
+		for idx, wallet := range t.walletPool.GetAllWallets() {
+			t.logger.Infof("wallet #%v: %v [nonce: %v]  %v ETH", idx, wallet.GetAddress().Hex(), wallet.GetNonce(), wallet.GetReadableBalance(18, 0, 4, false, false))
+		}
 	}
 
 	var subscription *execution.Subscription[*execution.Block]
+
 	if t.config.LimitPerBlock > 0 {
 		subscription = t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().SubscribeBlockEvent(10)
 		defer subscription.Unsubscribe()
@@ -192,9 +182,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		if err != nil {
 			t.logger.Errorf("error generating transaction: %v", err.Error())
 
-			if pendingChan != nil {
-				<-pendingChan
-			}
+			// Note: onComplete callback is still called by spamoor even on error,
+			// so we don't drain pendingChan here
 		} else {
 			perBlockCount++
 			totalCount++
@@ -230,102 +219,63 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) runChildWalletFundingRoutine(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(10 * time.Minute):
-			err := t.ensureChildWalletFunding(ctx)
-			if err != nil {
-				t.logger.Infof("failed ensuring child wallet funding: %v", err)
-			}
-		}
-	}
-}
-
-func (t *Task) ensureChildWalletFunding(ctx context.Context) error {
-	t.logger.Infof("ensure child wallet funding")
-
-	err := t.walletPool.EnsureFunding(ctx, t.config.RefillMinBalance, t.config.RefillAmount, t.config.RefillFeeCap, t.config.RefillTipCap, t.config.RefillPendingLimit)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, confirmedFn wallet.TxConfirmFn) error {
+func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, completeFn spamoor.TxCompleteFn) error {
 	txWallet := t.wallet
 	if t.wallet == nil {
-		txWallet = t.walletPool.GetNextChildWallet()
+		txWallet = t.walletPool.GetWallet(spamoor.SelectWalletRoundRobin, 0)
 	}
 
-	blobRef := "identifier,random"
-	if t.config.BlobData != "" {
-		blobRef = t.config.BlobData
+	blobData := t.config.BlobData
+	if blobData == "" {
+		blobData = "identifier,random"
 	}
 
-	blobRefs := []string{}
+	blobRefs := make([][]string, t.config.BlobSidecars)
+
 	for i := uint64(0); i < t.config.BlobSidecars; i++ {
-		blobRefs = append(blobRefs, blobRef)
+		blobRefs[i] = strings.Split(blobData, ",")
 	}
 
-	blobHashes, blobSidecar, err := blobtx.GenerateBlobSidecar(blobRefs, transactionIdx, 0)
-	if err != nil {
-		return err
+	toAddr := txWallet.GetAddress()
+
+	if t.config.RandomTarget {
+		addrBytes := make([]byte, 20)
+		//nolint:errcheck // ignore
+		rand.Read(addrBytes)
+		toAddr = common.Address(addrBytes)
+	} else if t.config.TargetAddress != "" {
+		toAddr = t.targetAddr
 	}
 
-	tx, err := txWallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
-		toAddr := txWallet.GetAddress()
-
-		if t.config.RandomTarget {
-			addrBytes := make([]byte, 20)
-			//nolint:errcheck // ignore
-			rand.Read(addrBytes)
-			toAddr = common.Address(addrBytes)
-		} else if t.config.TargetAddress != "" {
-			toAddr = t.targetAddr
+	txAmount := new(big.Int).Set(t.config.Amount)
+	if t.config.RandomAmount {
+		n, err := rand.Int(rand.Reader, txAmount)
+		if err == nil {
+			txAmount = n
 		}
+	}
 
-		txAmount := new(big.Int).Set(t.config.Amount)
-		if t.config.RandomAmount {
-			n, err2 := rand.Int(rand.Reader, txAmount)
-			if err2 == nil {
-				txAmount = n
-			}
-		}
+	txData := []byte{}
+	if t.transactionData != nil {
+		txData = t.transactionData
+	}
 
-		txData := []byte{}
-		if t.transactionData != nil {
-			txData = t.transactionData
-		}
-
-		txObj := &ethtypes.BlobTx{
-			ChainID:    uint256.MustFromBig(t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID()),
-			Nonce:      nonce,
-			BlobFeeCap: uint256.MustFromBig(t.config.BlobFeeCap),
-			GasTipCap:  uint256.MustFromBig(t.config.TipCap),
-			GasFeeCap:  uint256.MustFromBig(t.config.FeeCap),
-			Gas:        t.config.GasLimit,
-			To:         toAddr,
-			Value:      uint256.MustFromBig(txAmount),
-			Data:       txData,
-			BlobHashes: blobHashes,
-			Sidecar:    blobSidecar,
-		}
-
-		if !t.config.LegacyBlobTx {
-			err = blobSidecar.ToV1()
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		return ethtypes.NewTx(txObj), nil
-	})
+	blobTx, err := txbuilder.BuildBlobTx(&txbuilder.TxMetadata{
+		GasFeeCap:  uint256.MustFromBig(t.config.FeeCap),
+		GasTipCap:  uint256.MustFromBig(t.config.TipCap),
+		BlobFeeCap: uint256.MustFromBig(t.config.BlobFeeCap),
+		Gas:        t.config.GasLimit,
+		To:         &toAddr,
+		Value:      uint256.MustFromBig(txAmount),
+		Data:       txData,
+	}, blobRefs)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot build blob tx data: %w", err)
+	}
+
+	tx, err := txWallet.BuildBlobTx(blobTx)
+	if err != nil {
+		return fmt.Errorf("cannot build blob transaction: %w", err)
 	}
 
 	var clients []*execution.Client
@@ -350,11 +300,14 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		return fmt.Errorf("no ready clients available")
 	}
 
-	return txWallet.SendTransaction(ctx, tx, &wallet.SendTransactionOptions{
-		Clients:            clients,
-		ClientsStartOffset: transactionIdx,
-		OnConfirm:          confirmedFn,
-		LogFn: func(client *execution.Client, retry uint64, rebroadcast uint64, err error) {
+	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
+	client := walletMgr.GetClient(clients[transactionIdx%uint64(len(clients))])
+
+	return walletMgr.GetTxPool().SendTransaction(ctx, txWallet, tx, &spamoor.SendTransactionOptions{
+		Client:      client,
+		Rebroadcast: true,
+		OnComplete:  completeFn,
+		LogFn: func(client *spamoor.Client, retry int, rebroadcast int, err error) {
 			if err != nil {
 				t.logger.WithFields(logrus.Fields{
 					"client": client.GetName(),
@@ -373,7 +326,5 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 
 			logEntry.Infof("submitted blob transaction %v (nonce: %v, attempt: %v)", transactionIdx, tx.Nonce(), retry)
 		},
-		RebroadcastInterval: 30 * time.Second,
-		MaxRebroadcasts:     5,
 	})
 }

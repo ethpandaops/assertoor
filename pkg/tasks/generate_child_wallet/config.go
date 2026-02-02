@@ -15,6 +15,8 @@ type Config struct {
 	PrefundAmount     *big.Int `yaml:"prefundAmount" json:"prefundAmount" desc:"Amount (in wei) to transfer to the child wallet."`
 	PrefundMinBalance *big.Int `yaml:"prefundMinBalance" json:"prefundMinBalance" desc:"Minimum balance (in wei) before triggering a prefund."`
 
+	KeepFunding bool `yaml:"keepFunding" json:"keepFunding" desc:"If true, keep the wallet pool funding loop running after initial distribution. Default is false."`
+
 	WalletAddressResultVar    string `yaml:"walletAddressResultVar" json:"walletAddressResultVar" desc:"Variable name to store the child wallet address."`
 	WalletPrivateKeyResultVar string `yaml:"walletPrivateKeyResultVar" json:"walletPrivateKeyResultVar" desc:"Variable name to store the child wallet private key."`
 }

@@ -1,6 +1,36 @@
 definitions:
   helper.RawMessage:
     type: object
+  tasks.TaskDescriptorAPI:
+    properties:
+      aliases:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      configSchema:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      name:
+        type: string
+      outputs:
+        items:
+          $ref: '#/definitions/types.TaskOutputDefinition'
+        type: array
+    type: object
+  types.TaskOutputDefinition:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      type:
+        type: string
+    type: object
   types.TestSchedule:
     properties:
       cron:
@@ -28,6 +58,54 @@ definitions:
     - TestStatusFailure
     - TestStatusSkipped
     - TestStatusAborted
+  web_api.ClientResponse:
+    properties:
+      cl_error:
+        type: string
+      cl_head_root:
+        type: string
+      cl_head_slot:
+        type: integer
+      cl_ready:
+        type: boolean
+      cl_refresh:
+        type: string
+      cl_status:
+        type: string
+      cl_type:
+        type: integer
+      cl_version:
+        type: string
+      el_error:
+        type: string
+      el_head_hash:
+        type: string
+      el_head_number:
+        type: integer
+      el_ready:
+        type: boolean
+      el_refresh:
+        type: string
+      el_status:
+        type: string
+      el_type:
+        type: integer
+      el_version:
+        type: string
+      index:
+        type: integer
+      name:
+        type: string
+    type: object
+  web_api.GetClientsResponse:
+    properties:
+      client_count:
+        type: integer
+      clients:
+        items:
+          $ref: '#/definitions/web_api.ClientResponse'
+        type: array
+    type: object
   web_api.GetTestResponse:
     properties:
       basePath:
@@ -49,6 +127,10 @@ definitions:
         type: string
       timeout:
         type: integer
+      vars:
+        additionalProperties: {}
+        description: Config with global vars merged in
+        type: object
     type: object
   web_api.GetTestRunDetailedTask:
     properties:
@@ -66,6 +148,10 @@ definitions:
         type: string
       parent_index:
         type: integer
+      progress:
+        type: number
+      progress_message:
+        type: string
       result:
         type: string
       result_error:
@@ -96,7 +182,7 @@ definitions:
       datalen:
         type: integer
       level:
-        type: integer
+        type: string
       msg:
         type: string
       time:
@@ -366,6 +452,83 @@ info:
   title: Assertoor API Documentation
   version: "1.0"
 paths:
+  /api/v1/clients:
+    get:
+      description: Returns the list of configured consensus and execution layer clients
+        with their current status.
+      operationId: getClients
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetClientsResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get list of configured clients
+      tags:
+      - Client
+  /api/v1/task_descriptor/{name}:
+    get:
+      description: Returns a single task descriptor by name with its JSON schema
+      parameters:
+      - description: Task name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/tasks.TaskDescriptorAPI'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get a specific task descriptor
+      tags:
+      - Task
+  /api/v1/task_descriptors:
+    get:
+      description: Returns a list of all available task descriptors with their JSON
+        schemas
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/tasks.TaskDescriptorAPI'
+                  type: array
+              type: object
+      summary: Get all task descriptors
+      tags:
+      - Task
   /api/v1/test/{testId}:
     get:
       description: Returns the test definition with given ID.

@@ -20,6 +20,7 @@ type TaskScheduler struct {
 	rootTasks        []types.TaskIndex
 	allCleanupTasks  []types.TaskIndex
 	rootCleanupTasks []types.TaskIndex
+	testRunCtx       context.Context
 	taskStateMutex   sync.RWMutex
 	taskStateMap     map[types.TaskIndex]*taskState
 	cancelTaskCtx    context.CancelFunc
@@ -47,6 +48,10 @@ func (ts *TaskScheduler) GetTestRunID() uint64 {
 	return ts.testRunID
 }
 
+func (ts *TaskScheduler) GetTestRunCtx() context.Context {
+	return ts.testRunCtx
+}
+
 func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.TaskIndex, error) {
 	task, err := ts.newTaskState(options, nil, nil, false)
 	if err != nil {
@@ -69,17 +74,19 @@ func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.TaskI
 	return task.index, nil
 }
 
-func (ts *TaskScheduler) RunTasks(ctx context.Context, timeout time.Duration) error {
+func (ts *TaskScheduler) RunTasks(testRunCtx context.Context, timeout time.Duration) error {
 	var cleanupCtx, tasksCtx context.Context
 
-	cleanupCtx, ts.cancelCleanupCtx = context.WithCancel(ctx)
+	cleanupCtx, ts.cancelCleanupCtx = context.WithCancel(testRunCtx)
 
 	defer ts.runCleanupTasks(cleanupCtx)
 
+	ts.testRunCtx = testRunCtx
+
 	if timeout > 0 {
-		tasksCtx, ts.cancelTaskCtx = context.WithTimeout(ctx, timeout)
+		tasksCtx, ts.cancelTaskCtx = context.WithTimeout(testRunCtx, timeout)
 	} else {
-		tasksCtx, ts.cancelTaskCtx = context.WithCancel(ctx)
+		tasksCtx, ts.cancelTaskCtx = context.WithCancel(testRunCtx)
 	}
 
 	defer ts.cancelTaskCtx()

@@ -20,8 +20,10 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/types"
-	"github.com/ethpandaops/assertoor/pkg/wallet"
+	"github.com/ethpandaops/spamoor/spamoor"
+	"github.com/ethpandaops/spamoor/txbuilder"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
+	"github.com/holiman/uint256"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/util/hashing"
 	"github.com/protolambda/ztyp/tree"
@@ -215,12 +217,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		})
 		if err != nil {
 			t.logger.Errorf("error generating deposit: %v", err.Error())
-
-			if pendingChan != nil {
-				<-pendingChan
-			}
-
-			pendingWg.Done()
+			// Note: onComplete callback is still called by spamoor even on error,
+			// so we don't call pendingWg.Done() here
 		} else {
 			t.ctx.SetResult(types.TaskResultSuccess)
 
@@ -401,7 +399,7 @@ func (t *Task) awaitInclusion(ctx context.Context, validatorPubkeys []string, to
 	return nil
 }
 
-func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm wallet.TxConfirmFn) (*common.BLSPubkey, *ethtypes.Transaction, error) {
+func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onComplete spamoor.TxCompleteFn) (*common.BLSPubkey, *ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
 
@@ -467,15 +465,23 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
 	}
 
-	data := common.DepositData{
+	// Convert deposit amount from ETH to Gwei using big.Int to avoid overflow
+	depositAmountGwei := new(big.Int).SetUint64(t.config.DepositAmount)
+	depositAmountGwei.Mul(depositAmountGwei, big.NewInt(1000000000))
+
+	if !depositAmountGwei.IsUint64() {
+		return nil, nil, fmt.Errorf("deposit amount too large: %v ETH", t.config.DepositAmount)
+	}
+
+	depositData := common.DepositData{
 		Pubkey:                pub,
 		WithdrawalCredentials: tree.Root(withdrCreds),
-		Amount:                common.Gwei(t.config.DepositAmount * 1000000000),
+		Amount:                common.Gwei(depositAmountGwei.Uint64()),
 		Signature:             common.BLSSignature{},
 	}
 
 	if !t.config.TopUpDeposit {
-		msgRoot := data.ToMessage().HashTreeRoot(tree.GetHashFn())
+		msgRoot := depositData.ToMessage().HashTreeRoot(tree.GetHashFn())
 
 		var secKey hbls.SecretKey
 
@@ -488,10 +494,10 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		dom := common.ComputeDomain(common.DOMAIN_DEPOSIT, common.Version(genesis.GenesisForkVersion), common.Root{})
 		msg := common.ComputeSigningRoot(msgRoot, dom)
 		sig := secKey.SignHash(msg[:])
-		copy(data.Signature[:], sig.Serialize())
+		copy(depositData.Signature[:], sig.Serialize())
 	}
 
-	dataRoot := data.HashTreeRoot(tree.GetHashFn())
+	dataRoot := depositData.HashTreeRoot(tree.GetHashFn())
 
 	// generate deposit transaction
 
@@ -520,42 +526,39 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 		return nil, nil, fmt.Errorf("cannot create bound instance of DepositContract: %w", err)
 	}
 
-	txWallet, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
+	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
+
+	txWallet, err := walletMgr.GetWalletByPrivkey(t.ctx.Scheduler.GetTestRunCtx(), t.walletPrivKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
-	err = txWallet.AwaitReady(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot load wallet state: %w", err)
-	}
-
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", txWallet.GetAddress().Hex(), txWallet.GetNonce(), txWallet.GetReadableBalance(18, 0, 4, false, false))
 
-	tx, err := txWallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, signer bind.SignerFn) (*ethtypes.Transaction, error) {
-		amount := big.NewInt(0).SetUint64(uint64(data.Amount))
+	amount := big.NewInt(0).SetUint64(uint64(depositData.Amount))
+	amount.Mul(amount, big.NewInt(1000000000))
 
-		amount.Mul(amount, big.NewInt(1000000000))
+	txMeta := &txbuilder.TxMetadata{
+		GasFeeCap: uint256.MustFromBig(big.NewInt(t.config.DepositTxFeeCap)),
+		GasTipCap: uint256.MustFromBig(big.NewInt(t.config.DepositTxTipCap)),
+		Gas:       200000,
+		Value:     uint256.MustFromBig(amount),
+	}
 
-		return depositContract.Deposit(&bind.TransactOpts{
-			From:      txWallet.GetAddress(),
-			Nonce:     big.NewInt(0).SetUint64(nonce),
-			Value:     amount,
-			GasLimit:  200000,
-			GasFeeCap: big.NewInt(t.config.DepositTxFeeCap),
-			GasTipCap: big.NewInt(t.config.DepositTxTipCap),
-			Signer:    signer,
-			NoSend:    true,
-		}, data.Pubkey[:], data.WithdrawalCredentials[:], data.Signature[:], dataRoot)
+	tx, err := txWallet.BuildBoundTx(ctx, txMeta, func(opts *bind.TransactOpts) (*ethtypes.Transaction, error) {
+		return depositContract.Deposit(opts, depositData.Pubkey[:], depositData.WithdrawalCredentials[:], depositData.Signature[:], dataRoot)
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot build deposit transaction: %w", err)
 	}
 
-	err = txWallet.SendTransaction(ctx, tx, &wallet.SendTransactionOptions{
-		Clients:   clients,
-		OnConfirm: onConfirm,
-		LogFn: func(client *execution.Client, retry uint64, rebroadcast uint64, err error) {
+	client := walletMgr.GetClient(clients[0])
+
+	err = walletMgr.GetTxPool().SendTransaction(ctx, txWallet, tx, &spamoor.SendTransactionOptions{
+		Client:      client,
+		Rebroadcast: true,
+		OnComplete:  onComplete,
+		LogFn: func(client *spamoor.Client, retry int, rebroadcast int, err error) {
 			if err != nil {
 				return
 			}
@@ -570,8 +573,6 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onConfirm
 
 			logEntry.Infof("submitted deposit transaction (account idx: %v, nonce: %v, attempt: %v)", accountIdx, tx.Nonce(), retry)
 		},
-		RebroadcastInterval: 30 * time.Second,
-		MaxRebroadcasts:     5,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed sending deposit transaction: %w", err)

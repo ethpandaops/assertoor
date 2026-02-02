@@ -212,9 +212,12 @@ func (t *Test) Run(ctx context.Context) error {
 	}()
 
 	// run test tasks
+	testRunCtx, cancelTestRunCtx := context.WithCancel(ctx)
+	defer cancelTestRunCtx()
+
 	t.logger.WithField("timeout", t.timeout.String()).Info("starting test")
 
-	err := t.taskScheduler.RunTasks(ctx, t.timeout)
+	err := t.taskScheduler.RunTasks(testRunCtx, t.timeout)
 
 	if ctx.Err() != nil {
 		t.logger.Info("test aborted!")

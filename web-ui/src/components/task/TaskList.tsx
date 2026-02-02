@@ -207,7 +207,6 @@ function TaskListItem({ task, depth, isSelected, isCollapsed, onClick, onToggleC
 
   const displayStatus = getDisplayStatus();
   const isRunning = task.status === 'running';
-  const hasProgress = task.progress > 0 && task.progress < 100;
 
   return (
     <button
@@ -248,25 +247,10 @@ function TaskListItem({ task, depth, isSelected, isCollapsed, onClick, onToggleC
           {task.title && task.title !== task.name && (
             <div className="text-[10px] text-[var(--color-text-secondary)] truncate ml-6">{task.name}</div>
           )}
-          {/* Progress bar for running tasks with progress */}
-          {isRunning && hasProgress && (
-            <div className="mt-1 ml-6">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1 bg-[var(--color-bg-tertiary)] rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary-500 transition-all duration-300"
-                    style={{ width: `${task.progress}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-[var(--color-text-tertiary)] shrink-0">
-                  {Math.round(task.progress)}%
-                </span>
-              </div>
-              {task.progress_message && (
-                <div className="text-[10px] text-[var(--color-text-tertiary)] truncate mt-0.5">
-                  {task.progress_message}
-                </div>
-              )}
+          {/* Progress message for running tasks */}
+          {isRunning && task.progress_message && (
+            <div className="text-[10px] text-[var(--color-text-tertiary)] truncate mt-0.5 ml-6">
+              {task.progress_message}
             </div>
           )}
         </div>

@@ -8,7 +8,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/events"
 	"github.com/ethpandaops/assertoor/pkg/logger"
 	"github.com/ethpandaops/assertoor/pkg/names"
-	"github.com/ethpandaops/assertoor/pkg/wallet"
+	"github.com/ethpandaops/assertoor/pkg/txmgr"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,7 +17,7 @@ type Coordinator interface {
 	LogReader() logger.LogReader
 	Database() *db.Database
 	ClientPool() *clients.ClientPool
-	WalletManager() *wallet.Manager
+	WalletManager() *txmgr.Spamoor
 	ValidatorNames() *names.ValidatorNames
 	GlobalVariables() Variables
 	TestRegistry() TestRegistry

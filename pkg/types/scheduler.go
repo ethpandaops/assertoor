@@ -8,13 +8,14 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/events"
 	"github.com/ethpandaops/assertoor/pkg/helper"
 	"github.com/ethpandaops/assertoor/pkg/names"
-	"github.com/ethpandaops/assertoor/pkg/wallet"
+	"github.com/ethpandaops/assertoor/pkg/txmgr"
 )
 
 type TaskSchedulerRunner interface {
 	TaskScheduler
 	GetServices() TaskServices
 	GetTestRunID() uint64
+	GetTestRunCtx() context.Context
 	ParseTaskOptions(rawtask helper.IRawMessage) (*TaskOptions, error)
 	ExecuteTask(ctx context.Context, taskIndex TaskIndex, taskWatchFn func(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)) error
 	WatchTaskPass(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)
@@ -32,7 +33,7 @@ type TaskScheduler interface {
 type TaskServices interface {
 	Database() *db.Database
 	ClientPool() *clients.ClientPool
-	WalletManager() *wallet.Manager
+	WalletManager() *txmgr.Spamoor
 	ValidatorNames() *names.ValidatorNames
 	EventBus() *events.EventBus
 }

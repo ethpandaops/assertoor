@@ -56,7 +56,7 @@ function ProgressRing({ progress, size }: ProgressRingProps) {
   const center = size / 2;
 
   return (
-    <div className="relative mr-1.5" style={{ width: size, height: size }}>
+    <div className="relative mr-1.5 animate-[pulse-subtle_2s_ease-in-out_infinite]" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="transform -rotate-90">
         {/* Background circle */}
         <circle

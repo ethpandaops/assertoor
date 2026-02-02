@@ -6,10 +6,10 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	mrand "math/rand"
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -17,8 +17,8 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/ethpandaops/assertoor/pkg/vars"
-	"github.com/ethpandaops/assertoor/pkg/wallet"
-	"github.com/ethpandaops/assertoor/pkg/wallet/blobtx"
+	"github.com/ethpandaops/spamoor/spamoor"
+	"github.com/ethpandaops/spamoor/txbuilder"
 	"github.com/holiman/uint256"
 	"github.com/sirupsen/logrus"
 )
@@ -66,8 +66,8 @@ type Task struct {
 	options              *types.TaskOptions
 	config               Config
 	logger               logrus.FieldLogger
-	wallet               *wallet.Wallet
-	authorizationWallets []*wallet.Wallet
+	wallet               *spamoor.Wallet
+	authorizationWallets []*spamoor.Wallet
 
 	targetAddr      common.Address
 	transactionData []byte
@@ -110,36 +110,6 @@ func (t *Task) LoadConfig() error {
 		return valerr
 	}
 
-	// load wallets
-	privKey, err := crypto.HexToECDSA(config.PrivateKey)
-	if err != nil {
-		return err
-	}
-
-	t.wallet, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
-	if err != nil {
-		return fmt.Errorf("cannot initialize wallet: %w", err)
-	}
-
-	// load authorization wallets
-	if config.SetCodeTxType && len(config.Authorizations) > 0 {
-		t.authorizationWallets = make([]*wallet.Wallet, 0, len(config.Authorizations))
-
-		for _, authorization := range config.Authorizations {
-			privKey, err2 := crypto.HexToECDSA(authorization.SignerPrivkey)
-			if err2 != nil {
-				return err2
-			}
-
-			authWallet, err2 := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(privKey)
-			if err2 != nil {
-				return fmt.Errorf("cannot initialize authorization wallet: %w", err2)
-			}
-
-			t.authorizationWallets = append(t.authorizationWallets, authWallet)
-		}
-	}
-
 	// parse target addr
 	if config.TargetAddress != "" {
 		err = t.targetAddr.UnmarshalText([]byte(config.TargetAddress))
@@ -162,17 +132,32 @@ func (t *Task) LoadConfig() error {
 func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.ReportProgress(0, "Preparing wallet...")
 
-	err := t.wallet.AwaitReady(ctx)
+	privKey, err := crypto.HexToECDSA(t.config.PrivateKey)
 	if err != nil {
-		return fmt.Errorf("cannot load wallet state: %w", err)
+		return err
 	}
 
-	if t.config.SetCodeTxType {
-		for _, authWallet := range t.authorizationWallets {
-			err = authWallet.AwaitReady(ctx)
-			if err != nil {
-				return fmt.Errorf("cannot load authorization wallet state: %w", err)
+	t.wallet, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.ctx.Scheduler.GetTestRunCtx(), privKey)
+	if err != nil {
+		return fmt.Errorf("cannot initialize wallet: %w", err)
+	}
+
+	// load authorization wallets
+	if t.config.SetCodeTxType && len(t.config.Authorizations) > 0 {
+		t.authorizationWallets = make([]*spamoor.Wallet, 0, len(t.config.Authorizations))
+
+		for _, authorization := range t.config.Authorizations {
+			privKey, err2 := crypto.HexToECDSA(authorization.SignerPrivkey)
+			if err2 != nil {
+				return err2
 			}
+
+			authWallet, err2 := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.ctx.Scheduler.GetTestRunCtx(), privKey)
+			if err2 != nil {
+				return fmt.Errorf("cannot initialize authorization wallet: %w", err2)
+			}
+
+			t.authorizationWallets = append(t.authorizationWallets, authWallet)
 		}
 	}
 
@@ -180,7 +165,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.ctx.ReportProgress(0, "Generating transaction...")
 
-	tx, err := t.generateTransaction(ctx)
+	tx, err := t.generateTransaction()
 	if err != nil {
 		return err
 	}
@@ -220,6 +205,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	if len(clients) == 0 {
 		err = fmt.Errorf("no ready clients available")
 	} else {
+		walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
 		for i := 0; i < len(clients); i++ {
 			client := clients[i%len(clients)]
 
@@ -227,7 +213,10 @@ func (t *Task) Execute(ctx context.Context) error {
 				"client": client.GetName(),
 			}).Infof("sending tx: %v", tx.Hash().Hex())
 
-			err = client.GetRPCClient().SendTransaction(ctx, tx)
+			err := walletMgr.GetTxPool().SendTransaction(ctx, t.wallet, tx, &spamoor.SendTransactionOptions{
+				Client:             walletMgr.GetClient(client),
+				ClientsStartOffset: i,
+			})
 			if err == nil {
 				break
 			}
@@ -245,7 +234,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("transactionHash", tx.Hash().Hex())
 
 	if t.config.AwaitReceipt {
-		receipt, err := t.wallet.AwaitTransaction(ctx, tx)
+		receipt, err := t.ctx.Scheduler.GetServices().WalletManager().GetTxPool().AwaitTransaction(ctx, t.wallet, tx)
 		if err != nil {
 			t.logger.Warnf("failed waiting for tx receipt: %v", err)
 			return fmt.Errorf("failed waiting for tx receipt: %v", err)
@@ -316,7 +305,11 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	for _, authorizationWallet := range t.authorizationWallets {
 		// resync nonces of authorization wallets (might be increased by more than one, so we need to resync)
-		authorizationWallet.ResyncState()
+		client := t.ctx.Scheduler.GetServices().WalletManager().GetReadyClient()
+		err := authorizationWallet.UpdateWallet(ctx, client, true)
+		if err != nil {
+			return fmt.Errorf("cannot update authorization wallet: %w", err)
+		}
 	}
 
 	t.ctx.ReportProgress(100, fmt.Sprintf("Transaction completed: %s", tx.Hash().Hex()))
@@ -324,136 +317,194 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) generateTransaction(ctx context.Context) (*ethtypes.Transaction, error) {
-	tx, err := t.wallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
-		var toAddr *common.Address
+func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
+	var toAddr *common.Address
 
-		if !t.config.ContractDeployment {
-			addr := t.wallet.GetAddress()
+	if !t.config.ContractDeployment {
+		addr := t.wallet.GetAddress()
 
-			if t.config.RandomTarget {
-				addrBytes := make([]byte, 20)
-				//nolint:errcheck // ignore
-				rand.Read(addrBytes)
-				addr = common.Address(addrBytes)
-			} else if t.config.TargetAddress != "" {
-				addr = t.targetAddr
-			}
-
-			toAddr = &addr
+		if t.config.RandomTarget {
+			addrBytes := make([]byte, 20)
+			//nolint:errcheck // ignore
+			rand.Read(addrBytes)
+			addr = common.Address(addrBytes)
+		} else if t.config.TargetAddress != "" {
+			addr = t.targetAddr
 		}
 
-		txAmount := new(big.Int).Set(&t.config.Amount.Value)
-		if t.config.RandomAmount {
-			n, err := rand.Int(rand.Reader, txAmount)
-			if err == nil {
-				txAmount = n
-			}
+		toAddr = &addr
+	}
+
+	txAmount := new(big.Int).Set(&t.config.Amount.Value)
+	if t.config.RandomAmount {
+		n, err := rand.Int(rand.Reader, txAmount)
+		if err == nil {
+			txAmount = n
+		}
+	}
+
+	txData := []byte{}
+	if t.transactionData != nil {
+		txData = t.transactionData
+	}
+
+	var txObj *ethtypes.Transaction
+
+	switch {
+	case t.config.LegacyTxType:
+		txData, err := txbuilder.LegacyTx(&txbuilder.TxMetadata{
+			GasFeeCap: uint256.MustFromBig(&t.config.FeeCap.Value),
+			Gas:       t.config.GasLimit,
+			To:        toAddr,
+			Value:     uint256.MustFromBig(txAmount),
+			Data:      txData,
+		})
+		if err != nil {
+			return nil, err
 		}
 
 		if t.config.Nonce != nil {
-			nonce = *t.config.Nonce
+			txObj, err = t.wallet.ReplaceLegacyTx(txData, *t.config.Nonce)
+		} else {
+			txObj, err = t.wallet.BuildLegacyTx(txData)
+		}
+		if err != nil {
+			return nil, err
 		}
 
-		txData := []byte{}
-		if t.transactionData != nil {
-			txData = t.transactionData
+	case t.config.BlobTxType:
+		if toAddr == nil {
+			return nil, fmt.Errorf("contract deployment not supported with blob transactions")
 		}
 
-		var txObj ethtypes.TxData
+		blobData := t.config.BlobData
+		if blobData == "" {
+			blobData = "identifier"
+		}
 
-		switch {
-		case t.config.LegacyTxType:
-			txObj = &ethtypes.LegacyTx{
-				Nonce:    nonce,
-				GasPrice: &t.config.FeeCap.Value,
-				Gas:      t.config.GasLimit,
-				To:       toAddr,
-				Value:    txAmount,
-				Data:     txData,
+		blobCount := t.config.BlobSidecars
+		blobRefs := make([][]string, blobCount)
+		for i := 0; i < int(blobCount); i++ {
+			blobLabel := fmt.Sprintf("0x1611AA0000%08dFF%02dFF%04dFEED", t.ctx.Index, i, 0)
+
+			if t.config.BlobData != "" {
+				blobRefs[i] = []string{}
+				for _, blob := range strings.Split(t.config.BlobData, ",") {
+					if blob == "label" {
+						blob = blobLabel
+					}
+					blobRefs[i] = append(blobRefs[i], blob)
+				}
+
+			} else {
+				specialBlob := mrand.Intn(50)
+				switch specialBlob {
+				case 0: // special blob commitment - all 0x0
+					blobRefs[i] = []string{"0x0"}
+				case 1, 2: // reuse well known blob
+					blobRefs[i] = []string{"repeat:0x42:1337"}
+				case 3, 4: // duplicate commitment
+					if i == 0 {
+						blobRefs[i] = []string{blobLabel, "random"}
+					} else {
+						blobRefs[i] = []string{"copy:0"}
+					}
+				default: // random blob data
+					blobRefs[i] = []string{blobLabel, "random:full"}
+				}
 			}
-		case t.config.BlobTxType:
-			if toAddr == nil {
-				return nil, fmt.Errorf("contract deployment not supported with blob transactions")
+		}
+
+		blobTx, err := txbuilder.BuildBlobTx(&txbuilder.TxMetadata{
+			GasFeeCap:  uint256.MustFromBig(&t.config.FeeCap.Value),
+			GasTipCap:  uint256.MustFromBig(&t.config.TipCap.Value),
+			BlobFeeCap: uint256.MustFromBig(&t.config.BlobFeeCap.Value),
+			Gas:        21000,
+			To:         toAddr,
+			Value:      uint256.NewInt(0),
+		}, blobRefs)
+		if err != nil {
+			return nil, err
+		}
+
+		if t.config.Nonce != nil {
+			txObj, err = t.wallet.ReplaceBlobTx(blobTx, *t.config.Nonce)
+		} else {
+			txObj, err = t.wallet.BuildBlobTx(blobTx)
+		}
+		if err != nil {
+			return nil, err
+		}
+	case t.config.SetCodeTxType:
+		authList := []ethtypes.SetCodeAuthorization{}
+
+		for idx, authorization := range t.config.Authorizations {
+			authEntry := ethtypes.SetCodeAuthorization{
+				ChainID: *uint256.NewInt(authorization.ChainID),
+				Address: common.HexToAddress(authorization.CodeAddress),
 			}
 
-			blobData := t.config.BlobData
-			if blobData == "" {
-				blobData = "identifier"
+			authWallet := t.authorizationWallets[idx]
+
+			if authorization.Nonce != nil {
+				authEntry.Nonce = *authorization.Nonce
+			} else {
+				authEntry.Nonce = authWallet.GetNextNonce()
 			}
 
-			blobHashes, blobSidecar, err := blobtx.GenerateBlobSidecar(strings.Split(blobData, ";"), 0, 0)
+			authEntry, err := ethtypes.SignSetCode(authWallet.GetPrivateKey(), authEntry)
 			if err != nil {
 				return nil, err
 			}
 
-			txObj = &ethtypes.BlobTx{
-				Nonce:      nonce,
-				BlobFeeCap: uint256.MustFromBig(&t.config.BlobFeeCap.Value),
-				GasTipCap:  uint256.MustFromBig(&t.config.TipCap.Value),
-				GasFeeCap:  uint256.MustFromBig(&t.config.FeeCap.Value),
-				Gas:        t.config.GasLimit,
-				To:         *toAddr,
-				Value:      uint256.MustFromBig(txAmount),
-				Data:       txData,
-				BlobHashes: blobHashes,
-				Sidecar:    blobSidecar,
-			}
-		case t.config.SetCodeTxType:
-			authList := []ethtypes.SetCodeAuthorization{}
-
-			for idx, authorization := range t.config.Authorizations {
-				authEntry := ethtypes.SetCodeAuthorization{
-					ChainID: *uint256.NewInt(authorization.ChainID),
-					Address: common.HexToAddress(authorization.CodeAddress),
-				}
-
-				authWallet := t.authorizationWallets[idx]
-
-				if authorization.Nonce != nil {
-					authEntry.Nonce = *authorization.Nonce
-				} else {
-					authEntry.Nonce = authWallet.UseNextNonce(true)
-				}
-
-				authEntry, err := ethtypes.SignSetCode(authWallet.GetPrivateKey(), authEntry)
-				if err != nil {
-					return nil, err
-				}
-
-				authList = append(authList, authEntry)
-			}
-
-			txObj = &ethtypes.SetCodeTx{
-				ChainID:   uint256.MustFromBig(t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID()),
-				Nonce:     nonce,
-				GasTipCap: uint256.MustFromBig(&t.config.TipCap.Value),
-				GasFeeCap: uint256.MustFromBig(&t.config.FeeCap.Value),
-				Gas:       t.config.GasLimit,
-				To:        *toAddr,
-				Value:     uint256.MustFromBig(txAmount),
-				Data:      txData,
-				AuthList:  authList,
-			}
-
-		default:
-			txObj = &ethtypes.DynamicFeeTx{
-				ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
-				Nonce:     nonce,
-				GasTipCap: &t.config.TipCap.Value,
-				GasFeeCap: &t.config.FeeCap.Value,
-				Gas:       t.config.GasLimit,
-				To:        toAddr,
-				Value:     txAmount,
-				Data:      txData,
-			}
+			authList = append(authList, authEntry)
 		}
 
-		return ethtypes.NewTx(txObj), nil
-	})
-	if err != nil {
-		return nil, err
+		setCodeTx, err := txbuilder.SetCodeTx(&txbuilder.TxMetadata{
+			GasFeeCap:  uint256.MustFromBig(&t.config.FeeCap.Value),
+			GasTipCap:  uint256.MustFromBig(&t.config.TipCap.Value),
+			BlobFeeCap: uint256.MustFromBig(&t.config.BlobFeeCap.Value),
+			Gas:        t.config.GasLimit,
+			To:         toAddr,
+			Value:      uint256.NewInt(0),
+			AuthList:   authList,
+			Data:       txData,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if t.config.Nonce != nil {
+			txObj, err = t.wallet.ReplaceSetCodeTx(setCodeTx, *t.config.Nonce)
+		} else {
+			txObj, err = t.wallet.BuildSetCodeTx(setCodeTx)
+		}
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		txData, err := txbuilder.DynFeeTx(&txbuilder.TxMetadata{
+			GasTipCap: uint256.MustFromBig(&t.config.TipCap.Value),
+			GasFeeCap: uint256.MustFromBig(&t.config.FeeCap.Value),
+			Gas:       t.config.GasLimit,
+			To:        toAddr,
+			Value:     uint256.MustFromBig(txAmount),
+			Data:      txData,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if t.config.Nonce != nil {
+			txObj, err = t.wallet.ReplaceDynamicFeeTx(txData, *t.config.Nonce)
+		} else {
+			txObj, err = t.wallet.BuildDynamicFeeTx(txData)
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return tx, nil
+	return txObj, nil
 }

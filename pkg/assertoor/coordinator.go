@@ -19,9 +19,9 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/logger"
 	"github.com/ethpandaops/assertoor/pkg/names"
 	"github.com/ethpandaops/assertoor/pkg/test"
+	"github.com/ethpandaops/assertoor/pkg/txmgr"
 	"github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/ethpandaops/assertoor/pkg/vars"
-	"github.com/ethpandaops/assertoor/pkg/wallet"
 	"github.com/ethpandaops/assertoor/pkg/web"
 	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -36,7 +36,7 @@ type Coordinator struct {
 	log             *logger.LogScope
 	database        *db.Database
 	clientPool      *clients.ClientPool
-	walletManager   *wallet.Manager
+	walletManager   *txmgr.Spamoor
 	webserver       *web.Server
 	publicWebserver *web.Server
 	validatorNames  *names.ValidatorNames
@@ -133,7 +133,6 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	}
 
 	c.clientPool = clientPool
-	c.walletManager = wallet.NewManager(clientPool.GetExecutionPool(), c.log.GetLogger().WithField("module", "wallet"))
 
 	for idx := range c.Config.Endpoints {
 		err = clientPool.AddClient(&c.Config.Endpoints[idx])
@@ -141,6 +140,14 @@ func (c *Coordinator) Run(ctx context.Context) error {
 			return err
 		}
 	}
+
+	// init spamoor
+	spamoorManager, err := txmgr.NewSpamoor(ctx, c.log.GetLogger(), clientPool.GetExecutionPool())
+	if err != nil {
+		return err
+	}
+
+	c.walletManager = spamoorManager
 
 	// init global variables
 	c.globalVars = vars.NewVariables(nil)
@@ -239,7 +246,7 @@ func (c *Coordinator) ClientPool() *clients.ClientPool {
 	return c.clientPool
 }
 
-func (c *Coordinator) WalletManager() *wallet.Manager {
+func (c *Coordinator) WalletManager() *txmgr.Spamoor {
 	return c.walletManager
 }
 

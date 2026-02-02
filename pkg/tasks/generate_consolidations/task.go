@@ -13,14 +13,15 @@ import (
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/types"
-	"github.com/ethpandaops/assertoor/pkg/wallet"
+	"github.com/ethpandaops/spamoor/spamoor"
+	"github.com/ethpandaops/spamoor/txbuilder"
+	"github.com/holiman/uint256"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
 	util "github.com/wealdtech/go-eth2-util"
@@ -128,6 +129,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
+
 	if t.config.LimitPerSlot > 0 {
 		subscription = t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
 		defer subscription.Unsubscribe()
@@ -188,11 +190,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		if err != nil {
 			t.logger.Errorf("error generating consolidation: %v", err.Error())
 
-			if pendingChan != nil {
-				<-pendingChan
-			}
-
-			pendingWg.Done()
+			// Note: onComplete callback is still called by spamoor even on error,
+			// so we don't drain pendingChan or call pendingWg.Done() here
 		} else {
 			t.ctx.SetResult(types.TaskResultSuccess)
 
@@ -298,7 +297,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onConfirm wallet.TxConfirmFn) (*ethtypes.Transaction, error) {
+func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onComplete spamoor.TxCompleteFn) (*ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 
 	var sourceValidator, targetValidator *v1.Validator
@@ -377,44 +376,43 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 		return nil, fmt.Errorf("no ready clients available")
 	}
 
-	txWallet, err := t.ctx.Scheduler.GetServices().WalletManager().GetWalletByPrivkey(t.walletPrivKey)
+	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
+
+	txWallet, err := walletMgr.GetWalletByPrivkey(ctx, t.walletPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
-	err = txWallet.AwaitReady(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("cannot load wallet state: %w", err)
-	}
-
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", txWallet.GetAddress().Hex(), txWallet.GetNonce(), txWallet.GetReadableBalance(18, 0, 4, false, false))
 
-	tx, err := txWallet.BuildTransaction(ctx, func(_ context.Context, nonce uint64, _ bind.SignerFn) (*ethtypes.Transaction, error) {
-		txData := make([]byte, 96)
-		copy(txData[0:48], sourceValidator.Validator.PublicKey[:])
-		copy(txData[48:], targetValidator.Validator.PublicKey[:])
+	txData := make([]byte, 96)
+	copy(txData[0:48], sourceValidator.Validator.PublicKey[:])
+	copy(txData[48:], targetValidator.Validator.PublicKey[:])
 
-		txObj := &ethtypes.DynamicFeeTx{
-			ChainID:   t.ctx.Scheduler.GetServices().ClientPool().GetExecutionPool().GetBlockCache().GetChainID(),
-			Nonce:     nonce,
-			GasTipCap: t.config.TxTipCap,
-			GasFeeCap: t.config.TxFeeCap,
-			Gas:       t.config.TxGasLimit,
-			To:        &t.consolidationContractAddr,
-			Value:     t.config.TxAmount,
-			Data:      txData,
-		}
-
-		return ethtypes.NewTx(txObj), nil
+	dynFeeTx, err := txbuilder.DynFeeTx(&txbuilder.TxMetadata{
+		GasTipCap: uint256.MustFromBig(t.config.TxTipCap),
+		GasFeeCap: uint256.MustFromBig(t.config.TxFeeCap),
+		Gas:       t.config.TxGasLimit,
+		To:        &t.consolidationContractAddr,
+		Value:     uint256.MustFromBig(t.config.TxAmount),
+		Data:      txData,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot build consolidation tx data: %w", err)
+	}
+
+	tx, err := txWallet.BuildDynamicFeeTx(dynFeeTx)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build consolidation transaction: %w", err)
 	}
 
-	err = txWallet.SendTransaction(ctx, tx, &wallet.SendTransactionOptions{
-		Clients:   clients,
-		OnConfirm: onConfirm,
-		LogFn: func(client *execution.Client, retry uint64, rebroadcast uint64, err error) {
+	client := walletMgr.GetClient(clients[0])
+
+	err = walletMgr.GetTxPool().SendTransaction(ctx, txWallet, tx, &spamoor.SendTransactionOptions{
+		Client:      client,
+		Rebroadcast: true,
+		OnComplete:  onComplete,
+		LogFn: func(client *spamoor.Client, retry int, rebroadcast int, err error) {
 			if err != nil {
 				return
 			}
@@ -429,8 +427,6 @@ func (t *Task) generateConsolidation(ctx context.Context, accountIdx uint64, onC
 
 			logEntry.Infof("submitted consolidation transaction (source index: %v, target index: %v, nonce: %v, attempt: %v)", sourceValidator.Index, targetValidator.Index, tx.Nonce(), retry)
 		},
-		RebroadcastInterval: 30 * time.Second,
-		MaxRebroadcasts:     5,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed sending consolidation transaction: %w", err)

@@ -22,6 +22,7 @@ type Config struct {
 	ContractDeployment bool           `yaml:"contractDeployment" json:"contractDeployment" desc:"If true, deploy a contract instead of sending to an address."`
 	CallData           string         `yaml:"callData" json:"callData" desc:"Hex-encoded call data to include in the transaction."`
 	BlobData           string         `yaml:"blobData" json:"blobData" desc:"Hex-encoded blob data to use in blob sidecars."`
+	BlobSidecars       uint64         `yaml:"blobSidecars" json:"blobSidecars" desc:"Number of blob sidecars to include in the transaction."`
 	RandomAmount       bool           `yaml:"randomAmount" json:"randomAmount" desc:"If true, use a random amount for the transaction."`
 	Amount             *helper.BigInt `yaml:"amount" json:"amount" desc:"Amount (in wei) to send in the transaction."`
 	Nonce              *uint64        `yaml:"nonce" json:"nonce" desc:"Custom nonce to use for the transaction."`
@@ -56,6 +57,7 @@ func DefaultConfig() Config {
 		TipCap:       &helper.BigInt{Value: *big.NewInt(1000000000)},   // 1 Gwei
 		GasLimit:     50000,
 		Amount:       &helper.BigInt{Value: *big.NewInt(0)},
+		BlobSidecars: 1,
 		AwaitReceipt: true,
 	}
 }
