@@ -1,4 +1,5 @@
 import type { BuilderTask } from '../../stores/builderStore';
+import { hasNamedChildren, getNamedChildSlots } from '../../stores/builderStore';
 
 // Generate a unique task ID
 let idCounter = 0;
@@ -22,6 +23,13 @@ export function findTaskById(tasks: BuilderTask[], taskId: string): BuilderTask 
       const found = findTaskById(task.children, taskId);
       if (found) return found;
     }
+    if (task.namedChildren) {
+      for (const child of Object.values(task.namedChildren)) {
+        if (child.id === taskId) return child;
+        const found = findTaskById([child], taskId);
+        if (found) return found;
+      }
+    }
   }
   return null;
 }
@@ -42,6 +50,17 @@ export function findParentTask(
         return found !== null ? found : task;
       }
     }
+    if (task.namedChildren) {
+      for (const child of Object.values(task.namedChildren)) {
+        if (child.id === taskId) {
+          return task;
+        }
+        const found = findParentTask([child], taskId, task);
+        if (found !== null) {
+          return found;
+        }
+      }
+    }
   }
   return null;
 }
@@ -56,6 +75,15 @@ export function findTaskPath(tasks: BuilderTask[], taskId: string, path: string[
       const found = findTaskPath(task.children, taskId, [...path, task.id]);
       if (found) return found;
     }
+    if (task.namedChildren) {
+      for (const child of Object.values(task.namedChildren)) {
+        if (child.id === taskId) {
+          return [...path, task.id];
+        }
+        const found = findTaskPath([child], taskId, [...path, task.id]);
+        if (found) return found;
+      }
+    }
   }
   return null;
 }
@@ -67,6 +95,11 @@ export function getAllTaskIds(tasks: BuilderTask[]): string[] {
     ids.push(task.id);
     if (task.children) {
       ids.push(...getAllTaskIds(task.children));
+    }
+    if (task.namedChildren) {
+      for (const child of Object.values(task.namedChildren)) {
+        ids.push(...getAllTaskIds([child]));
+      }
     }
   }
   return ids;
@@ -80,11 +113,23 @@ export function getAllTasks(tasks: BuilderTask[]): BuilderTask[] {
     if (task.children) {
       result.push(...getAllTasks(task.children));
     }
+    if (task.namedChildren) {
+      for (const child of Object.values(task.namedChildren)) {
+        result.push(...getAllTasks([child]));
+      }
+    }
   }
   return result;
 }
 
+// Task types that run children concurrently (outputs from siblings are not accessible)
+const CONCURRENT_TASK_TYPES = new Set([
+  'run_tasks_concurrent',
+  'run_task_matrix',
+]);
+
 // Find tasks that precede a given task (for variable context)
+// This considers execution order and excludes concurrent siblings
 export function findPrecedingTasks(
   tasks: BuilderTask[],
   taskId: string,
@@ -92,38 +137,7 @@ export function findPrecedingTasks(
 ): BuilderTask[] {
   const preceding: BuilderTask[] = [];
 
-  function collectPreceding(taskList: BuilderTask[], targetId: string): boolean {
-    for (let i = 0; i < taskList.length; i++) {
-      const task = taskList[i];
-
-      if (task.id === targetId) {
-        // Found the target, stop here
-        return true;
-      }
-
-      // Check if target is in children
-      if (task.children) {
-        const foundInChildren = collectPreceding(task.children, targetId);
-        if (foundInChildren) {
-          // All siblings before this parent are preceding
-          for (let j = 0; j < i; j++) {
-            addAllTasks(taskList[j]);
-          }
-          // If including parents, add the parent too
-          if (includeParents) {
-            preceding.push(task);
-          }
-          return true;
-        }
-      }
-
-      // If we haven't found target yet, this task precedes it
-      // (will be added if we find target later)
-    }
-
-    return false;
-  }
-
+  // Helper to add a task and all its completed descendants
   function addAllTasks(task: BuilderTask): void {
     preceding.push(task);
     if (task.children) {
@@ -131,30 +145,86 @@ export function findPrecedingTasks(
         addAllTasks(child);
       }
     }
+    if (task.namedChildren) {
+      for (const child of Object.values(task.namedChildren)) {
+        addAllTasks(child);
+      }
+    }
   }
 
-  // Collect all tasks before the target in execution order
-  for (let i = 0; i < tasks.length; i++) {
-    if (tasks[i].id === taskId) {
-      // Found at root level, all previous root tasks precede
-      for (let j = 0; j < i; j++) {
-        addAllTasks(tasks[j]);
-      }
-      return preceding;
-    }
+  // Search for target task and collect preceding tasks
+  function searchInList(
+    taskList: BuilderTask[],
+    targetId: string,
+    parentTaskType?: string
+  ): { found: boolean; targetIndex: number } {
+    for (let i = 0; i < taskList.length; i++) {
+      const task = taskList[i];
 
-    if (tasks[i].children) {
-      const foundInChildren = collectPreceding(tasks[i].children!, taskId);
-      if (foundInChildren) {
-        // All tasks before this root task precede
-        for (let j = 0; j < i; j++) {
-          addAllTasks(tasks[j]);
+      if (task.id === targetId) {
+        // Found the target
+        const isConcurrent = parentTaskType && CONCURRENT_TASK_TYPES.has(parentTaskType);
+        if (!isConcurrent) {
+          for (let j = 0; j < i; j++) {
+            addAllTasks(taskList[j]);
+          }
         }
-        return preceding;
+        return { found: true, targetIndex: i };
+      }
+
+      // Check children
+      if (task.children) {
+        const result = searchInList(task.children, targetId, task.taskType);
+        if (result.found) {
+          const parentIsConcurrent = parentTaskType && CONCURRENT_TASK_TYPES.has(parentTaskType);
+          if (!parentIsConcurrent) {
+            for (let j = 0; j < i; j++) {
+              addAllTasks(taskList[j]);
+            }
+          }
+          if (includeParents) {
+            preceding.push(task);
+          }
+          return { found: true, targetIndex: i };
+        }
+      }
+
+      // Check named children (these typically run concurrently)
+      if (task.namedChildren) {
+        for (const [_slotName, child] of Object.entries(task.namedChildren)) {
+          if (child.id === targetId) {
+            const parentIsConcurrent = parentTaskType && CONCURRENT_TASK_TYPES.has(parentTaskType);
+            if (!parentIsConcurrent) {
+              for (let j = 0; j < i; j++) {
+                addAllTasks(taskList[j]);
+              }
+            }
+            if (includeParents) {
+              preceding.push(task);
+            }
+            return { found: true, targetIndex: i };
+          }
+          const result = searchInList([child], targetId, task.taskType);
+          if (result.found) {
+            const parentIsConcurrent = parentTaskType && CONCURRENT_TASK_TYPES.has(parentTaskType);
+            if (!parentIsConcurrent) {
+              for (let j = 0; j < i; j++) {
+                addAllTasks(taskList[j]);
+              }
+            }
+            if (includeParents) {
+              preceding.push(task);
+            }
+            return { found: true, targetIndex: i };
+          }
+        }
       }
     }
+
+    return { found: false, targetIndex: -1 };
   }
 
+  searchInList(tasks, taskId);
   return preceding;
 }
 
@@ -163,10 +233,41 @@ export function removeTaskById(tasks: BuilderTask[], taskId: string): BuilderTas
   return tasks
     .filter((task) => task.id !== taskId)
     .map((task) => {
+      let updated = task;
+
       if (task.children) {
-        return { ...task, children: removeTaskById(task.children, taskId) };
+        const newChildren = removeTaskById(task.children, taskId);
+        if (newChildren !== task.children) {
+          updated = { ...updated, children: newChildren };
+        }
       }
-      return task;
+
+      if (task.namedChildren) {
+        const newNamedChildren: Record<string, BuilderTask> = {};
+        let changed = false;
+
+        for (const [slotName, child] of Object.entries(task.namedChildren)) {
+          if (child.id === taskId) {
+            changed = true;
+            // Don't include this child
+          } else {
+            const [newChild] = removeTaskById([child], taskId);
+            if (newChild !== child) {
+              changed = true;
+            }
+            newNamedChildren[slotName] = newChild;
+          }
+        }
+
+        if (changed) {
+          updated = {
+            ...updated,
+            namedChildren: Object.keys(newNamedChildren).length > 0 ? newNamedChildren : undefined,
+          };
+        }
+      }
+
+      return updated;
     });
 }
 
@@ -187,10 +288,34 @@ export function insertTaskAt(
       }
       return { ...task, children };
     }
+
+    let updated = task;
+
     if (task.children) {
-      return { ...task, children: insertTaskAt(task.children, newTask, parentId, index) };
+      const newChildren = insertTaskAt(task.children, newTask, parentId, index);
+      if (newChildren !== task.children) {
+        updated = { ...updated, children: newChildren };
+      }
     }
-    return task;
+
+    if (task.namedChildren) {
+      const newNamedChildren: Record<string, BuilderTask> = {};
+      let changed = false;
+
+      for (const [slotName, child] of Object.entries(task.namedChildren)) {
+        const [newChild] = insertTaskAt([child], newTask, parentId, index);
+        if (newChild !== child) {
+          changed = true;
+        }
+        newNamedChildren[slotName] = newChild;
+      }
+
+      if (changed) {
+        updated = { ...updated, namedChildren: newNamedChildren };
+      }
+    }
+
+    return updated;
   });
 }
 
@@ -223,7 +348,8 @@ export function isDescendantOf(tasks: BuilderTask[], taskId: string, potentialAn
 }
 
 // Get task index within its parent (or root)
-export function getTaskIndex(tasks: BuilderTask[], taskId: string): { parentId: string | null; index: number } | null {
+// For named children, returns the slot index
+export function getTaskIndex(tasks: BuilderTask[], taskId: string): { parentId: string | null; index: number; slotName?: string } | null {
   // Check root level
   for (let i = 0; i < tasks.length; i++) {
     if (tasks[i].id === taskId) {
@@ -231,7 +357,7 @@ export function getTaskIndex(tasks: BuilderTask[], taskId: string): { parentId: 
     }
   }
 
-  // Check children
+  // Check children and namedChildren
   for (const task of tasks) {
     if (task.children) {
       for (let i = 0; i < task.children.length; i++) {
@@ -241,6 +367,23 @@ export function getTaskIndex(tasks: BuilderTask[], taskId: string): { parentId: 
       }
       const found = getTaskIndex(task.children, taskId);
       if (found) return found;
+    }
+
+    if (task.namedChildren) {
+      const slots = getNamedChildSlots(task.taskType);
+      if (slots) {
+        for (let slotIdx = 0; slotIdx < slots.length; slotIdx++) {
+          const slot = slots[slotIdx];
+          const child = task.namedChildren[slot.name];
+          if (child) {
+            if (child.id === taskId) {
+              return { parentId: task.id, index: slotIdx, slotName: slot.name };
+            }
+            const found = getTaskIndex([child], taskId);
+            if (found) return found;
+          }
+        }
+      }
     }
   }
 
@@ -255,6 +398,11 @@ export function countTasks(tasks: BuilderTask[]): number {
     if (task.children) {
       count += countTasks(task.children);
     }
+    if (task.namedChildren) {
+      for (const child of Object.values(task.namedChildren)) {
+        count += countTasks([child]);
+      }
+    }
   }
   return count;
 }
@@ -266,6 +414,12 @@ export function getMaxDepth(tasks: BuilderTask[], currentDepth = 0): number {
     if (task.children && task.children.length > 0) {
       const childDepth = getMaxDepth(task.children, currentDepth + 1);
       maxDepth = Math.max(maxDepth, childDepth);
+    }
+    if (task.namedChildren) {
+      for (const child of Object.values(task.namedChildren)) {
+        const childDepth = getMaxDepth([child], currentDepth + 1);
+        maxDepth = Math.max(maxDepth, childDepth);
+      }
     }
   }
   return maxDepth;
@@ -296,12 +450,23 @@ export function wouldCreateCircular(
 
 // Deep clone a task tree
 export function cloneTaskTree(tasks: BuilderTask[]): BuilderTask[] {
-  return tasks.map((task) => ({
-    ...task,
-    config: { ...task.config },
-    configVars: { ...task.configVars },
-    children: task.children ? cloneTaskTree(task.children) : undefined,
-  }));
+  return tasks.map((task) => {
+    const cloned: BuilderTask = {
+      ...task,
+      config: { ...task.config },
+      configVars: { ...task.configVars },
+      children: task.children ? cloneTaskTree(task.children) : undefined,
+    };
+
+    if (task.namedChildren) {
+      cloned.namedChildren = {};
+      for (const [slotName, child] of Object.entries(task.namedChildren)) {
+        cloned.namedChildren[slotName] = cloneTaskTree([child])[0];
+      }
+    }
+
+    return cloned;
+  });
 }
 
 // Create a new task from a task type
@@ -317,8 +482,8 @@ export function createTask(taskType: string, title?: string): BuilderTask {
     task.title = title;
   }
 
-  // Initialize children array for glue tasks
-  if (canHaveChildren(taskType)) {
+  // Initialize children array for glue tasks (except those with named children)
+  if (canHaveChildren(taskType) && !hasNamedChildren(taskType)) {
     task.children = [];
   }
 

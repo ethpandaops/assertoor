@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { Node, Edge } from 'reactflow';
 import type { BuilderTask } from '../../../stores/builderStore';
+import { getNamedChildSlots, hasNamedChildren } from '../../../stores/builderStore';
 import type { BuilderNodeData } from './BuilderNode';
 import type { GlueNodeData } from './GlueTaskNode';
 import type { StartEndNodeData } from './StartEndNode';
@@ -48,9 +49,11 @@ interface SizeResult {
 
 // Get max children for a task type
 function getMaxChildren(taskType: string): number {
+  if (hasNamedChildren(taskType)) {
+    const slots = getNamedChildSlots(taskType);
+    return slots?.length || 0;
+  }
   switch (taskType) {
-    case 'run_task_background':
-      return 2;
     case 'run_task_options':
     case 'run_task_matrix':
       return 1;
@@ -71,22 +74,24 @@ function calculateTaskSize(task: BuilderTask): SizeResult {
   const children = task.children || [];
   const isConcurrent = CONCURRENT_GLUE_TASKS.has(task.taskType);
 
-  // Special handling for run_task_background - always two lanes
-  if (task.taskType === 'run_task_background') {
-    // Get sizes of background (index 0) and foreground (index 1) children
-    const bgChild = children.length === 2 ? children[0] : null;
-    const fgChild = children.length === 2 ? children[1] : (children.length === 1 ? children[0] : null);
+  // Special handling for tasks with named children (e.g., run_task_background)
+  const namedSlots = getNamedChildSlots(task.taskType);
+  if (namedSlots) {
+    // Calculate size for each slot
+    const slotSizes = namedSlots.map((slot) => {
+      const slotChild = task.namedChildren?.[slot.name];
+      return slotChild ? calculateTaskSize(slotChild) : { width: NODE_WIDTH, height: NODE_HEIGHT };
+    });
 
-    const bgSize = bgChild ? calculateTaskSize(bgChild) : { width: NODE_WIDTH, height: NODE_HEIGHT };
-    const fgSize = fgChild ? calculateTaskSize(fgChild) : { width: NODE_WIDTH, height: NODE_HEIGHT };
-
-    const maxChildHeight = Math.max(bgSize.height, fgSize.height);
+    const maxChildHeight = Math.max(...slotSizes.map((s) => s.height));
 
     // Content height = label + drop zone + child + drop zone
     const laneContentHeight = BG_TASK_LABEL_HEIGHT + DROP_ZONE_HEIGHT + VERTICAL_GAP + maxChildHeight + VERTICAL_GAP + DROP_ZONE_HEIGHT;
 
-    // Width = padding + bg lane + gap + divider + gap + fg lane + padding
-    const totalWidth = CONTAINER_PADDING_X * 2 + bgSize.width + LANE_GAP + BG_TASK_DIVIDER_WIDTH + LANE_GAP + fgSize.width;
+    // Width = padding + (slot widths + gaps + dividers)
+    const totalSlotWidth = slotSizes.reduce((sum, s) => sum + s.width, 0);
+    const dividerCount = namedSlots.length - 1;
+    const totalWidth = CONTAINER_PADDING_X * 2 + totalSlotWidth + (namedSlots.length - 1) * LANE_GAP + dividerCount * (BG_TASK_DIVIDER_WIDTH + LANE_GAP);
 
     return {
       width: totalWidth,
@@ -215,211 +220,85 @@ export function useBuilderGraphLayout(
 
         const edgeColor = isConcurrent ? 'var(--color-purple-400)' : 'var(--color-blue-400)';
 
-        // Special handling for run_task_background - always show two lanes
-        if (task.taskType === 'run_task_background') {
-          // Determine which children go where
-          // With 2 children: [0]=background, [1]=foreground
-          // With 1 child: [0]=foreground (no background task)
-          // With 0 children: both empty
-          const bgChild = childCount === 2 ? children[0] : null;
-          const fgChild = childCount === 2 ? children[1] : (childCount === 1 ? children[0] : null);
-
-          const bgSize = bgChild ? calculateTaskSize(bgChild) : { width: NODE_WIDTH, height: NODE_HEIGHT };
-          const fgSize = fgChild ? calculateTaskSize(fgChild) : { width: NODE_WIDTH, height: NODE_HEIGHT };
-          const maxChildHeight = Math.max(bgSize.height, fgSize.height);
+        // Special handling for tasks with named children (e.g., run_task_background)
+        const taskNamedSlots = getNamedChildSlots(task.taskType);
+        if (taskNamedSlots) {
+          // Calculate sizes for each slot
+          const slotSizes = taskNamedSlots.map((slot) => {
+            const slotChild = task.namedChildren?.[slot.name];
+            return slotChild ? calculateTaskSize(slotChild) : { width: NODE_WIDTH, height: NODE_HEIGHT };
+          });
+          const maxChildHeight = Math.max(...slotSizes.map((s) => s.height));
 
           const laneTopY = CONTAINER_PADDING_TOP;
+          let currentX = CONTAINER_PADDING_X;
 
-          // Background lane (left)
-          const bgLaneX = CONTAINER_PADDING_X;
+          taskNamedSlots.forEach((slot, slotIndex) => {
+            const slotChild = task.namedChildren?.[slot.name];
+            const slotSize = slotSizes[slotIndex];
 
-          // Background label
-          const bgLabelId = generateId('label');
-          nodes.push({
-            id: bgLabelId,
-            type: 'laneLabel',
-            position: { x: bgLaneX, y: laneTopY },
-            parentNode: nodeId,
-            extent: 'parent',
-            draggable: false,
-            data: {
-              label: 'Background',
-              variant: 'background',
-            } as LaneLabelNodeData,
-            style: { width: bgSize.width, height: BG_TASK_LABEL_HEIGHT },
-          });
-
-          // Background drop zone
-          const bgDropY = laneTopY + BG_TASK_LABEL_HEIGHT;
-          const bgDropId = generateId('drop');
-          nodes.push({
-            id: bgDropId,
-            type: 'dropZone',
-            position: { x: bgLaneX, y: bgDropY },
-            parentNode: nodeId,
-            extent: 'parent',
-            draggable: false,
-            data: {
-              dropId: bgChild
-                ? (isCleanup ? `cleanup-insert-before-${bgChild.id}` : `insert-before-${bgChild.id}`)
-                : (isCleanup ? `cleanup-insert-bg-child-${task.id}` : `insert-bg-child-${task.id}`),
-              parentTaskId: task.id,
-              insertIndex: 0,
-              isCleanup,
-            } as DropZoneNodeData,
-            style: { width: bgSize.width, height: DROP_ZONE_HEIGHT },
-          });
-
-          // Background child or empty placeholder
-          const bgChildY = bgDropY + DROP_ZONE_HEIGHT + VERTICAL_GAP;
-          if (bgChild) {
-            const bgResult = processTask(bgChild, bgLaneX, bgChildY, nodeId, undefined, isCleanup);
-            addEdge(bgDropId, bgResult.nodeId, 'var(--color-amber-400)');
-
-            // Bottom drop zone for background
-            const bgBottomDropId = generateId('drop');
+            // Slot label
+            const labelId = generateId('label');
             nodes.push({
-              id: bgBottomDropId,
-              type: 'dropZone',
-              position: { x: bgLaneX, y: bgChildY + bgSize.height + VERTICAL_GAP },
+              id: labelId,
+              type: 'laneLabel',
+              position: { x: currentX, y: laneTopY },
               parentNode: nodeId,
               extent: 'parent',
               draggable: false,
               data: {
-                dropId: isCleanup ? `cleanup-insert-after-bg-${task.id}` : `insert-after-bg-${task.id}`,
-                parentTaskId: task.id,
-                insertIndex: 1,
-                disabled: true,
-                isCleanup,
-              } as DropZoneNodeData,
-              style: { width: bgSize.width, height: DROP_ZONE_HEIGHT },
+                label: slot.name.charAt(0).toUpperCase() + slot.name.slice(1),
+                variant: slot.name as 'background' | 'foreground',
+              } as LaneLabelNodeData,
+              style: { width: slotSize.width, height: BG_TASK_LABEL_HEIGHT },
             });
-            addEdge(bgResult.nodeId, bgBottomDropId, 'var(--color-amber-400)');
-          } else {
-            // Empty background slot - show larger drop area
-            const emptyBgDropId = generateId('drop');
-            const emptyHeight = maxChildHeight + VERTICAL_GAP + DROP_ZONE_HEIGHT;
-            nodes.push({
-              id: emptyBgDropId,
-              type: 'dropZone',
-              position: { x: bgLaneX, y: bgChildY },
-              parentNode: nodeId,
-              extent: 'parent',
-              draggable: false,
-              data: {
-                dropId: isCleanup ? `cleanup-insert-bg-child-${task.id}` : `insert-bg-child-${task.id}`,
-                isHorizontal: true,
-                parentTaskId: task.id,
-                insertIndex: 0,
-                isCleanup,
-              } as DropZoneNodeData,
-              style: { width: bgSize.width, height: emptyHeight },
-            });
-          }
 
-          // Divider (center)
-          const dividerX = bgLaneX + bgSize.width + LANE_GAP;
-          const dividerHeight = BG_TASK_LABEL_HEIGHT + DROP_ZONE_HEIGHT + VERTICAL_GAP + maxChildHeight + VERTICAL_GAP + DROP_ZONE_HEIGHT;
-          const dividerId = generateId('divider');
-          nodes.push({
-            id: dividerId,
-            type: 'divider',
-            position: { x: dividerX, y: laneTopY },
-            parentNode: nodeId,
-            extent: 'parent',
-            draggable: false,
-            data: {
-              orientation: 'vertical',
-            } as DividerNodeData,
-            style: { width: BG_TASK_DIVIDER_WIDTH, height: dividerHeight },
+            // Slot child or empty placeholder
+            const slotChildY = laneTopY + BG_TASK_LABEL_HEIGHT + DROP_ZONE_HEIGHT + VERTICAL_GAP;
+            if (slotChild) {
+              processTask(slotChild, currentX, slotChildY, nodeId, undefined, isCleanup);
+            } else {
+              const emptyDropId = generateId('drop');
+              const emptyHeight = DROP_ZONE_HEIGHT + VERTICAL_GAP + maxChildHeight + VERTICAL_GAP + DROP_ZONE_HEIGHT;
+              nodes.push({
+                id: emptyDropId,
+                type: 'dropZone',
+                position: { x: currentX, y: laneTopY + BG_TASK_LABEL_HEIGHT },
+                parentNode: nodeId,
+                extent: 'parent',
+                draggable: false,
+                data: {
+                  dropId: isCleanup ? `cleanup-insert-named-${slot.name}-${task.id}` : `insert-named-${slot.name}-${task.id}`,
+                  isHorizontal: true,
+                  parentTaskId: task.id,
+                  insertIndex: slotIndex,
+                  isCleanup,
+                } as DropZoneNodeData,
+                style: { width: slotSize.width, height: emptyHeight },
+              });
+            }
+
+            currentX += slotSize.width + LANE_GAP;
+
+            // Add divider between slots (not after the last one)
+            if (slotIndex < taskNamedSlots.length - 1) {
+              const dividerHeight = BG_TASK_LABEL_HEIGHT + DROP_ZONE_HEIGHT + VERTICAL_GAP + maxChildHeight + VERTICAL_GAP + DROP_ZONE_HEIGHT;
+              const dividerId = generateId('divider');
+              nodes.push({
+                id: dividerId,
+                type: 'divider',
+                position: { x: currentX, y: laneTopY },
+                parentNode: nodeId,
+                extent: 'parent',
+                draggable: false,
+                data: {
+                  orientation: 'vertical',
+                } as DividerNodeData,
+                style: { width: BG_TASK_DIVIDER_WIDTH, height: dividerHeight },
+              });
+              currentX += BG_TASK_DIVIDER_WIDTH + LANE_GAP;
+            }
           });
-
-          // Foreground lane (right)
-          const fgLaneX = dividerX + BG_TASK_DIVIDER_WIDTH + LANE_GAP;
-
-          // Foreground label
-          const fgLabelId = generateId('label');
-          nodes.push({
-            id: fgLabelId,
-            type: 'laneLabel',
-            position: { x: fgLaneX, y: laneTopY },
-            parentNode: nodeId,
-            extent: 'parent',
-            draggable: false,
-            data: {
-              label: 'Foreground',
-              variant: 'foreground',
-            } as LaneLabelNodeData,
-            style: { width: fgSize.width, height: BG_TASK_LABEL_HEIGHT },
-          });
-
-          // Foreground drop zone
-          const fgDropY = laneTopY + BG_TASK_LABEL_HEIGHT;
-          const fgDropId = generateId('drop');
-          nodes.push({
-            id: fgDropId,
-            type: 'dropZone',
-            position: { x: fgLaneX, y: fgDropY },
-            parentNode: nodeId,
-            extent: 'parent',
-            draggable: false,
-            data: {
-              dropId: fgChild
-                ? (isCleanup ? `cleanup-insert-before-${fgChild.id}` : `insert-before-${fgChild.id}`)
-                : (isCleanup ? `cleanup-insert-fg-child-${task.id}` : `insert-fg-child-${task.id}`),
-              parentTaskId: task.id,
-              insertIndex: childCount === 2 ? 1 : 0,
-              isCleanup,
-            } as DropZoneNodeData,
-            style: { width: fgSize.width, height: DROP_ZONE_HEIGHT },
-          });
-
-          // Foreground child or empty placeholder
-          const fgChildY = fgDropY + DROP_ZONE_HEIGHT + VERTICAL_GAP;
-          if (fgChild) {
-            const fgResult = processTask(fgChild, fgLaneX, fgChildY, nodeId, undefined, isCleanup);
-            addEdge(fgDropId, fgResult.nodeId, 'var(--color-emerald-400)');
-
-            // Bottom drop zone for foreground
-            const fgBottomDropId = generateId('drop');
-            nodes.push({
-              id: fgBottomDropId,
-              type: 'dropZone',
-              position: { x: fgLaneX, y: fgChildY + fgSize.height + VERTICAL_GAP },
-              parentNode: nodeId,
-              extent: 'parent',
-              draggable: false,
-              data: {
-                dropId: isCleanup ? `cleanup-insert-after-fg-${task.id}` : `insert-after-fg-${task.id}`,
-                parentTaskId: task.id,
-                insertIndex: childCount === 2 ? 2 : 1,
-                disabled: true,
-                isCleanup,
-              } as DropZoneNodeData,
-              style: { width: fgSize.width, height: DROP_ZONE_HEIGHT },
-            });
-            addEdge(fgResult.nodeId, fgBottomDropId, 'var(--color-emerald-400)');
-          } else {
-            // Empty foreground slot - show larger drop area
-            const emptyFgDropId = generateId('drop');
-            const emptyHeight = maxChildHeight + VERTICAL_GAP + DROP_ZONE_HEIGHT;
-            nodes.push({
-              id: emptyFgDropId,
-              type: 'dropZone',
-              position: { x: fgLaneX, y: fgChildY },
-              parentNode: nodeId,
-              extent: 'parent',
-              draggable: false,
-              data: {
-                dropId: isCleanup ? `cleanup-insert-fg-child-${task.id}` : `insert-fg-child-${task.id}`,
-                isHorizontal: true,
-                parentTaskId: task.id,
-                insertIndex: childCount === 2 ? 1 : 0,
-                isCleanup,
-              } as DropZoneNodeData,
-              style: { width: fgSize.width, height: emptyHeight },
-            });
-          }
         } else if (isConcurrent && childCount > 0) {
           // Other concurrent tasks: render parallel lanes
           const childSizes = children.map((child) => calculateTaskSize(child));
@@ -511,72 +390,103 @@ export function useBuilderGraphLayout(
           // Sequential or empty: stack children vertically with execution line
           const childSizes = children.map((child) => calculateTaskSize(child));
           const maxChildWidth = childCount > 0 ? Math.max(...childSizes.map((s) => s.width)) : NODE_WIDTH;
+          const isSingleChildTask = task.taskType === 'run_task_options' || task.taskType === 'run_task_matrix';
 
           let currentY = CONTAINER_PADDING_TOP;
           const centerX = CONTAINER_PADDING_X + (size.width - CONTAINER_PADDING_X * 2 - maxChildWidth) / 2;
 
-          // Initial drop zone
-          const firstDropId = generateId('drop');
-          nodes.push({
-            id: firstDropId,
-            type: 'dropZone',
-            position: { x: centerX, y: currentY },
-            parentNode: nodeId,
-            extent: 'parent',
-            draggable: false,
-            data: {
-              dropId: childCount > 0
-                ? (isCleanup ? `cleanup-insert-before-${children[0].id}` : `insert-before-${children[0].id}`)
-                : (isCleanup ? `cleanup-insert-first-child-${task.id}` : `insert-first-child-${task.id}`),
-              parentTaskId: task.id,
-              insertIndex: 0,
-              isCleanup,
-            } as DropZoneNodeData,
-            style: { width: maxChildWidth, height: DROP_ZONE_HEIGHT },
-          });
-
-          let prevNodeId = firstDropId;
-          currentY += DROP_ZONE_HEIGHT + VERTICAL_GAP;
-
-          // Process each child
-          for (let i = 0; i < childCount; i++) {
-            const child = children[i];
-            const childSize = childSizes[i];
-
-            // Center child within container
+          // For single-child tasks with a filled slot, render child directly without drop zones
+          if (isSingleChildTask && childCount > 0) {
+            const child = children[0];
+            const childSize = childSizes[0];
             const childX = centerX + (maxChildWidth - childSize.width) / 2;
-            const childResult = processTask(child, childX, currentY, nodeId, undefined, isCleanup);
-
-            // Edge from previous node to child
-            addEdge(prevNodeId, childResult.nodeId, edgeColor);
-
-            currentY += childSize.height + VERTICAL_GAP;
-
-            // Drop zone after this child
-            const dropId = generateId('drop');
+            // Add some padding at top
+            currentY += DROP_ZONE_HEIGHT + VERTICAL_GAP;
+            processTask(child, childX, currentY, nodeId, undefined, isCleanup);
+          } else if (isSingleChildTask && childCount === 0) {
+            // Single-child task with empty slot - show drop zone
+            const emptyDropId = generateId('drop');
             nodes.push({
-              id: dropId,
+              id: emptyDropId,
               type: 'dropZone',
               position: { x: centerX, y: currentY },
               parentNode: nodeId,
               extent: 'parent',
               draggable: false,
               data: {
-                dropId: i < childCount - 1
-                  ? (isCleanup ? `cleanup-insert-before-${children[i + 1].id}` : `insert-before-${children[i + 1].id}`)
-                  : (isCleanup ? `cleanup-insert-after-children-${task.id}` : `insert-after-children-${task.id}`),
+                dropId: isCleanup ? `cleanup-insert-single-child-${task.id}` : `insert-single-child-${task.id}`,
                 parentTaskId: task.id,
-                insertIndex: i + 1,
+                insertIndex: 0,
+                isCleanup,
+              } as DropZoneNodeData,
+              style: { width: maxChildWidth, height: DROP_ZONE_HEIGHT },
+            });
+          } else {
+            // Multi-child tasks (run_tasks, run_tasks_concurrent): normal flow with drop zones
+
+            // Initial drop zone
+            const firstDropId = generateId('drop');
+            nodes.push({
+              id: firstDropId,
+              type: 'dropZone',
+              position: { x: centerX, y: currentY },
+              parentNode: nodeId,
+              extent: 'parent',
+              draggable: false,
+              data: {
+                dropId: childCount > 0
+                  ? (isCleanup ? `cleanup-insert-before-${children[0].id}` : `insert-before-${children[0].id}`)
+                  : (isCleanup ? `cleanup-insert-first-child-${task.id}` : `insert-first-child-${task.id}`),
+                parentTaskId: task.id,
+                insertIndex: 0,
                 isCleanup,
               } as DropZoneNodeData,
               style: { width: maxChildWidth, height: DROP_ZONE_HEIGHT },
             });
 
-            // Edge from child to drop zone
-            addEdge(childResult.nodeId, dropId, edgeColor);
-
-            prevNodeId = dropId;
+            let prevNodeId = firstDropId;
             currentY += DROP_ZONE_HEIGHT + VERTICAL_GAP;
+
+            // Process each child
+            for (let i = 0; i < childCount; i++) {
+              const child = children[i];
+              const childSize = childSizes[i];
+
+              // Center child within container
+              const childX = centerX + (maxChildWidth - childSize.width) / 2;
+              const childResult = processTask(child, childX, currentY, nodeId, undefined, isCleanup);
+
+              // Edge from previous node to child
+              addEdge(prevNodeId, childResult.nodeId, edgeColor);
+
+              currentY += childSize.height + VERTICAL_GAP;
+
+              // Drop zone after this child
+              const dropId = generateId('drop');
+              nodes.push({
+                id: dropId,
+                type: 'dropZone',
+                position: { x: centerX, y: currentY },
+                parentNode: nodeId,
+                extent: 'parent',
+                draggable: false,
+                data: {
+                  dropId: i < childCount - 1
+                    ? (isCleanup ? `cleanup-insert-before-${children[i + 1].id}` : `insert-before-${children[i + 1].id}`)
+                    : (isCleanup ? `cleanup-insert-after-children-${task.id}` : `insert-after-children-${task.id}`),
+                  parentTaskId: task.id,
+                  insertIndex: i + 1,
+                  isCleanup,
+                } as DropZoneNodeData,
+                style: { width: maxChildWidth, height: DROP_ZONE_HEIGHT },
+              });
+
+              // Edge from child to drop zone
+              addEdge(childResult.nodeId, dropId, edgeColor);
+
+              prevNodeId = dropId;
+              currentY += DROP_ZONE_HEIGHT + VERTICAL_GAP;
+            }
           }
         }
       } else {

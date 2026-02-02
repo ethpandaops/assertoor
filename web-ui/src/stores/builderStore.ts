@@ -3,6 +3,46 @@ import type { TestDetails, TaskDescriptor } from '../types/api';
 import { serializeToYaml, deserializeFromYaml } from '../utils/builder/yamlSerializer';
 import { generateTaskId, findTaskById, removeTaskById, insertTaskAt, moveTaskTo } from '../utils/builder/taskUtils';
 
+// Configuration for named child slots
+export interface NamedChildSlot {
+  name: string;           // Slot name (e.g., 'background', 'foreground')
+  label: string;          // Display label (e.g., 'BG', 'FG')
+  yamlKey: string;        // Key used in YAML config (e.g., 'backgroundTask')
+  colorClass: string;     // Tailwind color class for styling
+}
+
+// Task types that have named child slots instead of a children array
+export const NAMED_CHILD_TASK_TYPES: Record<string, NamedChildSlot[]> = {
+  'run_task_background': [
+    { name: 'background', label: 'BG', yamlKey: 'backgroundTask', colorClass: 'amber' },
+    { name: 'foreground', label: 'FG', yamlKey: 'foregroundTask', colorClass: 'emerald' },
+  ],
+  // Future task types with named children can be added here
+};
+
+// Helper to get named child config for a task type
+export function getNamedChildSlots(taskType: string): NamedChildSlot[] | undefined {
+  return NAMED_CHILD_TASK_TYPES[taskType];
+}
+
+// Helper to check if a task type uses named children
+export function hasNamedChildren(taskType: string): boolean {
+  return taskType in NAMED_CHILD_TASK_TYPES;
+}
+
+// Helper to get slot index by name
+export function getSlotIndex(taskType: string, slotName: string): number {
+  const slots = NAMED_CHILD_TASK_TYPES[taskType];
+  if (!slots) return -1;
+  return slots.findIndex((s) => s.name === slotName);
+}
+
+// Helper to get slot name by index
+export function getSlotName(taskType: string, index: number): string | undefined {
+  const slots = NAMED_CHILD_TASK_TYPES[taskType];
+  return slots?.[index]?.name;
+}
+
 // Builder task representation
 export interface BuilderTask {
   id: string;                          // UUID for internal tracking
@@ -13,7 +53,8 @@ export interface BuilderTask {
   ifCondition?: string;                // Optional skip condition
   config: Record<string, unknown>;     // Direct config values
   configVars: Record<string, string>;  // JQ expressions for dynamic values
-  children?: BuilderTask[];            // For run_tasks, run_tasks_concurrent
+  children?: BuilderTask[];            // For run_tasks, run_tasks_concurrent, run_task_options, run_task_matrix
+  namedChildren?: Record<string, BuilderTask>;  // For tasks with named child slots (e.g., run_task_background)
 }
 
 // Test configuration structure
@@ -111,6 +152,74 @@ const createEmptyTestConfig = (): TestConfig => ({
   tasks: [],
 });
 
+// Helper to recursively update a task tree (generic traversal for namedChildren)
+function traverseAndUpdate(
+  tasks: BuilderTask[],
+  callback: (task: BuilderTask) => BuilderTask | null // Return null to keep unchanged, or updated task
+): BuilderTask[] {
+  return tasks.map((task) => {
+    const result = callback(task);
+    if (result !== null) {
+      return result;
+    }
+
+    let updated = task;
+    let wasUpdated = false;
+
+    if (task.children) {
+      const newChildren = traverseAndUpdate(task.children, callback);
+      if (newChildren !== task.children) {
+        updated = { ...updated, children: newChildren };
+        wasUpdated = true;
+      }
+    }
+
+    if (task.namedChildren) {
+      const newNamedChildren: Record<string, BuilderTask> = {};
+      let namedChildrenUpdated = false;
+
+      for (const [slotName, child] of Object.entries(task.namedChildren)) {
+        const [newChild] = traverseAndUpdate([child], callback);
+        if (newChild !== child) {
+          namedChildrenUpdated = true;
+        }
+        newNamedChildren[slotName] = newChild;
+      }
+
+      if (namedChildrenUpdated) {
+        updated = { ...updated, namedChildren: newNamedChildren };
+        wasUpdated = true;
+      }
+    }
+
+    return wasUpdated ? updated : task;
+  });
+}
+
+// Helper to set a named child slot
+function setNamedChildSlot(
+  tasks: BuilderTask[],
+  parentId: string,
+  slotName: string,
+  newTask: BuilderTask | undefined
+): BuilderTask[] {
+  return traverseAndUpdate(tasks, (task) => {
+    if (task.id === parentId) {
+      const namedChildren = { ...(task.namedChildren || {}) };
+      if (newTask) {
+        namedChildren[slotName] = newTask;
+      } else {
+        delete namedChildren[slotName];
+      }
+      return {
+        ...task,
+        namedChildren: Object.keys(namedChildren).length > 0 ? namedChildren : undefined,
+      };
+    }
+    return null; // Continue traversal
+  });
+}
+
 // Create the builder store
 export const useBuilderStore = create<BuilderState>((set, get) => ({
   // Initial state
@@ -155,7 +264,26 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     const newTask = { ...task, id: task.id || generateTaskId() };
 
     if (parentId) {
-      // Add as child of parent task
+      const parent = findTaskById(state.testConfig.tasks, parentId);
+      if (parent && hasNamedChildren(parent.taskType) && index !== undefined) {
+        const slotName = getSlotName(parent.taskType, index);
+        if (!slotName) return state;
+
+        // If slot is already filled, don't add
+        if (parent.namedChildren?.[slotName]) {
+          return state;
+        }
+
+        return {
+          testConfig: {
+            ...state.testConfig,
+            tasks: setNamedChildSlot(state.testConfig.tasks, parentId, slotName, newTask),
+          },
+          isDirty: true,
+        };
+      }
+
+      // Standard insertion for other parent tasks
       const newTasks = insertTaskAt(state.testConfig.tasks, newTask, parentId, index);
       return {
         testConfig: { ...state.testConfig, tasks: newTasks },
@@ -178,23 +306,15 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
 
   // Update a task
   updateTask: (taskId, updates) => set((state) => {
-    const updateTaskInList = (tasks: BuilderTask[]): BuilderTask[] => {
-      return tasks.map((task) => {
-        if (task.id === taskId) {
-          return { ...task, ...updates };
-        }
-        if (task.children) {
-          return { ...task, children: updateTaskInList(task.children) };
-        }
-        return task;
-      });
-    };
+    const newTasks = traverseAndUpdate(state.testConfig.tasks, (task) => {
+      if (task.id === taskId) {
+        return { ...task, ...updates };
+      }
+      return null;
+    });
 
     return {
-      testConfig: {
-        ...state.testConfig,
-        tasks: updateTaskInList(state.testConfig.tasks),
-      },
+      testConfig: { ...state.testConfig, tasks: newTasks },
       isDirty: true,
     };
   }),
@@ -223,7 +343,34 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     // Remove from current position
     let newTasks = removeTaskById(state.testConfig.tasks, taskId);
 
-    // Insert at new position
+    // Check if target parent uses named children
+    if (targetParentId) {
+      const parent = findTaskById(newTasks, targetParentId);
+      if (parent && hasNamedChildren(parent.taskType)) {
+        const slotName = getSlotName(parent.taskType, targetIndex);
+        if (!slotName) {
+          // Invalid slot index, move to root
+          newTasks = moveTaskTo(newTasks, task, undefined, state.testConfig.tasks.length);
+          return { testConfig: { ...state.testConfig, tasks: newTasks }, isDirty: false };
+        }
+
+        // If slot is already filled, don't move
+        if (parent.namedChildren?.[slotName]) {
+          newTasks = moveTaskTo(newTasks, task, undefined, state.testConfig.tasks.length);
+          return { testConfig: { ...state.testConfig, tasks: newTasks }, isDirty: false };
+        }
+
+        return {
+          testConfig: {
+            ...state.testConfig,
+            tasks: setNamedChildSlot(newTasks, targetParentId, slotName, task),
+          },
+          isDirty: true,
+        };
+      }
+    }
+
+    // Standard insertion for other parent tasks
     newTasks = moveTaskTo(newTasks, task, targetParentId, targetIndex);
 
     return {
@@ -238,6 +385,24 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     const cleanupTasks = state.testConfig.cleanupTasks || [];
 
     if (parentId) {
+      const parent = findTaskById(cleanupTasks, parentId);
+      if (parent && hasNamedChildren(parent.taskType) && index !== undefined) {
+        const slotName = getSlotName(parent.taskType, index);
+        if (!slotName) return state;
+
+        if (parent.namedChildren?.[slotName]) {
+          return state;
+        }
+
+        return {
+          testConfig: {
+            ...state.testConfig,
+            cleanupTasks: setNamedChildSlot(cleanupTasks, parentId, slotName, newTask),
+          },
+          isDirty: true,
+        };
+      }
+
       const newTasks = insertTaskAt(cleanupTasks, newTask, parentId, index);
       return {
         testConfig: { ...state.testConfig, cleanupTasks: newTasks },
@@ -258,23 +423,15 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
   }),
 
   updateCleanupTask: (taskId, updates) => set((state) => {
-    const updateTaskInList = (tasks: BuilderTask[]): BuilderTask[] => {
-      return tasks.map((task) => {
-        if (task.id === taskId) {
-          return { ...task, ...updates };
-        }
-        if (task.children) {
-          return { ...task, children: updateTaskInList(task.children) };
-        }
-        return task;
-      });
-    };
+    const newTasks = traverseAndUpdate(state.testConfig.cleanupTasks || [], (task) => {
+      if (task.id === taskId) {
+        return { ...task, ...updates };
+      }
+      return null;
+    });
 
     return {
-      testConfig: {
-        ...state.testConfig,
-        cleanupTasks: updateTaskInList(state.testConfig.cleanupTasks || []),
-      },
+      testConfig: { ...state.testConfig, cleanupTasks: newTasks },
       isDirty: true,
     };
   }),
@@ -300,6 +457,31 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     if (!task) return state;
 
     let newTasks = removeTaskById(cleanupTasks, taskId);
+
+    if (targetParentId) {
+      const parent = findTaskById(newTasks, targetParentId);
+      if (parent && hasNamedChildren(parent.taskType)) {
+        const slotName = getSlotName(parent.taskType, targetIndex);
+        if (!slotName) {
+          newTasks = moveTaskTo(newTasks, task, undefined, cleanupTasks.length);
+          return { testConfig: { ...state.testConfig, cleanupTasks: newTasks }, isDirty: false };
+        }
+
+        if (parent.namedChildren?.[slotName]) {
+          newTasks = moveTaskTo(newTasks, task, undefined, cleanupTasks.length);
+          return { testConfig: { ...state.testConfig, cleanupTasks: newTasks }, isDirty: false };
+        }
+
+        return {
+          testConfig: {
+            ...state.testConfig,
+            cleanupTasks: setNamedChildSlot(newTasks, targetParentId, slotName, task),
+          },
+          isDirty: true,
+        };
+      }
+    }
+
     newTasks = moveTaskTo(newTasks, task, targetParentId, targetIndex);
 
     return {
@@ -313,11 +495,28 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     const task = findTaskById(state.testConfig.tasks, taskId);
     if (!task) return state;
 
-    // Remove from main tasks
     const newMainTasks = removeTaskById(state.testConfig.tasks, taskId);
-
-    // Add to cleanup tasks
     const cleanupTasks = state.testConfig.cleanupTasks || [];
+
+    if (targetParentId) {
+      const parent = findTaskById(cleanupTasks, targetParentId);
+      if (parent && hasNamedChildren(parent.taskType)) {
+        const slotName = getSlotName(parent.taskType, targetIndex);
+        if (!slotName || parent.namedChildren?.[slotName]) {
+          return state;
+        }
+
+        return {
+          testConfig: {
+            ...state.testConfig,
+            tasks: newMainTasks,
+            cleanupTasks: setNamedChildSlot(cleanupTasks, targetParentId, slotName, task),
+          },
+          isDirty: true,
+        };
+      }
+    }
+
     const newCleanupTasks = moveTaskTo(cleanupTasks, task, targetParentId, targetIndex);
 
     return {
@@ -336,20 +535,45 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     const task = findTaskById(cleanupTasks, taskId);
     if (!task) return state;
 
-    // Remove from cleanup tasks
-    let newCleanupTasks = removeTaskById(cleanupTasks, taskId);
-    if (newCleanupTasks.length === 0) {
-      newCleanupTasks = undefined as unknown as BuilderTask[];
+    // Check if target slot is available before removing
+    if (targetParentId) {
+      const parent = findTaskById(state.testConfig.tasks, targetParentId);
+      if (parent && hasNamedChildren(parent.taskType)) {
+        const slotName = getSlotName(parent.taskType, targetIndex);
+        if (!slotName || parent.namedChildren?.[slotName]) {
+          return state;
+        }
+      }
     }
 
-    // Add to main tasks
+    let newCleanupTasks: BuilderTask[] | undefined = removeTaskById(cleanupTasks, taskId);
+    if (newCleanupTasks.length === 0) {
+      newCleanupTasks = undefined;
+    }
+
+    if (targetParentId) {
+      const parent = findTaskById(state.testConfig.tasks, targetParentId);
+      if (parent && hasNamedChildren(parent.taskType)) {
+        const slotName = getSlotName(parent.taskType, targetIndex)!;
+
+        return {
+          testConfig: {
+            ...state.testConfig,
+            tasks: setNamedChildSlot(state.testConfig.tasks, targetParentId, slotName, task),
+            cleanupTasks: newCleanupTasks,
+          },
+          isDirty: true,
+        };
+      }
+    }
+
     const newMainTasks = moveTaskTo(state.testConfig.tasks, task, targetParentId, targetIndex);
 
     return {
       testConfig: {
         ...state.testConfig,
         tasks: newMainTasks,
-        cleanupTasks: newCleanupTasks?.length ? newCleanupTasks : undefined,
+        cleanupTasks: newCleanupTasks,
       },
       isDirty: true,
     };
@@ -360,12 +584,23 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     const task = findTaskById(state.testConfig.tasks, taskId);
     if (!task) return state;
 
-    const duplicateWithNewIds = (t: BuilderTask): BuilderTask => ({
-      ...t,
-      id: generateTaskId(),
-      taskId: t.taskId ? `${t.taskId}_copy` : undefined,
-      children: t.children?.map(duplicateWithNewIds),
-    });
+    const duplicateWithNewIds = (t: BuilderTask): BuilderTask => {
+      const newTask: BuilderTask = {
+        ...t,
+        id: generateTaskId(),
+        taskId: t.taskId ? `${t.taskId}_copy` : undefined,
+        children: t.children?.map(duplicateWithNewIds),
+      };
+
+      if (t.namedChildren) {
+        newTask.namedChildren = {};
+        for (const [slotName, child] of Object.entries(t.namedChildren)) {
+          newTask.namedChildren[slotName] = duplicateWithNewIds(child);
+        }
+      }
+
+      return newTask;
+    };
 
     const newTask = duplicateWithNewIds(task);
 
@@ -374,14 +609,32 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
       tasks: BuilderTask[],
       searchId: string,
       parent: string | null = null
-    ): { parentId: string | null; index: number } | null => {
+    ): { parentId: string | null; index: number; slotName?: string } | null => {
       for (let i = 0; i < tasks.length; i++) {
-        if (tasks[i].id === searchId) {
+        const t = tasks[i];
+        if (t.id === searchId) {
           return { parentId: parent, index: i + 1 };
         }
-        if (tasks[i].children) {
-          const found = findParentAndIndex(tasks[i].children!, searchId, tasks[i].id);
+        if (t.children) {
+          const found = findParentAndIndex(t.children, searchId, t.id);
           if (found) return found;
+        }
+        if (t.namedChildren) {
+          const slots = getNamedChildSlots(t.taskType);
+          if (slots) {
+            for (let slotIdx = 0; slotIdx < slots.length; slotIdx++) {
+              const slot = slots[slotIdx];
+              const child = t.namedChildren[slot.name];
+              if (child) {
+                if (child.id === searchId) {
+                  // Can't duplicate into same named slot, return null
+                  return null;
+                }
+                const found = findParentAndIndex([child], searchId, t.id);
+                if (found) return found;
+              }
+            }
+          }
         }
       }
       return null;
@@ -390,7 +643,6 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     const location = findParentAndIndex(state.testConfig.tasks, taskId);
     if (!location) return state;
 
-    // Use addTask action
     if (location.parentId) {
       const newTasks = insertTaskAt(state.testConfig.tasks, newTask, location.parentId, location.index);
       return {
@@ -450,6 +702,11 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
         ids.push(task.id);
         if (task.children) {
           ids.push(...getAllIds(task.children));
+        }
+        if (task.namedChildren) {
+          for (const child of Object.values(task.namedChildren)) {
+            ids.push(...getAllIds([child]));
+          }
         }
       }
       return ids;
@@ -528,7 +785,6 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
 
   // Load from test details
   loadTest: (testDetails, _descriptors) => {
-    // Convert test details config to BuilderTask format
     const config = convertTestDetailsToBuilderConfig(testDetails);
 
     set({
@@ -588,7 +844,6 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     const state = get();
     const errors: ValidationError[] = [];
 
-    // Check test name
     if (!state.testConfig.name || state.testConfig.name.trim() === '') {
       errors.push({
         message: 'Test name is required',
@@ -597,7 +852,6 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
       });
     }
 
-    // Check for empty test
     if (state.testConfig.tasks.length === 0) {
       errors.push({
         message: 'Test must have at least one task',
@@ -605,7 +859,6 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
       });
     }
 
-    // Validate each task
     const validateTask = (task: BuilderTask, path: string) => {
       const descriptor = descriptors.get(task.taskType);
 
@@ -617,14 +870,16 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
         });
       }
 
-      // Check for duplicate taskIds
-      // (would need to track seen IDs across all tasks)
-
-      // Validate children for glue tasks
       if (task.children) {
         task.children.forEach((child, i) => {
           validateTask(child, `${path}[${i}]`);
         });
+      }
+
+      if (task.namedChildren) {
+        for (const [slotName, child] of Object.entries(task.namedChildren)) {
+          validateTask(child, `${path}.${slotName}`);
+        }
       }
     };
 
@@ -669,14 +924,11 @@ const GLUE_TASKS_WITH_SINGLE_CHILD = new Set([
   'run_task_matrix',
 ]);
 
-// Glue task with background/foreground children
-const BACKGROUND_GLUE_TASK = 'run_task_background';
-
 // Convert raw task from API to BuilderTask
 function convertRawTaskToBuilder(rawTask: RawTask): BuilderTask {
-  // Copy config and extract children based on task type
   const config: Record<string, unknown> = { ...(rawTask.config || {}) };
   let children: BuilderTask[] | undefined;
+  let namedChildren: Record<string, BuilderTask> | undefined;
 
   // Extract children from config for glue tasks
   if (GLUE_TASKS_WITH_CHILDREN.has(rawTask.name)) {
@@ -691,24 +943,22 @@ function convertRawTaskToBuilder(rawTask: RawTask): BuilderTask {
       children = [convertRawTaskToBuilder(childTask)];
     }
     delete config.task;
-  } else if (rawTask.name === BACKGROUND_GLUE_TASK) {
-    const bgTask = config.backgroundTask as RawTask | undefined;
-    const fgTask = config.foregroundTask as RawTask | undefined;
-    const bgFgChildren: BuilderTask[] = [];
-
-    if (bgTask && typeof bgTask === 'object') {
-      bgFgChildren.push(convertRawTaskToBuilder(bgTask));
+  } else if (hasNamedChildren(rawTask.name)) {
+    // Handle tasks with named children (e.g., run_task_background)
+    const slots = getNamedChildSlots(rawTask.name);
+    if (slots) {
+      namedChildren = {};
+      for (const slot of slots) {
+        const childTask = config[slot.yamlKey] as RawTask | undefined;
+        if (childTask && typeof childTask === 'object') {
+          namedChildren[slot.name] = convertRawTaskToBuilder(childTask);
+        }
+        delete config[slot.yamlKey];
+      }
+      if (Object.keys(namedChildren).length === 0) {
+        namedChildren = undefined;
+      }
     }
-    if (fgTask && typeof fgTask === 'object') {
-      bgFgChildren.push(convertRawTaskToBuilder(fgTask));
-    }
-
-    if (bgFgChildren.length > 0) {
-      children = bgFgChildren;
-    }
-
-    delete config.backgroundTask;
-    delete config.foregroundTask;
   }
 
   const task: BuilderTask = {
@@ -738,6 +988,10 @@ function convertRawTaskToBuilder(rawTask: RawTask): BuilderTask {
     task.children = children;
   }
 
+  if (namedChildren) {
+    task.namedChildren = namedChildren;
+  }
+
   return task;
 }
 
@@ -753,7 +1007,6 @@ function convertTestDetailsToBuilderConfig(testDetails: TestDetails): TestConfig
     config.timeout = formatDuration(testDetails.timeout);
   }
 
-  // The testDetails.config contains the raw test config with tasks array
   const rawConfig = testDetails.config as {
     tasks?: RawTask[];
     cleanupTasks?: RawTask[];
@@ -761,17 +1014,14 @@ function convertTestDetailsToBuilderConfig(testDetails: TestDetails): TestConfig
   };
 
   if (rawConfig) {
-    // Extract global vars/config
     if (rawConfig.config && typeof rawConfig.config === 'object') {
       config.testVars = rawConfig.config;
     }
 
-    // Convert tasks
     if (rawConfig.tasks && Array.isArray(rawConfig.tasks)) {
       config.tasks = rawConfig.tasks.map(convertRawTaskToBuilder);
     }
 
-    // Convert cleanup tasks
     if (rawConfig.cleanupTasks && Array.isArray(rawConfig.cleanupTasks)) {
       config.cleanupTasks = rawConfig.cleanupTasks.map(convertRawTaskToBuilder);
     }

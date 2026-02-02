@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useBuilderStore } from '../../../stores/builderStore';
 import { useTaskDescriptors } from '../../../hooks/useApi';
 import { findPrecedingTasks } from '../../../utils/builder/taskUtils';
@@ -26,6 +27,20 @@ interface Suggestion {
   taskInfo?: { taskId: string; title?: string; taskType: string };
 }
 
+// Group suggestions by task
+interface SuggestionGroup {
+  type: 'global' | 'task';
+  taskInfo?: { taskId: string; title?: string; taskType: string };
+  suggestions: Suggestion[];
+}
+
+interface DropdownPosition {
+  top: number;
+  left: number;
+  width: number;
+  direction: 'below' | 'above';
+}
+
 function ExpressionInput({
   taskId,
   value,
@@ -34,8 +49,10 @@ function ExpressionInput({
 }: ExpressionInputProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const tasks = useBuilderStore((state) => state.testConfig.tasks);
   const testVars = useBuilderStore((state) => state.testConfig.testVars);
@@ -97,6 +114,41 @@ function ExpressionInput({
     return suggestions;
   }, [variableContext]);
 
+  // Group suggestions by task for better rendering
+  const groupedSuggestions = useMemo((): SuggestionGroup[] => {
+    const groups: SuggestionGroup[] = [];
+
+    // Global vars group
+    const globalSuggestions = allSuggestions.filter((s) => s.category === 'global');
+    if (globalSuggestions.length > 0) {
+      groups.push({ type: 'global', suggestions: globalSuggestions });
+    }
+
+    // Group task outputs by task
+    const taskMap = new Map<string, Suggestion[]>();
+    for (const s of allSuggestions) {
+      if (s.category === 'task' && s.taskInfo) {
+        const key = s.taskInfo.taskId;
+        if (!taskMap.has(key)) {
+          taskMap.set(key, []);
+        }
+        taskMap.get(key)!.push(s);
+      }
+    }
+
+    for (const [, suggestions] of taskMap) {
+      if (suggestions.length > 0) {
+        groups.push({
+          type: 'task',
+          taskInfo: suggestions[0].taskInfo,
+          suggestions,
+        });
+      }
+    }
+
+    return groups;
+  }, [allSuggestions]);
+
   // Filter based on current input
   const filteredSuggestions = useMemo(() => {
     if (!value) return allSuggestions;
@@ -108,6 +160,46 @@ function ExpressionInput({
         s.taskInfo?.taskId.toLowerCase().includes(lower)
     );
   }, [allSuggestions, value]);
+
+  // Filter grouped suggestions
+  const filteredGroups = useMemo((): SuggestionGroup[] => {
+    if (!value) return groupedSuggestions;
+    const lower = value.toLowerCase();
+
+    return groupedSuggestions
+      .map((group) => ({
+        ...group,
+        suggestions: group.suggestions.filter(
+          (s) =>
+            s.label.toLowerCase().includes(lower) ||
+            s.value.toLowerCase().includes(lower) ||
+            s.taskInfo?.taskId.toLowerCase().includes(lower) ||
+            s.taskInfo?.title?.toLowerCase().includes(lower)
+        ),
+      }))
+      .filter((group) => group.suggestions.length > 0);
+  }, [groupedSuggestions, value]);
+
+  // Calculate dropdown position when showing suggestions
+  useEffect(() => {
+    if (showSuggestions && containerRef.current) {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - containerRect.bottom;
+      const spaceAbove = containerRect.top;
+      const dropdownHeight = 240; // Approximate max height of dropdown
+
+      // Position above if not enough space below and more space above
+      const direction = spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? 'above' : 'below';
+
+      setDropdownPosition({
+        top: direction === 'below' ? containerRect.bottom + 4 : containerRect.top - dropdownHeight - 4,
+        left: containerRect.left,
+        width: containerRect.width,
+        direction,
+      });
+    }
+  }, [showSuggestions]);
 
   // Handle suggestion selection
   const handleSelectSuggestion = useCallback((suggestion: Suggestion) => {
@@ -161,8 +253,94 @@ function ExpressionInput({
     }
   }, [selectedIndex, showSuggestions]);
 
+  // Dropdown content rendered via portal
+  const dropdownContent = showSuggestions && filteredGroups.length > 0 && dropdownPosition && (
+    <>
+      {/* Backdrop to close on click outside */}
+      <div
+        className="fixed inset-0 z-[9998]"
+        onClick={() => setShowSuggestions(false)}
+      />
+
+      {/* Suggestions dropdown */}
+      <div
+        ref={dropdownRef}
+        style={{
+          position: 'fixed',
+          top: dropdownPosition.top,
+          left: dropdownPosition.left,
+          width: dropdownPosition.width,
+        }}
+        className="z-[9999] max-h-48 overflow-y-auto bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-sm shadow-lg"
+      >
+        {filteredGroups.map((group, groupIndex) => {
+          // Calculate the starting index for this group's suggestions
+          let startIndex = 0;
+          for (let i = 0; i < groupIndex; i++) {
+            startIndex += filteredGroups[i].suggestions.length;
+          }
+
+          return (
+            <div key={group.type === 'global' ? 'global' : group.taskInfo?.taskId} className="border-b border-[var(--color-border)] last:border-b-0">
+              {/* Group header */}
+              <div className="px-2 py-1 bg-[var(--color-bg-tertiary)] text-xs">
+                {group.type === 'global' ? (
+                  <span className="font-medium text-green-600 dark:text-green-400">Test Variables</span>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium text-blue-600 dark:text-blue-400 truncate">
+                      {group.taskInfo?.title || group.taskInfo?.taskType}
+                    </span>
+                    <span className="font-mono text-[var(--color-text-tertiary)]">
+                      #{group.taskInfo?.taskId}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Group suggestions */}
+              {group.suggestions.map((suggestion, index) => {
+                const globalIndex = startIndex + index;
+                return (
+                  <button
+                    key={suggestion.value}
+                    data-selected={globalIndex === selectedIndex}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectSuggestion(suggestion);
+                    }}
+                    className={`
+                      w-full text-left px-2 py-1 text-sm transition-colors
+                      ${globalIndex === selectedIndex
+                        ? 'bg-primary-50 dark:bg-primary-900/30'
+                        : 'hover:bg-[var(--color-bg-tertiary)]'
+                      }
+                    `}
+                  >
+                    {suggestion.category === 'global' ? (
+                      <span className="font-mono text-xs">{suggestion.value}</span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-xs">{suggestion.label}</span>
+                        {suggestion.description && (
+                          <span className="text-xs text-[var(--color-text-tertiary)] truncate">
+                            ({suggestion.description})
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <div className="flex items-center gap-2">
         <span className="text-xs text-primary-600 shrink-0">$</span>
         <input
@@ -178,42 +356,8 @@ function ExpressionInput({
         />
       </div>
 
-      {/* Suggestions dropdown */}
-      {showSuggestions && filteredSuggestions.length > 0 && (
-        <div
-          ref={dropdownRef}
-          className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-sm shadow-lg"
-        >
-          {filteredSuggestions.map((suggestion, index) => (
-            <button
-              key={suggestion.value}
-              data-selected={index === selectedIndex}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleSelectSuggestion(suggestion);
-              }}
-              className={`
-                w-full text-left px-2 py-1.5 text-sm transition-colors
-                ${index === selectedIndex
-                  ? 'bg-primary-50 dark:bg-primary-900/30'
-                  : 'hover:bg-[var(--color-bg-tertiary)]'
-                }
-              `}
-            >
-              <div className="flex items-center gap-2">
-                <span className={`px-1 py-0.5 text-xs rounded-sm ${
-                  suggestion.category === 'global'
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                }`}>
-                  {suggestion.category === 'global' ? 'var' : 'out'}
-                </span>
-                <span className="font-mono text-xs truncate">{suggestion.value}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Render dropdown via portal to escape overflow constraints */}
+      {createPortal(dropdownContent, document.body)}
     </div>
   );
 }

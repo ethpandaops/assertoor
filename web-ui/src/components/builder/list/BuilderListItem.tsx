@@ -1,9 +1,103 @@
 import { memo, useCallback } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { useBuilderStore } from '../../../stores/builderStore';
+import { useBuilderStore, getNamedChildSlots, hasNamedChildren } from '../../../stores/builderStore';
 import { canHaveChildren } from '../../../utils/builder/taskUtils';
-import type { BuilderTask } from '../../../stores/builderStore';
+import type { BuilderTask, NamedChildSlot } from '../../../stores/builderStore';
 import type { TaskDescriptor } from '../../../types/api';
+
+// Color mapping for Tailwind classes (since dynamic class names aren't purged)
+const slotColorClasses: Record<string, { bg: string; bgDark: string; text: string; textDark: string }> = {
+  amber: {
+    bg: 'bg-amber-100',
+    bgDark: 'dark:bg-amber-900/30',
+    text: 'text-amber-700',
+    textDark: 'dark:text-amber-300',
+  },
+  emerald: {
+    bg: 'bg-emerald-100',
+    bgDark: 'dark:bg-emerald-900/30',
+    text: 'text-emerald-700',
+    textDark: 'dark:text-emerald-300',
+  },
+  blue: {
+    bg: 'bg-blue-100',
+    bgDark: 'dark:bg-blue-900/30',
+    text: 'text-blue-700',
+    textDark: 'dark:text-blue-300',
+  },
+  purple: {
+    bg: 'bg-purple-100',
+    bgDark: 'dark:bg-purple-900/30',
+    text: 'text-purple-700',
+    textDark: 'dark:text-purple-300',
+  },
+};
+
+// Slot label component
+function SlotLabel({ slot }: { slot: NamedChildSlot }) {
+  const colors = slotColorClasses[slot.colorClass] || slotColorClasses.blue;
+  return (
+    <span className={`px-1.5 py-0.5 text-xs rounded-sm shrink-0 ${colors.bg} ${colors.bgDark} ${colors.text} ${colors.textDark}`}>
+      {slot.label}
+    </span>
+  );
+}
+
+// Drop zone component for named child slots
+interface NamedSlotDropZoneProps {
+  dropId: string;
+  slot: NamedChildSlot;
+  childDepth: number;
+  childAncestorLines: boolean[];
+  isLastSlot: boolean;
+  isOverSlot: boolean;
+  renderTreeLines: (forDepth: number, lines: boolean[], showConnector: boolean, isLastItem: boolean) => React.ReactNode;
+  TREE_INDENT: number;
+}
+
+function NamedSlotDropZone({
+  dropId,
+  slot,
+  childDepth,
+  childAncestorLines,
+  isLastSlot,
+  isOverSlot,
+  renderTreeLines,
+  TREE_INDENT,
+}: NamedSlotDropZoneProps) {
+  const { setNodeRef, isOver } = useDroppable({ id: dropId });
+  const showIndicator = isOver || isOverSlot;
+  const colors = slotColorClasses[slot.colorClass] || slotColorClasses.blue;
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="relative"
+      style={{ paddingLeft: `${childDepth * TREE_INDENT + 8}px` }}
+    >
+      {renderTreeLines(childDepth, childAncestorLines, true, isLastSlot)}
+      <div
+        className={`
+          mx-2 my-1 px-3 py-2 rounded-sm border-2 border-dashed
+          transition-all duration-150
+          ${showIndicator
+            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+            : 'border-gray-300 dark:border-gray-600 hover:border-primary-400 hover:bg-primary-50/50 dark:hover:bg-primary-900/10'
+          }
+        `}
+      >
+        <div className="flex items-center gap-2">
+          <span className={`px-1.5 py-0.5 text-xs rounded-sm ${colors.bg} ${colors.bgDark} ${colors.text} ${colors.textDark}`}>
+            {slot.label}
+          </span>
+          <span className="text-xs text-[var(--color-text-tertiary)]">
+            Drop {slot.name} task here
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface BuilderListItemProps {
   task: BuilderTask;
@@ -15,8 +109,9 @@ interface BuilderListItemProps {
   overId: string | null;
   isLast?: boolean;  // Is this the last child in its parent?
   ancestorLines?: boolean[];  // Which ancestor levels need vertical lines
-  roleLabel?: 'background' | 'foreground';  // For run_task_background children
+  slotConfig?: NamedChildSlot;  // Slot configuration for named children (e.g., run_task_background)
   isCleanup?: boolean;  // Whether this is a cleanup task
+  hideDropZones?: boolean;  // Hide insert-before drop zones (for fixed-position slots)
 }
 
 function BuilderListItem({
@@ -29,8 +124,9 @@ function BuilderListItem({
   overId,
   isLast = true,
   ancestorLines = [],
-  roleLabel,
+  slotConfig,
   isCleanup = false,
+  hideDropZones = false,
 }: BuilderListItemProps) {
   const removeTask = useBuilderStore((state) => state.removeTask);
   const duplicateTask = useBuilderStore((state) => state.duplicateTask);
@@ -48,12 +144,15 @@ function BuilderListItem({
   const isGlue = canHaveChildren(task.taskType);
   const hasChildren = task.children && task.children.length > 0;
   const childCount = task.children?.length || 0;
+  const taskNamedChildSlots = getNamedChildSlots(task.taskType);
 
   // Determine max children allowed for this task type
   const getMaxChildren = (taskType: string): number => {
+    if (hasNamedChildren(taskType)) {
+      const slots = getNamedChildSlots(taskType);
+      return slots?.length || 0;
+    }
     switch (taskType) {
-      case 'run_task_background':
-        return 2; // background + foreground
       case 'run_task_options':
       case 'run_task_matrix':
         return 1; // single child task
@@ -68,21 +167,28 @@ function BuilderListItem({
   // Drop zone prefix based on whether this is a cleanup task
   const dropPrefix = isCleanup ? 'cleanup-' : '';
 
-  // Drop zone for inserting BEFORE this task
+  // Drop zone for inserting BEFORE this task (disabled for fixed-position slots)
   const { setNodeRef: setBeforeRef, isOver: isOverBefore } = useDroppable({
     id: `${dropPrefix}insert-before-${task.id}`,
+    disabled: hideDropZones,
   });
 
-  // Drop zone for inserting as FIRST child of glue task
-  const { setNodeRef: setFirstChildRef, isOver: isOverFirstChild } = useDroppable({
-    id: `${dropPrefix}insert-first-child-${task.id}`,
-    disabled: !isGlue || !canAddMoreChildren,
+  // Determine glue task type category
+  const isSingleChildTask = task.taskType === 'run_task_options' || task.taskType === 'run_task_matrix';
+  const hasNamedChildSlots = !!taskNamedChildSlots;
+  const isMultiChildTask = task.taskType === 'run_tasks' || task.taskType === 'run_tasks_concurrent';
+
+  // For single-child tasks (run_task_options, run_task_matrix)
+  const singleChild = isSingleChildTask ? task.children?.[0] : null;
+  const { setNodeRef: setSingleChildRef, isOver: isOverSingleChild } = useDroppable({
+    id: `${dropPrefix}insert-single-child-${task.id}`,
+    disabled: !isSingleChildTask || !!singleChild,
   });
 
-  // Drop zone for inserting AFTER all children (at end of glue task)
-  const { setNodeRef: setAfterChildrenRef, isOver: isOverAfterChildren } = useDroppable({
+  // For multi-child tasks (run_tasks, run_tasks_concurrent) - "add more" placeholder at end
+  const { setNodeRef: setAddMoreRef, isOver: isOverAddMore } = useDroppable({
     id: `${dropPrefix}insert-after-children-${task.id}`,
-    disabled: !isGlue || !canAddMoreChildren,
+    disabled: !isMultiChildTask,
   });
 
   // Handle delete
@@ -104,8 +210,8 @@ function BuilderListItem({
 
   // Check if any drop indicator should show
   const showBeforeIndicator = isOverBefore || overId === `${dropPrefix}insert-before-${task.id}`;
-  const showFirstChildIndicator = isOverFirstChild || overId === `${dropPrefix}insert-first-child-${task.id}`;
-  const showAfterChildrenIndicator = isOverAfterChildren || overId === `${dropPrefix}insert-after-children-${task.id}`;
+  const showSingleChildIndicator = isOverSingleChild || overId === `${dropPrefix}insert-single-child-${task.id}`;
+  const showAddMoreIndicator = isOverAddMore || overId === `${dropPrefix}insert-after-children-${task.id}`;
 
   // Tree line width for each level
   const TREE_INDENT = 20;
@@ -155,24 +261,26 @@ function BuilderListItem({
 
   return (
     <div className={isDragging ? 'opacity-50' : ''}>
-      {/* Drop indicator BEFORE this task */}
-      <div
-        ref={setBeforeRef}
-        className="relative"
-        style={{ paddingLeft: `${depth * TREE_INDENT + 8}px` }}
-      >
-        {/* Continuation lines for drop indicator - always show line since task is below */}
-        {renderTreeLines(depth, ancestorLines, false, false)}
+      {/* Drop indicator BEFORE this task (hidden for fixed-position slots) */}
+      {!hideDropZones && (
         <div
-          className={`
-            h-1 mx-2 rounded-sm transition-all duration-150
-            ${showBeforeIndicator
-              ? 'bg-primary-500 my-1'
-              : 'bg-transparent hover:bg-primary-200 dark:hover:bg-primary-800'
-            }
-          `}
-        />
-      </div>
+          ref={setBeforeRef}
+          className="relative"
+          style={{ paddingLeft: `${depth * TREE_INDENT + 8}px` }}
+        >
+          {/* Continuation lines for drop indicator - always show line since task is below */}
+          {renderTreeLines(depth, ancestorLines, false, false)}
+          <div
+            className={`
+              h-1 mx-2 rounded-sm transition-all duration-150
+              ${showBeforeIndicator
+                ? 'bg-primary-500 my-1'
+                : 'bg-transparent hover:bg-primary-200 dark:hover:bg-primary-800'
+              }
+            `}
+          />
+        </div>
+      )}
 
       {/* Main task row with tree lines */}
       <div
@@ -214,15 +322,9 @@ function BuilderListItem({
             )}
           </div>
 
-          {/* Role label for run_task_background children */}
-          {roleLabel && (
-            <span className={`px-1.5 py-0.5 text-xs rounded-sm shrink-0 ${
-              roleLabel === 'background'
-                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
-            }`}>
-              {roleLabel === 'background' ? 'BG' : 'FG'}
-            </span>
+          {/* Slot label for named children */}
+          {slotConfig && (
+            <SlotLabel slot={slotConfig} />
           )}
 
           {/* Task info */}
@@ -275,101 +377,151 @@ function BuilderListItem({
             // Only add parent's continuation if parent has tree lines (depth > 0)
             const childAncestorLines = depth === 0 ? [] : [...ancestorLines, !isLast];
 
+            // === Named child slots (e.g., run_task_background): render slots dynamically ===
+            if (hasNamedChildSlots && taskNamedChildSlots) {
+              return (
+                <>
+                  {taskNamedChildSlots.map((slot, slotIndex) => {
+                    const slotChild = task.namedChildren?.[slot.name];
+                    const isLastSlot = slotIndex === taskNamedChildSlots.length - 1;
+                    const dropId = `${dropPrefix}insert-named-${slot.name}-${task.id}`;
+                    const isOverSlot = overId === dropId;
+
+                    if (slotChild) {
+                      return (
+                        <BuilderListItem
+                          key={`${slot.name}-child-${slotChild.id}`}
+                          task={slotChild}
+                          depth={childDepth}
+                          isSelected={selection.taskIds.has(slotChild.id)}
+                          isPrimary={selection.primaryTaskId === slotChild.id}
+                          onSelect={onSelect}
+                          descriptorMap={descriptorMap}
+                          overId={overId}
+                          isLast={isLastSlot}
+                          ancestorLines={childAncestorLines}
+                          slotConfig={slot}
+                          isCleanup={isCleanup}
+                          hideDropZones={true}
+                        />
+                      );
+                    }
+
+                    return (
+                      <NamedSlotDropZone
+                        key={`${slot.name}-placeholder-${task.id}`}
+                        dropId={dropId}
+                        slot={slot}
+                        childDepth={childDepth}
+                        childAncestorLines={childAncestorLines}
+                        isLastSlot={isLastSlot}
+                        isOverSlot={isOverSlot}
+                        renderTreeLines={renderTreeLines}
+                        TREE_INDENT={TREE_INDENT}
+                      />
+                    );
+                  })}
+                </>
+              );
+            }
+
+            // === Single-child tasks (run_task_options, run_task_matrix): show 1 slot ===
+            if (isSingleChildTask) {
+              return (
+                <>
+                  {singleChild ? (
+                    <BuilderListItem
+                      task={singleChild}
+                      depth={childDepth}
+                      isSelected={selection.taskIds.has(singleChild.id)}
+                      isPrimary={selection.primaryTaskId === singleChild.id}
+                      onSelect={onSelect}
+                      descriptorMap={descriptorMap}
+                      overId={overId}
+                      isLast={true}
+                      ancestorLines={childAncestorLines}
+                      isCleanup={isCleanup}
+                      hideDropZones={true}
+                    />
+                  ) : (
+                    <div
+                      ref={setSingleChildRef}
+                      className="relative"
+                      style={{ paddingLeft: `${childDepth * TREE_INDENT + 8}px` }}
+                    >
+                      {renderTreeLines(childDepth, childAncestorLines, true, true)}
+                      <div
+                        className={`
+                          mx-2 my-1 px-3 py-2 rounded-sm border-2 border-dashed
+                          transition-all duration-150
+                          ${showSingleChildIndicator
+                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-primary-400 hover:bg-primary-50/50 dark:hover:bg-primary-900/10'
+                          }
+                        `}
+                      >
+                        <div className="flex items-center gap-2">
+                          <PlusIcon className="size-4 text-gray-400" />
+                          <span className="text-xs text-[var(--color-text-tertiary)]">
+                            Drop task here
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            }
+
+            // === Multi-child tasks (run_tasks, run_tasks_concurrent): show children + add placeholder ===
             return (
               <>
-                {/* Drop indicator for FIRST child position */}
-                {!hasChildren && (
-                  <div
-                    ref={setFirstChildRef}
-                    className="relative"
-                    style={{ paddingLeft: `${childDepth * TREE_INDENT + 8}px` }}
-                  >
-                    {renderTreeLines(childDepth, childAncestorLines, false, true)}
-                    <div
-                      className={`
-                        h-1 mx-2 rounded-sm transition-all duration-150
-                        ${showFirstChildIndicator
-                          ? 'bg-primary-500 my-1'
-                          : 'bg-transparent hover:bg-primary-200 dark:hover:bg-primary-800'
-                        }
-                      `}
-                    />
-                  </div>
-                )}
-
-                {/* Render children */}
-                {hasChildren && task.children!.map((child, index) => {
+                {/* Render existing children */}
+                {task.children?.map((child, index) => {
                   const isLastChild = index === task.children!.length - 1;
 
-                  // Compute role label for run_task_background children
-                  let childRoleLabel: 'background' | 'foreground' | undefined;
-                  if (task.taskType === 'run_task_background') {
-                    if (childCount === 1) {
-                      childRoleLabel = 'foreground'; // Single child is foreground
-                    } else {
-                      childRoleLabel = index === 0 ? 'background' : 'foreground';
-                    }
-                  }
-
                   return (
-                    <div key={child.id}>
-                      {/* First child drop indicator */}
-                      {index === 0 && canAddMoreChildren && (
-                        <div
-                          ref={setFirstChildRef}
-                          className="relative"
-                          style={{ paddingLeft: `${childDepth * TREE_INDENT + 8}px` }}
-                        >
-                          {/* Show continuation line at child level (since there's at least one child) */}
-                          {renderTreeLines(childDepth, childAncestorLines, false, false)}
-                          <div
-                            className={`
-                              h-1 mx-2 rounded-sm transition-all duration-150
-                              ${showFirstChildIndicator
-                                ? 'bg-primary-500 my-1'
-                                : 'bg-transparent hover:bg-primary-200 dark:hover:bg-primary-800'
-                              }
-                            `}
-                          />
-                        </div>
-                      )}
-                      <BuilderListItem
-                        task={child}
-                        depth={childDepth}
-                        isSelected={selection.taskIds.has(child.id)}
-                        isPrimary={selection.primaryTaskId === child.id}
-                        onSelect={onSelect}
-                        descriptorMap={descriptorMap}
-                        overId={overId}
-                        isLast={isLastChild}
-                        ancestorLines={childAncestorLines}
-                        roleLabel={childRoleLabel}
-                        isCleanup={isCleanup}
-                      />
-                    </div>
+                    <BuilderListItem
+                      key={child.id}
+                      task={child}
+                      depth={childDepth}
+                      isSelected={selection.taskIds.has(child.id)}
+                      isPrimary={selection.primaryTaskId === child.id}
+                      onSelect={onSelect}
+                      descriptorMap={descriptorMap}
+                      overId={overId}
+                      isLast={isLastChild && !canAddMoreChildren}
+                      ancestorLines={childAncestorLines}
+                      isCleanup={isCleanup}
+                    />
                   );
                 })}
 
-                {/* Drop indicator for AFTER all children */}
-                {hasChildren && canAddMoreChildren && (
+                {/* "Add more" placeholder at the end */}
+                <div
+                  ref={setAddMoreRef}
+                  className="relative"
+                  style={{ paddingLeft: `${childDepth * TREE_INDENT + 8}px` }}
+                >
+                  {renderTreeLines(childDepth, childAncestorLines, true, true)}
                   <div
-                    ref={setAfterChildrenRef}
-                    className="relative"
-                    style={{ paddingLeft: `${childDepth * TREE_INDENT + 8}px` }}
+                    className={`
+                      mx-2 my-1 px-3 py-2 rounded-sm border-2 border-dashed
+                      transition-all duration-150
+                      ${showAddMoreIndicator
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-primary-400 hover:bg-primary-50/50 dark:hover:bg-primary-900/10'
+                      }
+                    `}
                   >
-                    {/* No continuation at child level since we're after all children */}
-                    {renderTreeLines(childDepth, childAncestorLines, false, true)}
-                    <div
-                      className={`
-                        h-1 mx-2 rounded-sm transition-all duration-150
-                        ${showAfterChildrenIndicator
-                          ? 'bg-primary-500 my-1'
-                          : 'bg-transparent hover:bg-primary-200 dark:hover:bg-primary-800'
-                        }
-                      `}
-                    />
+                    <div className="flex items-center gap-2">
+                      <PlusIcon className="size-4 text-gray-400" />
+                      <span className="text-xs text-[var(--color-text-tertiary)]">
+                        {hasChildren ? 'Drop to add more tasks' : 'Drop task here'}
+                      </span>
+                    </div>
                   </div>
-                )}
+                </div>
               </>
             );
           })()}
@@ -440,6 +592,19 @@ function DeleteIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+      />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 4v16m8-8H4"
       />
     </svg>
   );

@@ -57,18 +57,32 @@ function BuilderList({ dndContext }: BuilderListProps) {
     setSelection(['__test_header__'], '__test_header__');
   }, [setSelection]);
 
-  // Drop zone for main tasks section (always active - used for both empty and non-empty states)
-  const { setNodeRef: setMainTasksRef, isOver: isOverMainTasks } = useDroppable({
+  // Drop zone for empty main tasks section
+  const { setNodeRef: setEmptyMainRef, isOver: isOverEmptyMain } = useDroppable({
+    id: 'empty-main-tasks',
+    disabled: tasks.length > 0,
+  });
+
+  // Drop zone for appending to main tasks (separate from main area)
+  const { setNodeRef: setAppendMainRef, isOver: isOverAppendMain } = useDroppable({
     id: 'insert-at-end',
+    disabled: tasks.length === 0,
   });
 
-  // Drop zone for cleanup tasks section (always active - used for both empty and non-empty states)
-  const { setNodeRef: setCleanupTasksRef, isOver: isOverCleanupTasks } = useDroppable({
+  // Drop zone for empty cleanup tasks section
+  const { setNodeRef: setEmptyCleanupRef, isOver: isOverEmptyCleanup } = useDroppable({
+    id: 'empty-cleanup-tasks',
+    disabled: cleanupTasks.length > 0,
+  });
+
+  // Drop zone for appending to cleanup tasks (separate from main area)
+  const { setNodeRef: setAppendCleanupRef, isOver: isOverAppendCleanup } = useDroppable({
     id: 'cleanup-insert-at-end',
+    disabled: cleanupTasks.length === 0,
   });
 
-  const showMainDropIndicator = isOverMainTasks || overId === 'insert-at-end';
-  const showCleanupDropIndicator = isOverCleanupTasks || overId === 'cleanup-insert-at-end';
+  const showMainDropIndicator = isOverEmptyMain || isOverAppendMain || overId === 'insert-at-end' || overId === 'empty-main-tasks';
+  const showCleanupDropIndicator = isOverEmptyCleanup || isOverAppendCleanup || overId === 'cleanup-insert-at-end' || overId === 'empty-cleanup-tasks';
   const isHeaderSelected = selection.primaryTaskId === '__test_header__';
 
   return (
@@ -114,21 +128,19 @@ function BuilderList({ dndContext }: BuilderListProps) {
           <div className="h-px flex-1 bg-[var(--color-border)]" />
         </div>
 
-        {/* Main tasks list area - entire section is a drop zone */}
-        <div
-          ref={setMainTasksRef}
-          className={`
-            min-h-24 mx-3 my-2 rounded-lg transition-colors
-            ${tasks.length === 0 && showMainDropIndicator
-              ? 'bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-400'
-              : tasks.length === 0
-                ? 'bg-[var(--color-bg-tertiary)]/50'
-                : ''
-            }
-          `}
-        >
+        {/* Main tasks list area */}
+        <div className="mx-3 my-2">
           {tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-24 text-center">
+            <div
+              ref={setEmptyMainRef}
+              className={`
+                min-h-24 rounded-lg transition-colors flex flex-col items-center justify-center text-center
+                ${showMainDropIndicator
+                  ? 'bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-400'
+                  : 'bg-[var(--color-bg-tertiary)]/50'
+                }
+              `}
+            >
               <p className="text-sm text-[var(--color-text-tertiary)]">No tasks yet</p>
               <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
                 Drag tasks here from the palette
@@ -152,16 +164,25 @@ function BuilderList({ dndContext }: BuilderListProps) {
                 />
               ))}
 
-              {/* Drop indicator at the very end */}
+              {/* Append placeholder at the end */}
               <div
+                ref={setAppendMainRef}
                 className={`
-                  h-1 mx-4 rounded-sm transition-all duration-150
+                  mx-2 mt-2 px-3 py-2 rounded-sm border-2 border-dashed
+                  transition-all duration-150
                   ${showMainDropIndicator
-                    ? 'bg-primary-500 my-2'
-                    : 'bg-transparent hover:bg-primary-200 dark:hover:bg-primary-800 mt-2'
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-primary-400 hover:bg-primary-50/50 dark:hover:bg-primary-900/10'
                   }
                 `}
-              />
+              >
+                <div className="flex items-center gap-2">
+                  <PlusIcon className="size-4 text-gray-400" />
+                  <span className="text-xs text-[var(--color-text-tertiary)]">
+                    Drop to add task at end
+                  </span>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -181,21 +202,19 @@ function BuilderList({ dndContext }: BuilderListProps) {
           <div className="h-px flex-1 bg-amber-300 dark:bg-amber-700" />
         </div>
 
-        {/* Cleanup tasks list area - entire section is a drop zone */}
-        <div
-          ref={setCleanupTasksRef}
-          className={`
-            min-h-24 mx-3 my-2 rounded-lg transition-colors
-            ${cleanupTasks.length === 0 && showCleanupDropIndicator
-              ? 'bg-amber-50 dark:bg-amber-900/20 ring-2 ring-amber-400'
-              : cleanupTasks.length === 0
-                ? 'bg-[var(--color-bg-tertiary)]/50'
-                : ''
-            }
-          `}
-        >
+        {/* Cleanup tasks list area */}
+        <div className="mx-3 my-2">
           {cleanupTasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-24 text-center">
+            <div
+              ref={setEmptyCleanupRef}
+              className={`
+                min-h-24 rounded-lg transition-colors flex flex-col items-center justify-center text-center
+                ${showCleanupDropIndicator
+                  ? 'bg-amber-50 dark:bg-amber-900/20 ring-2 ring-amber-400'
+                  : 'bg-[var(--color-bg-tertiary)]/50'
+                }
+              `}
+            >
               <p className="text-sm text-[var(--color-text-tertiary)]">No cleanup tasks</p>
               <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
                 Drag tasks here from the palette
@@ -219,16 +238,25 @@ function BuilderList({ dndContext }: BuilderListProps) {
                 />
               ))}
 
-              {/* Drop indicator at the very end of cleanup */}
+              {/* Append placeholder at the end of cleanup */}
               <div
+                ref={setAppendCleanupRef}
                 className={`
-                  h-1 mx-4 rounded-sm transition-all duration-150
+                  mx-2 mt-2 px-3 py-2 rounded-sm border-2 border-dashed
+                  transition-all duration-150
                   ${showCleanupDropIndicator
-                    ? 'bg-amber-500 my-2'
-                    : 'bg-transparent hover:bg-amber-200 dark:hover:bg-amber-800 mt-2'
+                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-900/10'
                   }
                 `}
-              />
+              >
+                <div className="flex items-center gap-2">
+                  <PlusIcon className="size-4 text-gray-400" />
+                  <span className="text-xs text-[var(--color-text-tertiary)]">
+                    Drop to add cleanup task at end
+                  </span>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -264,6 +292,19 @@ function CleanupIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+      />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 4v16m8-8H4"
       />
     </svg>
   );

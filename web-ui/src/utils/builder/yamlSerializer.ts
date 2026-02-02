@@ -1,6 +1,7 @@
 import yaml from 'js-yaml';
 import type { BuilderTask, TestConfig } from '../../stores/builderStore';
 import { generateTaskId } from './taskUtils';
+import { hasNamedChildren, getNamedChildSlots } from '../../stores/builderStore';
 
 // Glue task names that have children in config.tasks
 const GLUE_TASKS_WITH_CHILDREN = new Set([
@@ -14,14 +15,11 @@ const GLUE_TASKS_WITH_SINGLE_CHILD = new Set([
   'run_task_matrix',
 ]);
 
-// Glue task with background/foreground children
-const BACKGROUND_GLUE_TASK = 'run_task_background';
-
 // Check if a task type is a glue task
 export function isGlueTask(taskType: string): boolean {
   return GLUE_TASKS_WITH_CHILDREN.has(taskType) ||
     GLUE_TASKS_WITH_SINGLE_CHILD.has(taskType) ||
-    taskType === BACKGROUND_GLUE_TASK;
+    hasNamedChildren(taskType);
 }
 
 // Raw YAML task structure
@@ -79,13 +77,18 @@ function builderTaskToYaml(task: BuilderTask): YamlTask {
     } else if (GLUE_TASKS_WITH_SINGLE_CHILD.has(task.taskType)) {
       // Single child goes into config.task
       config.task = builderTaskToYaml(task.children[0]);
-    } else if (task.taskType === BACKGROUND_GLUE_TASK) {
-      // Background task has backgroundTask and foregroundTask in config
-      if (task.children.length >= 1) {
-        config.backgroundTask = builderTaskToYaml(task.children[0]);
-      }
-      if (task.children.length >= 2) {
-        config.foregroundTask = builderTaskToYaml(task.children[1]);
+    }
+  }
+
+  // Handle named children (e.g., run_task_background)
+  if (task.namedChildren) {
+    const slots = getNamedChildSlots(task.taskType);
+    if (slots) {
+      for (const slot of slots) {
+        const child = task.namedChildren[slot.name];
+        if (child) {
+          config[slot.yamlKey] = builderTaskToYaml(child);
+        }
       }
     }
   }
@@ -145,24 +148,22 @@ function yamlTaskToBuilder(yamlTask: YamlTask): BuilderTask {
         builderTask.children = [yamlTaskToBuilder(childTask)];
       }
       delete config.task;
-    } else if (yamlTask.name === BACKGROUND_GLUE_TASK) {
-      const children: BuilderTask[] = [];
-      const bgTask = config.backgroundTask as YamlTask | undefined;
-      const fgTask = config.foregroundTask as YamlTask | undefined;
-
-      if (bgTask && typeof bgTask === 'object') {
-        children.push(yamlTaskToBuilder(bgTask));
+    } else if (hasNamedChildren(yamlTask.name)) {
+      // Handle tasks with named children
+      const slots = getNamedChildSlots(yamlTask.name);
+      if (slots) {
+        builderTask.namedChildren = {};
+        for (const slot of slots) {
+          const childTask = config[slot.yamlKey] as YamlTask | undefined;
+          if (childTask && typeof childTask === 'object') {
+            builderTask.namedChildren[slot.name] = yamlTaskToBuilder(childTask);
+          }
+          delete config[slot.yamlKey];
+        }
+        if (Object.keys(builderTask.namedChildren).length === 0) {
+          delete builderTask.namedChildren;
+        }
       }
-      if (fgTask && typeof fgTask === 'object') {
-        children.push(yamlTaskToBuilder(fgTask));
-      }
-
-      if (children.length > 0) {
-        builderTask.children = children;
-      }
-
-      delete config.backgroundTask;
-      delete config.foregroundTask;
     }
 
     // Store remaining config

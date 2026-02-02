@@ -9,8 +9,9 @@ import {
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
+  type CollisionDetection,
 } from '@dnd-kit/core';
-import { useBuilderStore } from '../../stores/builderStore';
+import { useBuilderStore, getSlotIndex } from '../../stores/builderStore';
 import { createTask, findTaskById, wouldCreateCircular, getTaskIndex } from '../../utils/builder/taskUtils';
 import TaskPalette from './palette/TaskPalette';
 import BuilderCanvas from './canvas/BuilderCanvas';
@@ -82,6 +83,9 @@ const VALID_DROP_ZONES = [
   'insert-first-child-',
   'insert-after-children-',
   'insert-at-end',
+  'empty-main-tasks',
+  'insert-named-',  // Generic named slot drop zones
+  'insert-single-child-',
 ];
 
 // Valid drop zone prefixes/IDs for cleanup tasks
@@ -90,6 +94,9 @@ const VALID_CLEANUP_DROP_ZONES = [
   'cleanup-insert-first-child-',
   'cleanup-insert-after-children-',
   'cleanup-insert-at-end',
+  'empty-cleanup-tasks',
+  'cleanup-insert-named-',  // Generic named slot drop zones
+  'cleanup-insert-single-child-',
 ];
 
 function isValidDropZone(id: string): boolean {
@@ -99,6 +106,63 @@ function isValidDropZone(id: string): boolean {
 function isCleanupDropZone(id: string): boolean {
   return VALID_CLEANUP_DROP_ZONES.some((zone) => id === zone || id.startsWith(zone));
 }
+
+// Custom collision detection: uses closestCenter but only when pointer is
+// within proximity of any valid drop zone
+const boundedClosestCenter: CollisionDetection = (args) => {
+  const { droppableRects, droppableContainers, pointerCoordinates } = args;
+
+  if (!pointerCoordinates) {
+    return closestCenter(args);
+  }
+
+  // Filter to only valid drop zones
+  const validDroppables = droppableContainers.filter((container) => {
+    const id = String(container.id);
+    return isValidDropZone(id) || isCleanupDropZone(id);
+  });
+
+  if (validDroppables.length === 0) {
+    return [];
+  }
+
+  const { x, y } = pointerCoordinates;
+  const padding = 100; // Distance threshold from any droppable
+
+  // Check if pointer is near any valid droppable
+  let isNearValidDroppable = false;
+  let hasAnyRect = false;
+
+  for (const container of validDroppables) {
+    const rect = droppableRects.get(container.id);
+    if (rect) {
+      hasAnyRect = true;
+      // Check if pointer is within the rect + padding
+      if (
+        x >= rect.left - padding &&
+        x <= rect.right + padding &&
+        y >= rect.top - padding &&
+        y <= rect.bottom + padding
+      ) {
+        isNearValidDroppable = true;
+        break;
+      }
+    }
+  }
+
+  // If no rects found at all, fall back to closestCenter
+  // (handles initial render or timing issues)
+  if (!hasAnyRect) {
+    return closestCenter(args);
+  }
+
+  if (!isNearValidDroppable) {
+    return []; // Pointer is not near any valid drop zone
+  }
+
+  // Pointer is near a valid droppable, use closestCenter
+  return closestCenter(args);
+};
 
 function BuilderLayout({ isLoading }: BuilderLayoutProps) {
   const validationErrors = useBuilderStore((state) => state.validationErrors);
@@ -160,9 +224,9 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
   }, []);
 
   // Parse drop target for main tasks
-  const parseDropTarget = useCallback((overIdStr: string): { parentId: string | undefined; index: number } | null => {
-    // Insert at end of root tasks
-    if (overIdStr === 'insert-at-end') {
+  const parseDropTarget = useCallback((overIdStr: string): { parentId: string | undefined; index: number; isNamedSlot?: boolean } | null => {
+    // Insert at end of root tasks (or empty state)
+    if (overIdStr === 'insert-at-end' || overIdStr === 'empty-main-tasks') {
       return { parentId: undefined, index: tasks.length };
     }
 
@@ -192,13 +256,44 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
       return null;
     }
 
+    // Insert as named child slot (e.g., insert-named-background-{parentId})
+    if (overIdStr.startsWith('insert-named-')) {
+      const rest = overIdStr.replace('insert-named-', '');
+      // Find the last hyphen to separate slot name from parent ID
+      const lastHyphenIdx = rest.lastIndexOf('-');
+      if (lastHyphenIdx === -1) return null;
+
+      // The format is: insert-named-{slotName}-{parentId}
+      // But slotName could contain hyphens, and parentId starts with 'task_'
+      // Find the pattern 'task_' to locate where the parent ID starts
+      const taskIdMatch = rest.match(/task_\d+_\d+_[a-z0-9]+$/);
+      if (!taskIdMatch) return null;
+
+      const parentTaskId = taskIdMatch[0];
+      const slotName = rest.slice(0, rest.length - parentTaskId.length - 1);
+
+      const parent = findTaskById(tasks, parentTaskId);
+      if (!parent) return null;
+
+      const slotIdx = getSlotIndex(parent.taskType, slotName);
+      if (slotIdx === -1) return null;
+
+      return { parentId: parentTaskId, index: slotIdx, isNamedSlot: true };
+    }
+
+    // Insert as single child of run_task_options or run_task_matrix (index 0)
+    if (overIdStr.startsWith('insert-single-child-')) {
+      const parentTaskId = overIdStr.replace('insert-single-child-', '');
+      return { parentId: parentTaskId, index: 0 };
+    }
+
     return null;
   }, [tasks]);
 
   // Parse drop target for cleanup tasks
-  const parseCleanupDropTarget = useCallback((overIdStr: string): { parentId: string | undefined; index: number } | null => {
-    // Insert at end of cleanup tasks
-    if (overIdStr === 'cleanup-insert-at-end') {
+  const parseCleanupDropTarget = useCallback((overIdStr: string): { parentId: string | undefined; index: number; isNamedSlot?: boolean } | null => {
+    // Insert at end of cleanup tasks (or empty state)
+    if (overIdStr === 'cleanup-insert-at-end' || overIdStr === 'empty-cleanup-tasks') {
       return { parentId: undefined, index: cleanupTasks.length };
     }
 
@@ -226,6 +321,31 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
         return { parentId: parentTaskId, index: parent.children?.length || 0 };
       }
       return null;
+    }
+
+    // Insert as named child slot (e.g., cleanup-insert-named-background-{parentId})
+    if (overIdStr.startsWith('cleanup-insert-named-')) {
+      const rest = overIdStr.replace('cleanup-insert-named-', '');
+      // Find the pattern 'task_' to locate where the parent ID starts
+      const taskIdMatch = rest.match(/task_\d+_\d+_[a-z0-9]+$/);
+      if (!taskIdMatch) return null;
+
+      const parentTaskId = taskIdMatch[0];
+      const slotName = rest.slice(0, rest.length - parentTaskId.length - 1);
+
+      const parent = findTaskById(cleanupTasks, parentTaskId);
+      if (!parent) return null;
+
+      const slotIdx = getSlotIndex(parent.taskType, slotName);
+      if (slotIdx === -1) return null;
+
+      return { parentId: parentTaskId, index: slotIdx, isNamedSlot: true };
+    }
+
+    // Insert as single child of run_task_options or run_task_matrix (index 0)
+    if (overIdStr.startsWith('cleanup-insert-single-child-')) {
+      const parentTaskId = overIdStr.replace('cleanup-insert-single-child-', '');
+      return { parentId: parentTaskId, index: 0 };
     }
 
     return null;
@@ -313,14 +433,21 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
           const { id, location } = tasksWithLocations[i];
 
           let adjustedIndex = insertIndex;
-          if (location!.parentId === (target.parentId || null)) {
+          // Only adjust index for array-based children, not named slots
+          // Named slots have fixed indices that shouldn't be adjusted
+          const isFromNamedSlot = location!.slotName !== undefined;
+          const isToNamedSlot = target.isNamedSlot === true;
+          if (!isFromNamedSlot && !isToNamedSlot && location!.parentId === (target.parentId || null)) {
             if (location!.index < insertIndex) {
               adjustedIndex = insertIndex - 1;
             }
           }
 
           moveTask(id, target.parentId, adjustedIndex);
-          insertIndex++;
+          // Only increment insert index for array-based targets
+          if (!isToNamedSlot) {
+            insertIndex++;
+          }
         }
       } else if (isCleanup && isFromCleanup) {
         const target = parseCleanupDropTarget(overIdStr);
@@ -356,14 +483,20 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
           const { id, location } = tasksWithLocations[i];
 
           let adjustedIndex = insertIndex;
-          if (location!.parentId === (target.parentId || null)) {
+          // Only adjust index for array-based children, not named slots
+          const isFromNamedSlot = location!.slotName !== undefined;
+          const isToNamedSlot = target.isNamedSlot === true;
+          if (!isFromNamedSlot && !isToNamedSlot && location!.parentId === (target.parentId || null)) {
             if (location!.index < insertIndex) {
               adjustedIndex = insertIndex - 1;
             }
           }
 
           moveCleanupTask(id, target.parentId, adjustedIndex);
-          insertIndex++;
+          // Only increment insert index for array-based targets
+          if (!isToNamedSlot) {
+            insertIndex++;
+          }
         }
       } else if (isCleanup && isFromMain) {
         // Moving from main to cleanup
@@ -409,7 +542,7 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={boundedClosestCenter}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
