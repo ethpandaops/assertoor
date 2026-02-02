@@ -15,8 +15,8 @@ type Config struct {
 	MinClientCount        int             `yaml:"minClientCount" json:"minClientCount" desc:"Minimum number of healthy clients required."`
 	MaxUnhealthyCount     int             `yaml:"maxUnhealthyCount" json:"maxUnhealthyCount" desc:"Maximum number of unhealthy clients allowed (-1 for unlimited)."`
 	FailOnCheckMiss       bool            `yaml:"failOnCheckMiss" json:"failOnCheckMiss" desc:"If true, fail the task when health check condition is not met."`
-	ExecutionRPCResultVar string          `yaml:"executionRpcResultVar" json:"executionRpcResultVar" desc:"Variable name to store the list of healthy execution RPC endpoints."`
-	ConsensusRPCResultVar string          `yaml:"consensusRpcResultVar" json:"consensusRpcResultVar" desc:"Variable name to store the list of healthy consensus RPC endpoints."`
+	ExecutionRPCResultVar string          `yaml:"executionRpcResultVar" json:"executionRpcResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
+	ConsensusRPCResultVar string          `yaml:"consensusRpcResultVar" json:"consensusRpcResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
 	ContinueOnPass        bool            `yaml:"continueOnPass" json:"continueOnPass" desc:"If true, continue monitoring after the check passes instead of completing immediately."`
 }
 

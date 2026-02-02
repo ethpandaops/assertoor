@@ -25,9 +25,9 @@ type Config struct {
 	FailOnReject          bool   `yaml:"failOnReject" json:"failOnReject" desc:"Fail the task if any deposit transaction is rejected."`
 	AwaitInclusion        bool   `yaml:"awaitInclusion" json:"awaitInclusion" desc:"Wait for deposits to be included in beacon blocks before completing."`
 
-	DepositTransactionsResultVar string `yaml:"depositTransactionsResultVar" json:"depositTransactionsResultVar" desc:"Variable name to store the list of deposit transaction hashes."`
-	DepositReceiptsResultVar     string `yaml:"depositReceiptsResultVar" json:"depositReceiptsResultVar" desc:"Variable name to store the list of deposit transaction receipts."`
-	ValidatorPubkeysResultVar    string `yaml:"validatorPubkeysResultVar" json:"validatorPubkeysResultVar" desc:"Variable name to store the list of validator public keys."`
+	DepositTransactionsResultVar string `yaml:"depositTransactionsResultVar" json:"depositTransactionsResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
+	DepositReceiptsResultVar     string `yaml:"depositReceiptsResultVar" json:"depositReceiptsResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
+	ValidatorPubkeysResultVar    string `yaml:"validatorPubkeysResultVar" json:"validatorPubkeysResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
 }
 
 func DefaultConfig() Config {

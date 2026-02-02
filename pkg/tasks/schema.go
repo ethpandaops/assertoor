@@ -115,6 +115,11 @@ func generateSchemaFromType(t reflect.Type) *JSONSchema {
 				continue
 			}
 
+			// Skip deprecated fields
+			if deprecatedTag := field.Tag.Get("deprecated"); deprecatedTag == "true" {
+				continue
+			}
+
 			fieldName := getJSONFieldName(&field, jsonTag)
 
 			// Generate schema for field type

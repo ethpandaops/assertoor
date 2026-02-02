@@ -17,8 +17,8 @@ type Config struct {
 
 	KeepFunding bool `yaml:"keepFunding" json:"keepFunding" desc:"If true, keep the wallet pool funding loop running after initial distribution. Default is false."`
 
-	WalletAddressResultVar    string `yaml:"walletAddressResultVar" json:"walletAddressResultVar" desc:"Variable name to store the child wallet address."`
-	WalletPrivateKeyResultVar string `yaml:"walletPrivateKeyResultVar" json:"walletPrivateKeyResultVar" desc:"Variable name to store the child wallet private key."`
+	WalletAddressResultVar    string `yaml:"walletAddressResultVar" json:"walletAddressResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
+	WalletPrivateKeyResultVar string `yaml:"walletPrivateKeyResultVar" json:"walletPrivateKeyResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
 }
 
 func DefaultConfig() Config {

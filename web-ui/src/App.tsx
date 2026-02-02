@@ -9,6 +9,7 @@ const TestRun = lazy(() => import(/* webpackChunkName: "page-testrun" */ './page
 const Registry = lazy(() => import(/* webpackChunkName: "page-registry" */ './pages/Registry'));
 const TestPage = lazy(() => import(/* webpackChunkName: "page-test" */ './pages/TestPage'));
 const Clients = lazy(() => import(/* webpackChunkName: "page-clients" */ './pages/Clients'));
+const TestBuilder = lazy(() => import(/* webpackChunkName: "page-builder" */ './pages/TestBuilder'));
 
 function PageLoader() {
   return (
@@ -60,6 +61,14 @@ function App() {
             element={
               <Suspense fallback={<PageLoader />}>
                 <Clients />
+              </Suspense>
+            }
+          />
+          <Route
+            path="builder"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <TestBuilder />
               </Suspense>
             }
           />

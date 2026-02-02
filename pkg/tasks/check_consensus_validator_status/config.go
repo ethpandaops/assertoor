@@ -11,8 +11,8 @@ type Config struct {
 	FailOnCheckMiss       bool     `yaml:"failOnCheckMiss" json:"failOnCheckMiss" desc:"If true, fail the task when validator status check condition is not met."`
 	ContinueOnPass        bool     `yaml:"continueOnPass" json:"continueOnPass" desc:"If true, continue monitoring after the check passes instead of completing immediately."`
 
-	ValidatorInfoResultVar   string `yaml:"validatorInfoResultVar" json:"validatorInfoResultVar" desc:"Variable name to store the validator info."`
-	ValidatorPubKeyResultVar string `yaml:"validatorPubKeyResultVar" json:"validatorPubKeyResultVar" desc:"Variable name to store the validator public key."`
+	ValidatorInfoResultVar   string `yaml:"validatorInfoResultVar" json:"validatorInfoResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
+	ValidatorPubKeyResultVar string `yaml:"validatorPubKeyResultVar" json:"validatorPubKeyResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
 }
 
 func DefaultConfig() Config {

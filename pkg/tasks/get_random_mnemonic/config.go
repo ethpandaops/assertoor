@@ -1,7 +1,7 @@
 package getrandommnemonic
 
 type Config struct {
-	MnemonicResultVar string `yaml:"mnemonicResultVar" json:"mnemonicResultVar" desc:"Variable name to store the generated mnemonic phrase."`
+	MnemonicResultVar string `yaml:"mnemonicResultVar" json:"mnemonicResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
 }
 
 func DefaultConfig() Config {

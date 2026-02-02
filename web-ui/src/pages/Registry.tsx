@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useTests, useDeleteTest, useRegisterTest, useRegisterExternalTest } from '../hooks/useApi';
 import { useAuthContext } from '../context/AuthContext';
 import Modal from '../components/common/Modal';
@@ -50,13 +51,22 @@ function Registry() {
             {tests?.length ?? 0} tests registered
           </div>
           {isLoggedIn && (
-            <button
-              onClick={() => setShowRegisterModal(true)}
-              className="btn btn-primary btn-sm flex items-center gap-1.5"
-            >
-              <PlusIcon className="size-4" />
-              Register Test
-            </button>
+            <>
+              <Link
+                to="/builder"
+                className="btn btn-secondary btn-sm flex items-center gap-1.5"
+              >
+                <BuilderIcon className="size-4" />
+                Build Test
+              </Link>
+              <button
+                onClick={() => setShowRegisterModal(true)}
+                className="btn btn-primary btn-sm flex items-center gap-1.5"
+              >
+                <PlusIcon className="size-4" />
+                Register Test
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -388,6 +398,19 @@ function PlusIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  );
+}
+
+function BuilderIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"
+      />
     </svg>
   );
 }

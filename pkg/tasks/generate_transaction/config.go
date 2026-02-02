@@ -46,9 +46,9 @@ type Config struct {
 		Data   string `yaml:"data" json:"data" desc:"Expected event data."`
 	} `yaml:"expectEvents" json:"expectEvents" desc:"List of events expected to be emitted by the transaction."`
 
-	TransactionHashResultVar    string `yaml:"transactionHashResultVar" json:"transactionHashResultVar" desc:"Variable name to store the transaction hash."`
-	TransactionReceiptResultVar string `yaml:"transactionReceiptResultVar" json:"transactionReceiptResultVar" desc:"Variable name to store the transaction receipt."`
-	ContractAddressResultVar    string `yaml:"contractAddressResultVar" json:"contractAddressResultVar" desc:"Variable name to store the deployed contract address."`
+	TransactionHashResultVar    string `yaml:"transactionHashResultVar" json:"transactionHashResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
+	TransactionReceiptResultVar string `yaml:"transactionReceiptResultVar" json:"transactionReceiptResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
+	ContractAddressResultVar    string `yaml:"contractAddressResultVar" json:"contractAddressResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
 }
 
 func DefaultConfig() Config {
