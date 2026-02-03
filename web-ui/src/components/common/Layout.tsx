@@ -7,6 +7,7 @@ const navItems = [
   { path: '/registry', label: 'Registry' },
   { path: '/builder', label: 'Builder' },
   { path: '/clients', label: 'Clients' },
+  { path: '/api-docs', label: 'API' },
 ];
 
 function Layout() {
@@ -22,10 +23,12 @@ function Layout() {
         <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex items-center justify-between h-14">
             {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="w-7 h-7 bg-primary-600 rounded-md flex items-center justify-center">
-                <span className="text-white font-bold text-sm">A</span>
-              </div>
+            <Link to="/" className="flex items-center gap-3">
+              <img
+                src="/img/assertoor.png"
+                alt="Assertoor"
+                className="h-11 w-auto object-contain"
+              />
               <span className="text-lg font-semibold">Assertoor</span>
             </Link>
 

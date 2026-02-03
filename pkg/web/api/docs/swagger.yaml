@@ -106,6 +106,13 @@ definitions:
           $ref: '#/definitions/web_api.ClientResponse'
         type: array
     type: object
+  web_api.GetLogsResponse:
+    properties:
+      log:
+        items:
+          $ref: '#/definitions/web_api.LogEntry'
+        type: array
+    type: object
   web_api.GetTestResponse:
     properties:
       basePath:
@@ -298,6 +305,23 @@ definitions:
       source:
         type: string
     type: object
+  web_api.LogEntry:
+    properties:
+      data:
+        additionalProperties:
+          type: string
+        type: object
+      datalen:
+        type: integer
+      level:
+        type: integer
+      msg:
+        type: string
+      tidx:
+        type: integer
+      time:
+        type: string
+    type: object
   web_api.PostTestRunCancelRequest:
     properties:
       skip_cleanup:
@@ -480,6 +504,39 @@ paths:
       summary: Get list of configured clients
       tags:
       - Client
+  /api/v1/logs/{since}:
+    get:
+      description: Returns application-level logs from the coordinator. Protected
+        endpoint - requires authentication unless auth is disabled.
+      parameters:
+      - description: Log index to start from (0 for all)
+        in: path
+        name: since
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetLogsResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get application logs
+      tags:
+      - Logs
   /api/v1/task_descriptor/{name}:
     get:
       description: Returns a single task descriptor by name with its JSON schema

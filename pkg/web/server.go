@@ -1,12 +1,9 @@
 package web
 
 import (
-	"encoding/json"
-	"html/template"
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/ethpandaops/assertoor/pkg/events"
 	coordinator_types "github.com/ethpandaops/assertoor/pkg/types"
@@ -135,6 +132,10 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 			}).Methods("GET")
 		}
 
+		// Logs API (protected)
+		ws.router.HandleFunc("/api/v1/logs/{since}", apiHandler.GetLogs).Methods("GET")
+		ws.router.HandleFunc("/logs/{since}", apiHandler.GetLogs).Methods("GET") // Legacy alias for external tools
+
 		// protected apis (require authentication)
 		ws.router.HandleFunc("/api/v1/tests/register", apiHandler.PostTestsRegister).Methods("POST")
 		ws.router.HandleFunc("/api/v1/tests/register_external", apiHandler.PostTestsRegisterExternal).Methods("POST")
@@ -162,10 +163,15 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 			ws.router.HandleFunc("/api/v1/ai/chat/{sessionId}", aiHandler.GetChatSession).Methods("GET")
 			ws.router.HandleFunc("/api/v1/ai/chat/{sessionId}/stream", aiHandler.StreamChatSession).Methods("GET")
 		}
+
+		// Swagger API documentation (standalone, no custom header)
+		ws.router.PathPrefix("/api/docs/").Handler(httpSwagger.Handler(func(c *httpSwagger.Config) {
+			c.Layout = httpSwagger.StandaloneLayout
+		}))
 	}
 
 	if frontendConfig != nil {
-		if /*frontendConfig.Pprof &&*/ !securityTrimmed {
+		if !securityTrimmed {
 			// add pprof handler
 			ws.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
 		}
@@ -174,101 +180,13 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 			// Create SPA handler for React frontend
 			spaHandler, err := handlers.NewSPAHandler(ws.logger.WithField("module", "web-spa"))
 			if err != nil {
-				ws.logger.WithError(err).Warn("failed to create SPA handler, falling back to legacy frontend")
-
-				// Fall back to legacy frontend
-				frontendHandler := handlers.NewFrontendHandler(
-					coordinator,
-					ws.logger.WithField("module", "web-frontend"),
-					frontendConfig.SiteName,
-					frontendConfig.Minify,
-					frontendConfig.Debug,
-					securityTrimmed,
-					isAPIEnabled,
-				)
-
-				ws.router.HandleFunc("/", frontendHandler.Index).Methods("GET")
-				ws.router.HandleFunc("/registry", frontendHandler.Registry).Methods("GET")
-				ws.router.HandleFunc("/test/{testId}", frontendHandler.TestPage).Methods("GET")
-				ws.router.HandleFunc("/run/{runId}", frontendHandler.TestRun).Methods("GET")
-				ws.router.HandleFunc("/clients", frontendHandler.Clients).Methods("GET")
-				ws.router.HandleFunc("/logs/{since}", frontendHandler.LogsData).Methods("GET")
-
-				if isAPIEnabled {
-					ws.router.PathPrefix("/api/docs/").Handler(ws.getSwaggerHandler(ws.logger, frontendHandler))
-				}
-
-				ws.router.PathPrefix("/").Handler(frontendHandler)
-			} else {
-				// Use React SPA for all frontend routes
-				if isAPIEnabled {
-					// Swagger docs still need special handling
-					frontendHandler := handlers.NewFrontendHandler(
-						coordinator,
-						ws.logger.WithField("module", "web-frontend"),
-						frontendConfig.SiteName,
-						frontendConfig.Minify,
-						frontendConfig.Debug,
-						securityTrimmed,
-						isAPIEnabled,
-					)
-					ws.router.PathPrefix("/api/docs/").Handler(ws.getSwaggerHandler(ws.logger, frontendHandler))
-				}
-
-				// SPA handles all other routes
-				ws.router.PathPrefix("/").Handler(spaHandler)
+				return err
 			}
+
+			// SPA handles all frontend routes
+			ws.router.PathPrefix("/").Handler(spaHandler)
 		}
 	}
 
 	return nil
-}
-
-func (ws *Server) getSwaggerHandler(logger logrus.FieldLogger, fh *handlers.FrontendHandler) http.HandlerFunc {
-	return httpSwagger.Handler(func(c *httpSwagger.Config) {
-		c.Layout = httpSwagger.StandaloneLayout
-
-		// override swagger header bar
-		headerHTML, err := fh.BuildPageHeader()
-		if err != nil {
-			logger.Errorf("failed generating page header for api: %v", err)
-		} else {
-			headerStr, err := json.Marshal(headerHTML)
-			if err != nil {
-				logger.Errorf("failed marshalling page header for api: %v", err)
-			} else {
-				var headerScript strings.Builder
-
-				headerScript.WriteString("var headerHtml = ")
-				headerScript.Write(headerStr)
-				headerScript.WriteString(";")
-				headerScript.WriteString("var headerEl = document.createElement(\"div\"); headerEl.className = \"header\"; headerEl.innerHTML = headerHtml; document.body.insertBefore(headerEl, document.body.firstElementChild);")
-				headerScript.WriteString(`function addCss(fileName) { var el = document.createElement("link"); el.type = "text/css"; el.rel = "stylesheet"; el.href = fileName; document.head.appendChild(el); }`)
-				headerScript.WriteString(`function addStyle(cssCode) { var el = document.createElement("style"); el.type = "text/css"; el.appendChild(document.createTextNode(cssCode)); document.head.appendChild(el); }`)
-				headerScript.WriteString(`function addScript(fileName) { var el = document.createElement("script"); el.type = "text/javascript"; el.src = fileName; document.head.appendChild(el); }`)
-				headerScript.WriteString(`addCss("/css/bootstrap.min.css");`)
-				headerScript.WriteString(`addCss("/css/layout.css");`)
-				headerScript.WriteString(`addScript("/js/color-modes.js");`)
-				headerScript.WriteString(`addScript("/js/jquery.min.js");`)
-				headerScript.WriteString(`addScript("/js/bootstrap.bundle.min.js");`)
-				headerScript.WriteString(`addStyle("#swagger-ui .topbar { display: none; } .swagger-ui .opblock .opblock-section-header { background: rgba(var(--bs-body-bg-rgb), 0.8); } [data-bs-theme='dark'] .swagger-ui svg { filter: invert(100%); }");`)
-				headerScript.WriteString(`
-					// override swagger style (replace all color selectors)
-					swaggerStyle = Array.prototype.filter.call(document.styleSheets, function(style) { return style.href && style.href.match(/swagger-ui/) })[0];
-					swaggerRules = swaggerStyle.rules || swaggerStyle.cssRules;
-					swaggerColorSelectors = [];
-					Array.prototype.forEach.call(swaggerRules, function(rule) {
-						if(rule.cssText.match(/color: rgb\(59, 65, 81\);/)) {
-							swaggerColorSelectors.push(rule.selectorText);
-						}
-					});
-					addStyle(swaggerColorSelectors.join(", ") + " { color: inherit; }");
-
-				`)
-
-				//nolint:gosec // ignore
-				c.AfterScript = template.JS(headerScript.String())
-			}
-		}
-	})
 }

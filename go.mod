@@ -10,6 +10,7 @@ require (
 	github.com/ethpandaops/spamoor v1.1.15
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/gorilla/mux v1.8.1
 	github.com/herumi/bls-eth-go-binary v1.37.0
@@ -30,7 +31,6 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/swaggo/swag v1.16.6
-	github.com/tdewolff/minify v2.3.6+incompatible
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/negroni v1.0.0
 	github.com/wealdtech/go-eth2-types/v2 v2.8.2
@@ -69,7 +69,6 @@ require (
 	github.com/go-openapi/spec v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.1 // indirect
 	github.com/goccy/go-yaml v1.11.3 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/huandu/go-clone v1.7.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -97,7 +96,6 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/supranational/blst v0.3.16-0.20250831170142-f48500c1fdbe // indirect
 	github.com/swaggo/files v1.0.1 // indirect
-	github.com/tdewolff/parse v2.3.4+incompatible // indirect
 	github.com/tklauser/go-sysconf v0.3.14 // indirect
 	github.com/tklauser/numcpus v0.8.0 // indirect
 	github.com/wealdtech/go-bytesutil v1.2.1 // indirect

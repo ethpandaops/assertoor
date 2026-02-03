@@ -10,6 +10,7 @@ const Registry = lazy(() => import(/* webpackChunkName: "page-registry" */ './pa
 const TestPage = lazy(() => import(/* webpackChunkName: "page-test" */ './pages/TestPage'));
 const Clients = lazy(() => import(/* webpackChunkName: "page-clients" */ './pages/Clients'));
 const TestBuilder = lazy(() => import(/* webpackChunkName: "page-builder" */ './pages/TestBuilder'));
+const ApiDocs = lazy(() => import(/* webpackChunkName: "page-api-docs" */ './pages/ApiDocs'));
 
 function PageLoader() {
   return (
@@ -69,6 +70,14 @@ function App() {
             element={
               <Suspense fallback={<PageLoader />}>
                 <TestBuilder />
+              </Suspense>
+            }
+          />
+          <Route
+            path="api-docs"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <ApiDocs />
               </Suspense>
             }
           />

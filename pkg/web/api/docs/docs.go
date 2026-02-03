@@ -60,6 +60,59 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/logs/{since}": {
+            "get": {
+                "description": "Returns application-level logs from the coordinator. Protected endpoint - requires authentication unless auth is disabled.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Logs"
+                ],
+                "summary": "Get application logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Log index to start from (0 for all)",
+                        "name": "since",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.GetLogsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/task_descriptor/{name}": {
             "get": {
                 "description": "Returns a single task descriptor by name with its JSON schema",
@@ -1116,6 +1169,17 @@ const docTemplate = `{
                 }
             }
         },
+        "web_api.GetLogsResponse": {
+            "type": "object",
+            "properties": {
+                "log": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/web_api.LogEntry"
+                    }
+                }
+            }
+        },
         "web_api.GetTestResponse": {
             "type": "object",
             "properties": {
@@ -1403,6 +1467,32 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "source": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.LogEntry": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "datalen": {
+                    "type": "integer"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "tidx": {
+                    "type": "integer"
+                },
+                "time": {
                     "type": "string"
                 }
             }
