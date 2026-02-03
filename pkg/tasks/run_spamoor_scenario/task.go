@@ -184,8 +184,13 @@ func (t *Task) Execute(ctx context.Context) error {
 		return fmt.Errorf("scenario execution failed: %w", err)
 	}
 
-	t.ctx.ReportProgress(100, "Scenario completed")
-	t.ctx.SetResult(types.TaskResultSuccess)
+	if ctx.Err() != nil {
+		t.ctx.ReportProgress(100, "Scenario completed")
+		t.ctx.SetResult(types.TaskResultSuccess)
+	} else {
+		t.ctx.ReportProgress(100, "Scenario cancelled")
+		t.ctx.SetResult(types.TaskResultFailure)
+	}
 
 	return nil
 }
