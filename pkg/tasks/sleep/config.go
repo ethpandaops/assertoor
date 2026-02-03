@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	Duration helper.Duration `yaml:"duration" json:"duration" desc:"Duration to sleep (e.g., '10s', '5m', '1h')."`
+	Duration helper.Duration `yaml:"duration" json:"duration" require:"A" desc:"Duration to sleep (e.g., '10s', '5m', '1h')."`
 }
 
 func DefaultConfig() Config {

@@ -1,6 +1,11 @@
 package types
 
-import "time"
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"time"
+)
 
 type WebConfig struct {
 	Server       *ServerConfig   `yaml:"server"`
@@ -32,4 +37,80 @@ type FrontendConfig struct {
 type APIConfig struct {
 	Enabled     bool `yaml:"enabled" envconfig:"WEB_API_ENABLED"`
 	DisableAuth bool `yaml:"disableAuth" envconfig:"WEB_API_DISABLE_AUTH"`
+}
+
+// AIConfig holds configuration for the AI assistant feature.
+type AIConfig struct {
+	// Enable AI features
+	Enabled bool `yaml:"enabled" json:"enabled"`
+
+	// OpenRouter API key (can also be set via AI_OPENROUTER_KEY env var)
+	OpenRouterKey string `yaml:"openRouterKey" json:"openRouterKey"`
+
+	// Default model to use (default: "anthropic/claude-sonnet-4")
+	DefaultModel string `yaml:"defaultModel" json:"defaultModel"`
+
+	// Allowed models (empty means all models allowed)
+	AllowedModels []string `yaml:"allowedModels" json:"allowedModels"`
+
+	// Max tokens per response (default: 8192)
+	MaxTokens int `yaml:"maxTokens" json:"maxTokens"`
+}
+
+// ApplyEnvironment applies environment variables to AIConfig.
+// Environment variables override config file values.
+func (c *AIConfig) ApplyEnvironment() {
+	if v := os.Getenv("AI_ENABLED"); v != "" {
+		c.Enabled = v == "true" || v == "1"
+	}
+
+	if v := os.Getenv("AI_OPENROUTER_KEY"); v != "" {
+		c.OpenRouterKey = v
+	}
+
+	if v := os.Getenv("AI_DEFAULT_MODEL"); v != "" {
+		c.DefaultModel = v
+	}
+
+	if v := os.Getenv("AI_MAX_TOKENS"); v != "" {
+		if maxTokens, err := strconv.Atoi(v); err == nil {
+			c.MaxTokens = maxTokens
+		}
+	}
+}
+
+// Validate validates the AI configuration.
+func (c *AIConfig) Validate() error {
+	if !c.Enabled {
+		return nil
+	}
+
+	if c.OpenRouterKey == "" {
+		return fmt.Errorf("openRouterKey is required when AI is enabled")
+	}
+
+	if c.DefaultModel == "" {
+		return fmt.Errorf("defaultModel cannot be empty when AI is enabled")
+	}
+
+	if c.MaxTokens <= 0 {
+		return fmt.Errorf("maxTokens must be positive")
+	}
+
+	return nil
+}
+
+// DefaultAIConfig returns sensible defaults for AI configuration.
+func DefaultAIConfig() *AIConfig {
+	return &AIConfig{
+		Enabled:      false,
+		DefaultModel: "anthropic/claude-sonnet-4",
+		MaxTokens:    8192,
+		AllowedModels: []string{
+			"anthropic/claude-sonnet-4",
+			"anthropic/claude-opus-4",
+			"openai/gpt-4o",
+			"google/gemini-2.0-flash-001",
+		},
+	}
 }

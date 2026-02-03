@@ -36,6 +36,9 @@ type Config struct {
 	// Coordinator config
 	Coordinator *CoordinatorConfig `yaml:"coordinator" json:"coordinator"`
 
+	// AI assistant config
+	AI *web_types.AIConfig `yaml:"ai" json:"ai"`
+
 	// List of Test configurations.
 	Tests []*types.TestConfig `yaml:"tests" json:"tests"`
 
@@ -64,6 +67,7 @@ func DefaultConfig() *Config {
 		},
 		GlobalVars:    make(map[string]any),
 		Coordinator:   &CoordinatorConfig{},
+		AI:            web_types.DefaultAIConfig(),
 		Tests:         []*types.TestConfig{},
 		ExternalTests: []*types.ExternalTestConfig{},
 	}
@@ -83,6 +87,11 @@ func NewConfig(path string) (*Config, error) {
 
 	if err := yaml.Unmarshal(yamlFile, &config); err != nil {
 		return nil, err
+	}
+
+	// Apply environment variables to AI config
+	if config.AI != nil {
+		config.AI.ApplyEnvironment()
 	}
 
 	return config, nil
@@ -139,6 +148,13 @@ func (c *Config) Validate() error {
 	if c.Coordinator != nil {
 		if err := c.Coordinator.Validate(); err != nil {
 			errs = append(errs, fmt.Errorf("coordinator config: %v", err))
+		}
+	}
+
+	// Validate AI config
+	if c.AI != nil {
+		if err := c.AI.Validate(); err != nil {
+			errs = append(errs, fmt.Errorf("ai config: %v", err))
 		}
 	}
 

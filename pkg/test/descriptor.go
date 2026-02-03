@@ -55,10 +55,10 @@ func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localT
 		testVars := globalVars.NewScope()
 
 		for k, v := range testCfg.Config {
-			testVars.SetVar(k, v)
+			testVars.SetDefaultVar(k, v)
 		}
 
-		err := testVars.CopyVars(globalVars, testCfg.ConfigVars)
+		err := testVars.CopyVars(testVars, testCfg.ConfigVars)
 
 		descriptors = append(descriptors, &Descriptor{
 			id:       testID,
@@ -75,7 +75,7 @@ func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localT
 		testSrc := fmt.Sprintf("external:%v", extTestCfg.File)
 		testID := ""
 
-		testConfig, testVars, basePath, err := LoadExternalTestConfig(ctx, globalVars, extTestCfg)
+		testConfig, testVars, basePath, _, err := LoadExternalTestConfig(ctx, globalVars, extTestCfg)
 
 		if testConfig != nil && testConfig.ID != "" {
 			testID = testConfig.ID
@@ -98,15 +98,29 @@ func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localT
 	return descriptors
 }
 
-func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, extTestCfg *types.ExternalTestConfig) (*types.TestConfig, types.Variables, string, error) {
-	var reader io.Reader
+// LoadExternalTestConfig loads a test config from an external file, URL, or stored YAML source.
+// Returns the test config, variables, base path, raw YAML source, and any error.
+func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, extTestCfg *types.ExternalTestConfig) (testConfig *types.TestConfig, testVars types.Variables, basePath, yamlSource string, err error) {
+	var rawYaml []byte
 
-	var basePath string
+	// Determine source type and load YAML
+	switch {
+	case extTestCfg.YamlSource != "":
+		// YamlSource provided (e.g., from database for API-registered tests), use it directly
+		rawYaml = []byte(extTestCfg.YamlSource)
 
-	if strings.HasPrefix(extTestCfg.File, "http://") || strings.HasPrefix(extTestCfg.File, "https://") {
-		parsedURL, err := url.Parse(extTestCfg.File)
+		basePath, err = os.Getwd()
 		if err != nil {
-			return nil, nil, "", err
+			basePath = "."
+		}
+
+	case strings.HasPrefix(extTestCfg.File, "http://") || strings.HasPrefix(extTestCfg.File, "https://"):
+		// Load from URL
+		var parsedURL *url.URL
+
+		parsedURL, err = url.Parse(extTestCfg.File)
+		if err != nil {
+			return nil, nil, "", "", err
 		}
 
 		// Remove the filename from the path
@@ -118,51 +132,51 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 
 		client := &http.Client{Timeout: time.Second * 120}
 
-		req, err := http.NewRequestWithContext(ctx, "GET", extTestCfg.File, http.NoBody)
+		var req *http.Request
+
+		req, err = http.NewRequestWithContext(ctx, "GET", extTestCfg.File, http.NoBody)
 		if err != nil {
-			return nil, nil, basePath, err
+			return nil, nil, basePath, "", err
 		}
 
-		resp, err := client.Do(req)
+		var resp *http.Response
+
+		resp, err = client.Do(req)
 		if err != nil {
-			return nil, nil, basePath, err
+			return nil, nil, basePath, "", err
 		}
 
 		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				logrus.WithError(err).Warn("failed to close response body")
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				logrus.WithError(closeErr).Warn("failed to close response body")
 			}
 		}()
 
 		if resp.StatusCode != http.StatusOK {
-			return nil, nil, basePath, fmt.Errorf("error loading test config from url: %v, result: %v %v", extTestCfg.File, resp.StatusCode, resp.Status)
+			return nil, nil, basePath, "", fmt.Errorf("error loading test config from url: %v, result: %v %v", extTestCfg.File, resp.StatusCode, resp.Status)
 		}
 
-		reader = resp.Body
-	} else {
+		rawYaml, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, nil, basePath, "", fmt.Errorf("error reading test config from url %v: %w", extTestCfg.File, err)
+		}
+
+	default:
+		// Load from local file
 		basePath = path.Dir(extTestCfg.File)
 
-		f, err := os.Open(extTestCfg.File)
+		rawYaml, err = os.ReadFile(extTestCfg.File)
 		if err != nil {
-			return nil, nil, basePath, fmt.Errorf("error loading test config from file %v: %w", extTestCfg.File, err)
+			return nil, nil, basePath, "", fmt.Errorf("error loading test config from file %v: %w", extTestCfg.File, err)
 		}
-
-		defer func() {
-			if err := f.Close(); err != nil {
-				logrus.WithError(err).Warn("failed to close file")
-			}
-		}()
-
-		reader = f
 	}
 
-	decoder := yaml.NewDecoder(reader)
-	testConfig := &types.TestConfig{}
-	testVars := globalVars.NewScope()
+	testConfig = &types.TestConfig{}
+	testVars = globalVars.NewScope()
 
-	err := decoder.Decode(testConfig)
+	err = yaml.Unmarshal(rawYaml, testConfig)
 	if err != nil {
-		return nil, nil, basePath, fmt.Errorf("error decoding external test config %v: %v", extTestCfg.File, err)
+		return nil, nil, basePath, "", fmt.Errorf("error decoding external test config %v: %v", extTestCfg.File, err)
 	}
 
 	if testConfig.Config == nil {
@@ -204,10 +218,10 @@ func LoadExternalTestConfig(ctx context.Context, globalVars types.Variables, ext
 
 	err = testVars.CopyVars(testVars, testConfig.ConfigVars)
 	if err != nil {
-		return nil, nil, basePath, fmt.Errorf("error decoding external test configVars %v: %v", extTestCfg.File, err)
+		return nil, nil, basePath, "", fmt.Errorf("error decoding external test configVars %v: %v", extTestCfg.File, err)
 	}
 
-	return testConfig, testVars, basePath, nil
+	return testConfig, testVars, basePath, string(rawYaml), nil
 }
 
 func (d *Descriptor) ID() string {

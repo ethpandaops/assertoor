@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTaskDetails } from '../../hooks/useApi';
 import type { TaskState, TaskLogEntry } from '../../types/api';
 import { formatDurationMs, formatTime } from '../../utils/time';
@@ -11,6 +11,7 @@ interface TaskDetailsProps {
 function TaskDetails({ runId, task }: TaskDetailsProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'config' | 'result'>('overview');
   const { data: details } = useTaskDetails(runId, task.index);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const tabs = [
     { id: 'overview' as const, label: 'Overview' },
@@ -39,9 +40,9 @@ function TaskDetails({ runId, task }: TaskDetailsProps) {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto p-3">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3">
         {activeTab === 'overview' && <OverviewTab task={task} />}
-        {activeTab === 'logs' && <LogsTab logs={details?.log || []} />}
+        {activeTab === 'logs' && <LogsTab logs={details?.log || []} scrollContainerRef={scrollContainerRef} />}
         {activeTab === 'config' && <ConfigTab yaml={details?.config_yaml} />}
         {activeTab === 'result' && <ResultTab yaml={details?.result_yaml} />}
       </div>
@@ -129,7 +130,67 @@ function OverviewTab({ task }: { task: TaskState }) {
   );
 }
 
-function LogsTab({ logs }: { logs: TaskLogEntry[] }) {
+interface LogsTabProps {
+  logs: TaskLogEntry[];
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+}
+
+function LogsTab({ logs, scrollContainerRef }: LogsTabProps) {
+  const isAtBottomRef = useRef(true);
+  const prevLogCountRef = useRef(0);
+
+  // Check if container is scrolled to bottom
+  const checkIsAtBottom = useCallback(() => {
+    if (scrollContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+      // Consider "at bottom" if within 30px of the bottom
+      return scrollHeight - scrollTop - clientHeight < 30;
+    }
+    return true;
+  }, [scrollContainerRef]);
+
+  // Track scroll position via scroll event
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      isAtBottomRef.current = checkIsAtBottom();
+    };
+
+    // Initial check
+    isAtBottomRef.current = checkIsAtBottom();
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [scrollContainerRef, checkIsAtBottom]);
+
+  // Auto-scroll to bottom when new logs are added (only if was at bottom)
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Only scroll if we have new logs and were at bottom
+    if (logs.length > prevLogCountRef.current && isAtBottomRef.current) {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+      });
+    }
+    prevLogCountRef.current = logs.length;
+  }, [logs.length, scrollContainerRef]);
+
+  // Initial scroll to bottom when logs first load
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container && logs.length > 0 && prevLogCountRef.current === 0) {
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+        isAtBottomRef.current = true;
+      });
+    }
+  }, [logs.length, scrollContainerRef]);
+
   if (logs.length === 0) {
     return (
       <p className="text-center text-[var(--color-text-secondary)] text-xs">No logs available</p>

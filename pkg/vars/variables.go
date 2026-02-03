@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -244,7 +245,9 @@ func (v *Variables) ResolveQuery(queryStr string) (val interface{}, ok bool, err
 		return nil, false, fmt.Errorf("could not get generalized variables: %v", err)
 	}
 
-	queryStr = fmt.Sprintf(".%v", queryStr)
+	if !strings.HasPrefix(queryStr, ".") {
+		queryStr = "." + queryStr
+	}
 
 	query, err := gojq.Parse(queryStr)
 	if err != nil {
@@ -275,7 +278,10 @@ func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string
 
 	// now execute dynamic queries with gojq
 	for cfgName, varQuery := range consumeMap {
-		queryStr := fmt.Sprintf(".%v", varQuery)
+		queryStr := varQuery
+		if !strings.HasPrefix(queryStr, ".") {
+			queryStr = "." + queryStr
+		}
 
 		query, err2 := gojq.Parse(queryStr)
 		if err2 != nil {

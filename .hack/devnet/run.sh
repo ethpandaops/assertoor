@@ -78,6 +78,11 @@ done
 
 echo "$config_content" > "${__dir}/generated-assertoor-config.yaml"
 
+if [ -f "${__dir}/custom-ai-config.yaml" ]; then
+  ai_config_file="${__dir}/custom-ai-config.yaml"
+  cat "$ai_config_file" | envsubst >> "${__dir}/generated-assertoor-config.yaml"
+fi
+
 cat <<EOF
 ============================================================================================================
 Assertoor config at ${__dir}/generated-assertoor-config.yaml

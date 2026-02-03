@@ -58,6 +58,7 @@ type ExternalTestConfig struct {
 	Config     map[string]interface{} `yaml:"config" json:"config"`
 	ConfigVars map[string]string      `yaml:"configVars" json:"configVars"`
 	Schedule   *TestSchedule          `yaml:"schedule" json:"schedule"`
+	YamlSource string                 `yaml:"-" json:"-"` // Raw YAML source (for API-registered tests)
 }
 
 type TestSchedule struct {

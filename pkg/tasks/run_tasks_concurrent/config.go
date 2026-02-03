@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	Tasks            []helper.RawMessageMasked `yaml:"tasks" json:"tasks" desc:"List of tasks to execute concurrently."`
+	Tasks            []helper.RawMessageMasked `yaml:"tasks" json:"tasks" require:"A" desc:"List of tasks to execute concurrently."`
 	NewVariableScope bool                      `yaml:"newVariableScope" json:"newVariableScope" desc:"If true, create a new variable scope for child tasks."`
 
 	// Threshold behavior:

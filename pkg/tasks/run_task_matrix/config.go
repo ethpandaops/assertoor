@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	Task         *helper.RawMessageMasked `yaml:"task" json:"task" desc:"The task template to execute for each matrix value."`
+	Task         *helper.RawMessageMasked `yaml:"task" json:"task" require:"A" desc:"The task template to execute for each matrix value."`
 	MatrixVar    string                   `yaml:"matrixVar" json:"matrixVar" desc:"Variable name to bind each matrix value to during task execution."`
 	MatrixValues []any                    `yaml:"matrixValues" json:"matrixValues" desc:"List of values to iterate over, executing the task for each."`
 

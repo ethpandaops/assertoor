@@ -79,6 +79,11 @@ type JSONSchema struct {
 	Default              any                    `json:"default,omitempty"`
 	Enum                 []any                  `json:"enum,omitempty"`
 	AdditionalProperties *JSONSchema            `json:"additionalProperties,omitempty"`
+	// RequireGroup specifies requirement groups for this field.
+	// Format: "A" or "A.1" where A is the group and .1 is the subgroup.
+	// Fields in same subgroup must all be present together.
+	// Multiple subgroups (A.1, A.2) are alternatives - one must be satisfied.
+	RequireGroup string `json:"requireGroup,omitempty"`
 }
 
 // GenerateJSONSchema generates a JSON Schema from a Go struct via reflection.
@@ -133,6 +138,11 @@ func generateSchemaFromType(t reflect.Type) *JSONSchema {
 				if len(parts) > 0 && parts[0] != "" {
 					fieldSchema.Description = "Config field: " + parts[0]
 				}
+			}
+
+			// Add requirement group from require tag
+			if requireTag := field.Tag.Get("require"); requireTag != "" {
+				fieldSchema.RequireGroup = requireTag
 			}
 
 			schema.Properties[fieldName] = fieldSchema

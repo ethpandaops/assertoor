@@ -80,20 +80,25 @@ func (c *TestRegistry) LoadTests(ctx context.Context, local []*types.TestConfig,
 				Startup: false,
 				Cron:    []string{},
 			},
+			YamlSource: dbTestConfig.YamlSource,
 		}
 
 		if dbTestConfig.Timeout > 0 {
 			externalTest.Timeout = &helper.Duration{Duration: time.Duration(dbTestConfig.Timeout) * time.Second}
 		}
 
-		if err := yaml.Unmarshal([]byte(dbTestConfig.Config), &externalTest.Config); err != nil {
-			c.coordinator.Logger().Errorf("error decoding test config %v from db: %v", dbTestConfig.TestID, err)
-			continue
-		}
+		// When YamlSource is present, config/configVars are already in the YAML,
+		// so don't load them from DB (they would be treated as overrides)
+		if dbTestConfig.YamlSource == "" {
+			if err := yaml.Unmarshal([]byte(dbTestConfig.Config), &externalTest.Config); err != nil {
+				c.coordinator.Logger().Errorf("error decoding test config %v from db: %v", dbTestConfig.TestID, err)
+				continue
+			}
 
-		if err := yaml.Unmarshal([]byte(dbTestConfig.ConfigVars), &externalTest.ConfigVars); err != nil {
-			c.coordinator.Logger().Errorf("error decoding test configVars %v from db: %v", dbTestConfig.TestID, err)
-			continue
+			if err := yaml.Unmarshal([]byte(dbTestConfig.ConfigVars), &externalTest.ConfigVars); err != nil {
+				c.coordinator.Logger().Errorf("error decoding test configVars %v from db: %v", dbTestConfig.TestID, err)
+				continue
+			}
 		}
 
 		if dbTestConfig.ScheduleCronYaml != "" {
@@ -125,7 +130,7 @@ func (c *TestRegistry) LoadTests(ctx context.Context, local []*types.TestConfig,
 			break
 		}
 
-		dbTestCfg, err := c.externalTestCfgToDB(cfgExternalTest)
+		dbTestCfg, err := c.externalTestCfgToDB(cfgExternalTest, "")
 		if err != nil {
 			c.coordinator.Logger().Errorf("error converting external test config %v to db: %v", cfgExternalTest.ID, err)
 		}
@@ -190,6 +195,10 @@ func (c *TestRegistry) LoadTests(ctx context.Context, local []*types.TestConfig,
 }
 
 func (c *TestRegistry) AddLocalTest(testConfig *types.TestConfig) (types.TestDescriptor, error) {
+	return c.AddLocalTestWithYaml(testConfig, "")
+}
+
+func (c *TestRegistry) AddLocalTestWithYaml(testConfig *types.TestConfig, yamlSource string) (types.TestDescriptor, error) {
 	if testConfig.ID == "" {
 		return nil, fmt.Errorf("cannot add test descriptor without ID")
 	}
@@ -197,10 +206,10 @@ func (c *TestRegistry) AddLocalTest(testConfig *types.TestConfig) (types.TestDes
 	testVars := vars.NewVariables(c.coordinator.GlobalVariables())
 
 	for k, v := range testConfig.Config {
-		testVars.SetVar(k, v)
+		testVars.SetDefaultVar(k, v)
 	}
 
-	err := testVars.CopyVars(c.coordinator.GlobalVariables(), testConfig.ConfigVars)
+	err := testVars.CopyVars(testVars, testConfig.ConfigVars)
 	if err != nil {
 		return nil, fmt.Errorf("failed decoding configVars: %v", err)
 	}
@@ -211,6 +220,19 @@ func (c *TestRegistry) AddLocalTest(testConfig *types.TestConfig) (types.TestDes
 	}
 
 	testDescriptor := test.NewDescriptor(testConfig.ID, "api-call", workingDir, testConfig, testVars)
+
+	// Persist to database
+	dbTestCfg, err := c.localTestCfgToDB(testConfig, yamlSource)
+	if err != nil {
+		return nil, fmt.Errorf("error converting local test config for db: %v", err)
+	}
+
+	err = c.coordinator.Database().RunTransaction(func(tx *sqlx.Tx) error {
+		return c.coordinator.Database().InsertTestConfig(tx, dbTestCfg)
+	})
+	if err != nil {
+		c.coordinator.Logger().Errorf("error persisting local test to db: %v", err)
+	}
 
 	c.testDescriptorsMutex.Lock()
 	defer c.testDescriptorsMutex.Unlock()
@@ -229,8 +251,55 @@ func (c *TestRegistry) AddLocalTest(testConfig *types.TestConfig) (types.TestDes
 	return testDescriptor, nil
 }
 
+func (c *TestRegistry) localTestCfgToDB(testConfig *types.TestConfig, yamlSource string) (*db.TestConfig, error) {
+	dbTestCfg := &db.TestConfig{
+		TestID: testConfig.ID,
+		Source: "api-call",
+		Name:   testConfig.Name,
+	}
+
+	if testConfig.Timeout.Duration > 0 {
+		dbTestCfg.Timeout = int(testConfig.Timeout.Seconds())
+	}
+
+	if testConfig.Schedule != nil {
+		dbTestCfg.ScheduleStartup = testConfig.Schedule.Startup
+
+		if len(testConfig.Schedule.Cron) > 0 {
+			cronYaml, err := yaml.Marshal(testConfig.Schedule.Cron)
+			if err != nil {
+				return nil, fmt.Errorf("error encoding test cron schedule: %v", err)
+			}
+
+			dbTestCfg.ScheduleCronYaml = string(cronYaml)
+		}
+	}
+
+	// When yamlSource is provided, config/configVars are already in the YAML,
+	// so don't store them separately (they would be treated as overrides on reload)
+	if yamlSource == "" {
+		configYaml, err := yaml.Marshal(testConfig.Config)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding test config: %v", err)
+		}
+
+		dbTestCfg.Config = string(configYaml)
+
+		configVarsYaml, err := yaml.Marshal(testConfig.ConfigVars)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding test configVars: %v", err)
+		}
+
+		dbTestCfg.ConfigVars = string(configVarsYaml)
+	}
+
+	dbTestCfg.YamlSource = yamlSource
+
+	return dbTestCfg, nil
+}
+
 func (c *TestRegistry) AddExternalTest(ctx context.Context, extTestCfg *types.ExternalTestConfig) (types.TestDescriptor, error) {
-	testConfig, testVars, basePath, err := test.LoadExternalTestConfig(ctx, c.coordinator.GlobalVariables(), extTestCfg)
+	testConfig, testVars, basePath, yamlSource, err := test.LoadExternalTestConfig(ctx, c.coordinator.GlobalVariables(), extTestCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed loading test config from %v: %w", extTestCfg.File, err)
 	}
@@ -251,7 +320,7 @@ func (c *TestRegistry) AddExternalTest(ctx context.Context, extTestCfg *types.Ex
 	extTestCfg.ID = testDescriptor.ID()
 	extTestCfg.Name = testConfig.Name
 
-	dbTestCfg, err := c.externalTestCfgToDB(extTestCfg)
+	dbTestCfg, err := c.externalTestCfgToDB(extTestCfg, yamlSource)
 	if err != nil {
 		return nil, fmt.Errorf("error converting external test config %v for db: %v", extTestCfg.ID, err)
 	}
@@ -280,11 +349,12 @@ func (c *TestRegistry) AddExternalTest(ctx context.Context, extTestCfg *types.Ex
 	return testDescriptor, nil
 }
 
-func (c *TestRegistry) externalTestCfgToDB(cfgExternalTest *types.ExternalTestConfig) (*db.TestConfig, error) {
+func (c *TestRegistry) externalTestCfgToDB(cfgExternalTest *types.ExternalTestConfig, yamlSource string) (*db.TestConfig, error) {
 	dbTestCfg := &db.TestConfig{
-		TestID: cfgExternalTest.ID,
-		Source: cfgExternalTest.File,
-		Name:   cfgExternalTest.Name,
+		TestID:     cfgExternalTest.ID,
+		Source:     cfgExternalTest.File,
+		Name:       cfgExternalTest.Name,
+		YamlSource: yamlSource,
 	}
 
 	if cfgExternalTest.Timeout != nil {

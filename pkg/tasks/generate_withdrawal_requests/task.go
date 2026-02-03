@@ -32,19 +32,19 @@ var (
 	TaskName       = "generate_withdrawal_requests"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Generates withdrawal requests and sends them to the network",
+		Description: "Generates el triggered withdrawal or exit requests and sends them to the network",
 		Category:    "validator",
 		Config:      DefaultConfig(),
 		Outputs: []types.TaskOutputDefinition{
 			{
 				Name:        "transactionHashes",
 				Type:        "array",
-				Description: "Array of withdrawal transaction hashes.",
+				Description: "Array of el triggered withdrawal or exit transaction hashes.",
 			},
 			{
 				Name:        "transactionReceipts",
 				Type:        "array",
-				Description: "Array of withdrawal transaction receipts.",
+				Description: "Array of el triggered withdrawal or exit transaction receipts.",
 			},
 		},
 		NewTask: NewTask,

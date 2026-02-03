@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	Task             *helper.RawMessageMasked `yaml:"task" json:"task" desc:"The task to execute with additional options."`
+	Task             *helper.RawMessageMasked `yaml:"task" json:"task" require:"A" desc:"The task to execute with additional options."`
 	NewVariableScope bool                     `yaml:"newVariableScope" json:"newVariableScope" desc:"If true, create a new variable scope for the child task."`
 
 	// Retry behavior

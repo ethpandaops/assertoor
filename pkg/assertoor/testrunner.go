@@ -203,7 +203,32 @@ func (c *TestRunner) runTest(ctx context.Context, testRef types.TestRunner) {
 		return
 	}
 
-	if err := testRef.Run(ctx); err != nil {
+	eventBus := c.coordinator.EventBus()
+
+	// Publish test started event
+	eventBus.PublishTestStarted(testRef.RunID(), testRef.TestID(), testRef.Name())
+
+	err := testRef.Run(ctx)
+
+	// Publish test completion event based on final status
+	status := testRef.Status()
+
+	switch status {
+	case types.TestStatusSuccess, types.TestStatusSkipped:
+		eventBus.PublishTestCompleted(testRef.RunID(), testRef.TestID(), testRef.Name(), string(status))
+	case types.TestStatusFailure, types.TestStatusAborted:
+		errMsg := ""
+		if err != nil {
+			errMsg = err.Error()
+		}
+
+		eventBus.PublishTestFailed(testRef.RunID(), testRef.TestID(), testRef.Name(), errMsg)
+	case types.TestStatusPending, types.TestStatusRunning:
+		// These statuses should not occur after test completion, but handle them gracefully
+		eventBus.PublishTestCompleted(testRef.RunID(), testRef.TestID(), testRef.Name(), string(status))
+	}
+
+	if err != nil {
 		testRef.Logger().Errorf("test execution failed: %v", err)
 	}
 }

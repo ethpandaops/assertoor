@@ -6,7 +6,7 @@ import (
 )
 
 type Config struct {
-	PrivateKey string `yaml:"privateKey" json:"privateKey" desc:"Private key of the parent wallet used to fund the child wallet."`
+	PrivateKey string `yaml:"privateKey" json:"privateKey" require:"A" desc:"Private key of the parent wallet used to fund the child wallet."`
 	WalletSeed string `yaml:"walletSeed" json:"walletSeed" desc:"Seed used to derive the child wallet address deterministically."`
 	RandomSeed bool   `yaml:"randomSeed" json:"randomSeed" desc:"If true, generate a random seed for the child wallet."`
 

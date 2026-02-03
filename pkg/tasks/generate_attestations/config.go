@@ -9,13 +9,13 @@ import (
 
 type Config struct {
 	// Key configuration
-	Mnemonic   string `yaml:"mnemonic" json:"mnemonic" desc:"Mnemonic phrase used to derive validator keys."`
+	Mnemonic   string `yaml:"mnemonic" json:"mnemonic" require:"B" desc:"Mnemonic phrase used to derive validator keys."`
 	StartIndex int    `yaml:"startIndex" json:"startIndex" desc:"Index within the mnemonic from which to start deriving keys."`
-	IndexCount int    `yaml:"indexCount" json:"indexCount" desc:"Number of validator keys to use for generating attestations."`
+	IndexCount int    `yaml:"indexCount" json:"indexCount" require:"C" desc:"Number of validator keys to use for generating attestations."`
 
 	// Limit configuration
-	LimitTotal  int `yaml:"limitTotal" json:"limitTotal" desc:"Total limit on the number of attestations to generate."`
-	LimitEpochs int `yaml:"limitEpochs" json:"limitEpochs" desc:"Number of epochs to generate attestations for."`
+	LimitTotal  int `yaml:"limitTotal" json:"limitTotal" require:"A.1" desc:"Total limit on the number of attestations to generate."`
+	LimitEpochs int `yaml:"limitEpochs" json:"limitEpochs" require:"A.2" desc:"Number of epochs to generate attestations for."`
 
 	// Client selection
 	ClientPattern        string `yaml:"clientPattern" json:"clientPattern" desc:"Regex pattern to select specific client endpoints for submitting attestations."`

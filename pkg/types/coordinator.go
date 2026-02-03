@@ -32,6 +32,7 @@ type Coordinator interface {
 
 type TestRegistry interface {
 	AddLocalTest(testConfig *TestConfig) (TestDescriptor, error)
+	AddLocalTestWithYaml(testConfig *TestConfig, yamlSource string) (TestDescriptor, error)
 	AddExternalTest(ctx context.Context, extTestConfig *ExternalTestConfig) (TestDescriptor, error)
 	DeleteTest(testID string) error
 	GetTestDescriptors() []TestDescriptor

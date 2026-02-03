@@ -8,9 +8,9 @@ import (
 )
 
 type Config struct {
-	ScenarioName string             `yaml:"scenarioName" json:"scenarioName" desc:"Name of the spamoor scenario to run."`
-	PrivateKey   string             `yaml:"privateKey" json:"privateKey" desc:"Private key of the root wallet used to fund scenario wallets."`
-	ScenarioYAML helper.IRawMessage `yaml:"scenarioYaml" json:"scenarioYaml" desc:"YAML configuration for the scenario (passed as-is to spamoor)."`
+	ScenarioName string             `yaml:"scenarioName" json:"scenarioName" require:"A" desc:"Name of the spamoor scenario to run."`
+	PrivateKey   string             `yaml:"privateKey" json:"privateKey" require:"B" desc:"Private key of the root wallet used to fund scenario wallets."`
+	ScenarioYAML *helper.RawMessage `yaml:"scenarioYaml" json:"scenarioYaml" desc:"YAML configuration for the scenario (nested YAML structure passed to spamoor)."`
 }
 
 func DefaultConfig() Config {

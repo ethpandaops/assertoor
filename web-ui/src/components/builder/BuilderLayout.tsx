@@ -18,6 +18,7 @@ import BuilderCanvas from './canvas/BuilderCanvas';
 import ConfigPanel from './config/ConfigPanel';
 import BuilderToolbar from './toolbar/BuilderToolbar';
 import ValidationPanel from './validation/ValidationPanel';
+import { AIPanel } from './ai';
 import type { TaskDescriptor } from '../../types/api';
 
 // Resize handle component
@@ -176,12 +177,17 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
   const moveTaskToCleanup = useBuilderStore((state) => state.moveTaskToCleanup);
   const moveCleanupTaskToMain = useBuilderStore((state) => state.moveCleanupTaskToMain);
   const setSelection = useBuilderStore((state) => state.setSelection);
+  const testName = useBuilderStore((state) => state.testConfig.name);
+  const exportYaml = useBuilderStore((state) => state.exportYaml);
+  const loadFromYaml = useBuilderStore((state) => state.loadFromYaml);
 
   // Panel visibility and sizes
   const [showPalette, setShowPalette] = useState(true);
   const [showConfig, setShowConfig] = useState(true);
+  const [showAI, setShowAI] = useState(false);
   const [paletteWidth, setPaletteWidth] = useState(256); // 16rem = 256px
   const [configWidth, setConfigWidth] = useState(320); // 20rem = 320px
+  const [aiWidth, setAIWidth] = useState(384); // 24rem = 384px
 
   // Resize handlers
   const handlePaletteResize = useCallback((delta: number) => {
@@ -191,6 +197,15 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
   const handleConfigResize = useCallback((delta: number) => {
     setConfigWidth((w) => Math.max(280, Math.min(800, w + delta)));
   }, []);
+
+  const handleAIResize = useCallback((delta: number) => {
+    setAIWidth((w) => Math.max(320, Math.min(800, w + delta)));
+  }, []);
+
+  // Handle AI YAML apply
+  const handleApplyAIYaml = useCallback((yaml: string) => {
+    loadFromYaml(yaml);
+  }, [loadFromYaml]);
 
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -552,8 +567,10 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
         <BuilderToolbar
           showPalette={showPalette}
           showConfig={showConfig}
+          showAI={showAI}
           onTogglePalette={() => setShowPalette(!showPalette)}
           onToggleConfig={() => setShowConfig(!showConfig)}
+          onToggleAI={() => setShowAI(!showAI)}
         />
 
         {/* Main content area */}
@@ -612,6 +629,24 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
                     Click a single task to edit its configuration.
                   </p>
                 </div>
+              </div>
+            </>
+          )}
+
+          {/* AI Assistant Panel */}
+          {showAI && (
+            <>
+              <ResizeHandle direction="right" onResize={handleAIResize} />
+              <div
+                className="flex flex-col overflow-hidden"
+                style={{ width: aiWidth }}
+              >
+                <AIPanel
+                  testName={testName}
+                  currentYaml={exportYaml()}
+                  onApplyYaml={handleApplyAIYaml}
+                  onClose={() => setShowAI(false)}
+                />
               </div>
             </>
           )}

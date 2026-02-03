@@ -7,14 +7,14 @@ import (
 
 type Config struct {
 	LimitPerSlot              int      `yaml:"limitPerSlot" json:"limitPerSlot" desc:"Maximum number of consolidation requests to generate per slot."`
-	LimitTotal                int      `yaml:"limitTotal" json:"limitTotal" desc:"Total limit on the number of consolidation requests to generate."`
+	LimitTotal                int      `yaml:"limitTotal" json:"limitTotal" require:"A.1" desc:"Total limit on the number of consolidation requests to generate."`
 	LimitPending              int      `yaml:"limitPending" json:"limitPending" desc:"Maximum number of pending consolidation requests to allow before waiting."`
-	SourceMnemonic            string   `yaml:"sourceMnemonic" json:"sourceMnemonic" desc:"Mnemonic phrase to derive source validator keys."`
-	SourceStartIndex          int      `yaml:"sourceStartIndex" json:"sourceStartIndex" desc:"Index within the mnemonic from which to start deriving source keys."`
-	SourceStartValidatorIndex *uint64  `yaml:"sourceStartValidatorIndex" json:"sourceStartValidatorIndex" desc:"Starting validator index for source validators."`
-	SourceIndexCount          int      `yaml:"sourceIndexCount" json:"sourceIndexCount" desc:"Number of source validators to consolidate."`
-	TargetPublicKey           string   `yaml:"targetPublicKey" json:"targetPublicKey" desc:"Public key of the target validator to consolidate into."`
-	TargetValidatorIndex      *uint64  `yaml:"targetValidatorIndex" json:"targetValidatorIndex" desc:"Validator index of the target validator to consolidate into."`
+	SourceMnemonic            string   `yaml:"sourceMnemonic" json:"sourceMnemonic" require:"B.1" desc:"Mnemonic phrase to derive source validator keys."`
+	SourceStartIndex          int      `yaml:"sourceStartIndex" json:"sourceStartIndex" require:"B.1" desc:"Index within the mnemonic from which to start deriving source keys."`
+	SourceStartValidatorIndex *uint64  `yaml:"sourceStartValidatorIndex" json:"sourceStartValidatorIndex" require:"B.2" desc:"Starting validator index for source validators."`
+	SourceIndexCount          int      `yaml:"sourceIndexCount" json:"sourceIndexCount" require:"A.2" desc:"Number of source validators to consolidate."`
+	TargetPublicKey           string   `yaml:"targetPublicKey" json:"targetPublicKey" require:"C.1" desc:"Public key of the target validator to consolidate into."`
+	TargetValidatorIndex      *uint64  `yaml:"targetValidatorIndex" json:"targetValidatorIndex" require:"C.2" desc:"Validator index of the target validator to consolidate into."`
 	ConsolidationEpoch        *uint64  `yaml:"consolidationEpoch" json:"consolidationEpoch" desc:"Epoch at which consolidation should occur."`
 	WalletPrivkey             string   `yaml:"walletPrivkey" json:"walletPrivkey" desc:"Private key of the wallet used to send consolidation request transactions."`
 	ConsolidationContract     string   `yaml:"consolidationContract" json:"consolidationContract" desc:"Address of the consolidation request contract."`

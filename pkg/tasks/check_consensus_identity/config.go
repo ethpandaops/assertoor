@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	ClientPattern   string          `yaml:"clientPattern" json:"clientPattern" desc:"Regex pattern to select specific client endpoints for identity checking."`
+	ClientPattern   string          `yaml:"clientPattern" json:"clientPattern" require:"A" desc:"Regex pattern to select specific client endpoints for identity checking."`
 	PollInterval    helper.Duration `yaml:"pollInterval" json:"pollInterval" desc:"Interval between identity check polls (e.g., '10s', '1m')."`
 	MinClientCount  int             `yaml:"minClientCount" json:"minClientCount" desc:"Minimum number of clients required to pass the check."`
 	MaxFailCount    int             `yaml:"maxFailCount" json:"maxFailCount" desc:"Maximum number of clients allowed to fail the check (-1 for unlimited)."`

@@ -6,10 +6,10 @@ import (
 )
 
 type Config struct {
-	LimitPerBlock int    `yaml:"limitPerBlock" json:"limitPerBlock" desc:"Maximum number of blob transactions to generate per block."`
-	LimitTotal    int    `yaml:"limitTotal" json:"limitTotal" desc:"Total limit on the number of blob transactions to generate."`
-	LimitPending  int    `yaml:"limitPending" json:"limitPending" desc:"Maximum number of pending blob transactions to allow before waiting."`
-	PrivateKey    string `yaml:"privateKey" json:"privateKey" desc:"Private key of the wallet used to send blob transactions."`
+	LimitPerBlock int    `yaml:"limitPerBlock" json:"limitPerBlock" require:"A.1" desc:"Maximum number of blob transactions to generate per block."`
+	LimitTotal    int    `yaml:"limitTotal" json:"limitTotal" require:"A.2" desc:"Total limit on the number of blob transactions to generate."`
+	LimitPending  int    `yaml:"limitPending" json:"limitPending" require:"A.3" desc:"Maximum number of pending blob transactions to allow before waiting."`
+	PrivateKey    string `yaml:"privateKey" json:"privateKey" require:"B" desc:"Private key of the wallet used to send blob transactions."`
 	ChildWallets  uint64 `yaml:"childWallets" json:"childWallets" desc:"Number of child wallets to use for parallel transaction sending."`
 	WalletSeed    string `yaml:"walletSeed" json:"walletSeed" desc:"Seed used to derive child wallet addresses deterministically."`
 

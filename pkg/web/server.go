@@ -76,7 +76,7 @@ func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*Serve
 	return ws, nil
 }
 
-func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfig *types.APIConfig, coordinator coordinator_types.Coordinator, securityTrimmed bool, eventBus *events.EventBus) error {
+func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfig *types.APIConfig, aiConfig *types.AIConfig, coordinator coordinator_types.Coordinator, securityTrimmed bool, eventBus *events.EventBus) error {
 	isAPIEnabled := apiConfig != nil && apiConfig.Enabled
 	isFrontendEnabled := frontendConfig != nil && frontendConfig.Enabled
 
@@ -146,6 +146,22 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/details", apiHandler.GetTestRunDetails).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/task/{taskIndex}/details", apiHandler.GetTestRunTaskDetails).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/task/{taskId}/result/{resultType}/{fileId:.*}", apiHandler.GetTaskResult).Methods("GET")
+
+		// AI endpoints (if enabled)
+		if aiConfig != nil && aiConfig.Enabled {
+			aiHandler := api.NewAIHandler(
+				aiConfig,
+				coordinator.Database(),
+				ws.logger.WithField("module", "ai-api"),
+				authHandler,
+				disableAuth,
+			)
+			ws.router.HandleFunc("/api/v1/ai/config", aiHandler.GetConfig).Methods("GET")
+			ws.router.HandleFunc("/api/v1/ai/usage", aiHandler.GetUsage).Methods("GET")
+			ws.router.HandleFunc("/api/v1/ai/chat", aiHandler.Chat).Methods("POST")
+			ws.router.HandleFunc("/api/v1/ai/chat/{sessionId}", aiHandler.GetChatSession).Methods("GET")
+			ws.router.HandleFunc("/api/v1/ai/chat/{sessionId}/stream", aiHandler.StreamChatSession).Methods("GET")
+		}
 	}
 
 	if frontendConfig != nil {

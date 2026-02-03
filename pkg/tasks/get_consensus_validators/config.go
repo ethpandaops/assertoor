@@ -5,8 +5,8 @@ import (
 )
 
 type Config struct {
-	ClientPattern         string   `yaml:"clientPattern" json:"clientPattern" desc:"Regex pattern to select specific client endpoints for querying validators."`
-	ValidatorNamePattern  string   `yaml:"validatorNamePattern" json:"validatorNamePattern" desc:"Regex pattern to filter validators by name."`
+	ClientPattern         string   `yaml:"clientPattern" json:"clientPattern" require:"A.1" desc:"Regex pattern to select specific client endpoints for querying validators."`
+	ValidatorNamePattern  string   `yaml:"validatorNamePattern" json:"validatorNamePattern" require:"A.2" desc:"Regex pattern to filter validators by name."`
 	ValidatorStatus       []string `yaml:"validatorStatus" json:"validatorStatus" desc:"List of validator statuses to include in results."`
 	MinValidatorBalance   *uint64  `yaml:"minValidatorBalance" json:"minValidatorBalance" desc:"Minimum validator balance to include in results."`
 	MaxValidatorBalance   *uint64  `yaml:"maxValidatorBalance" json:"maxValidatorBalance" desc:"Maximum validator balance to include in results."`

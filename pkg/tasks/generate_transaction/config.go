@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	PrivateKey string `yaml:"privateKey" json:"privateKey" desc:"Private key of the wallet used to send the transaction."`
+	PrivateKey string `yaml:"privateKey" json:"privateKey" require:"A" desc:"Private key of the wallet used to send the transaction."`
 
 	LegacyTxType       bool           `yaml:"legacyTxType" json:"legacyTxType" desc:"If true, use legacy transaction type instead of EIP-1559."`
 	BlobTxType         bool           `yaml:"blobTxType" json:"blobTxType" desc:"If true, send a blob transaction (EIP-4844)."`

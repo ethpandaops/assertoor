@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	ForegroundTask   *helper.RawMessageMasked `yaml:"foregroundTask" json:"foregroundTask" desc:"The primary task to execute in the foreground."`
+	ForegroundTask   *helper.RawMessageMasked `yaml:"foregroundTask" json:"foregroundTask" require:"A" desc:"The primary task to execute in the foreground."`
 	BackgroundTask   *helper.RawMessageMasked `yaml:"backgroundTask" json:"backgroundTask" desc:"The task to execute in the background while foreground runs."`
 	NewVariableScope bool                     `yaml:"newVariableScope" json:"newVariableScope" desc:"If true, create a new variable scope for child tasks."`
 

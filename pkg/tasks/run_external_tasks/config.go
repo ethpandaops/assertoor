@@ -5,7 +5,7 @@ import (
 )
 
 type Config struct {
-	TestFile       string            `yaml:"testFile" json:"testFile" desc:"Path to the external test file to execute."`
+	TestFile       string            `yaml:"testFile" json:"testFile" require:"A" desc:"Path to the external test file to execute."`
 	TestConfig     map[string]any    `yaml:"testConfig" json:"testConfig" desc:"Configuration values to pass to the external test."`
 	TestConfigVars map[string]string `yaml:"testConfigVars" json:"testConfigVars" desc:"Variable mappings for external test configuration."`
 	ExpectFailure  bool              `yaml:"expectFailure" json:"expectFailure" desc:"If true, expect the external test to fail (inverts success condition)."`

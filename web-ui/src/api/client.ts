@@ -139,10 +139,36 @@ export async function deleteTest(testId: string): Promise<void> {
 }
 
 export async function registerTest(yaml: string): Promise<void> {
-  await fetchApiWithAuth<void>('/tests/register', {
+  // Send raw YAML with application/yaml content type
+  // The backend expects either YAML body or JSON with test fields directly
+  const authHeader = authStore.getAuthHeader();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/yaml',
+  };
+
+  if (authHeader) {
+    headers['Authorization'] = authHeader;
+  }
+
+  const response = await fetch(`${API_BASE}/tests/register`, {
     method: 'POST',
-    body: JSON.stringify({ yaml }),
+    headers,
+    body: yaml,
   });
+
+  if (response.status === 401) {
+    throw new Error('Unauthorized: Please log in to perform this action');
+  }
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+
+  const result = await response.json();
+
+  if (result.status !== 'OK') {
+    throw new Error(result.status);
+  }
 }
 
 export async function registerExternalTest(url: string): Promise<void> {

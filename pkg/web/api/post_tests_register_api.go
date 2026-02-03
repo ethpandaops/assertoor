@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/ethpandaops/assertoor/pkg/helper"
@@ -47,24 +49,40 @@ func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Read raw request body first (to store as yaml_source)
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error reading request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
 	// parse request body
 	req := &PostTestsRegisterRequest{}
+	yamlSource := ""
 
 	if r.Header.Get("Content-Type") == contentTypeYAML {
-		decoder := yaml.NewDecoder(r.Body)
+		decoder := yaml.NewDecoder(bytes.NewReader(rawBody))
 
 		err := decoder.Decode(req)
 		if err != nil {
 			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body yaml: %v", err), http.StatusBadRequest)
 			return
 		}
+
+		yamlSource = string(rawBody)
 	} else {
-		decoder := json.NewDecoder(r.Body)
+		decoder := json.NewDecoder(bytes.NewReader(rawBody))
 
 		err := decoder.Decode(req)
 		if err != nil {
 			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body json: %v", err), http.StatusBadRequest)
 			return
+		}
+
+		// Convert JSON to YAML for storage
+		yamlBytes, err := yaml.Marshal(req)
+		if err == nil {
+			yamlSource = string(yamlBytes)
 		}
 	}
 
@@ -102,8 +120,8 @@ func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// add test descriptor
-	testDescriptor, err := ah.coordinator.TestRegistry().AddLocalTest(testConfig)
+	// add test descriptor with YAML source for persistence
+	testDescriptor, err := ah.coordinator.TestRegistry().AddLocalTestWithYaml(testConfig, yamlSource)
 	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed adding test: %v", err), http.StatusInternalServerError)
 		return

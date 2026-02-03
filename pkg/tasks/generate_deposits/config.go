@@ -5,15 +5,15 @@ import (
 )
 
 type Config struct {
-	LimitPerSlot          int    `yaml:"limitPerSlot" json:"limitPerSlot" desc:"Maximum number of deposit operations to generate per slot."`
-	LimitTotal            int    `yaml:"limitTotal" json:"limitTotal" desc:"Total limit on the number of deposit operations to generate."`
+	LimitPerSlot          int    `yaml:"limitPerSlot" json:"limitPerSlot" require:"A.1" desc:"Maximum number of deposit operations to generate per slot."`
+	LimitTotal            int    `yaml:"limitTotal" json:"limitTotal" require:"A.2" desc:"Total limit on the number of deposit operations to generate."`
 	LimitPending          int    `yaml:"limitPending" json:"limitPending" desc:"Maximum number of pending deposits to allow before waiting."`
-	Mnemonic              string `yaml:"mnemonic" json:"mnemonic" desc:"Mnemonic phrase used to generate validator keys."`
+	Mnemonic              string `yaml:"mnemonic" json:"mnemonic" require:"B.1" desc:"Mnemonic phrase used to generate validator keys."`
 	StartIndex            int    `yaml:"startIndex" json:"startIndex" desc:"Index within the mnemonic from which to start generating validator keys."`
-	IndexCount            int    `yaml:"indexCount" json:"indexCount" desc:"Number of validator keys to generate from the mnemonic."`
-	PublicKey             string `yaml:"publicKey" json:"publicKey" desc:"Public key of an existing validator for top-up deposits (requires topUpDeposit)."`
-	WalletPrivkey         string `yaml:"walletPrivkey" json:"walletPrivkey" desc:"Private key of the wallet used to fund deposit transactions."`
-	DepositContract       string `yaml:"depositContract" json:"depositContract" desc:"Address of the deposit contract on the execution layer."`
+	IndexCount            int    `yaml:"indexCount" json:"indexCount" require:"A.3" desc:"Number of validator keys to generate from the mnemonic."`
+	PublicKey             string `yaml:"publicKey" json:"publicKey" require:"B.2" desc:"Public key of an existing validator for top-up deposits (requires topUpDeposit)."`
+	WalletPrivkey         string `yaml:"walletPrivkey" json:"walletPrivkey" require:"C" desc:"Private key of the wallet used to fund deposit transactions."`
+	DepositContract       string `yaml:"depositContract" json:"depositContract" require:"D" desc:"Address of the deposit contract on the execution layer."`
 	DepositAmount         uint64 `yaml:"depositAmount" json:"depositAmount" desc:"Amount of ETH to deposit per validator."`
 	DepositTxFeeCap       int64  `yaml:"depositTxFeeCap" json:"depositTxFeeCap" desc:"Maximum fee cap (in wei) for deposit transactions."`
 	DepositTxTipCap       int64  `yaml:"depositTxTipCap" json:"depositTxTipCap" desc:"Maximum priority tip (in wei) for deposit transactions."`

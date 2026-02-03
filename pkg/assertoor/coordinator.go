@@ -179,7 +179,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				return err
 			}
 
-			err = c.webserver.ConfigureRoutes(c.Config.Web.Frontend, c.Config.Web.API, c, false, c.eventBus)
+			err = c.webserver.ConfigureRoutes(c.Config.Web.Frontend, c.Config.Web.API, c.Config.AI, c, false, c.eventBus)
 			if err != nil {
 				return err
 			}
@@ -191,7 +191,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				return err
 			}
 
-			err = c.publicWebserver.ConfigureRoutes(c.Config.Web.Frontend, nil, c, true, nil)
+			err = c.publicWebserver.ConfigureRoutes(c.Config.Web.Frontend, nil, nil, c, true, nil)
 			if err != nil {
 				return err
 			}

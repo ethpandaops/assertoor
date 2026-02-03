@@ -852,6 +852,14 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
       });
     }
 
+    if (!state.testConfig.id || state.testConfig.id.trim() === '') {
+      errors.push({
+        message: 'Test ID is required for saving',
+        field: 'id',
+        severity: 'error',
+      });
+    }
+
     if (state.testConfig.tasks.length === 0) {
       errors.push({
         message: 'Test must have at least one task',

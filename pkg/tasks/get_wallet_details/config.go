@@ -3,8 +3,8 @@ package getwalletdetails
 import "errors"
 
 type Config struct {
-	PrivateKey string `yaml:"privateKey" json:"privateKey" desc:"Private key of the wallet to get details for."`
-	Address    string `yaml:"address" json:"address" desc:"Address of the wallet to get details for (alternative to privateKey)."`
+	PrivateKey string `yaml:"privateKey" json:"privateKey" require:"A.1" desc:"Private key of the wallet to get details for."`
+	Address    string `yaml:"address" json:"address" require:"A.2" desc:"Address of the wallet to get details for (alternative to privateKey)."`
 }
 
 func DefaultConfig() Config {
