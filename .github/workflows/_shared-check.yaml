@@ -62,7 +62,7 @@ jobs:
 
     - name: Check if all tasks have a README.md
       run: |
-        for taskdir in pkg/coordinator/tasks/*/; do
+        for taskdir in pkg/tasks/*/; do
           taskdir=${taskdir%*/}
           taskname=${taskdir##*/}
 
