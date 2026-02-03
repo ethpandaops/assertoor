@@ -60,29 +60,34 @@ func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
 	testConfig := testDescriptor.Config()
 
 	response := &GetTestResponse{
-		ID:         testDescriptor.ID(),
-		Source:     testDescriptor.Source(),
-		BasePath:   testDescriptor.BasePath(),
-		Name:       testConfig.Name,
-		Timeout:    uint64(testConfig.Timeout.Seconds()),
-		Config:     testConfig.Config,
-		ConfigVars: testConfig.ConfigVars,
-		Schedule:   testConfig.Schedule,
+		ID:       testDescriptor.ID(),
+		Source:   testDescriptor.Source(),
+		BasePath: testDescriptor.BasePath(),
+		Name:     testConfig.Name,
+		Timeout:  uint64(testConfig.Timeout.Seconds()),
+		Schedule: testConfig.Schedule,
 	}
 
-	// Include vars with global variables merged in (only for authenticated users)
-	// Start with config defaults, overlay with resolved values from variable scope
-	if ah.checkAuth(r) && len(testConfig.Config) > 0 {
-		resolvedVars := make(map[string]any, len(testConfig.Config))
-		for key, defaultValue := range testConfig.Config {
-			if resolved := testDescriptor.Vars().GetVar(key); resolved != nil {
-				resolvedVars[key] = resolved
-			} else {
-				resolvedVars[key] = defaultValue
-			}
-		}
+	// Config, ConfigVars, and Vars contain potentially sensitive information
+	// Only include them for authenticated users
+	if ah.checkAuth(r) {
+		response.Config = testConfig.Config
+		response.ConfigVars = testConfig.ConfigVars
 
-		response.Vars = resolvedVars
+		// Include vars with global variables merged in
+		// Start with config defaults, overlay with resolved values from variable scope
+		if len(testConfig.Config) > 0 {
+			resolvedVars := make(map[string]any, len(testConfig.Config))
+			for key, defaultValue := range testConfig.Config {
+				if resolved := testDescriptor.Vars().GetVar(key); resolved != nil {
+					resolvedVars[key] = resolved
+				} else {
+					resolvedVars[key] = defaultValue
+				}
+			}
+
+			response.Vars = resolvedVars
+		}
 	}
 
 	ah.sendOKResponse(w, r.URL.String(), response)

@@ -100,6 +100,16 @@ export function useTestDetails(testId: string, options?: { enabled?: boolean }) 
   });
 }
 
+// Get test YAML source (for loading existing tests in builder)
+export function useTestYaml(testId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['testYaml', testId] as const,
+    queryFn: () => api.getTestYaml(testId),
+    enabled: options?.enabled !== false && !!testId,
+    staleTime: 60000,
+  });
+}
+
 export function useCancelTestRun() {
   const queryClient = useQueryClient();
 

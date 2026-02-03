@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTestRunDetails, useCancelTestRun, queryKeys } from '../hooks/useApi';
 import { useEventStream } from '../hooks/useEventStream';
+import { useAuthContext } from '../context/AuthContext';
 import StatusBadge from '../components/common/StatusBadge';
 import SplitPane from '../components/common/SplitPane';
 import TaskList from '../components/task/TaskList';
@@ -24,6 +25,7 @@ function TestRun() {
     const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
     return (stored === 'list' || stored === 'graph') ? stored : 'list';
   });
+  const { isLoggedIn } = useAuthContext();
   const queryClient = useQueryClient();
   const pendingTaskRefreshRef = useRef<Set<number>>(new Set());
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -257,7 +259,7 @@ function TestRun() {
       ? Math.floor(Date.now() / 1000) - details.start_time
       : 0;
 
-  const canCancel = details.status === 'pending' || details.status === 'running';
+  const canCancel = isLoggedIn && (details.status === 'pending' || details.status === 'running');
 
   return (
     <div className="space-y-4">

@@ -18,7 +18,7 @@ import (
 // @Id getTaskResult
 // @Summary Get task result file
 // @Tags TestRun
-// @Description Returns a specific result file from a task
+// @Description Returns a specific result file from a task. Requires authentication as results may contain sensitive data.
 // @Produce octet-stream
 // @Param runId path string true "ID of the test run"
 // @Param taskId path string true "ID of the task"
@@ -26,10 +26,19 @@ import (
 // @Param fileId path string true "Index or name of the result file"
 // @Success 200 {file} binary "Success"
 // @Failure 400 {object} Response "Bad Request"
+// @Failure 401 {object} Response "Unauthorized"
 // @Failure 404 {object} Response "Not Found"
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/test_run/{runId}/task/{taskIndex}/result/{resultType}/{fileId} [get]
 func (ah *APIHandler) GetTaskResult(w http.ResponseWriter, r *http.Request) {
+	// Check authentication - task results may contain sensitive data
+	if !ah.checkAuth(r) {
+		w.Header().Set("Content-Type", contentTypeJSON)
+		ah.sendUnauthorizedResponse(w, r.URL.String())
+
+		return
+	}
+
 	vars := mux.Vars(r)
 
 	runID, err := strconv.ParseUint(vars["runId"], 10, 64)

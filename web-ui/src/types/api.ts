@@ -80,6 +80,12 @@ export interface TestDetails {
   vars?: Record<string, unknown>; // Config with global vars merged in (only for authenticated users)
 }
 
+// Test YAML source (from /api/v1/test/{testId}/yaml)
+export interface TestYamlResponse {
+  yaml: string;
+  source: string;
+}
+
 // Test schedule configuration
 export interface TestSchedule {
   startup: boolean;

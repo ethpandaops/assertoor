@@ -76,6 +76,18 @@ func (db *Database) GetTestRunStats() ([]*TestRunStats, error) {
 	return stats, nil
 }
 
+// GetTestConfig returns a single test config by ID.
+func (db *Database) GetTestConfig(testID string) (*TestConfig, error) {
+	var config TestConfig
+
+	err := db.reader.Get(&config, `SELECT * FROM test_configs WHERE test_id = $1`, testID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
 // DeleteTestConfig deletes a test config from the database.
 func (db *Database) DeleteTestConfig(tx *sqlx.Tx, testID string) error {
 	_, err := tx.Exec(`DELETE FROM test_configs WHERE test_id = $1`, testID)

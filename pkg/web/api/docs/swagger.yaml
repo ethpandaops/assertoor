@@ -1,4 +1,423 @@
 definitions:
+  api.ClientResponse:
+    properties:
+      cl_error:
+        type: string
+      cl_head_root:
+        type: string
+      cl_head_slot:
+        type: integer
+      cl_ready:
+        type: boolean
+      cl_refresh:
+        type: string
+      cl_status:
+        type: string
+      cl_type:
+        type: integer
+      cl_version:
+        type: string
+      el_error:
+        type: string
+      el_head_hash:
+        type: string
+      el_head_number:
+        type: integer
+      el_ready:
+        type: boolean
+      el_refresh:
+        type: string
+      el_status:
+        type: string
+      el_type:
+        type: integer
+      el_version:
+        type: string
+      index:
+        type: integer
+      name:
+        type: string
+    type: object
+  api.GetClientsResponse:
+    properties:
+      client_count:
+        type: integer
+      clients:
+        items:
+          $ref: '#/definitions/api.ClientResponse'
+        type: array
+    type: object
+  api.GetLogsResponse:
+    properties:
+      log:
+        items:
+          $ref: '#/definitions/api.LogEntry'
+        type: array
+    type: object
+  api.GetTestResponse:
+    properties:
+      basePath:
+        type: string
+      config:
+        additionalProperties: {}
+        type: object
+      configVars:
+        additionalProperties:
+          type: string
+        type: object
+      id:
+        type: string
+      name:
+        type: string
+      schedule:
+        $ref: '#/definitions/types.TestSchedule'
+      source:
+        type: string
+      timeout:
+        type: integer
+      vars:
+        additionalProperties: {}
+        description: Config with global vars merged in
+        type: object
+    type: object
+  api.GetTestRunDetailedTask:
+    properties:
+      completed:
+        type: boolean
+      config_yaml:
+        type: string
+      index:
+        type: integer
+      log:
+        items:
+          $ref: '#/definitions/api.GetTestRunDetailedTaskLog'
+        type: array
+      name:
+        type: string
+      parent_index:
+        type: integer
+      progress:
+        type: number
+      progress_message:
+        type: string
+      result:
+        type: string
+      result_error:
+        type: string
+      result_yaml:
+        type: string
+      runtime:
+        type: integer
+      start_time:
+        type: integer
+      started:
+        type: boolean
+      status:
+        type: string
+      stop_time:
+        type: integer
+      timeout:
+        type: integer
+      title:
+        type: string
+    type: object
+  api.GetTestRunDetailedTaskLog:
+    properties:
+      data:
+        additionalProperties:
+          type: string
+        type: object
+      datalen:
+        type: integer
+      level:
+        type: string
+      msg:
+        type: string
+      time:
+        type: string
+    type: object
+  api.GetTestRunDetailsResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      start_time:
+        type: integer
+      status:
+        $ref: '#/definitions/types.TestStatus'
+      stop_time:
+        type: integer
+      tasks:
+        items:
+          $ref: '#/definitions/api.GetTestRunDetailedTask'
+        type: array
+      test_id:
+        type: string
+    type: object
+  api.GetTestRunResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      start_time:
+        type: integer
+      status:
+        $ref: '#/definitions/types.TestStatus'
+      stop_time:
+        type: integer
+      tasks:
+        items:
+          $ref: '#/definitions/api.GetTestRunTask'
+        type: array
+      test_id:
+        type: string
+    type: object
+  api.GetTestRunTask:
+    properties:
+      completed:
+        type: boolean
+      index:
+        type: integer
+      name:
+        type: string
+      parent_index:
+        type: integer
+      result:
+        type: string
+      result_error:
+        type: string
+      result_files:
+        items:
+          $ref: '#/definitions/api.GetTestRunTaskResult'
+        type: array
+      runtime:
+        type: integer
+      start_time:
+        type: integer
+      started:
+        type: boolean
+      status:
+        type: string
+      stop_time:
+        type: integer
+      timeout:
+        type: integer
+      title:
+        type: string
+    type: object
+  api.GetTestRunTaskResult:
+    properties:
+      index:
+        type: integer
+      name:
+        type: string
+      size:
+        type: integer
+      type:
+        type: string
+      url:
+        type: string
+    type: object
+  api.GetTestRunsResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      start_time:
+        type: integer
+      status:
+        $ref: '#/definitions/types.TestStatus'
+      stop_time:
+        type: integer
+      test_id:
+        type: string
+    type: object
+  api.GetTestYamlResponse:
+    properties:
+      source:
+        type: string
+      yaml:
+        type: string
+    type: object
+  api.GetTestsResponse:
+    properties:
+      basePath:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      source:
+        type: string
+    type: object
+  api.LogEntry:
+    properties:
+      data:
+        additionalProperties:
+          type: string
+        type: object
+      datalen:
+        type: integer
+      level:
+        type: integer
+      msg:
+        type: string
+      tidx:
+        type: integer
+      time:
+        type: string
+    type: object
+  api.PostTestRunCancelRequest:
+    properties:
+      skip_cleanup:
+        type: boolean
+      test_id:
+        type: string
+    type: object
+  api.PostTestRunCancelResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      status:
+        type: string
+      test_id:
+        type: string
+    type: object
+  api.PostTestRunsDeleteRequest:
+    properties:
+      test_runs:
+        items:
+          type: integer
+        type: array
+    type: object
+  api.PostTestRunsDeleteResponse:
+    properties:
+      deleted:
+        items:
+          type: integer
+        type: array
+      errors:
+        items:
+          type: string
+        type: array
+    type: object
+  api.PostTestRunsScheduleRequest:
+    properties:
+      allow_duplicate:
+        type: boolean
+      config:
+        additionalProperties: {}
+        type: object
+      skip_queue:
+        type: boolean
+      test_id:
+        type: string
+    type: object
+  api.PostTestRunsScheduleResponse:
+    properties:
+      config:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+      run_id:
+        type: integer
+      test_id:
+        type: string
+    type: object
+  api.PostTestsDeleteRequest:
+    properties:
+      tests:
+        items:
+          type: string
+        type: array
+    type: object
+  api.PostTestsDeleteResponse:
+    properties:
+      deleted:
+        items:
+          type: string
+        type: array
+      errors:
+        items:
+          type: string
+        type: array
+    type: object
+  api.PostTestsRegisterExternalRequest:
+    properties:
+      config:
+        additionalProperties: true
+        type: object
+      configVars:
+        additionalProperties:
+          type: string
+        type: object
+      file:
+        type: string
+      name:
+        type: string
+      schedule:
+        $ref: '#/definitions/types.TestSchedule'
+      timeout:
+        type: integer
+    type: object
+  api.PostTestsRegisterExternalResponse:
+    properties:
+      config:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+      test_id:
+        type: string
+    type: object
+  api.PostTestsRegisterRequest:
+    properties:
+      cleanupTasks:
+        items:
+          $ref: '#/definitions/helper.RawMessage'
+        type: array
+      config:
+        additionalProperties: true
+        type: object
+      configVars:
+        additionalProperties:
+          type: string
+        type: object
+      id:
+        type: string
+      name:
+        type: string
+      schedule:
+        $ref: '#/definitions/types.TestSchedule'
+      tasks:
+        items:
+          $ref: '#/definitions/helper.RawMessage'
+        type: array
+      timeout:
+        type: string
+    type: object
+  api.PostTestsRegisterResponse:
+    properties:
+      config:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+      test_id:
+        type: string
+    type: object
+  github_com_ethpandaops_assertoor_pkg_web_api.Response:
+    properties:
+      data: {}
+      status:
+        type: string
+    type: object
   helper.RawMessage:
     type: object
   tasks.TaskDescriptorAPI:
@@ -58,418 +477,6 @@ definitions:
     - TestStatusFailure
     - TestStatusSkipped
     - TestStatusAborted
-  web_api.ClientResponse:
-    properties:
-      cl_error:
-        type: string
-      cl_head_root:
-        type: string
-      cl_head_slot:
-        type: integer
-      cl_ready:
-        type: boolean
-      cl_refresh:
-        type: string
-      cl_status:
-        type: string
-      cl_type:
-        type: integer
-      cl_version:
-        type: string
-      el_error:
-        type: string
-      el_head_hash:
-        type: string
-      el_head_number:
-        type: integer
-      el_ready:
-        type: boolean
-      el_refresh:
-        type: string
-      el_status:
-        type: string
-      el_type:
-        type: integer
-      el_version:
-        type: string
-      index:
-        type: integer
-      name:
-        type: string
-    type: object
-  web_api.GetClientsResponse:
-    properties:
-      client_count:
-        type: integer
-      clients:
-        items:
-          $ref: '#/definitions/web_api.ClientResponse'
-        type: array
-    type: object
-  web_api.GetLogsResponse:
-    properties:
-      log:
-        items:
-          $ref: '#/definitions/web_api.LogEntry'
-        type: array
-    type: object
-  web_api.GetTestResponse:
-    properties:
-      basePath:
-        type: string
-      config:
-        additionalProperties: {}
-        type: object
-      configVars:
-        additionalProperties:
-          type: string
-        type: object
-      id:
-        type: string
-      name:
-        type: string
-      schedule:
-        $ref: '#/definitions/types.TestSchedule'
-      source:
-        type: string
-      timeout:
-        type: integer
-      vars:
-        additionalProperties: {}
-        description: Config with global vars merged in
-        type: object
-    type: object
-  web_api.GetTestRunDetailedTask:
-    properties:
-      completed:
-        type: boolean
-      config_yaml:
-        type: string
-      index:
-        type: integer
-      log:
-        items:
-          $ref: '#/definitions/web_api.GetTestRunDetailedTaskLog'
-        type: array
-      name:
-        type: string
-      parent_index:
-        type: integer
-      progress:
-        type: number
-      progress_message:
-        type: string
-      result:
-        type: string
-      result_error:
-        type: string
-      result_yaml:
-        type: string
-      runtime:
-        type: integer
-      start_time:
-        type: integer
-      started:
-        type: boolean
-      status:
-        type: string
-      stop_time:
-        type: integer
-      timeout:
-        type: integer
-      title:
-        type: string
-    type: object
-  web_api.GetTestRunDetailedTaskLog:
-    properties:
-      data:
-        additionalProperties:
-          type: string
-        type: object
-      datalen:
-        type: integer
-      level:
-        type: string
-      msg:
-        type: string
-      time:
-        type: string
-    type: object
-  web_api.GetTestRunDetailsResponse:
-    properties:
-      name:
-        type: string
-      run_id:
-        type: integer
-      start_time:
-        type: integer
-      status:
-        $ref: '#/definitions/types.TestStatus'
-      stop_time:
-        type: integer
-      tasks:
-        items:
-          $ref: '#/definitions/web_api.GetTestRunDetailedTask'
-        type: array
-      test_id:
-        type: string
-    type: object
-  web_api.GetTestRunResponse:
-    properties:
-      name:
-        type: string
-      run_id:
-        type: integer
-      start_time:
-        type: integer
-      status:
-        $ref: '#/definitions/types.TestStatus'
-      stop_time:
-        type: integer
-      tasks:
-        items:
-          $ref: '#/definitions/web_api.GetTestRunTask'
-        type: array
-      test_id:
-        type: string
-    type: object
-  web_api.GetTestRunTask:
-    properties:
-      completed:
-        type: boolean
-      index:
-        type: integer
-      name:
-        type: string
-      parent_index:
-        type: integer
-      result:
-        type: string
-      result_error:
-        type: string
-      result_files:
-        items:
-          $ref: '#/definitions/web_api.GetTestRunTaskResult'
-        type: array
-      runtime:
-        type: integer
-      start_time:
-        type: integer
-      started:
-        type: boolean
-      status:
-        type: string
-      stop_time:
-        type: integer
-      timeout:
-        type: integer
-      title:
-        type: string
-    type: object
-  web_api.GetTestRunTaskResult:
-    properties:
-      index:
-        type: integer
-      name:
-        type: string
-      size:
-        type: integer
-      type:
-        type: string
-      url:
-        type: string
-    type: object
-  web_api.GetTestRunsResponse:
-    properties:
-      name:
-        type: string
-      run_id:
-        type: integer
-      start_time:
-        type: integer
-      status:
-        $ref: '#/definitions/types.TestStatus'
-      stop_time:
-        type: integer
-      test_id:
-        type: string
-    type: object
-  web_api.GetTestsResponse:
-    properties:
-      basePath:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
-      source:
-        type: string
-    type: object
-  web_api.LogEntry:
-    properties:
-      data:
-        additionalProperties:
-          type: string
-        type: object
-      datalen:
-        type: integer
-      level:
-        type: integer
-      msg:
-        type: string
-      tidx:
-        type: integer
-      time:
-        type: string
-    type: object
-  web_api.PostTestRunCancelRequest:
-    properties:
-      skip_cleanup:
-        type: boolean
-      test_id:
-        type: string
-    type: object
-  web_api.PostTestRunCancelResponse:
-    properties:
-      name:
-        type: string
-      run_id:
-        type: integer
-      status:
-        type: string
-      test_id:
-        type: string
-    type: object
-  web_api.PostTestRunsDeleteRequest:
-    properties:
-      test_runs:
-        items:
-          type: integer
-        type: array
-    type: object
-  web_api.PostTestRunsDeleteResponse:
-    properties:
-      deleted:
-        items:
-          type: integer
-        type: array
-      errors:
-        items:
-          type: string
-        type: array
-    type: object
-  web_api.PostTestRunsScheduleRequest:
-    properties:
-      allow_duplicate:
-        type: boolean
-      config:
-        additionalProperties: {}
-        type: object
-      skip_queue:
-        type: boolean
-      test_id:
-        type: string
-    type: object
-  web_api.PostTestRunsScheduleResponse:
-    properties:
-      config:
-        additionalProperties: {}
-        type: object
-      name:
-        type: string
-      run_id:
-        type: integer
-      test_id:
-        type: string
-    type: object
-  web_api.PostTestsDeleteRequest:
-    properties:
-      tests:
-        items:
-          type: string
-        type: array
-    type: object
-  web_api.PostTestsDeleteResponse:
-    properties:
-      deleted:
-        items:
-          type: string
-        type: array
-      errors:
-        items:
-          type: string
-        type: array
-    type: object
-  web_api.PostTestsRegisterExternalRequest:
-    properties:
-      config:
-        additionalProperties: true
-        type: object
-      configVars:
-        additionalProperties:
-          type: string
-        type: object
-      file:
-        type: string
-      name:
-        type: string
-      schedule:
-        $ref: '#/definitions/types.TestSchedule'
-      timeout:
-        type: integer
-    type: object
-  web_api.PostTestsRegisterExternalResponse:
-    properties:
-      config:
-        additionalProperties: {}
-        type: object
-      name:
-        type: string
-      test_id:
-        type: string
-    type: object
-  web_api.PostTestsRegisterRequest:
-    properties:
-      cleanupTasks:
-        items:
-          $ref: '#/definitions/helper.RawMessage'
-        type: array
-      config:
-        additionalProperties: true
-        type: object
-      configVars:
-        additionalProperties:
-          type: string
-        type: object
-      id:
-        type: string
-      name:
-        type: string
-      schedule:
-        $ref: '#/definitions/types.TestSchedule'
-      tasks:
-        items:
-          $ref: '#/definitions/helper.RawMessage'
-        type: array
-      timeout:
-        type: string
-    type: object
-  web_api.PostTestsRegisterResponse:
-    properties:
-      config:
-        additionalProperties: {}
-        type: object
-      name:
-        type: string
-      test_id:
-        type: string
-    type: object
-  web_api.Response:
-    properties:
-      data: {}
-      status:
-        type: string
-    type: object
 info:
   contact: {}
   description: API for querying information about Assertoor tests
@@ -488,19 +495,19 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.GetClientsResponse'
+                  $ref: '#/definitions/api.GetClientsResponse'
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get list of configured clients
       tags:
       - Client
@@ -521,19 +528,19 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.GetLogsResponse'
+                  $ref: '#/definitions/api.GetLogsResponse'
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get application logs
       tags:
       - Logs
@@ -553,7 +560,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
                   $ref: '#/definitions/tasks.TaskDescriptorAPI'
@@ -561,7 +568,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get a specific task descriptor
       tags:
       - Task
@@ -576,7 +583,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
                   items:
@@ -603,20 +610,64 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.GetTestResponse'
+                  $ref: '#/definitions/api.GetTestResponse'
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get test definition by test ID
+      tags:
+      - Test
+  /api/v1/test/{testId}/yaml:
+    get:
+      description: Returns the full YAML source for a test definition. For API-registered
+        tests, returns the stored YAML. For external tests referenced by file/URL,
+        loads and returns the content from the original source. Requires authentication
+        as YAML may contain sensitive configuration.
+      operationId: getTestYaml
+      parameters:
+      - description: ID of the test definition to get YAML for
+        in: path
+        name: testId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.GetTestYamlResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
+      summary: Get test YAML source by test ID
       tags:
       - Test
   /api/v1/test_run/{runId}:
@@ -637,19 +688,19 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.GetTestRunResponse'
+                  $ref: '#/definitions/api.GetTestRunResponse'
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get test run by run ID
       tags:
       - TestRun
@@ -668,7 +719,7 @@ paths:
         name: cancelOptions
         required: true
         schema:
-          $ref: '#/definitions/web_api.PostTestRunCancelRequest'
+          $ref: '#/definitions/api.PostTestRunCancelRequest'
       produces:
       - application/json
       responses:
@@ -676,19 +727,19 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.PostTestRunCancelResponse'
+                  $ref: '#/definitions/api.PostTestRunCancelResponse'
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Cancel test run by test ID
       tags:
       - TestRun
@@ -710,19 +761,19 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.GetTestRunDetailsResponse'
+                  $ref: '#/definitions/api.GetTestRunDetailsResponse'
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get detailed test run by run ID
       tags:
       - TestRun
@@ -743,7 +794,7 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
                   type: string
@@ -751,11 +802,11 @@ paths:
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get test run status by run ID
       tags:
       - TestRun
@@ -782,29 +833,30 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.GetTestRunDetailedTask'
+                  $ref: '#/definitions/api.GetTestRunDetailedTask'
               type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get detailed task of a given test run
       tags:
       - TestRun
   /api/v1/test_run/{runId}/task/{taskIndex}/result/{resultType}/{fileId}:
     get:
-      description: Returns a specific result file from a task
+      description: Returns a specific result file from a task. Requires authentication
+        as results may contain sensitive data.
       operationId: getTaskResult
       parameters:
       - description: ID of the test run
@@ -837,15 +889,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get task result file
       tags:
       - TestRun
@@ -865,21 +921,21 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/web_api.GetTestRunsResponse'
+                    $ref: '#/definitions/api.GetTestRunsResponse'
                   type: array
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get list of test runs
       tags:
       - TestRun
@@ -896,7 +952,7 @@ paths:
         name: testConfig
         required: true
         schema:
-          $ref: '#/definitions/web_api.PostTestRunsDeleteRequest'
+          $ref: '#/definitions/api.PostTestRunsDeleteRequest'
       produces:
       - application/json
       responses:
@@ -904,19 +960,19 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.PostTestRunsDeleteResponse'
+                  $ref: '#/definitions/api.PostTestRunsDeleteResponse'
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Delete test runs
       tags:
       - TestRun
@@ -930,7 +986,7 @@ paths:
         name: runOptions
         required: true
         schema:
-          $ref: '#/definitions/web_api.PostTestRunsScheduleRequest'
+          $ref: '#/definitions/api.PostTestRunsScheduleRequest'
       produces:
       - application/json
       responses:
@@ -938,19 +994,19 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.PostTestRunsScheduleResponse'
+                  $ref: '#/definitions/api.PostTestRunsScheduleResponse'
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Schedule new test run by test ID
       tags:
       - TestRun
@@ -966,21 +1022,21 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/web_api.GetTestsResponse'
+                    $ref: '#/definitions/api.GetTestsResponse'
                   type: array
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Get list of test definitions
       tags:
       - Test
@@ -997,7 +1053,7 @@ paths:
         name: testConfig
         required: true
         schema:
-          $ref: '#/definitions/web_api.PostTestsDeleteRequest'
+          $ref: '#/definitions/api.PostTestsDeleteRequest'
       produces:
       - application/json
       responses:
@@ -1005,19 +1061,19 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.PostTestsDeleteResponse'
+                  $ref: '#/definitions/api.PostTestsDeleteResponse'
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Delete tests
       tags:
       - Test
@@ -1034,7 +1090,7 @@ paths:
         name: testConfig
         required: true
         schema:
-          $ref: '#/definitions/web_api.PostTestsRegisterRequest'
+          $ref: '#/definitions/api.PostTestsRegisterRequest'
       produces:
       - application/json
       responses:
@@ -1042,19 +1098,19 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.PostTestsRegisterResponse'
+                  $ref: '#/definitions/api.PostTestsRegisterResponse'
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Register new test via yaml configuration
       tags:
       - Test
@@ -1070,7 +1126,7 @@ paths:
         name: externalTestConfig
         required: true
         schema:
-          $ref: '#/definitions/web_api.PostTestsRegisterExternalRequest'
+          $ref: '#/definitions/api.PostTestsRegisterExternalRequest'
       produces:
       - application/json
       responses:
@@ -1078,19 +1134,19 @@ paths:
           description: Success
           schema:
             allOf:
-            - $ref: '#/definitions/web_api.Response'
+            - $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/web_api.PostTestsRegisterExternalResponse'
+                  $ref: '#/definitions/api.PostTestsRegisterExternalResponse'
               type: object
         "400":
           description: Failure
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
         "500":
           description: Server Error
           schema:
-            $ref: '#/definitions/web_api.Response'
+            $ref: '#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response'
       summary: Register new test via external test configuration
       tags:
       - Test

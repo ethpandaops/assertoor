@@ -32,13 +32,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.GetClientsResponse"
+                                            "$ref": "#/definitions/api.GetClientsResponse"
                                         }
                                     }
                                 }
@@ -48,13 +48,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -85,13 +85,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.GetLogsResponse"
+                                            "$ref": "#/definitions/api.GetLogsResponse"
                                         }
                                     }
                                 }
@@ -101,13 +101,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -138,7 +138,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
@@ -154,7 +154,7 @@ const docTemplate = `{
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -176,7 +176,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
@@ -221,13 +221,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.GetTestResponse"
+                                            "$ref": "#/definitions/api.GetTestResponse"
                                         }
                                     }
                                 }
@@ -237,13 +237,79 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test/{testId}/yaml": {
+            "get": {
+                "description": "Returns the full YAML source for a test definition. For API-registered tests, returns the stored YAML. For external tests referenced by file/URL, loads and returns the content from the original source. Requires authentication as YAML may contain sensitive configuration.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Get test YAML source by test ID",
+                "operationId": "getTestYaml",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test definition to get YAML for",
+                        "name": "testId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.GetTestYamlResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -275,13 +341,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.GetTestRunResponse"
+                                            "$ref": "#/definitions/api.GetTestRunResponse"
                                         }
                                     }
                                 }
@@ -291,13 +357,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -328,7 +394,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/web_api.PostTestRunCancelRequest"
+                            "$ref": "#/definitions/api.PostTestRunCancelRequest"
                         }
                     }
                 ],
@@ -338,13 +404,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.PostTestRunCancelResponse"
+                                            "$ref": "#/definitions/api.PostTestRunCancelResponse"
                                         }
                                     }
                                 }
@@ -354,13 +420,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -392,13 +458,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.GetTestRunDetailsResponse"
+                                            "$ref": "#/definitions/api.GetTestRunDetailsResponse"
                                         }
                                     }
                                 }
@@ -408,13 +474,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -446,7 +512,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
@@ -462,13 +528,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -507,13 +573,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.GetTestRunDetailedTask"
+                                            "$ref": "#/definitions/api.GetTestRunDetailedTask"
                                         }
                                     }
                                 }
@@ -523,19 +589,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -543,7 +609,7 @@ const docTemplate = `{
         },
         "/api/v1/test_run/{runId}/task/{taskIndex}/result/{resultType}/{fileId}": {
             "get": {
-                "description": "Returns a specific result file from a task",
+                "description": "Returns a specific result file from a task. Requires authentication as results may contain sensitive data.",
                 "produces": [
                     "application/octet-stream"
                 ],
@@ -592,19 +658,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -635,7 +707,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
@@ -643,7 +715,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/web_api.GetTestRunsResponse"
+                                                "$ref": "#/definitions/api.GetTestRunsResponse"
                                             }
                                         }
                                     }
@@ -654,13 +726,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -688,7 +760,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/web_api.PostTestRunsDeleteRequest"
+                            "$ref": "#/definitions/api.PostTestRunsDeleteRequest"
                         }
                     }
                 ],
@@ -698,13 +770,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.PostTestRunsDeleteResponse"
+                                            "$ref": "#/definitions/api.PostTestRunsDeleteResponse"
                                         }
                                     }
                                 }
@@ -714,13 +786,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -744,7 +816,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/web_api.PostTestRunsScheduleRequest"
+                            "$ref": "#/definitions/api.PostTestRunsScheduleRequest"
                         }
                     }
                 ],
@@ -754,13 +826,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.PostTestRunsScheduleResponse"
+                                            "$ref": "#/definitions/api.PostTestRunsScheduleResponse"
                                         }
                                     }
                                 }
@@ -770,13 +842,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -799,7 +871,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
@@ -807,7 +879,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/web_api.GetTestsResponse"
+                                                "$ref": "#/definitions/api.GetTestsResponse"
                                             }
                                         }
                                     }
@@ -818,13 +890,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -852,7 +924,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/web_api.PostTestsDeleteRequest"
+                            "$ref": "#/definitions/api.PostTestsDeleteRequest"
                         }
                     }
                 ],
@@ -862,13 +934,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.PostTestsDeleteResponse"
+                                            "$ref": "#/definitions/api.PostTestsDeleteResponse"
                                         }
                                     }
                                 }
@@ -878,13 +950,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -912,7 +984,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/web_api.PostTestsRegisterRequest"
+                            "$ref": "#/definitions/api.PostTestsRegisterRequest"
                         }
                     }
                 ],
@@ -922,13 +994,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.PostTestsRegisterResponse"
+                                            "$ref": "#/definitions/api.PostTestsRegisterResponse"
                                         }
                                     }
                                 }
@@ -938,13 +1010,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -971,7 +1043,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/web_api.PostTestsRegisterExternalRequest"
+                            "$ref": "#/definitions/api.PostTestsRegisterExternalRequest"
                         }
                     }
                 ],
@@ -981,13 +1053,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/web_api.Response"
+                                    "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/web_api.PostTestsRegisterExternalResponse"
+                                            "$ref": "#/definitions/api.PostTestsRegisterExternalResponse"
                                         }
                                     }
                                 }
@@ -997,13 +1069,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Failure",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     },
                     "500": {
                         "description": "Server Error",
                         "schema": {
-                            "$ref": "#/definitions/web_api.Response"
+                            "$ref": "#/definitions/github_com_ethpandaops_assertoor_pkg_web_api.Response"
                         }
                     }
                 }
@@ -1011,6 +1083,643 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "api.ClientResponse": {
+            "type": "object",
+            "properties": {
+                "cl_error": {
+                    "type": "string"
+                },
+                "cl_head_root": {
+                    "type": "string"
+                },
+                "cl_head_slot": {
+                    "type": "integer"
+                },
+                "cl_ready": {
+                    "type": "boolean"
+                },
+                "cl_refresh": {
+                    "type": "string"
+                },
+                "cl_status": {
+                    "type": "string"
+                },
+                "cl_type": {
+                    "type": "integer"
+                },
+                "cl_version": {
+                    "type": "string"
+                },
+                "el_error": {
+                    "type": "string"
+                },
+                "el_head_hash": {
+                    "type": "string"
+                },
+                "el_head_number": {
+                    "type": "integer"
+                },
+                "el_ready": {
+                    "type": "boolean"
+                },
+                "el_refresh": {
+                    "type": "string"
+                },
+                "el_status": {
+                    "type": "string"
+                },
+                "el_type": {
+                    "type": "integer"
+                },
+                "el_version": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetClientsResponse": {
+            "type": "object",
+            "properties": {
+                "client_count": {
+                    "type": "integer"
+                },
+                "clients": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClientResponse"
+                    }
+                }
+            }
+        },
+        "api.GetLogsResponse": {
+            "type": "object",
+            "properties": {
+                "log": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.LogEntry"
+                    }
+                }
+            }
+        },
+        "api.GetTestResponse": {
+            "type": "object",
+            "properties": {
+                "basePath": {
+                    "type": "string"
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "configVars": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/types.TestSchedule"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "vars": {
+                    "description": "Config with global vars merged in",
+                    "type": "object",
+                    "additionalProperties": {}
+                }
+            }
+        },
+        "api.GetTestRunDetailedTask": {
+            "type": "object",
+            "properties": {
+                "completed": {
+                    "type": "boolean"
+                },
+                "config_yaml": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "log": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.GetTestRunDetailedTaskLog"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_index": {
+                    "type": "integer"
+                },
+                "progress": {
+                    "type": "number"
+                },
+                "progress_message": {
+                    "type": "string"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "result_error": {
+                    "type": "string"
+                },
+                "result_yaml": {
+                    "type": "string"
+                },
+                "runtime": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "started": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunDetailedTaskLog": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "datalen": {
+                    "type": "integer"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunDetailsResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.TestStatus"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.GetTestRunDetailedTask"
+                    }
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.TestStatus"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.GetTestRunTask"
+                    }
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunTask": {
+            "type": "object",
+            "properties": {
+                "completed": {
+                    "type": "boolean"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_index": {
+                    "type": "integer"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "result_error": {
+                    "type": "string"
+                },
+                "result_files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.GetTestRunTaskResult"
+                    }
+                },
+                "runtime": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "started": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunTaskResult": {
+            "type": "object",
+            "properties": {
+                "index": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestRunsResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.TestStatus"
+                },
+                "stop_time": {
+                    "type": "integer"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestYamlResponse": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string"
+                },
+                "yaml": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.GetTestsResponse": {
+            "type": "object",
+            "properties": {
+                "basePath": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.LogEntry": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "datalen": {
+                    "type": "integer"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "tidx": {
+                    "type": "integer"
+                },
+                "time": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestRunCancelRequest": {
+            "type": "object",
+            "properties": {
+                "skip_cleanup": {
+                    "type": "boolean"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestRunCancelResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestRunsDeleteRequest": {
+            "type": "object",
+            "properties": {
+                "test_runs": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "api.PostTestRunsDeleteResponse": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.PostTestRunsScheduleRequest": {
+            "type": "object",
+            "properties": {
+                "allow_duplicate": {
+                    "type": "boolean"
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "skip_queue": {
+                    "type": "boolean"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestRunsScheduleResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestsDeleteRequest": {
+            "type": "object",
+            "properties": {
+                "tests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.PostTestsDeleteResponse": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.PostTestsRegisterExternalRequest": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "configVars": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "file": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/types.TestSchedule"
+                },
+                "timeout": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.PostTestsRegisterExternalResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestsRegisterRequest": {
+            "type": "object",
+            "properties": {
+                "cleanupTasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helper.RawMessage"
+                    }
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "configVars": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/types.TestSchedule"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helper.RawMessage"
+                    }
+                },
+                "timeout": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PostTestsRegisterResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_ethpandaops_assertoor_pkg_web_api.Response": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "helper.RawMessage": {
             "type": "object"
         },
@@ -1095,632 +1804,6 @@ const docTemplate = `{
                 "TestStatusSkipped",
                 "TestStatusAborted"
             ]
-        },
-        "web_api.ClientResponse": {
-            "type": "object",
-            "properties": {
-                "cl_error": {
-                    "type": "string"
-                },
-                "cl_head_root": {
-                    "type": "string"
-                },
-                "cl_head_slot": {
-                    "type": "integer"
-                },
-                "cl_ready": {
-                    "type": "boolean"
-                },
-                "cl_refresh": {
-                    "type": "string"
-                },
-                "cl_status": {
-                    "type": "string"
-                },
-                "cl_type": {
-                    "type": "integer"
-                },
-                "cl_version": {
-                    "type": "string"
-                },
-                "el_error": {
-                    "type": "string"
-                },
-                "el_head_hash": {
-                    "type": "string"
-                },
-                "el_head_number": {
-                    "type": "integer"
-                },
-                "el_ready": {
-                    "type": "boolean"
-                },
-                "el_refresh": {
-                    "type": "string"
-                },
-                "el_status": {
-                    "type": "string"
-                },
-                "el_type": {
-                    "type": "integer"
-                },
-                "el_version": {
-                    "type": "string"
-                },
-                "index": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.GetClientsResponse": {
-            "type": "object",
-            "properties": {
-                "client_count": {
-                    "type": "integer"
-                },
-                "clients": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/web_api.ClientResponse"
-                    }
-                }
-            }
-        },
-        "web_api.GetLogsResponse": {
-            "type": "object",
-            "properties": {
-                "log": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/web_api.LogEntry"
-                    }
-                }
-            }
-        },
-        "web_api.GetTestResponse": {
-            "type": "object",
-            "properties": {
-                "basePath": {
-                    "type": "string"
-                },
-                "config": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "configVars": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "schedule": {
-                    "$ref": "#/definitions/types.TestSchedule"
-                },
-                "source": {
-                    "type": "string"
-                },
-                "timeout": {
-                    "type": "integer"
-                },
-                "vars": {
-                    "description": "Config with global vars merged in",
-                    "type": "object",
-                    "additionalProperties": {}
-                }
-            }
-        },
-        "web_api.GetTestRunDetailedTask": {
-            "type": "object",
-            "properties": {
-                "completed": {
-                    "type": "boolean"
-                },
-                "config_yaml": {
-                    "type": "string"
-                },
-                "index": {
-                    "type": "integer"
-                },
-                "log": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/web_api.GetTestRunDetailedTaskLog"
-                    }
-                },
-                "name": {
-                    "type": "string"
-                },
-                "parent_index": {
-                    "type": "integer"
-                },
-                "progress": {
-                    "type": "number"
-                },
-                "progress_message": {
-                    "type": "string"
-                },
-                "result": {
-                    "type": "string"
-                },
-                "result_error": {
-                    "type": "string"
-                },
-                "result_yaml": {
-                    "type": "string"
-                },
-                "runtime": {
-                    "type": "integer"
-                },
-                "start_time": {
-                    "type": "integer"
-                },
-                "started": {
-                    "type": "boolean"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "stop_time": {
-                    "type": "integer"
-                },
-                "timeout": {
-                    "type": "integer"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.GetTestRunDetailedTaskLog": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "datalen": {
-                    "type": "integer"
-                },
-                "level": {
-                    "type": "string"
-                },
-                "msg": {
-                    "type": "string"
-                },
-                "time": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.GetTestRunDetailsResponse": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "run_id": {
-                    "type": "integer"
-                },
-                "start_time": {
-                    "type": "integer"
-                },
-                "status": {
-                    "$ref": "#/definitions/types.TestStatus"
-                },
-                "stop_time": {
-                    "type": "integer"
-                },
-                "tasks": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/web_api.GetTestRunDetailedTask"
-                    }
-                },
-                "test_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.GetTestRunResponse": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "run_id": {
-                    "type": "integer"
-                },
-                "start_time": {
-                    "type": "integer"
-                },
-                "status": {
-                    "$ref": "#/definitions/types.TestStatus"
-                },
-                "stop_time": {
-                    "type": "integer"
-                },
-                "tasks": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/web_api.GetTestRunTask"
-                    }
-                },
-                "test_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.GetTestRunTask": {
-            "type": "object",
-            "properties": {
-                "completed": {
-                    "type": "boolean"
-                },
-                "index": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "parent_index": {
-                    "type": "integer"
-                },
-                "result": {
-                    "type": "string"
-                },
-                "result_error": {
-                    "type": "string"
-                },
-                "result_files": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/web_api.GetTestRunTaskResult"
-                    }
-                },
-                "runtime": {
-                    "type": "integer"
-                },
-                "start_time": {
-                    "type": "integer"
-                },
-                "started": {
-                    "type": "boolean"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "stop_time": {
-                    "type": "integer"
-                },
-                "timeout": {
-                    "type": "integer"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.GetTestRunTaskResult": {
-            "type": "object",
-            "properties": {
-                "index": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "url": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.GetTestRunsResponse": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "run_id": {
-                    "type": "integer"
-                },
-                "start_time": {
-                    "type": "integer"
-                },
-                "status": {
-                    "$ref": "#/definitions/types.TestStatus"
-                },
-                "stop_time": {
-                    "type": "integer"
-                },
-                "test_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.GetTestsResponse": {
-            "type": "object",
-            "properties": {
-                "basePath": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "source": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.LogEntry": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "datalen": {
-                    "type": "integer"
-                },
-                "level": {
-                    "type": "integer"
-                },
-                "msg": {
-                    "type": "string"
-                },
-                "tidx": {
-                    "type": "integer"
-                },
-                "time": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.PostTestRunCancelRequest": {
-            "type": "object",
-            "properties": {
-                "skip_cleanup": {
-                    "type": "boolean"
-                },
-                "test_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.PostTestRunCancelResponse": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "run_id": {
-                    "type": "integer"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "test_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.PostTestRunsDeleteRequest": {
-            "type": "object",
-            "properties": {
-                "test_runs": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "web_api.PostTestRunsDeleteResponse": {
-            "type": "object",
-            "properties": {
-                "deleted": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "errors": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "web_api.PostTestRunsScheduleRequest": {
-            "type": "object",
-            "properties": {
-                "allow_duplicate": {
-                    "type": "boolean"
-                },
-                "config": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "skip_queue": {
-                    "type": "boolean"
-                },
-                "test_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.PostTestRunsScheduleResponse": {
-            "type": "object",
-            "properties": {
-                "config": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "name": {
-                    "type": "string"
-                },
-                "run_id": {
-                    "type": "integer"
-                },
-                "test_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.PostTestsDeleteRequest": {
-            "type": "object",
-            "properties": {
-                "tests": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "web_api.PostTestsDeleteResponse": {
-            "type": "object",
-            "properties": {
-                "deleted": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "errors": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "web_api.PostTestsRegisterExternalRequest": {
-            "type": "object",
-            "properties": {
-                "config": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "configVars": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "file": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "schedule": {
-                    "$ref": "#/definitions/types.TestSchedule"
-                },
-                "timeout": {
-                    "type": "integer"
-                }
-            }
-        },
-        "web_api.PostTestsRegisterExternalResponse": {
-            "type": "object",
-            "properties": {
-                "config": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "name": {
-                    "type": "string"
-                },
-                "test_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.PostTestsRegisterRequest": {
-            "type": "object",
-            "properties": {
-                "cleanupTasks": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/helper.RawMessage"
-                    }
-                },
-                "config": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "configVars": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "schedule": {
-                    "$ref": "#/definitions/types.TestSchedule"
-                },
-                "tasks": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/helper.RawMessage"
-                    }
-                },
-                "timeout": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.PostTestsRegisterResponse": {
-            "type": "object",
-            "properties": {
-                "config": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "name": {
-                    "type": "string"
-                },
-                "test_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "web_api.Response": {
-            "type": "object",
-            "properties": {
-                "data": {},
-                "status": {
-                    "type": "string"
-                }
-            }
         }
     },
     "tags": [

@@ -3,6 +3,7 @@ import type {
   TestRun,
   Test,
   TestDetails,
+  TestYamlResponse,
   TestRunDetails,
   TaskDetails,
   TaskDescriptor,
@@ -83,6 +84,11 @@ export async function getTests(): Promise<Test[]> {
 // Test details (uses auth to get vars with global variables merged in)
 export async function getTestDetails(testId: string): Promise<TestDetails> {
   return fetchApiWithAuth<TestDetails>(`/test/${encodeURIComponent(testId)}`);
+}
+
+// Test YAML source (for loading existing tests in builder)
+export async function getTestYaml(testId: string): Promise<TestYamlResponse> {
+  return fetchApiWithAuth<TestYamlResponse>(`/test/${encodeURIComponent(testId)}/yaml`);
 }
 
 // Clients list

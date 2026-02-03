@@ -138,6 +138,7 @@ export interface BuilderState {
   // Load/export
   loadTest: (testDetails: TestDetails, descriptors: Map<string, TaskDescriptor>) => void;
   loadFromYaml: (yaml: string) => boolean;
+  setSourceTestId: (testId: string | null) => void;
   reset: () => void;
   exportYaml: () => string;
 
@@ -821,6 +822,9 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
       return false;
     }
   },
+
+  // Set source test ID (for tracking when editing existing tests)
+  setSourceTestId: (testId) => set({ sourceTestId: testId }),
 
   // Reset to empty state
   reset: () => set({

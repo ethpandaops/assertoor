@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTaskDetails } from '../../hooks/useApi';
+import { useAuthContext } from '../../context/AuthContext';
 import type { TaskState, TaskLogEntry } from '../../types/api';
 import { formatDurationMs, formatTime } from '../../utils/time';
 
@@ -10,15 +11,20 @@ interface TaskDetailsProps {
 
 function TaskDetails({ runId, task }: TaskDetailsProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'config' | 'result'>('overview');
-  const { data: details } = useTaskDetails(runId, task.index);
+  const { isLoggedIn } = useAuthContext();
+  const { data: details, error: detailsError } = useTaskDetails(runId, task.index, { enabled: isLoggedIn });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const tabs = [
     { id: 'overview' as const, label: 'Overview' },
-    { id: 'logs' as const, label: 'Logs' },
-    { id: 'config' as const, label: 'Config' },
-    { id: 'result' as const, label: 'Result' },
+    { id: 'logs' as const, label: 'Logs', requiresAuth: true },
+    { id: 'config' as const, label: 'Config', requiresAuth: true },
+    { id: 'result' as const, label: 'Result', requiresAuth: true },
   ];
+
+  // Check if current tab requires auth
+  const currentTabRequiresAuth = tabs.find(t => t.id === activeTab)?.requiresAuth;
+  const showAuthMessage = currentTabRequiresAuth && !isLoggedIn;
 
   return (
     <div className="flex flex-col h-full">
@@ -35,16 +41,38 @@ function TaskDetails({ runId, task }: TaskDetailsProps) {
             }`}
           >
             {tab.label}
+            {tab.requiresAuth && !isLoggedIn && (
+              <span className="ml-1 text-[var(--color-text-tertiary)]" title="Requires login">🔒</span>
+            )}
           </button>
         ))}
       </div>
 
       {/* Tab content */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3">
-        {activeTab === 'overview' && <OverviewTab task={task} />}
-        {activeTab === 'logs' && <LogsTab logs={details?.log || []} scrollContainerRef={scrollContainerRef} />}
-        {activeTab === 'config' && <ConfigTab yaml={details?.config_yaml} />}
-        {activeTab === 'result' && <ResultTab yaml={details?.result_yaml} />}
+        {showAuthMessage ? (
+          <div className="text-center py-6">
+            <p className="text-[var(--color-text-secondary)] text-sm mb-2">
+              Log in to view task {activeTab}
+            </p>
+            <p className="text-[var(--color-text-tertiary)] text-xs">
+              Task details contain potentially sensitive configuration and logs
+            </p>
+          </div>
+        ) : detailsError && activeTab !== 'overview' ? (
+          <div className="text-center py-6">
+            <p className="text-error-600 text-sm">
+              Failed to load task details
+            </p>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'overview' && <OverviewTab task={task} />}
+            {activeTab === 'logs' && <LogsTab logs={details?.log || []} scrollContainerRef={scrollContainerRef} />}
+            {activeTab === 'config' && <ConfigTab yaml={details?.config_yaml} />}
+            {activeTab === 'result' && <ResultTab yaml={details?.result_yaml} />}
+          </>
+        )}
       </div>
     </div>
   );

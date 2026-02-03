@@ -1,10 +1,9 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useBuilderStore } from '../stores/builderStore';
-import { useTestDetails, useTaskDescriptors } from '../hooks/useApi';
+import { useTestYaml } from '../hooks/useApi';
 import { useAuthContext } from '../context/AuthContext';
 import BuilderLayout from '../components/builder/BuilderLayout';
-import type { TaskDescriptor } from '../types/api';
 
 function TestBuilder() {
   const [searchParams] = useSearchParams();
@@ -12,39 +11,29 @@ function TestBuilder() {
 
   const { isLoggedIn } = useAuthContext();
   const reset = useBuilderStore((state) => state.reset);
-  const loadTest = useBuilderStore((state) => state.loadTest);
+  const loadFromYaml = useBuilderStore((state) => state.loadFromYaml);
+  const setSourceTestId = useBuilderStore((state) => state.setSourceTestId);
   const sourceTestId = useBuilderStore((state) => state.sourceTestId);
 
-  // Fetch test details if editing existing test
-  const { data: testDetails, isLoading: testLoading, error: testError } = useTestDetails(testId || '', {
+  // Fetch test YAML if editing existing test
+  const { data: testYaml, isLoading: yamlLoading, error: testError } = useTestYaml(testId || '', {
     enabled: !!testId,
   });
 
-  // Fetch task descriptors for loading
-  const { data: descriptors, isLoading: descriptorsLoading } = useTaskDescriptors();
-
-  // Build descriptor map
-  const descriptorMap = useMemo(() => {
-    const map = new Map<string, TaskDescriptor>();
-    if (descriptors) {
-      for (const d of descriptors) {
-        map.set(d.name, d);
-      }
-    }
-    return map;
-  }, [descriptors]);
-
-  // Load test on initial mount or when testId changes
+  // Load test YAML on initial mount or when testId changes
   useEffect(() => {
-    if (testId && testDetails && !descriptorsLoading && sourceTestId !== testId) {
-      loadTest(testDetails, descriptorMap);
+    if (testId && testYaml && sourceTestId !== testId) {
+      const success = loadFromYaml(testYaml.yaml);
+      if (success) {
+        setSourceTestId(testId);
+      }
     } else if (!testId && sourceTestId) {
       // If no testId in URL but we have a source, reset for new test
       reset();
     }
-  }, [testId, testDetails, descriptorsLoading, descriptorMap, sourceTestId, loadTest, reset]);
+  }, [testId, testYaml, sourceTestId, loadFromYaml, setSourceTestId, reset]);
 
-  const isLoading = testLoading || (testId && descriptorsLoading);
+  const isLoading = yamlLoading;
 
   // Handle error loading test
   if (testError) {
