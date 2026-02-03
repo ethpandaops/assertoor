@@ -1,13 +1,13 @@
 # assertoor
 VERSION := $(shell git rev-parse --short HEAD)
-GOLDFLAGS += -X 'github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.BuildVersion="$(VERSION)"'
-GOLDFLAGS += -X 'github.com/ethpandaops/assertoor/pkg/coordinator/buildinfo.BuildRelease="$(RELEASE)"'
+GOLDFLAGS += -X 'github.com/ethpandaops/assertoor/pkg/buildinfo.BuildVersion="$(VERSION)"'
+GOLDFLAGS += -X 'github.com/ethpandaops/assertoor/pkg/buildinfo.BuildRelease="$(RELEASE)"'
 CURRENT_UID := $(shell id -u)
 CURRENT_GID := $(shell id -g)
 
-.PHONY: all docs test clean
+.PHONY: all docs test clean ui ui-install ui-dev ui-clean
 
-all: docs build
+all: docs ui build
 
 test:
 	go test ./...
@@ -17,10 +17,25 @@ build:
 	env CGO_ENABLED=1 go build -v -o bin/ -ldflags="-s -w $(GOLDFLAGS)" .
 
 docs:
-	go install github.com/swaggo/swag/cmd/swag@v1.16.3 && swag init -g web/api/handler.go -d pkg/coordinator --parseDependency -o pkg/coordinator/web/api/docs
+	go install github.com/swaggo/swag/cmd/swag@v1.16.3 && swag init -g web/api/handler.go -d pkg --parseDependency -o pkg/web/api/docs
 
-clean:
+clean: ui-clean
 	rm -f bin/*
+
+# UI build targets
+ui-install:
+	cd web-ui && npm install
+
+ui: ui-install
+	cd web-ui && npm run build
+
+ui-dev:
+	cd web-ui && npm run dev
+
+ui-clean:
+	rm -f pkg/web/static/js/app*.js pkg/web/static/js/vendors*.js pkg/web/static/js/reactflow*.js
+	rm -f pkg/web/static/css/app*.css
+	rm -f pkg/web/static/index.html
 
 devnet:
 	.hack/devnet/run.sh

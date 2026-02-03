@@ -66,7 +66,7 @@ linters:
       - linters:
           - revive
         text: "var-naming: avoid meaningless package names"
-        path: "pkg/coordinator/(types|web/types|web/utils|web/api)/"
+        path: "pkg/(types|web/types|web/api)/"
 formatters:
   enable:
     - gofmt
