@@ -63,9 +63,8 @@ func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) 
 	if r.Header.Get("Content-Type") == contentTypeYAML {
 		decoder := yaml.NewDecoder(bytes.NewReader(rawBody))
 
-		err := decoder.Decode(req)
-		if err != nil {
-			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body yaml: %v", err), http.StatusBadRequest)
+		if decodeErr := decoder.Decode(req); decodeErr != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body yaml: %v", decodeErr), http.StatusBadRequest)
 			return
 		}
 
@@ -73,15 +72,14 @@ func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) 
 	} else {
 		decoder := json.NewDecoder(bytes.NewReader(rawBody))
 
-		err := decoder.Decode(req)
-		if err != nil {
-			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body json: %v", err), http.StatusBadRequest)
+		if decodeErr := decoder.Decode(req); decodeErr != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("error decoding request body json: %v", decodeErr), http.StatusBadRequest)
 			return
 		}
 
 		// Convert JSON to YAML for storage
-		yamlBytes, err := yaml.Marshal(req)
-		if err == nil {
+		yamlBytes, marshalErr := yaml.Marshal(req)
+		if marshalErr == nil {
 			yamlSource = string(yamlBytes)
 		}
 	}
@@ -113,9 +111,8 @@ func (ah *APIHandler) PostTestsRegister(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if req.Timeout != "" {
-		err := testConfig.Timeout.Unmarshal(req.Timeout)
-		if err != nil {
-			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed decoding timeout: %v", err), http.StatusBadRequest)
+		if unmarshalErr := testConfig.Timeout.Unmarshal(req.Timeout); unmarshalErr != nil {
+			ah.sendErrorResponse(w, r.URL.String(), fmt.Sprintf("failed decoding timeout: %v", unmarshalErr), http.StatusBadRequest)
 			return
 		}
 	}

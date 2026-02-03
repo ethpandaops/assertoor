@@ -104,7 +104,6 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	for i, task := range t.tasks {
 		err := t.ctx.Scheduler.ExecuteTask(ctx, task, nil)
-
 		if err != nil {
 			if t.config.ContinueOnFailure {
 				t.logger.Warnf("child task #%v failed: %v", i+1, err)

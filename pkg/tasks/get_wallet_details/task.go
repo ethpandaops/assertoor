@@ -102,7 +102,7 @@ func (t *Task) LoadConfig() error {
 	return nil
 }
 
-func (t *Task) Execute(ctx context.Context) error {
+func (t *Task) Execute(_ context.Context) error {
 	var wal *spamoor.Wallet
 
 	if t.config.PrivateKey != "" {
@@ -116,8 +116,10 @@ func (t *Task) Execute(ctx context.Context) error {
 			return fmt.Errorf("cannot initialize wallet: %w", err)
 		}
 	} else {
-		var err error
 		address := common.HexToAddress(t.config.Address)
+
+		var err error
+
 		wal, err = t.ctx.Scheduler.GetServices().WalletManager().GetWalletByAddress(t.ctx.Scheduler.GetTestRunCtx(), address)
 		if err != nil {
 			return fmt.Errorf("cannot initialize wallet: %w", err)

@@ -201,25 +201,25 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	err = nil
 	if len(clients) == 0 {
-		err = fmt.Errorf("no ready clients available")
-	} else {
-		walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
-		for i := 0; i < len(clients); i++ {
-			client := clients[i%len(clients)]
+		return fmt.Errorf("no ready clients available")
+	}
 
-			t.logger.WithFields(logrus.Fields{
-				"client": client.GetName(),
-			}).Infof("sending tx: %v", tx.Hash().Hex())
+	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
 
-			err := walletMgr.GetTxPool().SendTransaction(ctx, t.wallet, tx, &spamoor.SendTransactionOptions{
-				Client:             walletMgr.GetClient(client),
-				ClientsStartOffset: i,
-			})
-			if err == nil {
-				break
-			}
+	for i := 0; i < len(clients); i++ {
+		client := clients[i%len(clients)]
+
+		t.logger.WithFields(logrus.Fields{
+			"client": client.GetName(),
+		}).Infof("sending tx: %v", tx.Hash().Hex())
+
+		err = walletMgr.GetTxPool().SendTransaction(ctx, t.wallet, tx, &spamoor.SendTransactionOptions{
+			Client:             walletMgr.GetClient(client),
+			ClientsStartOffset: i,
+		})
+		if err == nil {
+			break
 		}
 	}
 
@@ -234,10 +234,12 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.Outputs.SetVar("transactionHash", tx.Hash().Hex())
 
 	if t.config.AwaitReceipt {
-		receipt, err := t.ctx.Scheduler.GetServices().WalletManager().GetTxPool().AwaitTransaction(ctx, t.wallet, tx)
+		var receipt *ethtypes.Receipt
+
+		receipt, err = t.ctx.Scheduler.GetServices().WalletManager().GetTxPool().AwaitTransaction(ctx, t.wallet, tx)
 		if err != nil {
 			t.logger.Warnf("failed waiting for tx receipt: %v", err)
-			return fmt.Errorf("failed waiting for tx receipt: %v", err)
+			return fmt.Errorf("failed waiting for tx receipt: %w", err)
 		}
 
 		if receipt == nil {
@@ -260,14 +262,15 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		t.ctx.Outputs.SetVar("contractAddress", receipt.ContractAddress.Hex())
 
-		if receiptData, err := vars.GeneralizeData(receipt); err == nil {
+		receiptData, generalizeErr := vars.GeneralizeData(receipt)
+		if generalizeErr == nil {
 			t.ctx.Outputs.SetVar("receipt", receiptData)
 
 			if t.config.TransactionReceiptResultVar != "" {
 				t.ctx.Vars.SetVar(t.config.TransactionReceiptResultVar, receiptData)
 			}
 		} else {
-			t.logger.Warnf("Failed setting `receipt` output: %v", err)
+			t.logger.Warnf("Failed setting `receipt` output: %v", generalizeErr)
 		}
 
 		if len(t.config.ExpectEvents) > 0 {
@@ -306,7 +309,8 @@ func (t *Task) Execute(ctx context.Context) error {
 	for _, authorizationWallet := range t.authorizationWallets {
 		// resync nonces of authorization wallets (might be increased by more than one, so we need to resync)
 		client := t.ctx.Scheduler.GetServices().WalletManager().GetReadyClient()
-		err := authorizationWallet.UpdateWallet(ctx, client, true)
+
+		err = authorizationWallet.UpdateWallet(ctx, client, true)
 		if err != nil {
 			return fmt.Errorf("cannot update authorization wallet: %w", err)
 		}
@@ -317,6 +321,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
+//nolint:gocyclo // transaction generation has multiple branches for different tx types
 func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 	var toAddr *common.Address
 
@@ -368,6 +373,7 @@ func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 		} else {
 			txObj, err = t.wallet.BuildLegacyTx(txData)
 		}
+
 		if err != nil {
 			return nil, err
 		}
@@ -377,27 +383,25 @@ func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 			return nil, fmt.Errorf("contract deployment not supported with blob transactions")
 		}
 
-		blobData := t.config.BlobData
-		if blobData == "" {
-			blobData = "identifier"
-		}
-
 		blobCount := t.config.BlobSidecars
+
 		blobRefs := make([][]string, blobCount)
-		for i := 0; i < int(blobCount); i++ {
+
+		for i := uint64(0); i < blobCount; i++ {
 			blobLabel := fmt.Sprintf("0x1611AA0000%08dFF%02dFF%04dFEED", t.ctx.Index, i, 0)
 
 			if t.config.BlobData != "" {
 				blobRefs[i] = []string{}
+
 				for _, blob := range strings.Split(t.config.BlobData, ",") {
 					if blob == "label" {
 						blob = blobLabel
 					}
+
 					blobRefs[i] = append(blobRefs[i], blob)
 				}
-
 			} else {
-				specialBlob := mrand.Intn(50)
+				specialBlob := mrand.Intn(50) //nolint:gosec // weak random is fine here
 				switch specialBlob {
 				case 0: // special blob commitment - all 0x0
 					blobRefs[i] = []string{"0x0"}
@@ -432,6 +436,7 @@ func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 		} else {
 			txObj, err = t.wallet.BuildBlobTx(blobTx)
 		}
+
 		if err != nil {
 			return nil, err
 		}
@@ -479,6 +484,7 @@ func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 		} else {
 			txObj, err = t.wallet.BuildSetCodeTx(setCodeTx)
 		}
+
 		if err != nil {
 			return nil, err
 		}
@@ -501,6 +507,7 @@ func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 		} else {
 			txObj, err = t.wallet.BuildDynamicFeeTx(txData)
 		}
+
 		if err != nil {
 			return nil, err
 		}

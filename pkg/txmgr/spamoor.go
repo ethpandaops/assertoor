@@ -104,8 +104,11 @@ func (s *Spamoor) forwardBlocks(ctx context.Context, blockSubscription *executio
 			return
 		case block := <-blockSubscription.Channel():
 			time.Sleep(1 * time.Second) // wait for block to be seen by all clients
+
 			seenBy := block.GetSeenBy()
+
 			spamoorClients := make([]*spamoor.Client, 0, len(seenBy))
+
 			for _, client := range seenBy {
 				spamoorClient := s.GetClient(client)
 				if spamoorClient == nil {

@@ -46,7 +46,6 @@ type Config struct {
 	ExternalTests []*types.ExternalTestConfig `yaml:"externalTests" json:"externalTests"`
 }
 
-//nolint:revive // ignore
 type CoordinatorConfig struct {
 	// Maximum number of tests executed concurrently
 	MaxConcurrentTests uint64 `yaml:"maxConcurrentTests" json:"maxConcurrentTests"`
@@ -97,6 +96,7 @@ func NewConfig(path string) (*Config, error) {
 	return config, nil
 }
 
+//nolint:gocyclo // validation logic is inherently complex
 func (c *Config) Validate() error {
 	var errs []error
 
