@@ -445,6 +445,7 @@ func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 			Gas:        t.config.GasLimit,
 			To:         toAddr,
 			Value:      uint256.NewInt(0),
+			Data:       txData,
 		}, blobRefs)
 		if err != nil {
 			return nil, err
