@@ -55,7 +55,13 @@ jobs:
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
-    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: web-ui/package-lock.json
+
     # setup project dependencies
     - name: Get dependencies
       run: |
@@ -65,6 +71,7 @@ jobs:
     - name: Build linux amd64 binary
       run: |
         make docs
+        make ui
         make build
       env:
         RELEASE: ${{ inputs.release }}
@@ -89,13 +96,19 @@ jobs:
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: web-ui/package-lock.json
 
     # setup cross build libs
     - name: Get cross build dependencies
       run: |
         sudo apt-get update
         sudo apt-get -y install gcc-aarch64-linux-gnu libstdc++-11-dev-arm64-cross libstdc++-12-dev-arm64-cross
-    
+
     # setup project dependencies
     - name: Get dependencies
       run: |
@@ -105,6 +118,7 @@ jobs:
     - name: Build linux arm64 binary
       run: |
         make docs
+        make ui
         make build GOARCH=arm64 CC=/usr/bin/aarch64-linux-gnu-gcc
       env:
         RELEASE: ${{ inputs.release }}
@@ -129,6 +143,12 @@ jobs:
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: web-ui/package-lock.json
 
     # setup project dependencies
     - name: Get dependencies
@@ -139,6 +159,7 @@ jobs:
     - name: Build windows binary
       run: |
         make docs
+        make ui
         make build
       env:
         RELEASE: ${{ inputs.release }}
@@ -163,6 +184,12 @@ jobs:
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: web-ui/package-lock.json
 
     # setup project dependencies
     - name: Get dependencies
@@ -173,6 +200,7 @@ jobs:
     - name: Build macos amd64 binary
       run: |
         make docs
+        make ui
         make build
       env:
         RELEASE: ${{ inputs.release }}
@@ -197,6 +225,12 @@ jobs:
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: web-ui/package-lock.json
 
     # setup project dependencies
     - name: Get dependencies
@@ -207,6 +241,7 @@ jobs:
     - name: Build macos arm64 binary
       run: |
         make docs
+        make ui
         make build GOARCH=arm64
       env:
         RELEASE: ${{ inputs.release }}

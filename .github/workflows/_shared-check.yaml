@@ -72,3 +72,25 @@ jobs:
             exit 1
           fi
         done
+
+  check_frontend:
+    name: Run frontend checks
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: web-ui/package-lock.json
+
+    - name: Install dependencies
+      run: cd web-ui && npm ci
+
+    - name: Run linter
+      run: cd web-ui && npm run lint
+
+    - name: Run type check
+      run: cd web-ui && npm run typecheck

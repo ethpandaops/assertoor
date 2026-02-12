@@ -1,9 +1,18 @@
 # syntax=docker/dockerfile:1
+FROM node:20-slim AS ui-builder
+WORKDIR /src
+COPY web-ui/package.json web-ui/package-lock.json ./web-ui/
+RUN cd web-ui && npm ci
+COPY web-ui/ ./web-ui/
+COPY pkg/web/static/embed.go ./pkg/web/static/
+RUN cd web-ui && npm run build
+
 FROM golang:1.25 AS builder
 WORKDIR /src
 COPY go.sum go.mod ./
 RUN go mod download
 COPY . .
+COPY --from=ui-builder /src/pkg/web/static/ ./pkg/web/static/
 RUN make build
 
 FROM ubuntu:latest
@@ -25,4 +34,3 @@ COPY --from=builder /src/bin/* /app/
 RUN chown -R assertoor:assertoor /app
 USER assertoor
 ENTRYPOINT ["/app/assertoor"]
-
