@@ -5,23 +5,7 @@ import yaml from 'js-yaml';
 import CodeMirror from '@uiw/react-codemirror';
 import { yaml as yamlLang } from '@codemirror/lang-yaml';
 import { githubLight, githubDark } from '@uiw/codemirror-theme-github';
-
-// Hook to detect dark mode
-function useDarkMode() {
-  const [isDark, setIsDark] = useState(() =>
-    document.documentElement.classList.contains('dark')
-  );
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  return isDark;
-}
+import { useDarkMode } from '../../hooks/useDarkMode';
 
 interface StartTestModalProps {
   isOpen: boolean;

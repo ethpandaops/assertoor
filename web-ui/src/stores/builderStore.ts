@@ -59,7 +59,7 @@ export interface BuilderTask {
 
 // Test configuration structure
 export interface TestConfig {
-  id?: string;
+  id: string;
   name: string;
   timeout?: string;
   testVars?: Record<string, unknown>;
@@ -95,6 +95,8 @@ export interface BuilderState {
 
   // Source test ID (when editing existing test)
   sourceTestId: string | null;
+  // Source info (where the YAML came from)
+  sourceInfo: { source: string; isExternal: boolean } | null;
 
   // Actions
   setTestConfig: (config: TestConfig) => void;
@@ -139,6 +141,7 @@ export interface BuilderState {
   loadTest: (testDetails: TestDetails, descriptors: Map<string, TaskDescriptor>) => void;
   loadFromYaml: (yaml: string) => boolean;
   setSourceTestId: (testId: string | null) => void;
+  setSourceInfo: (info: { source: string; isExternal: boolean } | null) => void;
   reset: () => void;
   exportYaml: () => string;
 
@@ -149,6 +152,7 @@ export interface BuilderState {
 
 // Default empty test config
 const createEmptyTestConfig = (): TestConfig => ({
+  id: '',
   name: 'New Test',
   tasks: [],
 });
@@ -231,6 +235,7 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
   validationErrors: [],
   isDirty: false,
   sourceTestId: null,
+  sourceInfo: null,
 
   // Set entire test config
   setTestConfig: (config) => set({
@@ -256,7 +261,7 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
   })),
 
   setTestId: (id) => set((state) => ({
-    testConfig: { ...state.testConfig, id: id || undefined },
+    testConfig: { ...state.testConfig, id },
     isDirty: true,
   })),
 
@@ -826,11 +831,15 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
   // Set source test ID (for tracking when editing existing tests)
   setSourceTestId: (testId) => set({ sourceTestId: testId }),
 
+  // Set source info (where the YAML came from)
+  setSourceInfo: (info) => set({ sourceInfo: info }),
+
   // Reset to empty state
   reset: () => set({
     testConfig: createEmptyTestConfig(),
     yamlSource: '',
     sourceTestId: null,
+    sourceInfo: null,
     isDirty: false,
     validationErrors: [],
     selection: { taskIds: new Set(), primaryTaskId: null },

@@ -543,6 +543,14 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
   // DnD context value
   const dndContext: BuilderDndContext = { activeId, overId };
 
+  // Handle opening the test settings panel (from toolbar ID click)
+  const handleOpenTestSettings = useCallback(() => {
+    setSelection(['__test_header__'], '__test_header__');
+    if (!showConfig) {
+      setShowConfig(true);
+    }
+  }, [setSelection, showConfig]);
+
   // Check if we should show config panel
   const showConfigPanel = showConfig && selection.primaryTaskId && selection.taskIds.size === 1;
 
@@ -571,6 +579,7 @@ function BuilderLayout({ isLoading }: BuilderLayoutProps) {
           onTogglePalette={() => setShowPalette(!showPalette)}
           onToggleConfig={() => setShowConfig(!showConfig)}
           onToggleAI={() => setShowAI(!showAI)}
+          onOpenTestSettings={handleOpenTestSettings}
         />
 
         {/* Main content area */}

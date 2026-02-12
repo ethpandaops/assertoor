@@ -176,12 +176,9 @@ function yamlTaskToBuilder(yamlTask: YamlTask): BuilderTask {
 // Serialize TestConfig to YAML string
 export function serializeToYaml(config: TestConfig): string {
   const yamlConfig: YamlTest = {
+    id: config.id,
     name: config.name,
   };
-
-  if (config.id) {
-    yamlConfig.id = config.id;
-  }
 
   if (config.timeout) {
     yamlConfig.timeout = config.timeout;
@@ -220,6 +217,7 @@ export function deserializeFromYaml(yamlString: string): DeserializeResult {
     return {
       success: true,
       config: {
+        id: '',
         name: 'New Test',
         tasks: [],
       },
@@ -237,13 +235,10 @@ export function deserializeFromYaml(yamlString: string): DeserializeResult {
     }
 
     const config: TestConfig = {
+      id: parsed.id || '',
       name: parsed.name || 'Untitled Test',
       tasks: [],
     };
-
-    if (parsed.id) {
-      config.id = parsed.id;
-    }
 
     if (parsed.timeout) {
       config.timeout = parsed.timeout;

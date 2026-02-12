@@ -4,6 +4,7 @@ import NumberField from './fields/NumberField';
 import BooleanField from './fields/BooleanField';
 import ArrayField from './fields/ArrayField';
 import ObjectField from './fields/ObjectField';
+import ExpressionMapField from './fields/ExpressionMapField';
 import DurationField from './fields/DurationField';
 import VariableSelector from './VariableSelector';
 import ExpressionInput from './ExpressionInput';
@@ -11,6 +12,7 @@ import ExpressionInput from './ExpressionInput';
 interface JSONSchema {
   type?: string | string[];
   properties?: Record<string, JSONSchema>;
+  propertyOrder?: string[];
   required?: string[];
   items?: JSONSchema;
   default?: unknown;
@@ -24,6 +26,7 @@ interface JSONSchema {
   maxLength?: number;
   pattern?: string;
   additionalProperties?: boolean | JSONSchema;
+  requireGroup?: string;
 }
 
 interface TaskConfigFormProps {
@@ -36,7 +39,7 @@ interface TaskConfigFormProps {
 }
 
 // String format types for different rendering
-export type StringFormat = 'text' | 'address' | 'hash' | 'bigint' | 'yaml' | 'multiline';
+export type StringFormat = 'text' | 'address' | 'hash' | 'bigint' | 'yaml' | 'multiline' | 'shell';
 
 // Parse the schema to determine field types
 function getFieldType(schema: JSONSchema): string {
@@ -44,6 +47,7 @@ function getFieldType(schema: JSONSchema): string {
 
   if (schema.enum) return 'enum';
   if (schema.format === 'duration') return 'duration';
+  if (schema.format === 'expressionMap') return 'expressionMap';
 
   switch (type) {
     case 'string':
@@ -70,59 +74,32 @@ function isDurationField(name: string, schema: JSONSchema): boolean {
   return durationNames.some((d) => name.toLowerCase().includes(d));
 }
 
-// Determine string format based on schema format or field name patterns
-function getStringFormat(name: string, schema: JSONSchema): StringFormat {
-  // Explicit format annotations
-  if (schema.format) {
-    switch (schema.format.toLowerCase()) {
-      case 'address':
-      case 'eth-address':
-        return 'address';
-      case 'hash':
-      case 'bytes32':
-      case 'hex':
-        return 'hash';
-      case 'bigint':
-      case 'uint256':
-      case 'int256':
-        return 'bigint';
-      case 'yaml':
-      case 'json':
-      case 'multiline':
-        return 'multiline';
-    }
+// Determine string format based on explicit schema format annotations only.
+function getStringFormat(_name: string, schema: JSONSchema): StringFormat {
+  if (!schema.format) return 'text';
+
+  switch (schema.format.toLowerCase()) {
+    case 'address':
+    case 'eth-address':
+      return 'address';
+    case 'hash':
+    case 'bytes32':
+    case 'hex':
+      return 'hash';
+    case 'bigint':
+    case 'uint256':
+    case 'int256':
+      return 'bigint';
+    case 'yaml':
+    case 'json':
+    case 'multiline':
+      return 'multiline';
+    case 'shell':
+    case 'script':
+      return 'shell';
+    default:
+      return 'text';
   }
-
-  // Infer from field name patterns
-  const lowerName = name.toLowerCase();
-
-  // Address patterns
-  if (lowerName.includes('address') || lowerName.includes('recipient') || lowerName.includes('sender')) {
-    return 'address';
-  }
-
-  // Hash/key patterns
-  if (lowerName.includes('hash') || lowerName.includes('pubkey') || lowerName.includes('privatekey') ||
-      lowerName.includes('secret') || lowerName.includes('signature') || lowerName.includes('root') ||
-      lowerName.includes('blockroot') || lowerName.includes('stateroot')) {
-    return 'hash';
-  }
-
-  // Big integer patterns (values that exceed JS number precision)
-  if (lowerName.includes('wei') || lowerName.includes('gwei') || lowerName.includes('amount') ||
-      lowerName.includes('balance') || lowerName.includes('value') || lowerName.includes('gasPrice') ||
-      lowerName.includes('gaslimit') || lowerName.includes('maxfee') || lowerName.includes('tip')) {
-    return 'bigint';
-  }
-
-  // Multiline patterns
-  if (lowerName.includes('script') || lowerName.includes('yaml') || lowerName.includes('json') ||
-      lowerName.includes('config') || lowerName.includes('template') || lowerName.includes('body') ||
-      lowerName.includes('payload') || lowerName.includes('data') || lowerName.includes('calldata')) {
-    return 'multiline';
-  }
-
-  return 'text';
 }
 
 function TaskConfigForm({
@@ -133,25 +110,31 @@ function TaskConfigForm({
   onConfigVarChange,
   taskId,
 }: TaskConfigFormProps) {
-  // Parse schema properties
+  // Parse schema properties, preserving struct field order via propertyOrder
   const properties = useMemo(() => {
     const parsed = schema as JSONSchema;
     if (!parsed.properties) return [];
 
     const required = new Set(parsed.required || []);
 
-    return Object.entries(parsed.properties).map(([name, propSchema]) => {
-      const ps = propSchema as JSONSchema;
-      const fieldType = getFieldType(ps);
-      return {
-        name,
-        schema: ps,
-        required: required.has(name),
-        fieldType,
-        isDuration: isDurationField(name, ps),
-        stringFormat: fieldType === 'string' ? getStringFormat(name, ps) : undefined,
-      };
-    });
+    // Use propertyOrder to maintain Go struct field order, fall back to Object.keys
+    const orderedNames = parsed.propertyOrder || Object.keys(parsed.properties);
+
+    return orderedNames
+      .filter((name) => name in parsed.properties!)
+      .map((name) => {
+        const ps = parsed.properties![name] as JSONSchema;
+        const fieldType = getFieldType(ps);
+        return {
+          name,
+          schema: ps,
+          required: required.has(name),
+          requireGroup: ps.requireGroup,
+          fieldType,
+          isDuration: isDurationField(name, ps),
+          stringFormat: fieldType === 'string' ? getStringFormat(name, ps) : undefined,
+        };
+      });
   }, [schema]);
 
   if (properties.length === 0) {
@@ -173,10 +156,14 @@ function TaskConfigForm({
           <div key={prop.name} className="space-y-1">
             {/* Field label */}
             <div className="flex items-center justify-between">
-              <label className="text-xs text-[var(--color-text-secondary)]">
-                {prop.schema.title || prop.name}
-                {prop.required && <span className="text-red-500 ml-1">*</span>}
-              </label>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-[var(--color-text-secondary)]">
+                  {prop.schema.title || prop.name}
+                </label>
+                {prop.requireGroup && (
+                  <RequireGroupBadge group={prop.requireGroup} />
+                )}
+              </div>
               <VariableSelector
                 taskId={taskId}
                 varValue={varValue}
@@ -206,6 +193,7 @@ function TaskConfigForm({
                 value={value}
                 onChange={(v) => onConfigChange(prop.name, v)}
                 stringFormat={prop.stringFormat}
+                taskId={taskId}
               />
             )}
           </div>
@@ -215,15 +203,37 @@ function TaskConfigForm({
   );
 }
 
+// Badge colors for requirement groups (A, B, C, ...)
+const groupColors: Record<string, string> = {
+  A: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  B: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  C: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  D: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+};
+
+function RequireGroupBadge({ group }: { group: string }) {
+  // Parse "A" or "A.1" format
+  const groupLetter = group.split('.')[0];
+  const subGroup = group.includes('.') ? group.split('.')[1] : null;
+  const colorClass = groupColors[groupLetter] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
+
+  return (
+    <span className={`inline-flex items-center px-1 py-0.5 text-[10px] font-medium rounded-xs ${colorClass}`} title={`Required (group ${group})`}>
+      {subGroup ? `required ${groupLetter}.${subGroup}` : 'required'}
+    </span>
+  );
+}
+
 interface FieldRendererProps {
   fieldType: string;
   schema: JSONSchema;
   value: unknown;
   onChange: (value: unknown) => void;
   stringFormat?: StringFormat;
+  taskId: string;
 }
 
-function FieldRenderer({ fieldType, schema, value, onChange, stringFormat }: FieldRendererProps) {
+function FieldRenderer({ fieldType, schema, value, onChange, stringFormat, taskId }: FieldRendererProps) {
   switch (fieldType) {
     case 'boolean':
       return (
@@ -279,6 +289,15 @@ function FieldRenderer({ fieldType, schema, value, onChange, stringFormat }: Fie
         />
       );
 
+    case 'expressionMap':
+      return (
+        <ExpressionMapField
+          value={value as Record<string, string> | undefined}
+          taskId={taskId}
+          onChange={onChange}
+        />
+      );
+
     case 'object':
       return (
         <ObjectField
@@ -294,7 +313,6 @@ function FieldRenderer({ fieldType, schema, value, onChange, stringFormat }: Fie
         <StringField
           value={value as string | undefined}
           defaultValue={schema.default as string | undefined}
-          placeholder={schema.description}
           pattern={schema.pattern}
           minLength={schema.minLength}
           maxLength={schema.maxLength}

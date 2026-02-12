@@ -78,6 +78,16 @@ export function useTaskDescriptor(name: string) {
   });
 }
 
+// Global variable names (for builder suggestions)
+export function useGlobalVariables(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['globalVariables'] as const,
+    queryFn: api.getGlobalVariables,
+    enabled: options?.enabled !== false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
 // Mutations
 export function useScheduleTestRun() {
   const queryClient = useQueryClient();

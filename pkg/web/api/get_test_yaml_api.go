@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -92,11 +93,11 @@ func (ah *APIHandler) GetTestYaml(w http.ResponseWriter, r *http.Request) {
 
 // loadExternalYaml loads YAML content from a file path or URL.
 func (ah *APIHandler) loadExternalYaml(ctx context.Context, source string) (string, error) {
-	// Check if source is a URL
-	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
-		// Handle "external:" prefix if present
-		cleanSource := strings.TrimPrefix(source, "external:")
+	// Strip "external:" prefix if present (added by test registry)
+	cleanSource := strings.TrimPrefix(source, "external:")
 
+	// Check if source is a URL
+	if strings.HasPrefix(cleanSource, "http://") || strings.HasPrefix(cleanSource, "https://") {
 		client := &http.Client{Timeout: time.Second * 120}
 
 		req, err := http.NewRequestWithContext(ctx, "GET", cleanSource, http.NoBody)
@@ -127,10 +128,11 @@ func (ah *APIHandler) loadExternalYaml(ctx context.Context, source string) (stri
 		return string(body), nil
 	}
 
-	// It's a local file path - strip "external:" prefix if present
-	filePath := strings.TrimPrefix(source, "external:")
+	// It's a local file path - read the file (this endpoint is auth-protected)
+	body, err := os.ReadFile(cleanSource)
+	if err != nil {
+		return "", fmt.Errorf("cannot load local file %s: %w", cleanSource, err)
+	}
 
-	// For security, we don't allow reading arbitrary files
-	// Only return error indicating the test needs to be loaded from file
-	return "", fmt.Errorf("cannot load local file %s via API - test must be re-registered with YAML source", filePath)
+	return string(body), nil
 }

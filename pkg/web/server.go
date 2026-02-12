@@ -102,6 +102,7 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 		ws.router.HandleFunc("/api/v1/task_descriptors", apiHandler.GetTaskDescriptors).Methods("GET")
 		ws.router.HandleFunc("/api/v1/task_descriptor/{name}", apiHandler.GetTaskDescriptor).Methods("GET")
 		ws.router.HandleFunc("/api/v1/clients", apiHandler.GetClients).Methods("GET")
+		ws.router.HandleFunc("/api/v1/global_variables", apiHandler.GetGlobalVariables).Methods("GET")
 
 		// SSE event stream endpoints
 		if eventBus != nil {

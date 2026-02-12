@@ -9,15 +9,16 @@ function TestBuilder() {
   const [searchParams] = useSearchParams();
   const testId = searchParams.get('testId');
 
-  const { isLoggedIn } = useAuthContext();
+  const { isLoggedIn, loading: authLoading } = useAuthContext();
   const reset = useBuilderStore((state) => state.reset);
   const loadFromYaml = useBuilderStore((state) => state.loadFromYaml);
   const setSourceTestId = useBuilderStore((state) => state.setSourceTestId);
+  const setSourceInfo = useBuilderStore((state) => state.setSourceInfo);
   const sourceTestId = useBuilderStore((state) => state.sourceTestId);
 
-  // Fetch test YAML if editing existing test
+  // Fetch test YAML if editing existing test (wait for auth to be ready)
   const { data: testYaml, isLoading: yamlLoading, error: testError } = useTestYaml(testId || '', {
-    enabled: !!testId,
+    enabled: !!testId && !authLoading,
   });
 
   // Load test YAML on initial mount or when testId changes
@@ -26,12 +27,14 @@ function TestBuilder() {
       const success = loadFromYaml(testYaml.yaml);
       if (success) {
         setSourceTestId(testId);
+        const isExternal = testYaml.source !== 'database' && testYaml.source !== 'api-call';
+        setSourceInfo({ source: testYaml.source, isExternal });
       }
     } else if (!testId && sourceTestId) {
       // If no testId in URL but we have a source, reset for new test
       reset();
     }
-  }, [testId, testYaml, sourceTestId, loadFromYaml, setSourceTestId, reset]);
+  }, [testId, testYaml, sourceTestId, loadFromYaml, setSourceTestId, setSourceInfo, reset]);
 
   const isLoading = yamlLoading;
 

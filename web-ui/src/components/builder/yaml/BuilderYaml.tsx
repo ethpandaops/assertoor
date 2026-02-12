@@ -4,23 +4,7 @@ import { yaml as yamlLang } from '@codemirror/lang-yaml';
 import { githubLight, githubDark } from '@uiw/codemirror-theme-github';
 import { useBuilderStore } from '../../../stores/builderStore';
 import { validateYamlSyntax, formatYaml } from '../../../utils/builder/yamlSerializer';
-
-// Hook to detect dark mode
-function useDarkMode() {
-  const [isDark, setIsDark] = useState(() =>
-    document.documentElement.classList.contains('dark')
-  );
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  return isDark;
-}
+import { useDarkMode } from '../../../hooks/useDarkMode';
 
 function BuilderYaml() {
   const yamlSource = useBuilderStore((state) => state.yamlSource);

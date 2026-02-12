@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBuilderStore } from '../../../stores/builderStore';
 import { useTaskDescriptors, useRegisterTest, useTests } from '../../../hooks/useApi';
 import { useAuthContext } from '../../../context/AuthContext';
-import type { TaskDescriptor } from '../../../types/api';
+import type { TaskDescriptor, Test } from '../../../types/api';
 
 interface BuilderToolbarProps {
   showPalette: boolean;
@@ -12,6 +12,7 @@ interface BuilderToolbarProps {
   onTogglePalette: () => void;
   onToggleConfig: () => void;
   onToggleAI: () => void;
+  onOpenTestSettings: () => void;
 }
 
 function BuilderToolbar({
@@ -21,21 +22,28 @@ function BuilderToolbar({
   onTogglePalette,
   onToggleConfig,
   onToggleAI,
+  onOpenTestSettings,
 }: BuilderToolbarProps) {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuthContext();
   const testConfig = useBuilderStore((state) => state.testConfig);
   const setTestName = useBuilderStore((state) => state.setTestName);
-  const setTestId = useBuilderStore((state) => state.setTestId);
   const isDirty = useBuilderStore((state) => state.isDirty);
   const exportYaml = useBuilderStore((state) => state.exportYaml);
   const validate = useBuilderStore((state) => state.validate);
   const reset = useBuilderStore((state) => state.reset);
   const loadFromYaml = useBuilderStore((state) => state.loadFromYaml);
+  const sourceTestId = useBuilderStore((state) => state.sourceTestId);
+  const sourceInfo = useBuilderStore((state) => state.sourceInfo);
 
   const { data: descriptors } = useTaskDescriptors();
   const { data: registryTests } = useTests();
   const registerMutation = useRegisterTest();
+
+  // Determine if editing an external test with the same ID (warning should show)
+  const idWarning = useMemo(() => {
+    return getIdWarning(testConfig.id, sourceTestId, sourceInfo, registryTests);
+  }, [testConfig.id, sourceTestId, sourceInfo, registryTests]);
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -125,42 +133,57 @@ function BuilderToolbar({
       return;
     }
     reset();
-  }, [isDirty, reset]);
+    navigate('/builder');
+  }, [isDirty, reset, navigate]);
 
   return (
-    <div className="flex items-center justify-between px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-t-lg">
-      {/* Left side - Test info */}
-      <div className="flex items-center gap-4">
-        {/* Test name */}
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={testConfig.name}
-            onChange={(e) => setTestName(e.target.value)}
-            placeholder="Test Name"
-            className="px-2 py-1 text-sm font-medium bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-primary-500 focus:outline-none transition-colors"
-          />
-          {isDirty && (
-            <span className="px-1.5 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded">
-              Modified
+    <div className="flex flex-col bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-t-lg">
+      {/* Warning banner for external sources or ID conflicts */}
+      {idWarning && (
+        <div className={`flex items-center gap-2 px-3 py-1.5 text-xs border-b border-[var(--color-border)] ${
+          idWarning.type === 'external'
+            ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300'
+            : 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300'
+        }`}>
+          <WarningIcon className="size-3.5 shrink-0" />
+          <span>{idWarning.message}</span>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between px-3 py-2">
+        {/* Left side - Test info */}
+        <div className="flex items-center gap-4">
+          {/* Test name */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={testConfig.name}
+              onChange={(e) => setTestName(e.target.value)}
+              placeholder="Test Name"
+              className="px-2 py-1 text-sm font-medium bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-primary-500 focus:outline-none transition-colors"
+            />
+            {isDirty && (
+              <span className="px-1.5 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded">
+                Modified
+              </span>
+            )}
+          </div>
+
+          {/* Test ID - clickable to open test settings */}
+          <button
+            onClick={onOpenTestSettings}
+            className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer group"
+            title="Click to edit test settings"
+          >
+            <span>ID:</span>
+            <span className="px-1 py-0.5 font-mono border border-transparent group-hover:border-[var(--color-border)] rounded transition-colors">
+              {testConfig.id || '(not set)'}
             </span>
-          )}
+            <EditIcon className="size-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+          </button>
         </div>
 
-        {/* Test ID */}
-        <div className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
-          <span>ID:</span>
-          <input
-            type="text"
-            value={testConfig.id || ''}
-            onChange={(e) => setTestId(e.target.value)}
-            placeholder="(auto)"
-            className="w-24 px-1 py-0.5 font-mono bg-transparent border border-transparent hover:border-[var(--color-border)] focus:border-primary-500 focus:outline-none rounded transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Right side - Actions */}
+        {/* Right side - Actions */}
       <div className="flex items-center gap-2">
         {/* Toggle buttons */}
         <div className="flex items-center gap-1 border-r border-[var(--color-border)] pr-2">
@@ -272,6 +295,7 @@ function BuilderToolbar({
           onClose={() => setShowLoadModal(false)}
         />
       )}
+      </div>
     </div>
   );
 }
@@ -435,6 +459,55 @@ function LoadModal({ tests, onLoad, onClose }: LoadModalProps) {
   );
 }
 
+// Helper to determine what warning to show for the test ID
+interface IdWarning {
+  type: 'external' | 'existing';
+  message: string;
+}
+
+function getIdWarning(
+  currentId: string | undefined,
+  sourceTestId: string | null,
+  sourceInfo: { source: string; isExternal: boolean } | null,
+  registryTests: Test[] | undefined,
+): IdWarning | null {
+  if (!currentId) return null;
+
+  // Check if this ID matches an existing test in the registry
+  const existingTest = registryTests?.find((t) => t.id === currentId);
+  if (!existingTest) return null;
+
+  // Check if the existing test is externally loaded
+  const isExternalSource = existingTest.source.startsWith('external:')
+    && existingTest.source !== 'external:api-call';
+
+  // If we're editing the source test with the same ID and it's external
+  if (sourceTestId === currentId && sourceInfo?.isExternal) {
+    return {
+      type: 'external',
+      message: 'This test is loaded from an external source. Changes will be overwritten on next restart.',
+    };
+  }
+
+  // If the user changed the ID to match a different existing test
+  if (sourceTestId !== currentId) {
+    if (isExternalSource) {
+      return {
+        type: 'external',
+        message: `A test with ID "${currentId}" already exists and is externally loaded. Saving will overwrite it, but changes will be lost on next restart.`,
+      };
+    }
+
+    // It might be the current test in an older version, or a different test
+    return {
+      type: 'existing',
+      message: `A test with ID "${currentId}" already exists. Saving will overwrite it.`,
+    };
+  }
+
+  return null;
+}
+
 // Icons
 function PaletteIcon({ className }: { className?: string }) {
   return (
@@ -472,6 +545,32 @@ function CloseIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+}
+
+function WarningIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+      />
+    </svg>
+  );
+}
+
+function EditIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+      />
     </svg>
   );
 }

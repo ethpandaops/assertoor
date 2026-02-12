@@ -104,6 +104,7 @@ function Registry() {
                     key={test.id}
                     test={test}
                     canStart={isLoggedIn}
+                    canEdit={isLoggedIn}
                     canDelete={isLoggedIn}
                     onSchedule={handleSchedule}
                     onDelete={handleDelete}
@@ -134,12 +135,13 @@ function Registry() {
 interface TestRowProps {
   test: Test;
   canStart: boolean;
+  canEdit: boolean;
   canDelete: boolean;
   onSchedule: (testId: string) => void;
   onDelete: (testId: string) => void;
 }
 
-function TestRow({ test, canStart, canDelete, onSchedule, onDelete }: TestRowProps) {
+function TestRow({ test, canStart, canEdit, canDelete, onSchedule, onDelete }: TestRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -164,6 +166,15 @@ function TestRow({ test, canStart, canDelete, onSchedule, onDelete }: TestRowPro
         </td>
         <td onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-1">
+            {canEdit && (
+              <Link
+                to={`/builder?testId=${encodeURIComponent(test.id)}`}
+                className="p-1.5 hover:bg-[var(--color-bg-tertiary)] rounded-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                title="Edit in builder"
+              >
+                <EditIcon className="size-4" />
+              </Link>
+            )}
             {canStart && (
               <button
                 onClick={() => onSchedule(test.id)}
@@ -398,6 +409,19 @@ function PlusIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  );
+}
+
+function EditIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+      />
     </svg>
   );
 }

@@ -1,6 +1,7 @@
 import { useMemo, useCallback, useState } from 'react';
 import { useBuilderStore } from '../../../stores/builderStore';
-import { useTaskDescriptors } from '../../../hooks/useApi';
+import { useTaskDescriptors, useGlobalVariables } from '../../../hooks/useApi';
+import { useAuthContext } from '../../../context/AuthContext';
 import { findTaskById, canHaveChildren } from '../../../utils/builder/taskUtils';
 import TaskConfigForm from './TaskConfigForm';
 import type { TaskDescriptor } from '../../../types/api';
@@ -25,6 +26,8 @@ function TestHeaderConfig() {
   const setTestTimeout = useBuilderStore((state) => state.setTestTimeout);
   const setTestVars = useBuilderStore((state) => state.setTestVars);
   const setTestId = useBuilderStore((state) => state.setTestId);
+  const { isLoggedIn } = useAuthContext();
+  const { data: globalVarsData } = useGlobalVariables({ enabled: isLoggedIn });
 
   const [newVarKey, setNewVarKey] = useState('');
   const [newVarValue, setNewVarValue] = useState('');
@@ -49,6 +52,22 @@ function TestHeaderConfig() {
     setNewVarKey('');
     setNewVarValue('');
   }, [newVarKey, newVarValue, testConfig.testVars, setTestVars]);
+
+  // Handle adding a global variable suggestion (pass-through with empty default)
+  const handleAddGlobalVar = useCallback((name: string) => {
+    const newVars = {
+      ...(testConfig.testVars || {}),
+      [name]: '',
+    };
+    setTestVars(newVars);
+  }, [testConfig.testVars, setTestVars]);
+
+  // Global variable names that haven't been added yet
+  const availableGlobalVars = useMemo(() => {
+    if (!globalVarsData?.names) return [];
+    const existing = new Set(Object.keys(testConfig.testVars || {}));
+    return globalVarsData.names.filter((name) => !existing.has(name)).sort();
+  }, [globalVarsData, testConfig.testVars]);
 
   // Handle removing a variable
   const handleRemoveVar = useCallback((key: string) => {
@@ -97,11 +116,11 @@ function TestHeaderConfig() {
             {/* Test ID */}
             <div>
               <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                Test ID <span className="text-[var(--color-text-tertiary)]">(optional)</span>
+                Test ID <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                value={testConfig.id || ''}
+                value={testConfig.id}
                 onChange={(e) => setTestId(e.target.value)}
                 placeholder="e.g., my-test-id"
                 className="w-full px-2 py-1.5 text-sm bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded focus:outline-hidden focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -157,55 +176,76 @@ function TestHeaderConfig() {
           {testConfig.testVars && Object.keys(testConfig.testVars).length > 0 && (
             <div className="space-y-2 mb-3">
               {Object.entries(testConfig.testVars).map(([key, value]) => (
-                <div key={key} className="flex items-start gap-2 p-2 bg-[var(--color-bg-tertiary)] rounded">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-mono text-primary-600">{key}</div>
-                    <input
-                      type="text"
-                      value={typeof value === 'string' ? value : JSON.stringify(value)}
-                      onChange={(e) => handleUpdateVar(key, e.target.value)}
-                      className="w-full mt-1 px-2 py-1 text-xs font-mono bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded focus:outline-hidden focus:ring-1 focus:ring-primary-500"
-                    />
+                <div key={key} className="p-2 bg-[var(--color-bg-tertiary)] rounded-sm">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs font-mono text-primary-600 truncate">{key}</div>
+                    <button
+                      onClick={() => handleRemoveVar(key)}
+                      className="p-0.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-xs shrink-0"
+                      title="Remove variable"
+                    >
+                      <DeleteIcon className="size-3.5 text-red-500" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleRemoveVar(key)}
-                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded shrink-0"
-                    title="Remove variable"
-                  >
-                    <DeleteIcon className="size-3.5 text-red-500" />
-                  </button>
+                  <input
+                    type="text"
+                    value={typeof value === 'string' ? value : JSON.stringify(value)}
+                    onChange={(e) => handleUpdateVar(key, e.target.value)}
+                    className="w-full px-2 py-1 text-xs font-mono bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-xs focus:outline-hidden focus:ring-1 focus:ring-primary-500"
+                  />
                 </div>
               ))}
             </div>
           )}
 
+          {/* Global variable suggestions */}
+          {availableGlobalVars.length > 0 && (
+            <div className="mb-3">
+              <div className="text-xs text-[var(--color-text-secondary)] mb-1.5">Global Variables</div>
+              <div className="flex flex-wrap gap-1.5">
+                {availableGlobalVars.map((name) => (
+                  <button
+                    key={name}
+                    onClick={() => handleAddGlobalVar(name)}
+                    className="px-2 py-0.5 text-xs font-mono bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xs hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
+                    title={`Add ${name} as a pass-through variable`}
+                  >
+                    + {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Add new variable */}
-          <div className="p-2 border border-dashed border-[var(--color-border)] rounded">
-            <div className="flex gap-2">
+          <div className="p-2 border border-dashed border-[var(--color-border)] rounded-sm">
+            <div className="space-y-1.5">
               <input
                 type="text"
                 value={newVarKey}
                 onChange={(e) => setNewVarKey(e.target.value)}
                 placeholder="Variable name"
-                className="flex-1 px-2 py-1 text-xs bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded focus:outline-hidden focus:ring-1 focus:ring-primary-500"
+                className="w-full px-2 py-1 text-xs bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-xs focus:outline-hidden focus:ring-1 focus:ring-primary-500"
               />
-              <input
-                type="text"
-                value={newVarValue}
-                onChange={(e) => setNewVarValue(e.target.value)}
-                placeholder="Value"
-                className="flex-1 px-2 py-1 text-xs font-mono bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded focus:outline-hidden focus:ring-1 focus:ring-primary-500"
-                onKeyDown={(e) => e.key === 'Enter' && handleAddVar()}
-              />
-              <button
-                onClick={handleAddVar}
-                disabled={!newVarKey.trim()}
-                className="px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add
-              </button>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={newVarValue}
+                  onChange={(e) => setNewVarValue(e.target.value)}
+                  placeholder="Value (optional)"
+                  className="flex-1 px-2 py-1 text-xs font-mono bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-xs focus:outline-hidden focus:ring-1 focus:ring-primary-500"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddVar()}
+                />
+                <button
+                  onClick={handleAddVar}
+                  disabled={!newVarKey.trim()}
+                  className="px-2 py-1 text-xs bg-primary-600 text-white rounded-xs hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+            <p className="text-xs text-[var(--color-text-tertiary)] mt-1.5">
               Values can be JSON (objects, arrays, numbers) or plain strings
             </p>
           </div>

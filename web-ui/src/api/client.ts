@@ -8,6 +8,7 @@ import type {
   TaskDetails,
   TaskDescriptor,
   ClientsPage,
+  GlobalVariablesResponse,
   ScheduleTestRunRequest,
 } from '../types/api';
 import { authStore } from '../stores/authStore';
@@ -113,6 +114,11 @@ export async function getTaskDescriptors(): Promise<TaskDescriptor[]> {
 
 export async function getTaskDescriptor(name: string): Promise<TaskDescriptor> {
   return fetchApi<TaskDescriptor>(`/task_descriptor/${encodeURIComponent(name)}`);
+}
+
+// Global variable names (auth required)
+export async function getGlobalVariables(): Promise<GlobalVariablesResponse> {
+  return fetchApiWithAuth<GlobalVariablesResponse>('/global_variables');
 }
 
 // Admin operations (require authentication)

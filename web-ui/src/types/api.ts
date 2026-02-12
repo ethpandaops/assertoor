@@ -175,6 +175,11 @@ export interface TaskOutputField {
   description: string;
 }
 
+// Global variables (from /api/v1/global_variables)
+export interface GlobalVariablesResponse {
+  names: string[];
+}
+
 // Client data
 export interface ClientData {
   index: number;
