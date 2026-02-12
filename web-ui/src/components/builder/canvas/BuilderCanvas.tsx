@@ -48,7 +48,7 @@ function BuilderCanvas({ dndContext }: BuilderCanvasProps) {
 
       {/* Canvas content */}
       <div className="flex-1 overflow-hidden bg-[var(--color-bg-primary)]">
-        {activeView === 'graph' && <BuilderGraph dndContext={dndContext} />}
+        {activeView === 'graph' && <BuilderGraph />}
         {activeView === 'list' && <BuilderList dndContext={dndContext} />}
         {activeView === 'yaml' && <BuilderYaml />}
       </div>

@@ -17,7 +17,7 @@ import LaneLabelNode from './LaneLabelNode';
 import DividerNode from './DividerNode';
 import { useBuilderGraphLayout } from './useBuilderGraphLayout';
 import type { TaskDescriptor } from '../../../types/api';
-import type { BuilderDndContext } from '../BuilderLayout';
+
 
 // Node types
 const nodeTypes: NodeTypes = {
@@ -29,11 +29,7 @@ const nodeTypes: NodeTypes = {
   divider: DividerNode,
 };
 
-interface BuilderGraphProps {
-  dndContext: BuilderDndContext;
-}
-
-function BuilderGraph({ dndContext: _dndContext }: BuilderGraphProps) {
+function BuilderGraph() {
   const tasks = useBuilderStore((state) => state.testConfig.tasks);
   const cleanupTasks = useBuilderStore((state) => state.testConfig.cleanupTasks || []);
   const selection = useBuilderStore((state) => state.selection);

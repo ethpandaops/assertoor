@@ -4,10 +4,6 @@ import TaskPaletteSearch from './TaskPaletteSearch';
 import TaskPaletteCategory from './TaskPaletteCategory';
 import type { TaskDescriptor } from '../../../types/api';
 
-interface TaskPaletteProps {
-  onDrop?: () => void; // eslint-disable-line @typescript-eslint/no-unused-vars
-}
-
 // Group tasks by category
 function groupByCategory(descriptors: TaskDescriptor[]): Map<string, TaskDescriptor[]> {
   const groups = new Map<string, TaskDescriptor[]>();
@@ -48,7 +44,7 @@ function filterTasks(
   });
 }
 
-function TaskPalette(_props: TaskPaletteProps) {
+function TaskPalette() {
   const { data: descriptors, isLoading, error } = useTaskDescriptors();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());

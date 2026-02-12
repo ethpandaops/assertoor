@@ -122,7 +122,7 @@ function TaskGraphInner({ tasks, selectedIndex, onSelect }: TaskGraphProps) {
 // Wrapper component that provides ReactFlow context
 function TaskGraph(props: TaskGraphProps) {
   // Memoize to prevent unnecessary re-renders of the entire graph
-  const memoizedProps = useMemo(() => props, [props.tasks, props.selectedIndex, props.onSelect]);
+  const memoizedProps = useMemo(() => props, [props]);
 
   return (
     <ReactFlowProvider>

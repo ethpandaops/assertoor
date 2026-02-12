@@ -51,12 +51,15 @@ function BuilderToolbar({
   const [importYaml, setImportYaml] = useState('');
 
   // Build descriptor map for validation
-  const descriptorMap = new Map<string, TaskDescriptor>();
-  if (descriptors) {
-    for (const d of descriptors) {
-      descriptorMap.set(d.name, d);
+  const descriptorMap = useMemo(() => {
+    const map = new Map<string, TaskDescriptor>();
+    if (descriptors) {
+      for (const d of descriptors) {
+        map.set(d.name, d);
+      }
     }
-  }
+    return map;
+  }, [descriptors]);
 
   // Handle export
   const handleExport = useCallback(() => {

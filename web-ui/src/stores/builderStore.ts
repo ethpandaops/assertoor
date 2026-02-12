@@ -138,7 +138,7 @@ export interface BuilderState {
   syncFromYaml: () => boolean; // Returns true if parse succeeded
 
   // Load/export
-  loadTest: (testDetails: TestDetails, descriptors: Map<string, TaskDescriptor>) => void;
+  loadTest: (testDetails: TestDetails) => void;
   loadFromYaml: (yaml: string) => boolean;
   setSourceTestId: (testId: string | null) => void;
   setSourceInfo: (info: { source: string; isExternal: boolean } | null) => void;
@@ -799,7 +799,7 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
   },
 
   // Load from test details
-  loadTest: (testDetails, _descriptors) => {
+  loadTest: (testDetails) => {
     const config = convertTestDetailsToBuilderConfig(testDetails);
 
     set({

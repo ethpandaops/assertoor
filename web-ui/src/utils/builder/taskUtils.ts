@@ -191,7 +191,7 @@ export function findPrecedingTasks(
 
       // Check named children (these typically run concurrently)
       if (task.namedChildren) {
-        for (const [_slotName, child] of Object.entries(task.namedChildren)) {
+        for (const [, child] of Object.entries(task.namedChildren)) {
           if (child.id === targetId) {
             const parentIsConcurrent = parentTaskType && CONCURRENT_TASK_TYPES.has(parentTaskType);
             if (!parentIsConcurrent) {

@@ -118,9 +118,9 @@ export const ChatHistory: React.FC = () => {
           <p className="mb-4">Ask the AI to help you build a test.</p>
           <p className="text-sm mb-2">Examples:</p>
           <ul className="text-sm space-y-1">
-            <li>"Create a test that checks consensus finality"</li>
-            <li>"Add a task to generate 10 deposits"</li>
-            <li>"Modify the timeout to 30 minutes"</li>
+            <li>{'"Create a test that checks consensus finality"'}</li>
+            <li>{'"Add a task to generate 10 deposits"'}</li>
+            <li>{'"Modify the timeout to 30 minutes"'}</li>
           </ul>
         </div>
       )}
