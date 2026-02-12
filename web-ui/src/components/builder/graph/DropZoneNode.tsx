@@ -4,7 +4,8 @@ import { useDroppable } from '@dnd-kit/core';
 
 export interface DropZoneNodeData {
   dropId: string;  // The drop zone ID for dnd-kit
-  isHorizontal?: boolean;  // For parallel lanes
+  isHorizontal?: boolean;  // For parallel lanes (add new lane)
+  isInterLane?: boolean;  // For vertical separators between parallel lanes (reorder)
   laneIndex?: number;  // Which lane this is in (for parallel containers)
   parentTaskId?: string;  // Parent glue task ID
   insertIndex: number;  // Where to insert when dropped
@@ -13,7 +14,7 @@ export interface DropZoneNodeData {
 }
 
 function DropZoneNode({ data }: NodeProps<DropZoneNodeData>) {
-  const { dropId, isHorizontal, disabled } = data;
+  const { dropId, isHorizontal, isInterLane, disabled } = data;
 
   const { setNodeRef, isOver } = useDroppable({
     id: dropId,
@@ -21,6 +22,40 @@ function DropZoneNode({ data }: NodeProps<DropZoneNodeData>) {
   });
 
   const isActive = isOver && !disabled;
+
+  if (isInterLane) {
+    // Vertical separator between parallel lanes (for reordering)
+    return (
+      <div
+        ref={setNodeRef}
+        className={`
+          relative w-full h-full
+          flex items-center justify-center
+          transition-all duration-150
+          ${isActive
+            ? 'bg-primary-500/10'
+            : ''
+          }
+        `}
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!w-1 !h-1 !bg-transparent !border-0"
+        />
+        {isActive ? (
+          <div className="w-0.5 h-4/5 bg-primary-500 rounded-full" />
+        ) : (
+          <div className="w-px h-1/3 bg-[var(--color-border)] opacity-30" />
+        )}
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!w-1 !h-1 !bg-transparent !border-0"
+        />
+      </div>
+    );
+  }
 
   if (isHorizontal) {
     // Horizontal drop zone (for adding parallel lanes)

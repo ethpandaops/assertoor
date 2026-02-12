@@ -120,11 +120,11 @@ function calculateTaskSize(task: BuilderTask): SizeResult {
     const maxChildHeight = Math.max(...childSizes.map((s) => s.height));
     const totalChildWidth = childSizes.reduce((sum, s) => sum + s.width, 0);
 
-    // Lane content height = drop zone + child + drop zone
-    const laneContentHeight = DROP_ZONE_HEIGHT + VERTICAL_GAP + maxChildHeight + VERTICAL_GAP + DROP_ZONE_HEIGHT;
+    // Lane content height = just child height (inter-lane gaps handle reordering)
+    const laneContentHeight = maxChildHeight;
 
-    // Total width = padding + all children + gaps + empty lane (if can add more)
-    const lanesWidth = totalChildWidth + (children.length - 1) * LANE_GAP + (canAddMore ? LANE_GAP + EMPTY_LANE_WIDTH : 0);
+    // Total width = inter-lane gaps (one before each lane) + children + empty lane
+    const lanesWidth = children.length * LANE_GAP + totalChildWidth + (canAddMore ? LANE_GAP + EMPTY_LANE_WIDTH : 0);
 
     return {
       width: CONTAINER_PADDING_X * 2 + Math.max(NODE_WIDTH, lanesWidth),
@@ -300,74 +300,48 @@ export function useBuilderGraphLayout(
             }
           });
         } else if (isConcurrent && childCount > 0) {
-          // Other concurrent tasks: render parallel lanes
+          // Other concurrent tasks: render parallel lanes with inter-lane drop zones
           const childSizes = children.map((child) => calculateTaskSize(child));
+          const maxChildHeight = Math.max(...childSizes.map((s) => s.height));
 
           let laneX = CONTAINER_PADDING_X;
           const laneTopY = CONTAINER_PADDING_TOP;
+          const gapHeight = maxChildHeight;
 
           for (let i = 0; i < childCount; i++) {
             const child = children[i];
             const childSize = childSizes[i];
 
-            // Center child in its lane
-            const laneWidth = childSize.width;
-            const childX = laneX;
-            const childY = laneTopY + DROP_ZONE_HEIGHT + VERTICAL_GAP;
-
-            // Top drop zone for this lane
-            const topDropId = generateId('drop');
+            // Inter-lane drop zone before this lane (for reordering and inserting)
+            const gapDropId = generateId('drop');
             nodes.push({
-              id: topDropId,
+              id: gapDropId,
               type: 'dropZone',
-              position: { x: childX, y: laneTopY },
+              position: { x: laneX, y: laneTopY },
               parentNode: nodeId,
               extent: 'parent',
               draggable: false,
               data: {
                 dropId: isCleanup ? `cleanup-insert-before-${child.id}` : `insert-before-${child.id}`,
+                isInterLane: true,
                 parentTaskId: task.id,
                 insertIndex: i,
-                disabled: false,
                 isCleanup,
               } as DropZoneNodeData,
-              style: { width: laneWidth, height: DROP_ZONE_HEIGHT },
+              style: { width: LANE_GAP, height: gapHeight },
             });
 
-            // Process child task
-            const childResult = processTask(child, childX, childY, nodeId, undefined, isCleanup);
+            laneX += LANE_GAP;
 
-            // Bottom drop zone for this lane
-            const bottomDropId = generateId('drop');
-            const bottomY = childY + childSize.height + VERTICAL_GAP;
-            nodes.push({
-              id: bottomDropId,
-              type: 'dropZone',
-              position: { x: childX, y: bottomY },
-              parentNode: nodeId,
-              extent: 'parent',
-              draggable: false,
-              data: {
-                dropId: isCleanup ? `cleanup-insert-after-children-${child.id}` : `insert-after-children-${child.id}`,
-                parentTaskId: task.id,
-                insertIndex: i + 1,
-                disabled: true, // Can't insert after in concurrent
-                isCleanup,
-              } as DropZoneNodeData,
-              style: { width: laneWidth, height: DROP_ZONE_HEIGHT },
-            });
+            // Process child task directly in the lane
+            processTask(child, laneX, laneTopY, nodeId, undefined, isCleanup);
 
-            // Edges for this lane
-            addEdge(topDropId, childResult.nodeId, edgeColor);
-            addEdge(childResult.nodeId, bottomDropId, edgeColor);
-
-            laneX += laneWidth + LANE_GAP;
+            laneX += childSize.width;
           }
 
           // Add empty lane for adding new parallel task (if allowed)
           if (canAddMore) {
-            const maxChildHeight2 = Math.max(...childSizes.map((s) => s.height));
-            const emptyLaneHeight = DROP_ZONE_HEIGHT + VERTICAL_GAP + maxChildHeight2 + VERTICAL_GAP + DROP_ZONE_HEIGHT;
+            laneX += LANE_GAP;
             const emptyLaneDropId = generateId('drop');
             nodes.push({
               id: emptyLaneDropId,
@@ -377,13 +351,13 @@ export function useBuilderGraphLayout(
               extent: 'parent',
               draggable: false,
               data: {
-                dropId: isCleanup ? `cleanup-insert-first-child-${task.id}` : `insert-first-child-${task.id}`,
+                dropId: isCleanup ? `cleanup-insert-after-children-${task.id}` : `insert-after-children-${task.id}`,
                 isHorizontal: true,
                 parentTaskId: task.id,
                 insertIndex: childCount,
                 isCleanup,
               } as DropZoneNodeData,
-              style: { width: EMPTY_LANE_WIDTH, height: emptyLaneHeight },
+              style: { width: EMPTY_LANE_WIDTH, height: gapHeight },
             });
           }
         } else {
