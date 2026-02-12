@@ -53,7 +53,7 @@ func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, er
 	}, nil
 }
 
-func (t *Task) Config() interface{} {
+func (t *Task) Config() any {
 	return t.config
 }
 
@@ -225,15 +225,41 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		txWallet = t.walletPool.GetWallet(spamoor.SelectWalletRoundRobin, 0)
 	}
 
+	blobCount := t.config.BlobSidecars
+
+	// Parse blobData formats:
+	//   Old format (per-sidecar): "refs;refs;refs" — semicolons separate sidecar groups
+	//   New format (all sidecars): "ref,ref,ref" — commas separate refs, applied to all sidecars
+	// "identifier" and "label" are replaced with a unique blob label.
 	blobData := t.config.BlobData
 	if blobData == "" {
 		blobData = "identifier,random"
 	}
 
-	blobRefs := make([][]string, t.config.BlobSidecars)
+	var blobDataGroups []string
 
-	for i := uint64(0); i < t.config.BlobSidecars; i++ {
-		blobRefs[i] = strings.Split(blobData, ",")
+	if strings.Contains(blobData, ";") {
+		blobDataGroups = strings.Split(blobData, ";")
+		blobCount = uint64(len(blobDataGroups))
+	} else {
+		for range blobCount {
+			blobDataGroups = append(blobDataGroups, blobData)
+		}
+	}
+
+	blobRefs := make([][]string, blobCount)
+
+	for i := uint64(0); i < blobCount; i++ {
+		blobLabel := fmt.Sprintf("0x1611BB0000%08dFF%02dFF%04dFEED", 0, i, 0)
+		blobRefs[i] = []string{}
+
+		for blob := range strings.SplitSeq(blobDataGroups[i], ",") {
+			if blob == "identifier" || blob == "label" {
+				blob = blobLabel
+			}
+
+			blobRefs[i] = append(blobRefs[i], blob)
+		}
 	}
 
 	toAddr := txWallet.GetAddress()
