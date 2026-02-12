@@ -154,7 +154,16 @@ export interface BuilderState {
 const createEmptyTestConfig = (): TestConfig => ({
   id: '',
   name: 'New Test',
-  tasks: [],
+  tasks: [
+    {
+      id: generateTaskId(),
+      taskType: 'check_clients_are_healthy',
+      title: 'Check if at least one client is ready',
+      timeout: '5m',
+      config: { minClientCount: 1 },
+      configVars: {},
+    },
+  ],
 });
 
 // Helper to recursively update a task tree (generic traversal for namedChildren)
