@@ -146,6 +146,18 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 			parentIdx = uint64(parentState.index)
 		}
 
+		// Extract runConcurrent from raw config (config isn't loaded/typed yet)
+		var runConcurrent bool
+
+		if taskState.options.Config != nil {
+			var partial struct {
+				RunConcurrent bool `yaml:"runConcurrent"`
+			}
+			if err := taskState.options.Config.Unmarshal(&partial); err == nil {
+				runConcurrent = partial.RunConcurrent
+			}
+		}
+
 		eventBus.PublishTaskCreated(
 			ts.testRunID,
 			uint64(taskIdx),
@@ -153,6 +165,7 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 			taskState.Title(),
 			taskState.options.ID,
 			parentIdx,
+			runConcurrent,
 		)
 	}
 

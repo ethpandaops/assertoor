@@ -357,12 +357,14 @@ func (eb *EventBus) PublishTaskCreated(
 	testRunID, taskIndex uint64,
 	taskName, taskTitle, taskID string,
 	parentIndex uint64,
+	runConcurrent bool,
 ) {
 	event, err := NewEvent(EventTaskCreated, testRunID, taskIndex, &TaskCreatedData{
-		TaskName:    taskName,
-		TaskTitle:   taskTitle,
-		TaskID:      taskID,
-		ParentIndex: parentIndex,
+		TaskName:      taskName,
+		TaskTitle:     taskTitle,
+		TaskID:        taskID,
+		ParentIndex:   parentIndex,
+		RunConcurrent: runConcurrent,
 	})
 	if err != nil {
 		return

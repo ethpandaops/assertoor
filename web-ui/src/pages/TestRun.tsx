@@ -53,6 +53,7 @@ function TestRun() {
               taskTitle?: string;
               taskId?: string;
               parentIndex?: number;
+              runConcurrent?: boolean;
             };
             queryClient.setQueryData(queryKeys.testRunDetails(runIdNum), (oldData?: TestRunDetails) => {
               if (!oldData?.tasks) return oldData;
@@ -75,6 +76,7 @@ function TestRun() {
                 result_error: '',
                 progress: 0,
                 progress_message: '',
+                run_concurrent: data.runConcurrent,
               };
               return {
                 ...oldData,

@@ -105,10 +105,11 @@ type TaskLogData struct {
 
 // TaskCreatedData contains data for task.created events.
 type TaskCreatedData struct {
-	TaskName    string `json:"taskName"`
-	TaskTitle   string `json:"taskTitle"`
-	TaskID      string `json:"taskId,omitempty"`
-	ParentIndex uint64 `json:"parentIndex"`
+	TaskName      string `json:"taskName"`
+	TaskTitle     string `json:"taskTitle"`
+	TaskID        string `json:"taskId,omitempty"`
+	ParentIndex   uint64 `json:"parentIndex"`
+	RunConcurrent bool   `json:"runConcurrent,omitempty"`
 }
 
 // ClientHeadUpdateData contains data for client.head_update events.
