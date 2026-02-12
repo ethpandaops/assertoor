@@ -42,8 +42,32 @@ on:
 
 # shared build jobs
 jobs:
+  build_frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      with:
+        ref: ${{ inputs.ref }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Build frontend
+      run: make ui
+
+    # upload artifacts
+    - name: "Upload artifact: frontend"
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      with:
+        path: ./pkg/web/static/
+        name: frontend
+
   build_linux_amd64_binary:
     name: Build linux/amd64 binary
+    needs: [build_frontend]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -55,12 +79,13 @@ jobs:
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
+
+    # download frontend artifacts
+    - name: Download frontend artifacts
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: web-ui/package-lock.json
+        name: frontend
+        path: ./pkg/web/static
 
     # setup project dependencies
     - name: Get dependencies
@@ -71,7 +96,6 @@ jobs:
     - name: Build linux amd64 binary
       run: |
         make docs
-        make ui
         make build
       env:
         RELEASE: ${{ inputs.release }}
@@ -82,10 +106,11 @@ jobs:
       with:
         path: ./bin/*
         name: assertoor_linux_amd64
-  
+
   build_linux_arm64_binary:
     name: Build linux/arm64 binary
-    runs-on: ubuntu-latest
+    needs: [build_frontend]
+    runs-on: ubuntu-24.04-arm
     steps:
     - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       with:
@@ -96,18 +121,13 @@ jobs:
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: web-ui/package-lock.json
 
-    # setup cross build libs
-    - name: Get cross build dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get -y install gcc-aarch64-linux-gnu libstdc++-11-dev-arm64-cross libstdc++-12-dev-arm64-cross
+    # download frontend artifacts
+    - name: Download frontend artifacts
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        name: frontend
+        path: ./pkg/web/static
 
     # setup project dependencies
     - name: Get dependencies
@@ -118,8 +138,7 @@ jobs:
     - name: Build linux arm64 binary
       run: |
         make docs
-        make ui
-        make build GOARCH=arm64 CC=/usr/bin/aarch64-linux-gnu-gcc
+        make build
       env:
         RELEASE: ${{ inputs.release }}
 
@@ -132,6 +151,7 @@ jobs:
 
   build_windows_binary:
     name: Build windows/amd64 binary
+    needs: [build_frontend]
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -143,12 +163,13 @@ jobs:
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
+
+    # download frontend artifacts
+    - name: Download frontend artifacts
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: web-ui/package-lock.json
+        name: frontend
+        path: ./pkg/web/static
 
     # setup project dependencies
     - name: Get dependencies
@@ -159,7 +180,6 @@ jobs:
     - name: Build windows binary
       run: |
         make docs
-        make ui
         make build
       env:
         RELEASE: ${{ inputs.release }}
@@ -173,7 +193,8 @@ jobs:
 
   build_darwin_amd64_binary:
     name: Build macos/amd64 binary
-    runs-on: macos-latest
+    needs: [build_frontend]
+    runs-on: macos-15-intel
     steps:
     - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       with:
@@ -184,12 +205,13 @@ jobs:
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
+
+    # download frontend artifacts
+    - name: Download frontend artifacts
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: web-ui/package-lock.json
+        name: frontend
+        path: ./pkg/web/static
 
     # setup project dependencies
     - name: Get dependencies
@@ -200,7 +222,6 @@ jobs:
     - name: Build macos amd64 binary
       run: |
         make docs
-        make ui
         make build
       env:
         RELEASE: ${{ inputs.release }}
@@ -214,7 +235,8 @@ jobs:
 
   build_darwin_arm64_binary:
     name: Build macos/arm64 binary
-    runs-on: macos-latest
+    needs: [build_frontend]
+    runs-on: macos-26
     steps:
     - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       with:
@@ -225,12 +247,13 @@ jobs:
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
+
+    # download frontend artifacts
+    - name: Download frontend artifacts
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: web-ui/package-lock.json
+        name: frontend
+        path: ./pkg/web/static
 
     # setup project dependencies
     - name: Get dependencies
@@ -241,8 +264,7 @@ jobs:
     - name: Build macos arm64 binary
       run: |
         make docs
-        make ui
-        make build GOARCH=arm64
+        make build
       env:
         RELEASE: ${{ inputs.release }}
 
@@ -288,7 +310,7 @@ jobs:
       run: |
         chmod +x ./bin/*
         ls -lach ./bin
-    
+
     # build amd64 image
     - name: Build amd64 docker image
       run: |
@@ -300,12 +322,12 @@ jobs:
       run: |
         docker push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-amd64
         docker push ${{ inputs.docker_repository }}:${{ inputs.docker_tag_prefix }}-${{ steps.vars.outputs.sha_short }}-amd64
-  
+
   build_arm64_docker_image:
     name: Build arm64 docker image
     needs: [build_linux_arm64_binary]
     if: ${{ inputs.docker }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
     - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       with:
@@ -315,8 +337,6 @@ jobs:
       run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
     # prepare docker
-    - name: Set up Docker QEMU
-      uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
     - name: Login to Docker Hub
@@ -337,7 +357,7 @@ jobs:
       run: |
         chmod +x ./bin/*
         ls -lach ./bin
-    
+
     # build arm64 image
     - name: Build arm64 docker image
       run: |
@@ -371,7 +391,7 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    
+
     # build multiarch image
     - name: Build multiarch docker manifest
       run: |
@@ -406,7 +426,7 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    
+
     # build multiarch image
     - name: "Build additional docker manifest: ${{ matrix.tag }}"
       run: |

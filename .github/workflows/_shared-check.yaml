@@ -2,6 +2,12 @@
 name: Reusable check workflow
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: 'The branch, tag or SHA to check'
+        default: ''
+        required: false
+        type: string
 
 # shared check jobs
 jobs:
@@ -10,13 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      with:
+        ref: ${{ inputs.ref }}
 
     # setup global dependencies
     - name: Set up go
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: 1.25.x
-    
+
     - name: Verify dependencies
       run: go mod verify
 
@@ -78,13 +86,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      with:
+        ref: ${{ inputs.ref }}
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: web-ui/package-lock.json
+        node-version: '22'
 
     - name: Install dependencies
       run: cd web-ui && npm ci
