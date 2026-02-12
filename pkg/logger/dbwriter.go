@@ -155,41 +155,53 @@ func (lh *logDBWriter) GetLogEntryCount() uint64 {
 func (lh *logDBWriter) GetLogEntries(from, limit uint64) []*db.TaskLog {
 	bufEntries := lh.getBufferEntries()
 
-	if len(bufEntries) > 0 && bufEntries[0].LogIndex >= from {
-		firstIdx := bufEntries[0].LogIndex
-		if firstIdx > from {
-			if uint64(len(bufEntries)) <= firstIdx-from {
-				return nil
-			}
-
-			bufEntries = bufEntries[firstIdx-from:]
+	// If buffer covers the requested start position, serve directly from buffer
+	if len(bufEntries) > 0 && bufEntries[0].LogIndex <= from {
+		offset := from - bufEntries[0].LogIndex
+		if offset >= uint64(len(bufEntries)) {
+			return nil
 		}
 
-		if limit == 0 || uint64(len(bufEntries)) <= limit {
-			return bufEntries
+		bufEntries = bufEntries[offset:]
+
+		if limit > 0 && uint64(len(bufEntries)) > limit {
+			return bufEntries[:limit]
 		}
 
-		return bufEntries[0:limit]
+		return bufEntries
 	}
 
-	dbEntries, err := lh.logger.options.Database.GetTaskLogs(lh.logger.options.TestRunID, lh.logger.options.TaskID, from, limit)
+	// Need to query DB (buffer is empty or starts after `from`)
+	dbEntries, err := lh.logger.options.Database.GetTaskLogs(
+		lh.logger.options.TestRunID, lh.logger.options.TaskID, from, limit,
+	)
 	if err != nil {
 		return nil
 	}
 
-	if uint64(len(dbEntries)) == limit || len(bufEntries) == 0 {
+	// If DB returned the full limit or no buffer entries to merge, return DB results
+	if (limit > 0 && uint64(len(dbEntries)) >= limit) || len(bufEntries) == 0 {
 		return dbEntries
 	}
 
+	// Merge DB and buffer entries, removing any overlap
 	if len(dbEntries) > 0 && dbEntries[len(dbEntries)-1].LogIndex >= bufEntries[0].LogIndex {
-		// remove overlapping entries
 		lastDBIndex := dbEntries[len(dbEntries)-1].LogIndex
 		firstBufIndex := bufEntries[0].LogIndex
-		bufEntries = bufEntries[lastDBIndex-firstBufIndex+1:]
+		overlap := lastDBIndex - firstBufIndex + 1
+
+		if overlap >= uint64(len(bufEntries)) {
+			bufEntries = nil
+		} else {
+			bufEntries = bufEntries[overlap:]
+		}
 	}
 
-	dbEntries = append(dbEntries, bufEntries...)
-	if uint64(len(dbEntries)) > limit {
+	if len(bufEntries) > 0 {
+		dbEntries = append(dbEntries, bufEntries...)
+	}
+
+	if limit > 0 && uint64(len(dbEntries)) > limit {
 		return dbEntries[:limit]
 	}
 

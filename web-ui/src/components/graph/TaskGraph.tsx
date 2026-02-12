@@ -4,12 +4,14 @@ import ReactFlow, {
   Controls,
   MiniMap,
   type NodeTypes,
+  type EdgeTypes,
   useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { TaskState } from '../../types/api';
-import TaskGraphNode from './TaskGraphNode';
+import TaskGraphNode, { JunctionNode } from './TaskGraphNode';
+import CustomStepEdge from './CustomStepEdge';
 import { useTaskGraph } from './useTaskGraph';
 
 interface TaskGraphProps {
@@ -18,9 +20,14 @@ interface TaskGraphProps {
   onSelect: (index: number) => void;
 }
 
-// Define custom node types
+// Define custom node and edge types
 const nodeTypes: NodeTypes = {
   taskNode: TaskGraphNode,
+  junctionNode: JunctionNode,
+};
+
+const edgeTypes: EdgeTypes = {
+  customStep: CustomStepEdge,
 };
 
 function TaskGraphInner({ tasks, selectedIndex, onSelect }: TaskGraphProps) {
@@ -90,6 +97,7 @@ function TaskGraphInner({ tasks, selectedIndex, onSelect }: TaskGraphProps) {
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       fitView
       fitViewOptions={{ padding: 0.2 }}
       minZoom={0.1}

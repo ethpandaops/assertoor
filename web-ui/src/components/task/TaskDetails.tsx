@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useTaskDetails } from '../../hooks/useApi';
 import { useAuthContext } from '../../context/AuthContext';
 import type { TaskState, TaskLogEntry } from '../../types/api';
@@ -7,9 +7,10 @@ import { formatDurationMs, formatTime } from '../../utils/time';
 interface TaskDetailsProps {
   runId: number;
   task: TaskState;
+  sseLogs: TaskLogEntry[];
 }
 
-function TaskDetails({ runId, task }: TaskDetailsProps) {
+function TaskDetails({ runId, task, sseLogs }: TaskDetailsProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'config' | 'result'>('overview');
   const { isLoggedIn } = useAuthContext();
   const { data: details, error: detailsError } = useTaskDetails(runId, task.index, { enabled: isLoggedIn });
@@ -25,6 +26,30 @@ function TaskDetails({ runId, task }: TaskDetailsProps) {
   // Check if current tab requires auth
   const currentTabRequiresAuth = tabs.find(t => t.id === activeTab)?.requiresAuth;
   const showAuthMessage = currentTabRequiresAuth && !isLoggedIn;
+
+  // Merge API-fetched logs with SSE logs using a watermark approach.
+  // When API details load, all SSE logs accumulated up to that point are already
+  // included in the API response. We record that count as the watermark and only
+  // append SSE logs received after it.
+  const detailsLoadedRef = useRef(false);
+  const sseWatermarkRef = useRef(0);
+
+  const mergedLogs = useMemo(() => {
+    const apiLogs = details?.log || [];
+
+    // When API logs first become available, set the watermark
+    if (!detailsLoadedRef.current && apiLogs.length > 0) {
+      detailsLoadedRef.current = true;
+      sseWatermarkRef.current = sseLogs.length;
+    }
+
+    // SSE logs received after the API fetch
+    const newSseLogs = sseLogs.slice(sseWatermarkRef.current);
+
+    if (apiLogs.length === 0 && !detailsLoadedRef.current) return sseLogs;
+    if (newSseLogs.length === 0) return apiLogs;
+    return [...apiLogs, ...newSseLogs];
+  }, [details?.log, sseLogs]);
 
   return (
     <div className="flex flex-col h-full">
@@ -68,7 +93,7 @@ function TaskDetails({ runId, task }: TaskDetailsProps) {
         ) : (
           <>
             {activeTab === 'overview' && <OverviewTab task={task} />}
-            {activeTab === 'logs' && <LogsTab logs={details?.log || []} scrollContainerRef={scrollContainerRef} />}
+            {activeTab === 'logs' && <LogsTab logs={mergedLogs} scrollContainerRef={scrollContainerRef} />}
             {activeTab === 'config' && <ConfigTab yaml={details?.config_yaml} />}
             {activeTab === 'result' && <ResultTab yaml={details?.result_yaml} />}
           </>
@@ -79,8 +104,19 @@ function TaskDetails({ runId, task }: TaskDetailsProps) {
 }
 
 function OverviewTab({ task }: { task: TaskState }) {
-  // Calculate duration
-  const duration = task.runtime || 0;
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (task.status !== 'running') return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [task.status]);
+
+  // Calculate duration: live for running tasks, static for completed
+  const duration =
+    task.status === 'running' && task.start_time > 0
+      ? now - task.start_time
+      : task.runtime || 0;
 
   // Determine status display
   const getStatusText = () => {

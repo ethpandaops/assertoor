@@ -10,8 +10,7 @@ import TaskList from '../components/task/TaskList';
 import TaskDetails from '../components/task/TaskDetails';
 import { TaskGraph } from '../components/graph';
 import { formatDuration, formatRelativeTime } from '../utils/time';
-import * as api from '../api/client';
-import type { SSEEvent, TaskDetails as TaskDetailsType, TaskLogEntry, TaskState, TestRunDetails } from '../types/api';
+import type { SSEEvent, TaskLogEntry, TaskState, TestRunDetails } from '../types/api';
 
 type ViewMode = 'list' | 'graph';
 
@@ -27,76 +26,15 @@ function TestRun() {
   });
   const { isLoggedIn } = useAuthContext();
   const queryClient = useQueryClient();
-  const pendingTaskRefreshRef = useRef<Set<number>>(new Set());
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // SSE log buffer: accumulates logs per task, independent of the taskDetails cache
+  const sseLogsRef = useRef<Map<number, TaskLogEntry[]>>(new Map());
+  const [sseLogsVersion, setSseLogsVersion] = useState(0);
 
   // Persist view mode preference
   useEffect(() => {
     localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
   }, [viewMode]);
-
-  const flushTaskRefresh = useCallback(async () => {
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = null;
-    }
-
-    const taskIndexes = Array.from(pendingTaskRefreshRef.current);
-    pendingTaskRefreshRef.current.clear();
-
-    if (taskIndexes.length === 0 || runIdNum <= 0) {
-      return;
-    }
-
-    await Promise.all(
-      taskIndexes.map(async (taskIndex) => {
-        try {
-          const taskDetails = await queryClient.fetchQuery({
-            queryKey: queryKeys.taskDetails(runIdNum, taskIndex),
-            queryFn: () => api.getTaskDetails(runIdNum, taskIndex),
-          });
-
-          queryClient.setQueryData(queryKeys.testRunDetails(runIdNum), (oldData?: TestRunDetails) => {
-            if (!oldData?.tasks) return oldData;
-            return {
-              ...oldData,
-              tasks: oldData.tasks.map((task) => (task.index === taskIndex ? { ...task, ...taskDetails } : task)),
-            };
-          });
-        } catch (err) {
-          console.warn('Failed to refresh task details', { runId: runIdNum, taskIndex, err });
-        }
-      })
-    );
-  }, [queryClient, runIdNum]);
-
-  const scheduleTaskRefresh = useCallback(
-    (taskIndex: number) => {
-      pendingTaskRefreshRef.current.add(taskIndex);
-
-      if (!refreshTimerRef.current) {
-        refreshTimerRef.current = setTimeout(flushTaskRefresh, 1000);
-      }
-    },
-    [flushTaskRefresh]
-  );
-
-  const appendTaskLog = useCallback(
-    (taskIndex: number, logEntry: TaskLogEntry) => {
-      queryClient.setQueryData(
-        queryKeys.taskDetails(runIdNum, taskIndex),
-        (oldData?: TaskDetailsType) => {
-          if (!oldData) return oldData;
-          const nextLog = oldData.log ? [...oldData.log, logEntry] : [logEntry];
-          return {
-            ...oldData,
-            log: nextLog,
-          };
-        }
-      );
-    },
-    [queryClient, runIdNum]
-  );
 
   const handleEvent = useCallback(
     (event: SSEEvent) => {
@@ -109,7 +47,6 @@ function TestRun() {
           queryClient.invalidateQueries({ queryKey: queryKeys.testRunDetails(runIdNum) });
           break;
         case 'task.created':
-          // Add new task to the task list
           if (event.taskIndex !== undefined) {
             const data = event.data as {
               taskName?: string;
@@ -119,11 +56,9 @@ function TestRun() {
             };
             queryClient.setQueryData(queryKeys.testRunDetails(runIdNum), (oldData?: TestRunDetails) => {
               if (!oldData?.tasks) return oldData;
-              // Check if task already exists
               if (oldData.tasks.some((t) => t.index === event.taskIndex)) {
                 return oldData;
               }
-              // Add new task
               const newTask = {
                 index: event.taskIndex!,
                 parent_index: data.parentIndex ?? -1,
@@ -150,7 +85,6 @@ function TestRun() {
           break;
         case 'task.started':
           if (event.taskIndex !== undefined) {
-            // Immediate optimistic update
             queryClient.setQueryData(queryKeys.testRunDetails(runIdNum), (oldData?: TestRunDetails) => {
               if (!oldData?.tasks) return oldData;
               return {
@@ -162,7 +96,6 @@ function TestRun() {
                 ),
               };
             });
-            scheduleTaskRefresh(event.taskIndex);
           }
           break;
         case 'task.completed': {
@@ -180,7 +113,6 @@ function TestRun() {
                 ),
               };
             });
-            scheduleTaskRefresh(event.taskIndex);
           }
           break;
         }
@@ -198,13 +130,27 @@ function TestRun() {
                 ),
               };
             });
-            scheduleTaskRefresh(event.taskIndex);
           }
           break;
         }
         case 'task.progress':
           if (event.taskIndex !== undefined) {
-            scheduleTaskRefresh(event.taskIndex);
+            const data = event.data as { progress?: number; message?: string };
+            queryClient.setQueryData(queryKeys.testRunDetails(runIdNum), (oldData?: TestRunDetails) => {
+              if (!oldData?.tasks) return oldData;
+              return {
+                ...oldData,
+                tasks: oldData.tasks.map((task) =>
+                  task.index === event.taskIndex
+                    ? {
+                        ...task,
+                        progress: data.progress ?? task.progress,
+                        progress_message: data.message ?? task.progress_message,
+                      }
+                    : task
+                ),
+              };
+            });
           }
           break;
         case 'task.log':
@@ -226,28 +172,32 @@ function TestRun() {
               datalen: Object.keys(fields).length,
               data: fields,
             };
-            appendTaskLog(event.taskIndex, logEntry);
+
+            // Accumulate in SSE log buffer (always works, even if task isn't selected)
+            const taskLogs = sseLogsRef.current.get(event.taskIndex) || [];
+            taskLogs.push(logEntry);
+            sseLogsRef.current.set(event.taskIndex, taskLogs);
+            setSseLogsVersion((v) => v + 1);
           }
           break;
       }
     },
-    [appendTaskLog, queryClient, runIdNum, scheduleTaskRefresh]
+    [queryClient, runIdNum]
   );
 
   // Subscribe to SSE events for this run
   useEventStream({ runId: runIdNum, onEvent: handleEvent, enableDefaultInvalidation: false });
 
-  useEffect(() => {
-    return () => {
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
-    };
-  }, []);
-
   const { data: details, isLoading, error } = useTestRunDetails(runIdNum, { refetchInterval: false });
   const cancelMutation = useCancelTestRun();
+
+  // Get SSE logs for the selected task
+  // Must return a new array reference so downstream useMemos detect changes
+  const selectedTaskSseLogs = useMemo(() => {
+    void sseLogsVersion;
+    if (selectedTaskIndex === null) return [];
+    return sseLogsRef.current.get(selectedTaskIndex)?.slice() || [];
+  }, [selectedTaskIndex, sseLogsVersion]);
 
   // Calculate task statistics
   const taskStats = useMemo(() => {
@@ -413,7 +363,7 @@ function TestRun() {
             <div className="card-header">Task Details</div>
             <div className="flex-1 overflow-hidden">
               {selectedTask ? (
-                <TaskDetails runId={runIdNum} task={selectedTask} />
+                <TaskDetails key={selectedTask.index} runId={runIdNum} task={selectedTask} sseLogs={selectedTaskSseLogs} />
               ) : (
                 <div className="p-4 text-center text-[var(--color-text-secondary)] text-sm">
                   Select a task to view details

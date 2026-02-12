@@ -193,3 +193,24 @@ function formatRuntimeCompact(ms: number): string {
 }
 
 export default memo(TaskGraphNode);
+
+// Junction node: small routing dot between consecutive parallel groups
+function JunctionNodeComponent() {
+  return (
+    <>
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!bg-transparent !border-0"
+      />
+      <div className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600" />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!bg-transparent !border-0"
+      />
+    </>
+  );
+}
+
+export const JunctionNode = memo(JunctionNodeComponent);

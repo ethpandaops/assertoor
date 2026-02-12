@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import type { Node, Edge } from 'reactflow';
 import type { TaskState } from '../../types/api';
-import type { TaskNodeData } from './TaskGraphNode';
 
 // Layout constants
 const NODE_WIDTH = 180;
 const NODE_HEIGHT = 80;
+const JUNCTION_HEIGHT = 8;
 const HORIZONTAL_GAP = 60;
 const VERTICAL_GAP = 50;
 
@@ -33,7 +33,7 @@ function isConcurrentGlueTask(task: TaskState): boolean {
 }
 
 export interface UseTaskGraphResult {
-  nodes: Node<TaskNodeData>[];
+  nodes: Node[];
   edges: Edge[];
 }
 
@@ -76,15 +76,34 @@ export function useTaskGraph(
     }).sort((a, b) => a.index - b.index);
 
     // Execution graph edges: from -> to[]
-    const edges = new Map<number, Set<number>>();
+    const graphEdges = new Map<number, Set<number>>();
     const reverseEdges = new Map<number, Set<number>>(); // to -> from[]
     const visibleTasks = new Set<number>();
+    const junctionNodes = new Set<number>();
+    let junctionCounter = 0;
 
     function addEdge(from: number, to: number) {
-      if (!edges.has(from)) edges.set(from, new Set());
-      edges.get(from)!.add(to);
+      if (!graphEdges.has(from)) graphEdges.set(from, new Set());
+      graphEdges.get(from)!.add(to);
       if (!reverseEdges.has(to)) reverseEdges.set(to, new Set());
       reverseEdges.get(to)!.add(from);
+    }
+
+    // Connect two sets of nodes. When both sides are multi-lane,
+    // insert a junction node so converging and diverging edges don't overlap.
+    function connectNodes(fromList: number[], toList: number[]) {
+      if (fromList.length > 1 && toList.length > 1) {
+        junctionCounter--;
+        const junctionIdx = junctionCounter;
+        junctionNodes.add(junctionIdx);
+        visibleTasks.add(junctionIdx);
+        for (const f of fromList) addEdge(f, junctionIdx);
+        for (const t of toList) addEdge(junctionIdx, t);
+      } else {
+        for (const f of fromList) {
+          for (const t of toList) addEdge(f, t);
+        }
+      }
     }
 
     // Result of processing: first visible tasks (entry) and last visible tasks (exit)
@@ -128,11 +147,7 @@ export function useTaskGraph(
             }
 
             // Connect previous exit to current entry
-            for (const f of prevLast) {
-              for (const t of r.first) {
-                addEdge(f, t);
-              }
-            }
+            connectNodes(prevLast, r.first);
 
             // Update exit for next iteration
             prevLast = r.last.length > 0 ? r.last : prevLast;
@@ -151,11 +166,7 @@ export function useTaskGraph(
     let prevLast: number[] = [];
     for (const root of rootTasks) {
       const r = process(root);
-      for (const f of prevLast) {
-        for (const t of r.first) {
-          addEdge(f, t);
-        }
-      }
+      connectNodes(prevLast, r.first);
       prevLast = r.last.length > 0 ? r.last : prevLast;
     }
 
@@ -168,7 +179,7 @@ export function useTaskGraph(
       inDegree.set(idx, 0);
     }
     for (const idx of visibleTasks) {
-      const outs = edges.get(idx);
+      const outs = graphEdges.get(idx);
       if (outs) {
         for (const to of outs) {
           if (visibleTasks.has(to)) {
@@ -187,7 +198,7 @@ export function useTaskGraph(
 
       for (const idx of queue) {
         nodeRows.set(idx, row);
-        const outs = edges.get(idx);
+        const outs = graphEdges.get(idx);
         if (outs) {
           for (const to of outs) {
             if (visibleTasks.has(to)) {
@@ -277,9 +288,7 @@ export function useTaskGraph(
       maxLane = Math.max(maxLane, lane);
     }
 
-    // Compute per-row Y positions with extra gap at convergence/divergence transitions
-    // When closing edges from a multi-lane row converge to a node that also fans out
-    // to the next multi-lane row, the smoothstep curves overlap. Add extra gap there.
+    // Compute per-row Y positions with variable node heights
     const rowLaneCounts = new Map<number, number>();
     for (const r of sortedRows) {
       rowLaneCounts.set(r, byRow.get(r)!.length);
@@ -292,17 +301,24 @@ export function useTaskGraph(
       rowYPositions.set(r, currentY);
 
       if (i < sortedRows.length - 1) {
-        let gap = VERTICAL_GAP;
+        const isThisJunction = byRow.get(r)!.every(idx => junctionNodes.has(idx));
+        const isNextJunction = byRow.get(sortedRows[i + 1])!.every(idx => junctionNodes.has(idx));
         const thisLanes = rowLaneCounts.get(r) || 1;
         const nextLanes = rowLaneCounts.get(sortedRows[i + 1]) || 1;
 
-        // Add extra gap when multi-lane rows are close together
-        // (converging edges from this row + diverging edges to next row would overlap)
-        if (thisLanes > 1 || nextLanes > 1) {
-          gap += 30;
+        // Compact gap around junction rows — custom step edge handles tight spaces.
+        // Extra gap only for direct multi-lane transitions without junctions.
+        let gap: number;
+        if (isThisJunction || isNextJunction) {
+          gap = 30;
+        } else if (thisLanes > 1 || nextLanes > 1) {
+          gap = VERTICAL_GAP + 20;
+        } else {
+          gap = VERTICAL_GAP;
         }
 
-        currentY += NODE_HEIGHT + gap;
+        const rowHeight = isThisJunction ? JUNCTION_HEIGHT : NODE_HEIGHT;
+        currentY += rowHeight + gap;
       }
     }
 
@@ -310,32 +326,49 @@ export function useTaskGraph(
     const totalWidth = (maxLane + 1) * (NODE_WIDTH + HORIZONTAL_GAP) - HORIZONTAL_GAP;
     const offsetX = -totalWidth / 2;
 
-    const resultNodes: Node<TaskNodeData>[] = [];
+    const getNodeId = (idx: number): string =>
+      junctionNodes.has(idx) ? `junction-${-idx}` : `task-${idx}`;
+
+    const resultNodes: Node[] = [];
     for (const idx of visibleTasks) {
-      const task = taskMap.get(idx);
-      if (!task) continue;
-
-      const lane = nodeLanes.get(idx) || 0;
       const nodeRow = nodeRows.get(idx) || 0;
+      const y = rowYPositions.get(nodeRow) || 0;
 
-      resultNodes.push({
-        id: `task-${idx}`,
-        type: 'taskNode',
-        position: {
-          x: offsetX + lane * (NODE_WIDTH + HORIZONTAL_GAP),
-          y: rowYPositions.get(nodeRow) || 0,
-        },
-        data: {
-          task,
-          isSelected: idx === selectedIndex,
-          onSelect,
-        },
-      });
+      if (junctionNodes.has(idx)) {
+        // Junction node: align with lane 0 (first node position)
+        const centerX = offsetX + NODE_WIDTH / 2 - JUNCTION_HEIGHT / 2;
+
+        resultNodes.push({
+          id: getNodeId(idx),
+          type: 'junctionNode',
+          position: { x: centerX, y },
+          data: {},
+        });
+      } else {
+        const task = taskMap.get(idx);
+        if (!task) continue;
+
+        const lane = nodeLanes.get(idx) || 0;
+
+        resultNodes.push({
+          id: getNodeId(idx),
+          type: 'taskNode',
+          position: {
+            x: offsetX + lane * (NODE_WIDTH + HORIZONTAL_GAP),
+            y,
+          },
+          data: {
+            task,
+            isSelected: idx === selectedIndex,
+            onSelect,
+          },
+        });
+      }
     }
 
     // Create edges
     const resultEdges: Edge[] = [];
-    for (const [from, tos] of edges) {
+    for (const [from, tos] of graphEdges) {
       if (!visibleTasks.has(from)) continue;
 
       const fromLane = nodeLanes.get(from) || 0;
@@ -344,19 +377,23 @@ export function useTaskGraph(
         if (!visibleTasks.has(to)) continue;
 
         const toLane = nodeLanes.get(to) || 0;
-        const toTask = taskMap.get(to);
-        const isRunning = toTask?.status === 'running';
-        const isComplete = toTask?.status === 'complete';
-        const isSuccess = toTask?.result === 'success';
-        const isFailure = toTask?.result === 'failure';
 
-        // Use straight edge for same lane (vertical), smoothstep for different lanes
-        const edgeType = fromLane === toLane ? 'straight' : 'smoothstep';
+        // Color based on whichever end is an actual task (not a junction)
+        const refTask = taskMap.get(to) || taskMap.get(from);
+        const isRunning = refTask?.status === 'running';
+        const isComplete = refTask?.status === 'complete';
+        const isSuccess = refTask?.result === 'success';
+        const isFailure = refTask?.result === 'failure';
+
+        // Custom step edges for junctions (handles tight gaps without upward routing),
+        // smoothstep for cross-lane task edges, straight for same-lane
+        const isJunctionEdge = junctionNodes.has(from) || junctionNodes.has(to);
+        const edgeType = isJunctionEdge ? 'customStep' : fromLane !== toLane ? 'smoothstep' : 'straight';
 
         resultEdges.push({
           id: `edge-${from}-${to}`,
-          source: `task-${from}`,
-          target: `task-${to}`,
+          source: getNodeId(from),
+          target: getNodeId(to),
           type: edgeType,
           animated: isRunning,
           style: {
