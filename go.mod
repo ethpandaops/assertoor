@@ -7,7 +7,7 @@ require (
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/ethpandaops/ethwallclock v0.4.0
-	github.com/ethpandaops/spamoor v1.1.16-0.20260202043555-04648b790c5a
+	github.com/ethpandaops/spamoor v1.1.16
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0

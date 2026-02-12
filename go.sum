@@ -73,8 +73,8 @@ github.com/ethereum/go-verkle v0.2.2 h1:I2W0WjnrFUIzzVPwm8ykY+7pL2d4VhlsePn4j7cn
 github.com/ethereum/go-verkle v0.2.2/go.mod h1:M3b90YRnzqKyyzBEWJGqj8Qff4IDeXnzFw0P9bFw3uk=
 github.com/ethpandaops/ethwallclock v0.4.0 h1:+sgnhf4pk6hLPukP076VxkiLloE4L0Yk1yat+ZyHh1g=
 github.com/ethpandaops/ethwallclock v0.4.0/go.mod h1:y0Cu+mhGLlem19vnAV2x0hpFS5KZ7oOi2SWYayv9l24=
-github.com/ethpandaops/spamoor v1.1.16-0.20260202043555-04648b790c5a h1:z5RDsUKOdg2yLlNfLRRLdfrCJub7M3L9fQYnL8C+iQ0=
-github.com/ethpandaops/spamoor v1.1.16-0.20260202043555-04648b790c5a/go.mod h1:LW2DX5PlJKGM1vTeCjbm7rczdqYXwPRN9xJHE6bnZNY=
+github.com/ethpandaops/spamoor v1.1.16 h1:kqGFC0rOzKCEU+Pwi0XUB/DnzntAtFNe+bvD3cOidbI=
+github.com/ethpandaops/spamoor v1.1.16/go.mod h1:+Z810GiNvmc+MxNj675Wo59Md6Ip8jbJvih6/7oMNc0=
 github.com/fatih/color v1.16.0 h1:zmkK9Ngbjj+K0yRhTVONQh1p/HknKYSlNT+vZCzyokM=
 github.com/fatih/color v1.16.0/go.mod h1:fL2Sau1YI5c0pdGEVCbKQbLXB6edEj1ZgiY4NijnWvE=
 github.com/ferranbt/fastssz v0.1.4 h1:OCDB+dYDEQDvAgtAGnTSidK1Pe2tW3nFV40XyMkTeDY=
