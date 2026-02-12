@@ -385,16 +385,35 @@ func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 
 		blobCount := t.config.BlobSidecars
 
+		// Parse blobData formats:
+		//   Old format (per-sidecar): "refs;refs;refs" — semicolons separate sidecar groups
+		//   New format (all sidecars): "ref,ref,ref" — commas separate refs, applied to all sidecars
+		// Within each group, commas separate individual refs.
+		// "identifier" and "label" are replaced with a unique blob label.
+		var blobDataGroups []string
+
+		if t.config.BlobData != "" {
+			if strings.Contains(t.config.BlobData, ";") {
+				blobDataGroups = strings.Split(t.config.BlobData, ";")
+				blobCount = uint64(len(blobDataGroups))
+			} else {
+				// Same refs for all sidecars
+				for range blobCount {
+					blobDataGroups = append(blobDataGroups, t.config.BlobData)
+				}
+			}
+		}
+
 		blobRefs := make([][]string, blobCount)
 
 		for i := uint64(0); i < blobCount; i++ {
 			blobLabel := fmt.Sprintf("0x1611AA0000%08dFF%02dFF%04dFEED", t.ctx.Index, i, 0)
 
-			if t.config.BlobData != "" {
+			if i < uint64(len(blobDataGroups)) {
 				blobRefs[i] = []string{}
 
-				for _, blob := range strings.Split(t.config.BlobData, ",") {
-					if blob == "label" {
+				for _, blob := range strings.Split(blobDataGroups[i], ",") {
+					if blob == "identifier" || blob == "label" {
 						blob = blobLabel
 					}
 

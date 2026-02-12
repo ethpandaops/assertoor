@@ -1,6 +1,10 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { yaml as yamlLang } from '@codemirror/lang-yaml';
+import { githubLight, githubDark } from '@uiw/codemirror-theme-github';
 import { useTaskDetails } from '../../hooks/useApi';
 import { useAuthContext } from '../../context/AuthContext';
+import { useDarkMode } from '../../hooks/useDarkMode';
 import type { TaskState, TaskLogEntry } from '../../types/api';
 import { formatDurationMs, formatTime } from '../../utils/time';
 
@@ -310,32 +314,43 @@ function LogsTab({ logs, scrollContainerRef }: LogsTabProps) {
   );
 }
 
-function ConfigTab({ yaml }: { yaml?: string }) {
-  if (!yaml) {
+function YamlViewer({ value, emptyMessage }: { value?: string; emptyMessage: string }) {
+  const isDarkMode = useDarkMode();
+
+  if (!value) {
     return (
-      <p className="text-center text-[var(--color-text-secondary)]">No configuration available</p>
+      <p className="text-center text-[var(--color-text-secondary)]">{emptyMessage}</p>
     );
   }
 
   return (
-    <pre className="bg-[var(--color-bg-tertiary)] p-2 rounded-sm text-xs overflow-x-auto font-mono whitespace-pre">
-      {yaml}
-    </pre>
+    <CodeMirror
+      value={value}
+      extensions={[yamlLang()]}
+      theme={isDarkMode ? githubDark : githubLight}
+      readOnly
+      editable={false}
+      basicSetup={{
+        lineNumbers: true,
+        foldGutter: true,
+        highlightActiveLine: false,
+        highlightActiveLineGutter: false,
+        autocompletion: false,
+        bracketMatching: false,
+        indentOnInput: false,
+        searchKeymap: true,
+      }}
+      className="text-xs [&_.cm-editor]:!bg-[var(--color-bg-tertiary)] [&_.cm-gutters]:!bg-[var(--color-bg-tertiary)] [&_.cm-gutters]:!border-r-0 rounded-sm overflow-hidden"
+    />
   );
 }
 
-function ResultTab({ yaml }: { yaml?: string }) {
-  if (!yaml) {
-    return (
-      <p className="text-center text-[var(--color-text-secondary)]">No result data available</p>
-    );
-  }
+function ConfigTab({ yaml }: { yaml?: string }) {
+  return <YamlViewer value={yaml} emptyMessage="No configuration available" />;
+}
 
-  return (
-    <pre className="bg-[var(--color-bg-tertiary)] p-2 rounded-sm text-xs overflow-x-auto font-mono whitespace-pre">
-      {yaml}
-    </pre>
-  );
+function ResultTab({ yaml }: { yaml?: string }) {
+  return <YamlViewer value={yaml} emptyMessage="No result data available" />;
 }
 
 function formatFileSize(bytes: number): string {

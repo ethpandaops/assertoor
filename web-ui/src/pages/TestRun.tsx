@@ -218,6 +218,16 @@ function TestRun() {
     return { total: details.tasks.length, completed, passed, failed };
   }, [details?.tasks]);
 
+  // Live-updating runtime for running tests
+  const isRunning = details?.status === 'running' || details?.status === 'pending';
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [isRunning]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -253,11 +263,10 @@ function TestRun() {
     ? details.tasks.find((t) => t.index === selectedTaskIndex)
     : null;
 
-  // Calculate current runtime
   const runtime = details.stop_time
     ? details.stop_time - details.start_time
     : details.start_time
-      ? Math.floor(Date.now() / 1000) - details.start_time
+      ? Math.floor(now / 1000) - details.start_time
       : 0;
 
   const canCancel = isLoggedIn && (details.status === 'pending' || details.status === 'running');

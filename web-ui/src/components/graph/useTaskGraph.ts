@@ -18,10 +18,15 @@ const GLUE_TASKS = new Set([
   'run_task_background',
 ]);
 
-// Tasks that execute children concurrently (parallel lanes)
+// Tasks that always execute children concurrently (parallel lanes)
 const CONCURRENT_GLUE_TASKS = new Set([
   'run_tasks_concurrent',
-  'run_task_matrix',
+]);
+
+// Background glue: children run concurrently but only the foreground (last child)
+// determines execution flow — the background task has no outgoing edges.
+const BACKGROUND_GLUE_TASKS = new Set([
+  'run_task_background',
 ]);
 
 function isGlueTask(task: TaskState): boolean {
@@ -29,7 +34,13 @@ function isGlueTask(task: TaskState): boolean {
 }
 
 function isConcurrentGlueTask(task: TaskState): boolean {
+  // run_task_matrix is only concurrent when explicitly configured with runConcurrent: true
+  if (task.name === 'run_task_matrix') return !!task.run_concurrent;
   return CONCURRENT_GLUE_TASKS.has(task.name);
+}
+
+function isBackgroundGlueTask(task: TaskState): boolean {
+  return BACKGROUND_GLUE_TASKS.has(task.name);
 }
 
 export interface UseTaskGraphResult {
@@ -133,6 +144,20 @@ export function useTaskGraph(
           }
 
           return { first: allFirst, last: allLast };
+        } else if (isBackgroundGlueTask(task)) {
+          // Background: children run concurrently (side by side),
+          // but only the foreground (last child) has outgoing flow edges.
+          const allFirst: number[] = [];
+          const fgResult = process(children[children.length - 1]);
+          allFirst.push(...fgResult.first);
+
+          for (let i = 0; i < children.length - 1; i++) {
+            const r = process(children[i]);
+            allFirst.push(...r.first);
+            // Background children have no outgoing edges — intentionally ignored
+          }
+
+          return { first: allFirst, last: fgResult.last };
         } else {
           // Sequential: children run one after another
           let prevLast: number[] = [];

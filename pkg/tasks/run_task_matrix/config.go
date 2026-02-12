@@ -36,6 +36,11 @@ func DefaultConfig() Config {
 	}
 }
 
+// IsRunConcurrent returns whether the matrix tasks should run concurrently.
+func (c *Config) IsRunConcurrent() bool {
+	return c.RunConcurrent
+}
+
 func (c *Config) Validate() error {
 	if c.Task == nil {
 		return errors.New("child task must be specified")

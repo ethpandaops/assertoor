@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -22,20 +23,21 @@ type GetTestRunResponse struct {
 }
 
 type GetTestRunTask struct {
-	Index       uint64                 `json:"index"`
-	ParentIndex uint64                 `json:"parent_index"`
-	Name        string                 `json:"name"`
-	Title       string                 `json:"title"`
-	Started     bool                   `json:"started"`
-	Completed   bool                   `json:"completed"`
-	StartTime   int64                  `json:"start_time"`
-	StopTime    int64                  `json:"stop_time"`
-	Timeout     uint64                 `json:"timeout"`
-	RunTime     uint64                 `json:"runtime"`
-	Status      string                 `json:"status"`
-	Result      string                 `json:"result"`
-	ResultFiles []GetTestRunTaskResult `json:"result_files"`
-	ResultError string                 `json:"result_error"`
+	Index         uint64                 `json:"index"`
+	ParentIndex   uint64                 `json:"parent_index"`
+	Name          string                 `json:"name"`
+	Title         string                 `json:"title"`
+	Started       bool                   `json:"started"`
+	Completed     bool                   `json:"completed"`
+	StartTime     int64                  `json:"start_time"`
+	StopTime      int64                  `json:"stop_time"`
+	Timeout       uint64                 `json:"timeout"`
+	RunTime       uint64                 `json:"runtime"`
+	Status        string                 `json:"status"`
+	Result        string                 `json:"result"`
+	ResultFiles   []GetTestRunTaskResult `json:"result_files"`
+	ResultError   string                 `json:"result_error"`
+	RunConcurrent bool                   `json:"run_concurrent,omitempty"`
 }
 
 type GetTestRunTaskResult struct {
@@ -44,6 +46,46 @@ type GetTestRunTaskResult struct {
 	Name  string `json:"name"`
 	Size  uint64 `json:"size"`
 	URL   string `json:"url"`
+}
+
+// isConfigRunConcurrent extracts the runConcurrent flag from a task config.
+// Handles typed config structs (live tasks), raw maps (DB-loaded tasks),
+// and value-type structs where pointer-receiver interfaces don't match.
+func isConfigRunConcurrent(cfg any) bool {
+	// Pointer-receiver interface (works when Config() returns a pointer)
+	type concurrentProvider interface {
+		IsRunConcurrent() bool
+	}
+
+	if ccp, ok := cfg.(concurrentProvider); ok {
+		return ccp.IsRunConcurrent()
+	}
+
+	// Raw map from DB deserialization
+	if m, ok := cfg.(map[string]any); ok {
+		if v, exists := m["runConcurrent"]; exists {
+			if b, ok := v.(bool); ok {
+				return b
+			}
+		}
+
+		return false
+	}
+
+	// Value-type struct (Config() returns value, not pointer — interface won't match)
+	v := reflect.ValueOf(cfg)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() == reflect.Struct {
+		f := v.FieldByName("RunConcurrent")
+		if f.IsValid() && f.Kind() == reflect.Bool {
+			return f.Bool()
+		}
+	}
+
+	return false
 }
 
 // GetTestRun godoc
@@ -167,6 +209,8 @@ func (ah *APIHandler) GetTestRun(w http.ResponseWriter, r *http.Request) {
 			if taskStatus.Error != nil {
 				taskData.ResultError = taskStatus.Error.Error()
 			}
+
+			taskData.RunConcurrent = isConfigRunConcurrent(taskState.Config())
 
 			if len(resultHeaderMap[uint64(taskState.Index())]) > 0 {
 				taskData.ResultFiles = make([]GetTestRunTaskResult, len(resultHeaderMap[uint64(taskState.Index())]))

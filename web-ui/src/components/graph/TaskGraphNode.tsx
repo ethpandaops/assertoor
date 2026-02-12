@@ -93,7 +93,7 @@ function TaskGraphNode({ data, selected }: NodeProps<TaskNodeData>) {
       <div
         onClick={() => onSelect(task.index)}
         className={`
-          w-[180px] rounded-lg border-2 cursor-pointer
+          w-[180px] h-[80px] overflow-hidden rounded-lg border-2 cursor-pointer
           transition-all duration-200 shadow-sm hover:shadow-md
           ${colors.border} ${colors.bg}
           ${isSelected || selected ? 'ring-2 ring-primary-500 ring-offset-2 ring-offset-[var(--color-bg-primary)]' : ''}
@@ -117,7 +117,7 @@ function TaskGraphNode({ data, selected }: NodeProps<TaskNodeData>) {
         </div>
 
         {/* Task info */}
-        <div className="px-2.5 py-2">
+        <div className="px-2.5 py-1.5">
           <div className="text-xs font-medium truncate" title={task.title || task.name}>
             {task.title || task.name}
           </div>
@@ -132,8 +132,8 @@ function TaskGraphNode({ data, selected }: NodeProps<TaskNodeData>) {
 
           {/* Progress bar for running tasks */}
           {isRunning && hasProgress && (
-            <div className="mt-2">
-              <div className="flex items-center gap-2">
+            <div className="mt-1">
+              <div className="flex items-center gap-1.5">
                 <div className="flex-1 h-1 bg-[var(--color-bg-tertiary)] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-blue-500 transition-all duration-300"
@@ -145,7 +145,7 @@ function TaskGraphNode({ data, selected }: NodeProps<TaskNodeData>) {
                 </span>
               </div>
               {task.progress_message && (
-                <div className="text-[10px] text-[var(--color-text-tertiary)] truncate mt-1">
+                <div className="text-[10px] text-[var(--color-text-tertiary)] truncate mt-0.5">
                   {task.progress_message}
                 </div>
               )}
@@ -154,7 +154,7 @@ function TaskGraphNode({ data, selected }: NodeProps<TaskNodeData>) {
 
           {/* Error message for failed tasks */}
           {displayStatus === 'failure' && task.result_error && (
-            <div className="mt-2 text-[10px] text-red-600 dark:text-red-400 truncate" title={task.result_error}>
+            <div className="mt-1 text-[10px] text-red-600 dark:text-red-400 truncate" title={task.result_error}>
               {task.result_error}
             </div>
           )}

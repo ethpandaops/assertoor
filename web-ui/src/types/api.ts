@@ -130,6 +130,7 @@ export interface TaskState {
   result_files?: TaskResultFile[];
   progress: number;
   progress_message: string;
+  run_concurrent?: boolean;
 }
 
 // Task result file

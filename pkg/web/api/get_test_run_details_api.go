@@ -35,6 +35,7 @@ type GetTestRunDetailedTask struct {
 	Status          string                       `json:"status"`
 	Result          string                       `json:"result"`
 	ResultError     string                       `json:"result_error"`
+	RunConcurrent   bool                         `json:"run_concurrent,omitempty"`
 	Progress        float64                      `json:"progress"`
 	ProgressMessage string                       `json:"progress_message"`
 	Log             []*GetTestRunDetailedTaskLog `json:"log"`
@@ -163,6 +164,8 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 			if taskStatus.Error != nil {
 				taskData.ResultError = taskStatus.Error.Error()
 			}
+
+			taskData.RunConcurrent = isConfigRunConcurrent(taskState.Config())
 
 			taskData.Progress = taskStatus.Progress
 			taskData.ProgressMessage = taskStatus.ProgressMessage
