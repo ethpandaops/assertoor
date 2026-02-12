@@ -66,6 +66,8 @@ jobs:
     needs: [prinfo]
     if: ${{ needs.prinfo.outputs.run_builds == 'true' }}
     uses: ./.github/workflows/_shared-check.yaml
+    with:
+      ref: ${{ needs.prinfo.outputs.commit_ref }}
 
   build_binaries:
     name: "Build Assertoor"
