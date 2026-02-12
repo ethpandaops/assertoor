@@ -407,7 +407,7 @@ func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 		blobRefs := make([][]string, blobCount)
 
 		for i := uint64(0); i < blobCount; i++ {
-			blobLabel := fmt.Sprintf("0x1611AA0000%08dFF%02dFF%04dFEED", t.ctx.Index, i, 0)
+			blobLabel := fmt.Sprintf("0x1611BB0000%08dFF%02dFF%04dFEED", 0, i, 0)
 
 			if i < uint64(len(blobDataGroups)) {
 				blobRefs[i] = []string{}
