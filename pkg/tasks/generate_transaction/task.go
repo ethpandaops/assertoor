@@ -442,7 +442,7 @@ func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 			GasFeeCap:  uint256.MustFromBig(&t.config.FeeCap.Value),
 			GasTipCap:  uint256.MustFromBig(&t.config.TipCap.Value),
 			BlobFeeCap: uint256.MustFromBig(&t.config.BlobFeeCap.Value),
-			Gas:        21000,
+			Gas:        t.config.GasLimit,
 			To:         toAddr,
 			Value:      uint256.NewInt(0),
 		}, blobRefs)
