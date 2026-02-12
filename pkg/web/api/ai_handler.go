@@ -69,9 +69,10 @@ func (h *AIHandler) checkAuth(r *http.Request) bool {
 
 // AIConfigResponse is the response for GetConfig endpoint.
 type AIConfigResponse struct {
-	Enabled       bool     `json:"enabled"`
-	DefaultModel  string   `json:"defaultModel"`
-	AllowedModels []string `json:"allowedModels"`
+	Enabled             bool     `json:"enabled"`
+	DefaultModel        string   `json:"defaultModel"`
+	AllowedModels       []string `json:"allowedModels"`
+	ServerKeyConfigured bool     `json:"serverKeyConfigured"`
 }
 
 // GetConfig returns AI configuration (enabled, available models).
@@ -80,18 +81,70 @@ func (h *AIHandler) GetConfig(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
 	response := AIConfigResponse{
-		Enabled:       false,
-		DefaultModel:  "",
-		AllowedModels: []string{},
+		Enabled:             false,
+		DefaultModel:        "",
+		AllowedModels:       []string{},
+		ServerKeyConfigured: false,
 	}
 
 	if h.config != nil && h.config.Enabled {
 		response.Enabled = true
 		response.DefaultModel = h.config.DefaultModel
 		response.AllowedModels = h.config.AllowedModels
+		response.ServerKeyConfigured = h.client != nil
 	}
 
 	h.sendOKResponse(w, "/api/v1/ai/config", response)
+}
+
+// SystemPromptResponse is the response for GetSystemPrompt endpoint.
+type SystemPromptResponse struct {
+	Prompt string `json:"prompt"`
+}
+
+// GetSystemPrompt returns the AI system prompt text.
+// GET /api/v1/ai/system_prompt
+func (h *AIHandler) GetSystemPrompt(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", contentTypeJSON)
+
+	prompt := ai.BuildSystemPrompt()
+	h.sendOKResponse(w, "/api/v1/ai/system_prompt", SystemPromptResponse{
+		Prompt: prompt,
+	})
+}
+
+// ValidateYamlRequest is the request body for ValidateYaml endpoint.
+type ValidateYamlRequest struct {
+	Yaml string `json:"yaml"`
+}
+
+// ValidateYaml validates AI-generated YAML and returns validation results.
+// POST /api/v1/ai/validate
+func (h *AIHandler) ValidateYaml(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", contentTypeJSON)
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		h.sendErrorResponse(
+			w, "/api/v1/ai/validate", "failed to read request body", http.StatusBadRequest,
+		)
+
+		return
+	}
+
+	var req ValidateYamlRequest
+
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		h.sendErrorResponse(
+			w, "/api/v1/ai/validate", "invalid request body", http.StatusBadRequest,
+		)
+
+		return
+	}
+
+	result := ai.ValidateGeneratedYaml(req.Yaml)
+	h.sendOKResponse(w, "/api/v1/ai/validate", result)
 }
 
 // AIUsageResponse is the response for GetUsage endpoint.

@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAIStore } from '../../../stores/aiStore';
 import { ModelSelector } from './ModelSelector';
 import { TokenUsageDisplay } from './TokenUsageDisplay';
 import { ChatHistory } from './ChatHistory';
 import { MessageInput } from './MessageInput';
 import { YamlPreview } from './YamlPreview';
+import { ApiKeyInput } from './ApiKeyInput';
 
 interface AIPanelProps {
   testName: string;
@@ -30,7 +31,12 @@ export const AIPanel: React.FC<AIPanelProps> = ({
     error,
     clearError,
     clearMessages,
+    userApiKey,
+    isAvailable,
+    isClientSide,
   } = useAIStore();
+
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
 
   useEffect(() => {
     if (!config && !configLoading) {
@@ -49,13 +55,16 @@ export const AIPanel: React.FC<AIPanelProps> = ({
     setPendingYaml(null);
   };
 
+  const aiAvailable = isAvailable();
+  const clientSide = isClientSide();
+
   return (
     <div className="flex flex-col h-full bg-[var(--color-bg-secondary)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
         <div className="flex items-center gap-2">
           <svg
-            className="w-5 h-5 text-blue-500"
+            className="size-5 text-blue-500"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -75,7 +84,7 @@ export const AIPanel: React.FC<AIPanelProps> = ({
             className="p-1 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
             title="Clear chat"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -88,7 +97,7 @@ export const AIPanel: React.FC<AIPanelProps> = ({
             onClick={onClose}
             className="p-1 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -132,13 +141,44 @@ export const AIPanel: React.FC<AIPanelProps> = ({
         </div>
       )}
 
+      {/* Enabled but no key available - prompt user to enter key */}
+      {config && config.enabled && !aiAvailable && (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center max-w-sm">
+            <p className="text-[var(--color-text-secondary)] mb-3">
+              No server API key is configured. Enter your own OpenRouter API key to use AI
+              features.
+            </p>
+            <p className="text-xs text-[var(--color-text-tertiary)] mb-4">
+              Your key is stored locally in your browser and never sent to this server.
+            </p>
+            <ApiKeyInput />
+          </div>
+        </div>
+      )}
+
       {/* Main content */}
-      {config && config.enabled && (
+      {config && config.enabled && aiAvailable && (
         <>
           {/* Config bar */}
-          <div className="px-3 py-2 border-b border-[var(--color-border)] space-y-2">
+          <div className="px-3 py-2 border-b border-[var(--color-border)] flex flex-col gap-2">
             <ModelSelector />
-            <TokenUsageDisplay />
+            {/* Always show ApiKeyInput when no server key (required) or user already set a key */}
+            {(!config.serverKeyConfigured || userApiKey) && <ApiKeyInput />}
+            {/* When server key exists and no user key, show optional toggle */}
+            {config.serverKeyConfigured && !userApiKey && (
+              showApiKeyInput ? (
+                <ApiKeyInput />
+              ) : (
+                <button
+                  onClick={() => setShowApiKeyInput(true)}
+                  className="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] text-left"
+                >
+                  Use your own OpenRouter API key instead...
+                </button>
+              )
+            )}
+            {!clientSide && <TokenUsageDisplay />}
           </div>
 
           {/* Error banner */}
@@ -150,7 +190,7 @@ export const AIPanel: React.FC<AIPanelProps> = ({
                   onClick={clearError}
                   className="ml-2 text-red-400 hover:text-red-600"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"

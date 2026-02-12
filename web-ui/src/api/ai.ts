@@ -7,6 +7,7 @@ export interface AIConfig {
   enabled: boolean;
   defaultModel: string;
   allowedModels: string[];
+  serverKeyConfigured: boolean;
 }
 
 export interface AIUsageStats {
@@ -207,4 +208,161 @@ export async function pollAISession(
   }
 
   throw new Error('Session polling timed out');
+}
+
+// Get AI system prompt (for client-side mode)
+export async function fetchSystemPrompt(): Promise<string> {
+  const data = await fetchAIApi<{ prompt: string }>('/ai/system_prompt');
+  return data.prompt;
+}
+
+// Validate YAML via backend (for client-side mode)
+export async function validateYaml(yaml: string): Promise<ValidationResult> {
+  return fetchAIApi<ValidationResult>('/ai/validate', {
+    method: 'POST',
+    body: JSON.stringify({ yaml }),
+  });
+}
+
+// Extract YAML code blocks from AI response
+export function extractYamlFromResponse(response: string): string {
+  const re = /```ya?ml\s*\n([\s\S]*?)```/;
+  const match = re.exec(response);
+  return match ? match[1] : '';
+}
+
+// Build a fix prompt for validation issues (mirrors Go logic)
+export function buildFixPrompt(
+  brokenYaml: string,
+  validation: ValidationResult,
+  warningsOnly: boolean
+): string {
+  let prompt: string;
+
+  if (warningsOnly) {
+    prompt =
+      'The YAML you generated has validation warnings. Please review and fix the following issues if appropriate:\n\n';
+    for (const issue of validation.issues ?? []) {
+      if (issue.type === 'warning') {
+        prompt += `- ${issue.path}: ${issue.message}\n`;
+      }
+    }
+  } else {
+    prompt = 'The YAML you generated has validation errors. Please fix the following issues:\n\n';
+    for (const issue of validation.issues ?? []) {
+      if (issue.type === 'error') {
+        prompt += `- ${issue.path}: ${issue.message}\n`;
+      }
+    }
+  }
+
+  prompt += '\nHere is the YAML:\n```yaml\n' + brokenYaml + '\n```\n\n';
+
+  if (warningsOnly) {
+    prompt +=
+      'Please provide an improved version of the YAML that addresses the warnings where appropriate. ';
+  } else {
+    prompt += 'Please provide a corrected version of the YAML that fixes all the errors. ';
+  }
+
+  prompt += 'Only output the corrected YAML in a code block, no explanations needed.';
+  return prompt;
+}
+
+// Stream chat directly to OpenRouter from the browser (client-side mode)
+export async function clientSideStreamChat(
+  apiKey: string,
+  model: string,
+  messages: ChatMessage[],
+  maxTokens: number,
+  onChunk: (chunk: string) => void
+): Promise<string> {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': window.location.origin,
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: maxTokens,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`OpenRouter API error: ${response.status} - ${errorBody}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('No response body');
+  }
+
+  const decoder = new TextDecoder();
+  let fullResponse = '';
+  let buffer = '';
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data: ')) continue;
+
+      const data = trimmed.slice(6);
+      if (data === '[DONE]') continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) {
+          fullResponse += content;
+          onChunk(content);
+        }
+      } catch {
+        // skip malformed SSE chunks
+      }
+    }
+  }
+
+  return fullResponse;
+}
+
+// Non-streaming chat call to OpenRouter (for fix attempts)
+export async function clientSideChat(
+  apiKey: string,
+  model: string,
+  messages: ChatMessage[],
+  maxTokens: number
+): Promise<string> {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': window.location.origin,
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: maxTokens,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`OpenRouter API error: ${response.status} - ${errorBody}`);
+  }
+
+  const result = await response.json();
+  return result.choices?.[0]?.message?.content ?? '';
 }

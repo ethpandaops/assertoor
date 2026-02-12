@@ -160,6 +160,8 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 				disableAuth,
 			)
 			ws.router.HandleFunc("/api/v1/ai/config", aiHandler.GetConfig).Methods("GET")
+			ws.router.HandleFunc("/api/v1/ai/system_prompt", aiHandler.GetSystemPrompt).Methods("GET")
+			ws.router.HandleFunc("/api/v1/ai/validate", aiHandler.ValidateYaml).Methods("POST")
 			ws.router.HandleFunc("/api/v1/ai/usage", aiHandler.GetUsage).Methods("GET")
 			ws.router.HandleFunc("/api/v1/ai/chat", aiHandler.Chat).Methods("POST")
 			ws.router.HandleFunc("/api/v1/ai/chat/{sessionId}", aiHandler.GetChatSession).Methods("GET")
