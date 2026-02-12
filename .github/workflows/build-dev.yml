@@ -58,7 +58,8 @@ jobs:
         echo "run_builds=$run_builds" >> $GITHUB_OUTPUT
         echo "commit_ref=$commit_ref" >> $GITHUB_OUTPUT
         echo "build_docker=$has_docker_image_label" >> $GITHUB_OUTPUT
-        echo "docker_tag=$branch_name" >> $GITHUB_OUTPUT
+        docker_tag="${branch_name//\//-}"
+        echo "docker_tag=$docker_tag" >> $GITHUB_OUTPUT
 
   check_source:
     name: "Run code checks"
