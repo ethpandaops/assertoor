@@ -277,6 +277,35 @@ export function useTaskGraph(
       maxLane = Math.max(maxLane, lane);
     }
 
+    // Compute per-row Y positions with extra gap at convergence/divergence transitions
+    // When closing edges from a multi-lane row converge to a node that also fans out
+    // to the next multi-lane row, the smoothstep curves overlap. Add extra gap there.
+    const rowLaneCounts = new Map<number, number>();
+    for (const r of sortedRows) {
+      rowLaneCounts.set(r, byRow.get(r)!.length);
+    }
+
+    const rowYPositions = new Map<number, number>();
+    let currentY = 0;
+    for (let i = 0; i < sortedRows.length; i++) {
+      const r = sortedRows[i];
+      rowYPositions.set(r, currentY);
+
+      if (i < sortedRows.length - 1) {
+        let gap = VERTICAL_GAP;
+        const thisLanes = rowLaneCounts.get(r) || 1;
+        const nextLanes = rowLaneCounts.get(sortedRows[i + 1]) || 1;
+
+        // Add extra gap when multi-lane rows are close together
+        // (converging edges from this row + diverging edges to next row would overlap)
+        if (thisLanes > 1 || nextLanes > 1) {
+          gap += 30;
+        }
+
+        currentY += NODE_HEIGHT + gap;
+      }
+    }
+
     // Convert to React Flow format
     const totalWidth = (maxLane + 1) * (NODE_WIDTH + HORIZONTAL_GAP) - HORIZONTAL_GAP;
     const offsetX = -totalWidth / 2;
@@ -294,7 +323,7 @@ export function useTaskGraph(
         type: 'taskNode',
         position: {
           x: offsetX + lane * (NODE_WIDTH + HORIZONTAL_GAP),
-          y: nodeRow * (NODE_HEIGHT + VERTICAL_GAP),
+          y: rowYPositions.get(nodeRow) || 0,
         },
         data: {
           task,

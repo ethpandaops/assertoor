@@ -11,7 +11,7 @@ import TaskDetails from '../components/task/TaskDetails';
 import { TaskGraph } from '../components/graph';
 import { formatDuration, formatRelativeTime } from '../utils/time';
 import * as api from '../api/client';
-import type { SSEEvent, TaskDetails as TaskDetailsType, TaskLogEntry, TestRunDetails } from '../types/api';
+import type { SSEEvent, TaskDetails as TaskDetailsType, TaskLogEntry, TaskState, TestRunDetails } from '../types/api';
 
 type ViewMode = 'list' | 'graph';
 
@@ -75,7 +75,7 @@ function TestRun() {
       pendingTaskRefreshRef.current.add(taskIndex);
 
       if (!refreshTimerRef.current) {
-        refreshTimerRef.current = setTimeout(flushTaskRefresh, 5000);
+        refreshTimerRef.current = setTimeout(flushTaskRefresh, 1000);
       }
     },
     [flushTaskRefresh]
@@ -149,8 +149,59 @@ function TestRun() {
           }
           break;
         case 'task.started':
-        case 'task.completed':
-        case 'task.failed':
+          if (event.taskIndex !== undefined) {
+            // Immediate optimistic update
+            queryClient.setQueryData(queryKeys.testRunDetails(runIdNum), (oldData?: TestRunDetails) => {
+              if (!oldData?.tasks) return oldData;
+              return {
+                ...oldData,
+                tasks: oldData.tasks.map((task) =>
+                  task.index === event.taskIndex
+                    ? { ...task, started: true, status: 'running' as const, start_time: Date.now() }
+                    : task
+                ),
+              };
+            });
+            scheduleTaskRefresh(event.taskIndex);
+          }
+          break;
+        case 'task.completed': {
+          if (event.taskIndex !== undefined) {
+            const data = event.data as { result?: string };
+            const result = data.result === 'success' ? 'success' : data.result === 'failure' ? 'failure' : 'none';
+            queryClient.setQueryData(queryKeys.testRunDetails(runIdNum), (oldData?: TestRunDetails) => {
+              if (!oldData?.tasks) return oldData;
+              return {
+                ...oldData,
+                tasks: oldData.tasks.map((task) =>
+                  task.index === event.taskIndex
+                    ? { ...task, completed: true, status: 'complete' as const, result: result as TaskState['result'], stop_time: Date.now() }
+                    : task
+                ),
+              };
+            });
+            scheduleTaskRefresh(event.taskIndex);
+          }
+          break;
+        }
+        case 'task.failed': {
+          if (event.taskIndex !== undefined) {
+            const data = event.data as { error?: string };
+            queryClient.setQueryData(queryKeys.testRunDetails(runIdNum), (oldData?: TestRunDetails) => {
+              if (!oldData?.tasks) return oldData;
+              return {
+                ...oldData,
+                tasks: oldData.tasks.map((task) =>
+                  task.index === event.taskIndex
+                    ? { ...task, completed: true, status: 'complete' as const, result: 'failure' as const, result_error: data.error ?? '', stop_time: Date.now() }
+                    : task
+                ),
+              };
+            });
+            scheduleTaskRefresh(event.taskIndex);
+          }
+          break;
+        }
         case 'task.progress':
           if (event.taskIndex !== undefined) {
             scheduleTaskRefresh(event.taskIndex);
