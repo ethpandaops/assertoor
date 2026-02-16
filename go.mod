@@ -3,19 +3,19 @@ module github.com/ethpandaops/assertoor
 go 1.25.0
 
 require (
-	github.com/attestantio/go-eth2-client v0.27.1
+	github.com/attestantio/go-eth2-client v0.28.0
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
-	github.com/ethereum/go-ethereum v1.16.5
+	github.com/ethereum/go-ethereum v1.16.8
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/gorilla/mux v1.8.1
 	github.com/herumi/bls-eth-go-binary v1.37.0
 	github.com/holiman/uint256 v1.3.2
-	github.com/itchyny/gojq v0.12.17
+	github.com/itchyny/gojq v0.12.18
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/juliangruber/go-intersect v1.1.0
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.11.2
 	github.com/mashingan/smapping v0.1.19
 	github.com/pressly/goose/v3 v3.26.0
 	github.com/prometheus/client_golang v1.23.2
@@ -23,8 +23,8 @@ require (
 	github.com/protolambda/ztyp v0.2.2
 	github.com/prysmaticlabs/go-bitfield v0.0.0-20240618144021-706c95b2dd15
 	github.com/rs/zerolog v1.34.0
-	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/cobra v1.10.1
+	github.com/sirupsen/logrus v1.9.4
+	github.com/spf13/cobra v1.10.2
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/swaggo/swag v1.16.6
 	github.com/tdewolff/minify v2.3.6+incompatible
@@ -39,6 +39,8 @@ require (
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
+	github.com/OffchainLabs/go-bitfield v0.0.0-20251031151322-f427d04d8506 // indirect
+	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -49,7 +51,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/dot v1.6.4 // indirect
-	github.com/ethereum/c-kzg-4844/v2 v2.1.3 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.5 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
@@ -66,7 +68,7 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/huandu/go-clone v1.7.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/itchyny/timefmt-go v0.1.6 // indirect
+	github.com/itchyny/timefmt-go v0.1.7 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/kilic/bls12-381 v0.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
@@ -108,7 +110,7 @@ require (
 	golang.org/x/mod v0.25.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/tools v0.34.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
