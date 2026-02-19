@@ -1379,6 +1379,9 @@ const docTemplate = `{
                 "result_yaml": {
                     "type": "string"
                 },
+                "run_concurrent": {
+                    "type": "boolean"
+                },
                 "runtime": {
                     "type": "integer"
                 },
@@ -1509,6 +1512,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/web_api.GetTestRunTaskResult"
                     }
+                },
+                "run_concurrent": {
+                    "type": "boolean"
                 },
                 "runtime": {
                     "type": "integer"

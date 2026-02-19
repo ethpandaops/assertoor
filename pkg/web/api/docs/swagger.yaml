@@ -172,6 +172,8 @@ definitions:
         type: string
       result_yaml:
         type: string
+      run_concurrent:
+        type: boolean
       runtime:
         type: integer
       start_time:
@@ -258,6 +260,8 @@ definitions:
         items:
           $ref: '#/definitions/web_api.GetTestRunTaskResult'
         type: array
+      run_concurrent:
+        type: boolean
       runtime:
         type: integer
       start_time:
