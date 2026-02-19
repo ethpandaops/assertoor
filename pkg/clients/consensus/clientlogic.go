@@ -9,6 +9,7 @@ import (
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/attestantio/go-eth2-client/spec/gloas"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus/rpc"
 )
@@ -137,7 +138,7 @@ func (client *Client) runClientLogic() error {
 	}
 
 	// start event stream
-	blockStream := client.rpcClient.NewBlockStream(client.clientCtx, rpc.StreamBlockEvent|rpc.StreamFinalizedEvent)
+	blockStream := client.rpcClient.NewBlockStream(client.clientCtx, rpc.StreamBlockEvent|rpc.StreamFinalizedEvent|rpc.StreamExecutionPayloadEvent)
 	defer blockStream.Close()
 
 	// process events
@@ -171,6 +172,14 @@ func (client *Client) runClientLogic() error {
 					err := client.processFinalizedEvent(finalizedEvent)
 					if err != nil {
 						client.logger.Warnf("failed processing finalized event: %v", err)
+					}
+				}
+
+			case rpc.StreamExecutionPayloadEvent:
+				if payloadEvent, ok := evt.Data.(*v1.ExecutionPayloadAvailableEvent); ok {
+					err := client.processPayloadEvent(payloadEvent)
+					if err != nil {
+						client.logger.Warnf("failed processing payload event: %v", err)
 					}
 				}
 			}
@@ -218,6 +227,36 @@ func (client *Client) processBlockEvent(evt *v1.BlockEvent) error {
 func (client *Client) processFinalizedEvent(evt *v1.FinalizedCheckpointEvent) error {
 	client.logger.Debugf("received finalization_checkpoint event: finalized %v [0x%x]", evt.Epoch, evt.Block)
 	return client.setFinalizedHead(evt.Epoch, evt.Block)
+}
+
+func (client *Client) processPayloadEvent(evt *v1.ExecutionPayloadAvailableEvent) error {
+	cachedBlock := client.pool.blockCache.GetCachedBlockByRoot(evt.BlockRoot)
+	if cachedBlock == nil {
+		client.logger.Debugf("received payload event for unknown block [0x%x]", evt.BlockRoot)
+		return nil
+	}
+
+	loaded, err := cachedBlock.EnsurePayload(func() (*gloas.SignedExecutionPayloadEnvelope, error) {
+		ctx, cancel := context.WithTimeout(client.clientCtx, 10*time.Second)
+		defer cancel()
+
+		payload, err := client.rpcClient.GetExecutionPayloadByBlockroot(ctx, evt.BlockRoot)
+		if err != nil {
+			return nil, err
+		}
+
+		return payload, nil
+	})
+	if err != nil {
+		return fmt.Errorf("could not load payload for block [0x%x]: %w", evt.BlockRoot, err)
+	}
+
+	if loaded {
+		client.logger.Infof("received execution payload for block %v [0x%x]", cachedBlock.Slot, evt.BlockRoot)
+		client.pool.blockCache.notifyPayloadReady(cachedBlock)
+	}
+
+	return nil
 }
 
 func (client *Client) pollClientHead() error {
@@ -296,6 +335,12 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 
 	if loaded {
 		client.pool.blockCache.notifyBlockReady(cachedBlock)
+
+		// For gloas+ blocks, also try to load payload (for polled/backfill blocks)
+		blockData := cachedBlock.GetBlock()
+		if blockData != nil && blockData.Version >= spec.DataVersionGloas {
+			go client.loadBlockPayload(cachedBlock)
+		}
 	}
 
 	client.headMutex.Lock()
@@ -313,6 +358,29 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 	client.blockDispatcher.Fire(cachedBlock)
 
 	return nil
+}
+
+func (client *Client) loadBlockPayload(cachedBlock *Block) {
+	loaded, err := cachedBlock.EnsurePayload(func() (*gloas.SignedExecutionPayloadEnvelope, error) {
+		ctx, cancel := context.WithTimeout(client.clientCtx, 10*time.Second)
+		defer cancel()
+
+		payload, err := client.rpcClient.GetExecutionPayloadByBlockroot(ctx, cachedBlock.Root)
+		if err != nil {
+			return nil, err
+		}
+
+		return payload, nil
+	})
+	if err != nil {
+		client.logger.Warnf("could not load payload for block %v [0x%x]: %v", cachedBlock.Slot, cachedBlock.Root, err)
+		return
+	}
+
+	if loaded {
+		client.logger.Debugf("loaded execution payload for block %v [0x%x]", cachedBlock.Slot, cachedBlock.Root)
+		client.pool.blockCache.notifyPayloadReady(cachedBlock)
+	}
 }
 
 func (client *Client) setFinalizedHead(epoch phase0.Epoch, root phase0.Root) error {

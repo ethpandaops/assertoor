@@ -16,9 +16,10 @@ import (
 )
 
 const (
-	StreamBlockEvent     uint16 = 0x01
-	StreamHeadEvent      uint16 = 0x02
-	StreamFinalizedEvent uint16 = 0x04
+	StreamBlockEvent            uint16 = 0x01
+	StreamHeadEvent             uint16 = 0x02
+	StreamFinalizedEvent        uint16 = 0x04
+	StreamExecutionPayloadEvent uint16 = 0x08
 )
 
 type BeaconStreamEvent struct {
@@ -63,7 +64,16 @@ func (bs *BeaconStream) startStream() {
 		bs.running = false
 	}()
 
-	stream := bs.subscribeStream(bs.client.endpoint, bs.events)
+	// Start advanced stream (execution_payload_available) in a separate goroutine
+	// if requested. This runs independently since CL clients may not support it yet.
+	if bs.events&StreamExecutionPayloadEvent > 0 {
+		go bs.runAdvancedStream()
+	}
+
+	// Basic stream: block, head, finalized_checkpoint
+	basicEvents := bs.events &^ StreamExecutionPayloadEvent
+
+	stream := bs.subscribeStream(bs.client.endpoint, basicEvents)
 	if stream != nil {
 		defer stream.Close()
 
@@ -90,6 +100,43 @@ func (bs *BeaconStream) startStream() {
 				case <-bs.ctx.Done():
 				}
 			}
+		}
+	}
+}
+
+func (bs *BeaconStream) runAdvancedStream() {
+	for {
+		stream := bs.subscribeStream(bs.client.endpoint, StreamExecutionPayloadEvent)
+		if stream == nil {
+			return
+		}
+
+		bs.runAdvancedStreamEvents(stream)
+		stream.Close()
+
+		select {
+		case <-bs.ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+		}
+	}
+}
+
+func (bs *BeaconStream) runAdvancedStreamEvents(stream *eventstream.Stream) {
+	for {
+		select {
+		case <-bs.ctx.Done():
+			return
+		case evt := <-stream.Events:
+			if evt.Event() == "execution_payload_available" {
+				bs.processExecutionPayloadAvailableEvent(evt)
+			}
+		case <-stream.Ready:
+			// advanced stream ready, nothing to signal
+		case err := <-stream.Errors:
+			logger.WithField("client", bs.client.name).Debugf("advanced beacon stream error: %v", err)
+
+			return
 		}
 	}
 }
@@ -125,6 +172,16 @@ func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventst
 		}
 
 		fmt.Fprintf(&topics, "finalized_checkpoint")
+
+		topicsCount++
+	}
+
+	if events&StreamExecutionPayloadEvent > 0 {
+		if topicsCount > 0 {
+			fmt.Fprintf(&topics, ",")
+		}
+
+		fmt.Fprintf(&topics, "execution_payload_available")
 
 		topicsCount++
 	}
@@ -203,6 +260,21 @@ func (bs *BeaconStream) processFinalizedEvent(evt eventsource.Event) {
 
 	bs.EventChan <- &BeaconStreamEvent{
 		Event: StreamFinalizedEvent,
+		Data:  &parsed,
+	}
+}
+
+func (bs *BeaconStream) processExecutionPayloadAvailableEvent(evt eventsource.Event) {
+	var parsed v1.ExecutionPayloadAvailableEvent
+
+	err := json.Unmarshal([]byte(evt.Data()), &parsed)
+	if err != nil {
+		logger.WithField("client", bs.client.name).Warnf("beacon block stream failed to decode execution_payload_available event: %v", err)
+		return
+	}
+
+	bs.EventChan <- &BeaconStreamEvent{
+		Event: StreamExecutionPayloadEvent,
 		Data:  &parsed,
 	}
 }

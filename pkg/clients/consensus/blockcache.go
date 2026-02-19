@@ -45,6 +45,7 @@ type BlockCache struct {
 	maxSlotIdx   int64
 
 	blockDispatcher          Dispatcher[*Block]
+	payloadDispatcher        Dispatcher[*Block]
 	checkpointDispatcher     Dispatcher[*FinalizedCheckpoint]
 	wallclockEpochDispatcher Dispatcher[*ethwallclock.Epoch]
 	wallclockSlotDispatcher  Dispatcher[*ethwallclock.Slot]
@@ -97,6 +98,14 @@ func (cache *BlockCache) SubscribeWallclockSlotEvent(capacity int) *Subscription
 
 func (cache *BlockCache) notifyBlockReady(block *Block) {
 	cache.blockDispatcher.Fire(block)
+}
+
+func (cache *BlockCache) SubscribePayloadEvent(capacity int) *Subscription[*Block] {
+	return cache.payloadDispatcher.Subscribe(capacity)
+}
+
+func (cache *BlockCache) notifyPayloadReady(block *Block) {
+	cache.payloadDispatcher.Fire(block)
 }
 
 func (cache *BlockCache) SetMinFollowDistance(followDistance uint64) {
@@ -266,11 +275,12 @@ func (cache *BlockCache) AddBlock(root phase0.Root, slot phase0.Slot) (*Block, b
 	}
 
 	cacheBlock := &Block{
-		Root:       root,
-		Slot:       slot,
-		seenMap:    make(map[uint16]*Client),
-		headerChan: make(chan bool),
-		blockChan:  make(chan bool),
+		Root:        root,
+		Slot:        slot,
+		seenMap:     make(map[uint16]*Client),
+		headerChan:  make(chan bool),
+		blockChan:   make(chan bool),
+		payloadChan: make(chan bool),
 	}
 	cache.blockRootMap[root] = cacheBlock
 

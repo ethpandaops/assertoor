@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/attestantio/go-eth2-client/spec/capella"
+	"github.com/attestantio/go-eth2-client/spec/electra"
+	"github.com/attestantio/go-eth2-client/spec/gloas"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
@@ -214,12 +217,47 @@ func (t *Task) setMatchingBlocksOutput(blocks []*consensus.Block) {
 	t.ctx.Outputs.SetVar("matchingBlockBodies", blockBodies)
 }
 
+// needsPayload returns true if any payload-dependent filter is configured.
+func (t *Task) needsPayload() bool {
+	return t.config.ExtraDataPattern != "" ||
+		t.config.MinTransactionCount > 0 ||
+		t.config.MinWithdrawalCount > 0 ||
+		len(t.config.ExpectWithdrawals) > 0 ||
+		t.config.MinDepositRequestCount > 0 ||
+		len(t.config.ExpectDepositRequests) > 0 ||
+		t.config.MinWithdrawalRequestCount > 0 ||
+		len(t.config.ExpectWithdrawalRequests) > 0 ||
+		t.config.MinConsolidationRequestCount > 0 ||
+		len(t.config.ExpectConsolidationRequests) > 0
+}
+
+// getPayloadTimeout returns the configured payload timeout or the default of 12 seconds.
+func (t *Task) getPayloadTimeout() time.Duration {
+	if t.config.PayloadTimeout > 0 {
+		return time.Duration(t.config.PayloadTimeout) * time.Second
+	}
+
+	return 12 * time.Second
+}
+
 //nolint:gocyclo // ignore
 func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 	blockData := block.AwaitBlock(ctx, 2*time.Second)
 	if blockData == nil {
 		t.logger.Warnf("could not fetch block data for block %v [0x%x]", block.Slot, block.Root)
 		return false
+	}
+
+	// For gloas+ blocks, load payload if any payload-dependent checks are configured
+	var payload *gloas.SignedExecutionPayloadEnvelope
+
+	isGloas := blockData.Version >= spec.DataVersionGloas
+	if isGloas && t.needsPayload() {
+		payload = block.AwaitPayload(ctx, t.getPayloadTimeout())
+		if payload == nil {
+			t.logger.Warnf("could not fetch payload for gloas block %v [0x%x]", block.Slot, block.Root)
+			return false
+		}
 	}
 
 	// check validator name
@@ -233,7 +271,7 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 	}
 
 	// check extra data
-	if t.config.ExtraDataPattern != "" && !t.checkBlockExtraData(block, blockData) {
+	if t.config.ExtraDataPattern != "" && !t.checkBlockExtraData(block, blockData, payload) {
 		return false
 	}
 
@@ -273,12 +311,12 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 	}
 
 	// check withdrawal count
-	if (t.config.MinWithdrawalCount > 0 || len(t.config.ExpectWithdrawals) > 0) && !t.checkBlockWithdrawals(block, blockData) {
+	if (t.config.MinWithdrawalCount > 0 || len(t.config.ExpectWithdrawals) > 0) && !t.checkBlockWithdrawals(block, blockData, payload) {
 		return false
 	}
 
 	// check transaction count
-	if t.config.MinTransactionCount > 0 && !t.checkBlockTransactions(block, blockData) {
+	if t.config.MinTransactionCount > 0 && !t.checkBlockTransactions(block, blockData, payload) {
 		return false
 	}
 
@@ -288,17 +326,17 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 	}
 
 	// check deposit request count
-	if (t.config.MinDepositRequestCount > 0 || len(t.config.ExpectDepositRequests) > 0) && !t.checkBlockDepositRequests(block, blockData) {
+	if (t.config.MinDepositRequestCount > 0 || len(t.config.ExpectDepositRequests) > 0) && !t.checkBlockDepositRequests(block, blockData, payload) {
 		return false
 	}
 
 	// check withdrawal request count
-	if (t.config.MinWithdrawalRequestCount > 0 || len(t.config.ExpectWithdrawalRequests) > 0) && !t.checkBlockWithdrawalRequests(block, blockData) {
+	if (t.config.MinWithdrawalRequestCount > 0 || len(t.config.ExpectWithdrawalRequests) > 0) && !t.checkBlockWithdrawalRequests(block, blockData, payload) {
 		return false
 	}
 
 	// check consolidation request count
-	if (t.config.MinConsolidationRequestCount > 0 || len(t.config.ExpectConsolidationRequests) > 0) && !t.checkBlockConsolidationRequests(block, blockData) {
+	if (t.config.MinConsolidationRequestCount > 0 || len(t.config.ExpectConsolidationRequests) > 0) && !t.checkBlockConsolidationRequests(block, blockData, payload) {
 		return false
 	}
 
@@ -349,8 +387,17 @@ func (t *Task) checkBlockValidatorName(block *consensus.Block, blockData *spec.V
 	return true
 }
 
-func (t *Task) checkBlockExtraData(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	extraData, err := consensus.GetExecutionExtraData(blockData)
+func (t *Task) checkBlockExtraData(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
+	var extraData []byte
+
+	var err error
+
+	if blockData.Version >= spec.DataVersionGloas {
+		extraData, err = consensus.GetPayloadExtraData(payload)
+	} else {
+		extraData, err = consensus.GetExecutionExtraData(blockData)
+	}
+
 	if err != nil {
 		t.logger.Warnf("could not get extra data for block %v [0x%x]: %v", block.Slot, block.Root, err)
 		return false
@@ -636,11 +683,24 @@ func (t *Task) checkBlockBlsChanges(block *consensus.Block, blockData *spec.Vers
 	return true
 }
 
-func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	withdrawals, err := blockData.Withdrawals()
-	if err != nil {
-		t.logger.Warnf("could not get withdrawals for block %v [0x%x]: %v", block.Slot, block.Root, err)
-		return false
+func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
+	var withdrawals []*capella.Withdrawal
+
+	if blockData.Version >= spec.DataVersionGloas {
+		if payload == nil || payload.Message == nil || payload.Message.Payload == nil {
+			t.logger.Warnf("could not get withdrawals for gloas block %v [0x%x]: no payload", block.Slot, block.Root)
+			return false
+		}
+
+		withdrawals = payload.Message.Payload.Withdrawals
+	} else {
+		var err error
+
+		withdrawals, err = blockData.Withdrawals()
+		if err != nil {
+			t.logger.Warnf("could not get withdrawals for block %v [0x%x]: %v", block.Slot, block.Root, err)
+			return false
+		}
 	}
 
 	if len(withdrawals) < t.config.MinWithdrawalCount {
@@ -694,15 +754,28 @@ func (t *Task) checkBlockWithdrawals(block *consensus.Block, blockData *spec.Ver
 	return true
 }
 
-func (t *Task) checkBlockTransactions(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	transactions, err := blockData.ExecutionTransactions()
-	if err != nil {
-		t.logger.Warnf("could not get transactions for block %v [0x%x]: %v", block.Slot, block.Root, err)
-		return false
+func (t *Task) checkBlockTransactions(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
+	var txCount int
+
+	if blockData.Version >= spec.DataVersionGloas {
+		if payload == nil || payload.Message == nil || payload.Message.Payload == nil {
+			t.logger.Warnf("could not get transactions for gloas block %v [0x%x]: no payload", block.Slot, block.Root)
+			return false
+		}
+
+		txCount = len(payload.Message.Payload.Transactions)
+	} else {
+		transactions, err := blockData.ExecutionTransactions()
+		if err != nil {
+			t.logger.Warnf("could not get transactions for block %v [0x%x]: %v", block.Slot, block.Root, err)
+			return false
+		}
+
+		txCount = len(transactions)
 	}
 
-	if len(transactions) < t.config.MinTransactionCount {
-		t.logger.Infof("check failed for block %v [0x%x]: not enough transactions (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinTransactionCount, len(transactions))
+	if txCount < t.config.MinTransactionCount {
+		t.logger.Infof("check failed for block %v [0x%x]: not enough transactions (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinTransactionCount, txCount)
 		return false
 	}
 
@@ -724,11 +797,24 @@ func (t *Task) checkBlockBlobs(block *consensus.Block, blockData *spec.Versioned
 	return true
 }
 
-func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	executionRequests, err := blockData.ExecutionRequests()
-	if err != nil {
-		t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
-		return false
+func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
+	var executionRequests *electra.ExecutionRequests
+
+	if blockData.Version >= spec.DataVersionGloas {
+		if payload == nil || payload.Message == nil || payload.Message.ExecutionRequests == nil {
+			t.logger.Warnf("could not get execution requests for gloas block %v [0x%x]: no payload", block.Slot, block.Root)
+			return false
+		}
+
+		executionRequests = payload.Message.ExecutionRequests
+	} else {
+		var err error
+
+		executionRequests, err = blockData.ExecutionRequests()
+		if err != nil {
+			t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
+			return false
+		}
 	}
 
 	depositRequests := executionRequests.Deposits
@@ -774,11 +860,24 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 	return true
 }
 
-func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	executionRequests, err := blockData.ExecutionRequests()
-	if err != nil {
-		t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
-		return false
+func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
+	var executionRequests *electra.ExecutionRequests
+
+	if blockData.Version >= spec.DataVersionGloas {
+		if payload == nil || payload.Message == nil || payload.Message.ExecutionRequests == nil {
+			t.logger.Warnf("could not get execution requests for gloas block %v [0x%x]: no payload", block.Slot, block.Root)
+			return false
+		}
+
+		executionRequests = payload.Message.ExecutionRequests
+	} else {
+		var err error
+
+		executionRequests, err = blockData.ExecutionRequests()
+		if err != nil {
+			t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
+			return false
+		}
 	}
 
 	withdrawalRequests := executionRequests.Withdrawals
@@ -828,11 +927,24 @@ func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *s
 	return true
 }
 
-func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock) bool {
-	executionRequests, err := blockData.ExecutionRequests()
-	if err != nil {
-		t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
-		return false
+func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
+	var executionRequests *electra.ExecutionRequests
+
+	if blockData.Version >= spec.DataVersionGloas {
+		if payload == nil || payload.Message == nil || payload.Message.ExecutionRequests == nil {
+			t.logger.Warnf("could not get execution requests for gloas block %v [0x%x]: no payload", block.Slot, block.Root)
+			return false
+		}
+
+		executionRequests = payload.Message.ExecutionRequests
+	} else {
+		var err error
+
+		executionRequests, err = blockData.ExecutionRequests()
+		if err != nil {
+			t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
+			return false
+		}
 	}
 
 	consolidationRequests := executionRequests.Consolidations
