@@ -1,0 +1,1189 @@
+definitions:
+  helper.RawMessage:
+    type: object
+  tasks.TaskDescriptorAPI:
+    properties:
+      aliases:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      configSchema:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      name:
+        type: string
+      outputs:
+        items:
+          $ref: '#/definitions/types.TaskOutputDefinition'
+        type: array
+    type: object
+  types.TaskOutputDefinition:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      type:
+        type: string
+    type: object
+  types.TestSchedule:
+    properties:
+      cron:
+        items:
+          type: string
+        type: array
+      skipQueue:
+        type: boolean
+      startup:
+        type: boolean
+    type: object
+  types.TestStatus:
+    enum:
+    - pending
+    - running
+    - success
+    - failure
+    - skipped
+    - aborted
+    type: string
+    x-enum-varnames:
+    - TestStatusPending
+    - TestStatusRunning
+    - TestStatusSuccess
+    - TestStatusFailure
+    - TestStatusSkipped
+    - TestStatusAborted
+  web_api.ClientResponse:
+    properties:
+      cl_error:
+        type: string
+      cl_head_root:
+        type: string
+      cl_head_slot:
+        type: integer
+      cl_ready:
+        type: boolean
+      cl_refresh:
+        type: string
+      cl_status:
+        type: string
+      cl_type:
+        type: integer
+      cl_version:
+        type: string
+      el_error:
+        type: string
+      el_head_hash:
+        type: string
+      el_head_number:
+        type: integer
+      el_ready:
+        type: boolean
+      el_refresh:
+        type: string
+      el_status:
+        type: string
+      el_type:
+        type: integer
+      el_version:
+        type: string
+      index:
+        type: integer
+      name:
+        type: string
+    type: object
+  web_api.GetClientsResponse:
+    properties:
+      client_count:
+        type: integer
+      clients:
+        items:
+          $ref: '#/definitions/web_api.ClientResponse'
+        type: array
+    type: object
+  web_api.GetGlobalVariablesResponse:
+    properties:
+      names:
+        items:
+          type: string
+        type: array
+    type: object
+  web_api.GetLogsResponse:
+    properties:
+      log:
+        items:
+          $ref: '#/definitions/web_api.LogEntry'
+        type: array
+    type: object
+  web_api.GetTestResponse:
+    properties:
+      basePath:
+        type: string
+      config:
+        additionalProperties: {}
+        type: object
+      configVars:
+        additionalProperties:
+          type: string
+        type: object
+      id:
+        type: string
+      name:
+        type: string
+      schedule:
+        $ref: '#/definitions/types.TestSchedule'
+      source:
+        type: string
+      timeout:
+        type: integer
+      vars:
+        additionalProperties: {}
+        description: Config with global vars merged in
+        type: object
+    type: object
+  web_api.GetTestRunDetailedTask:
+    properties:
+      completed:
+        type: boolean
+      config_yaml:
+        type: string
+      index:
+        type: integer
+      log:
+        items:
+          $ref: '#/definitions/web_api.GetTestRunDetailedTaskLog'
+        type: array
+      name:
+        type: string
+      parent_index:
+        type: integer
+      progress:
+        type: number
+      progress_message:
+        type: string
+      result:
+        type: string
+      result_error:
+        type: string
+      result_yaml:
+        type: string
+      runtime:
+        type: integer
+      start_time:
+        type: integer
+      started:
+        type: boolean
+      status:
+        type: string
+      stop_time:
+        type: integer
+      timeout:
+        type: integer
+      title:
+        type: string
+    type: object
+  web_api.GetTestRunDetailedTaskLog:
+    properties:
+      data:
+        additionalProperties:
+          type: string
+        type: object
+      datalen:
+        type: integer
+      level:
+        type: string
+      msg:
+        type: string
+      time:
+        type: string
+    type: object
+  web_api.GetTestRunDetailsResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      start_time:
+        type: integer
+      status:
+        $ref: '#/definitions/types.TestStatus'
+      stop_time:
+        type: integer
+      tasks:
+        items:
+          $ref: '#/definitions/web_api.GetTestRunDetailedTask'
+        type: array
+      test_id:
+        type: string
+    type: object
+  web_api.GetTestRunResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      start_time:
+        type: integer
+      status:
+        $ref: '#/definitions/types.TestStatus'
+      stop_time:
+        type: integer
+      tasks:
+        items:
+          $ref: '#/definitions/web_api.GetTestRunTask'
+        type: array
+      test_id:
+        type: string
+    type: object
+  web_api.GetTestRunTask:
+    properties:
+      completed:
+        type: boolean
+      index:
+        type: integer
+      name:
+        type: string
+      parent_index:
+        type: integer
+      result:
+        type: string
+      result_error:
+        type: string
+      result_files:
+        items:
+          $ref: '#/definitions/web_api.GetTestRunTaskResult'
+        type: array
+      runtime:
+        type: integer
+      start_time:
+        type: integer
+      started:
+        type: boolean
+      status:
+        type: string
+      stop_time:
+        type: integer
+      timeout:
+        type: integer
+      title:
+        type: string
+    type: object
+  web_api.GetTestRunTaskResult:
+    properties:
+      index:
+        type: integer
+      name:
+        type: string
+      size:
+        type: integer
+      type:
+        type: string
+      url:
+        type: string
+    type: object
+  web_api.GetTestRunsResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      start_time:
+        type: integer
+      status:
+        $ref: '#/definitions/types.TestStatus'
+      stop_time:
+        type: integer
+      test_id:
+        type: string
+    type: object
+  web_api.GetTestYamlResponse:
+    properties:
+      source:
+        type: string
+      yaml:
+        type: string
+    type: object
+  web_api.GetTestsResponse:
+    properties:
+      basePath:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      source:
+        type: string
+    type: object
+  web_api.LogEntry:
+    properties:
+      data:
+        additionalProperties:
+          type: string
+        type: object
+      datalen:
+        type: integer
+      level:
+        type: integer
+      msg:
+        type: string
+      tidx:
+        type: integer
+      time:
+        type: string
+    type: object
+  web_api.PostTestRunCancelRequest:
+    properties:
+      skip_cleanup:
+        type: boolean
+      test_id:
+        type: string
+    type: object
+  web_api.PostTestRunCancelResponse:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      status:
+        type: string
+      test_id:
+        type: string
+    type: object
+  web_api.PostTestRunsDeleteRequest:
+    properties:
+      test_runs:
+        items:
+          type: integer
+        type: array
+    type: object
+  web_api.PostTestRunsDeleteResponse:
+    properties:
+      deleted:
+        items:
+          type: integer
+        type: array
+      errors:
+        items:
+          type: string
+        type: array
+    type: object
+  web_api.PostTestRunsScheduleRequest:
+    properties:
+      allow_duplicate:
+        type: boolean
+      config:
+        additionalProperties: {}
+        type: object
+      skip_queue:
+        type: boolean
+      test_id:
+        type: string
+    type: object
+  web_api.PostTestRunsScheduleResponse:
+    properties:
+      config:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+      run_id:
+        type: integer
+      test_id:
+        type: string
+    type: object
+  web_api.PostTestsDeleteRequest:
+    properties:
+      tests:
+        items:
+          type: string
+        type: array
+    type: object
+  web_api.PostTestsDeleteResponse:
+    properties:
+      deleted:
+        items:
+          type: string
+        type: array
+      errors:
+        items:
+          type: string
+        type: array
+    type: object
+  web_api.PostTestsRegisterExternalRequest:
+    properties:
+      config:
+        additionalProperties: true
+        type: object
+      configVars:
+        additionalProperties:
+          type: string
+        type: object
+      file:
+        type: string
+      name:
+        type: string
+      schedule:
+        $ref: '#/definitions/types.TestSchedule'
+      timeout:
+        type: integer
+    type: object
+  web_api.PostTestsRegisterExternalResponse:
+    properties:
+      config:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+      test_id:
+        type: string
+    type: object
+  web_api.PostTestsRegisterRequest:
+    properties:
+      cleanupTasks:
+        items:
+          $ref: '#/definitions/helper.RawMessage'
+        type: array
+      config:
+        additionalProperties: true
+        type: object
+      configVars:
+        additionalProperties:
+          type: string
+        type: object
+      id:
+        type: string
+      name:
+        type: string
+      schedule:
+        $ref: '#/definitions/types.TestSchedule'
+      tasks:
+        items:
+          $ref: '#/definitions/helper.RawMessage'
+        type: array
+      timeout:
+        type: string
+    type: object
+  web_api.PostTestsRegisterResponse:
+    properties:
+      config:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+      test_id:
+        type: string
+    type: object
+  web_api.Response:
+    properties:
+      data: {}
+      status:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: API for querying information about Assertoor tests
+  title: Assertoor API Documentation
+  version: "1.0"
+paths:
+  /api/v1/clients:
+    get:
+      description: Returns the list of configured consensus and execution layer clients
+        with their current status.
+      operationId: getClients
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetClientsResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get list of configured clients
+      tags:
+      - Client
+  /api/v1/global_variables:
+    get:
+      description: Returns the names of all configured global variables. Values are
+        not included as they may contain sensitive data.
+      operationId: getGlobalVariables
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetGlobalVariablesResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get global variable names
+      tags:
+      - Config
+  /api/v1/logs/{since}:
+    get:
+      description: Returns application-level logs from the coordinator. Protected
+        endpoint - requires authentication unless auth is disabled.
+      parameters:
+      - description: Log index to start from (0 for all)
+        in: path
+        name: since
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetLogsResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get application logs
+      tags:
+      - Logs
+  /api/v1/task_descriptor/{name}:
+    get:
+      description: Returns a single task descriptor by name with its JSON schema
+      parameters:
+      - description: Task name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/tasks.TaskDescriptorAPI'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get a specific task descriptor
+      tags:
+      - Task
+  /api/v1/task_descriptors:
+    get:
+      description: Returns a list of all available task descriptors with their JSON
+        schemas
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/tasks.TaskDescriptorAPI'
+                  type: array
+              type: object
+      summary: Get all task descriptors
+      tags:
+      - Task
+  /api/v1/test/{testId}:
+    get:
+      description: Returns the test definition with given ID.
+      operationId: getTest
+      parameters:
+      - description: ID of the test definition to get details for
+        in: path
+        name: testId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetTestResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get test definition by test ID
+      tags:
+      - Test
+  /api/v1/test/{testId}/yaml:
+    get:
+      description: Returns the full YAML source for a test definition. For API-registered
+        tests, returns the stored YAML. For external tests referenced by file/URL,
+        loads and returns the content from the original source. Requires authentication
+        as YAML may contain sensitive configuration.
+      operationId: getTestYaml
+      parameters:
+      - description: ID of the test definition to get YAML for
+        in: path
+        name: testId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetTestYamlResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get test YAML source by test ID
+      tags:
+      - Test
+  /api/v1/test_run/{runId}:
+    get:
+      description: Returns the run details with given ID. Includes a summary and a
+        list of task with limited details
+      operationId: getTestRun
+      parameters:
+      - description: ID of the test run to get details for
+        in: path
+        name: runId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetTestRunResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get test run by run ID
+      tags:
+      - TestRun
+  /api/v1/test_run/{runId}/cancel:
+    post:
+      description: Returns the test/run id & status of the cancelled test.
+      operationId: postTestRunCancel
+      parameters:
+      - description: ID of the test run to cancel
+        in: path
+        name: runId
+        required: true
+        type: string
+      - description: Test cancellation options
+        in: body
+        name: cancelOptions
+        required: true
+        schema:
+          $ref: '#/definitions/web_api.PostTestRunCancelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.PostTestRunCancelResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Cancel test run by test ID
+      tags:
+      - TestRun
+  /api/v1/test_run/{runId}/details:
+    get:
+      description: Returns the run details with given ID. Includes a summary and a
+        list of task with all details (incl. logs & task configurations)
+      operationId: getTestRunDetails
+      parameters:
+      - description: ID of the test run to get details for
+        in: path
+        name: runId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetTestRunDetailsResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get detailed test run by run ID
+      tags:
+      - TestRun
+  /api/v1/test_run/{runId}/status:
+    get:
+      description: Returns the run status with given ID.
+      operationId: getTestRunStatus
+      parameters:
+      - description: ID of the test run to get the status for
+        in: path
+        name: runId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get test run status by run ID
+      tags:
+      - TestRun
+  /api/v1/test_run/{runId}/task/{taskIndex}/details:
+    get:
+      description: Returns the task details with given run ID and task index. Includes
+        full log, configuration and result variables (unless security trimmed).
+      operationId: getTestRunTaskDetails
+      parameters:
+      - description: ID of the test run
+        in: path
+        name: runId
+        required: true
+        type: string
+      - description: Index of the task to get details for
+        in: path
+        name: taskIndex
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetTestRunDetailedTask'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get detailed task of a given test run
+      tags:
+      - TestRun
+  /api/v1/test_run/{runId}/task/{taskIndex}/result/{resultType}/{fileId}:
+    get:
+      description: Returns a specific result file from a task. Requires authentication
+        as results may contain sensitive data.
+      operationId: getTaskResult
+      parameters:
+      - description: ID of the test run
+        in: path
+        name: runId
+        required: true
+        type: string
+      - description: ID of the task
+        in: path
+        name: taskId
+        required: true
+        type: string
+      - description: Type of file to return (summary, result, ...)
+        in: path
+        name: resultType
+        required: true
+        type: string
+      - description: Index or name of the result file
+        in: path
+        name: fileId
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Success
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get task result file
+      tags:
+      - TestRun
+  /api/v1/test_runs:
+    get:
+      description: Returns a list of all test runs.
+      operationId: getTestRuns
+      parameters:
+      - description: Return test runs for this test ID only
+        in: query
+        name: test_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/web_api.GetTestRunsResponse'
+                  type: array
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get list of test runs
+      tags:
+      - TestRun
+  /api/v1/test_runs/delete:
+    post:
+      consumes:
+      - application/json
+      - application/yaml
+      description: Deletes test runs
+      operationId: postTestRunsDelete
+      parameters:
+      - description: Test configuration (json or yaml)
+        in: body
+        name: testConfig
+        required: true
+        schema:
+          $ref: '#/definitions/web_api.PostTestRunsDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.PostTestRunsDeleteResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Delete test runs
+      tags:
+      - TestRun
+  /api/v1/test_runs/schedule:
+    post:
+      description: Returns the test & run id of the scheduled test execution.
+      operationId: postTestRunsSchedule
+      parameters:
+      - description: Rest run options
+        in: body
+        name: runOptions
+        required: true
+        schema:
+          $ref: '#/definitions/web_api.PostTestRunsScheduleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.PostTestRunsScheduleResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Schedule new test run by test ID
+      tags:
+      - TestRun
+  /api/v1/tests:
+    get:
+      description: Returns the list of test definitions. These test definitions can
+        be used to create new test runs and are supplied via the assertoor configuration.
+      operationId: getTests
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/web_api.GetTestsResponse'
+                  type: array
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get list of test definitions
+      tags:
+      - Test
+  /api/v1/tests/delete:
+    post:
+      consumes:
+      - application/json
+      - application/yaml
+      description: Deletes tests
+      operationId: postTestsDelete
+      parameters:
+      - description: Test configuration (json or yaml)
+        in: body
+        name: testConfig
+        required: true
+        schema:
+          $ref: '#/definitions/web_api.PostTestsDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.PostTestsDeleteResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Delete tests
+      tags:
+      - Test
+  /api/v1/tests/register:
+    post:
+      consumes:
+      - application/json
+      - application/yaml
+      description: Returns the test id and name of the added test.
+      operationId: postTestsRegister
+      parameters:
+      - description: Test configuration (json or yaml)
+        in: body
+        name: testConfig
+        required: true
+        schema:
+          $ref: '#/definitions/web_api.PostTestsRegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.PostTestsRegisterResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Register new test via yaml configuration
+      tags:
+      - Test
+  /api/v1/tests/register_external:
+    post:
+      consumes:
+      - application/json
+      description: Returns the test id and name of the added test.
+      operationId: postTestsRegisterExternal
+      parameters:
+      - description: Test configuration (json or yaml)
+        in: body
+        name: externalTestConfig
+        required: true
+        schema:
+          $ref: '#/definitions/web_api.PostTestsRegisterExternalRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.PostTestsRegisterExternalResponse'
+              type: object
+        "400":
+          description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Register new test via external test configuration
+      tags:
+      - Test
+swagger: "2.0"
+tags:
+- description: All endpoints related to test definitions
+  name: Test
+- description: All endpoints related to test runs
+  name: TestRun
