@@ -7,20 +7,24 @@ import (
 	"time"
 
 	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/attestantio/go-eth2-client/spec/gloas"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 )
 
 type Block struct {
-	Root        phase0.Root
-	Slot        phase0.Slot
-	headerMutex sync.Mutex
-	headerChan  chan bool
-	header      *phase0.SignedBeaconBlockHeader
-	blockMutex  sync.Mutex
-	blockChan   chan bool
-	block       *spec.VersionedSignedBeaconBlock
-	seenMutex   sync.RWMutex
-	seenMap     map[uint16]*Client
+	Root         phase0.Root
+	Slot         phase0.Slot
+	headerMutex  sync.Mutex
+	headerChan   chan bool
+	header       *phase0.SignedBeaconBlockHeader
+	blockMutex   sync.Mutex
+	blockChan    chan bool
+	block        *spec.VersionedSignedBeaconBlock
+	payloadMutex sync.Mutex
+	payloadChan  chan bool
+	payload      *gloas.SignedExecutionPayloadEnvelope
+	seenMutex    sync.RWMutex
+	seenMap      map[uint16]*Client
 }
 
 func (block *Block) GetSeenBy() []*Client {
@@ -137,6 +141,50 @@ func (block *Block) EnsureBlock(loadBlock func() (*spec.VersionedSignedBeaconBlo
 
 	block.block = blockBody
 	close(block.blockChan)
+
+	return true, nil
+}
+
+// GetPayload returns the execution payload envelope if available.
+func (block *Block) GetPayload() *gloas.SignedExecutionPayloadEnvelope {
+	return block.payload
+}
+
+// AwaitPayload waits for the execution payload envelope to become available.
+func (block *Block) AwaitPayload(ctx context.Context, timeout time.Duration) *gloas.SignedExecutionPayloadEnvelope {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	select {
+	case <-block.payloadChan:
+	case <-time.After(timeout):
+	case <-ctx.Done():
+	}
+
+	return block.payload
+}
+
+// EnsurePayload loads and sets the execution payload envelope if not already set.
+func (block *Block) EnsurePayload(loadPayload func() (*gloas.SignedExecutionPayloadEnvelope, error)) (bool, error) {
+	if block.payload != nil {
+		return false, nil
+	}
+
+	block.payloadMutex.Lock()
+	defer block.payloadMutex.Unlock()
+
+	if block.payload != nil {
+		return false, nil
+	}
+
+	payload, err := loadPayload()
+	if err != nil {
+		return false, err
+	}
+
+	block.payload = payload
+	close(block.payloadChan)
 
 	return true, nil
 }
