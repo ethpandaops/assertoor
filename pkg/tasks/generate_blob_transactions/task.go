@@ -219,6 +219,48 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
+// isFuluActive checks whether the Fulu fork is active by comparing the
+// current wallclock epoch against FULU_FORK_EPOCH from the consensus specs.
+func (t *Task) isFuluActive() bool {
+	blockCache := t.ctx.Scheduler.GetServices().ClientPool().
+		GetConsensusPool().GetBlockCache()
+
+	specValues := blockCache.GetSpecValues()
+	if specValues == nil {
+		return false
+	}
+
+	fuluEpochVal, ok := specValues["FULU_FORK_EPOCH"]
+	if !ok {
+		return false
+	}
+
+	var fuluEpoch uint64
+
+	switch v := fuluEpochVal.(type) {
+	case uint64:
+		fuluEpoch = v
+	case string:
+		if _, err := fmt.Sscanf(v, "%d", &fuluEpoch); err != nil {
+			return false
+		}
+	default:
+		return false
+	}
+
+	wallclock := blockCache.GetWallclock()
+	if wallclock == nil {
+		return false
+	}
+
+	_, currentEpoch, err := wallclock.Now()
+	if err != nil {
+		return false
+	}
+
+	return currentEpoch.Number() >= fuluEpoch
+}
+
 func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, completeFn spamoor.TxCompleteFn) error {
 	txWallet := t.wallet
 	if t.wallet == nil {
@@ -307,6 +349,13 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		}
 	}
 
+	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
+	spamoorClients := make([]*spamoor.Client, len(clients))
+
+	for i, c := range clients {
+		spamoorClients[i] = walletMgr.GetClient(c)
+	}
+
 	blobTx, err := txbuilder.BuildBlobTx(&txbuilder.TxMetadata{
 		GasFeeCap:  uint256.MustFromBig(t.config.FeeCap),
 		GasTipCap:  uint256.MustFromBig(t.config.TipCap),
@@ -325,11 +374,13 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		return fmt.Errorf("cannot build blob transaction: %w", err)
 	}
 
-	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
-	client := walletMgr.GetClient(clients[transactionIdx%uint64(len(clients))])
+	// Check if Fulu is active to determine blob sidecar version.
+	// After Fulu, blob sidecars must use v1 format (cell proofs).
+	useBlobV1 := t.isFuluActive()
 
-	err = walletMgr.GetTxPool().SendTransaction(ctx, txWallet, tx, &spamoor.SendTransactionOptions{
-		Client:      client,
+	sendOpts := &spamoor.SendTransactionOptions{
+		Client:      spamoorClients[transactionIdx%uint64(len(spamoorClients))],
+		ClientList:  spamoorClients,
 		Rebroadcast: true,
 		OnComplete:  completeFn,
 		LogFn: func(client *spamoor.Client, retry int, rebroadcast int, err error) {
@@ -351,7 +402,25 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 
 			logEntry.Infof("submitted blob transaction %v (nonce: %v, attempt: %v)", transactionIdx, tx.Nonce(), retry)
 		},
-	})
+	}
+
+	if useBlobV1 {
+		convertedToV1 := false
+
+		sendOpts.OnEncode = func(tx *ethtypes.Transaction) ([]byte, error) {
+			if !convertedToV1 {
+				if convErr := tx.BlobTxSidecar().ToV1(); convErr != nil {
+					return nil, fmt.Errorf("cannot convert blob sidecar to v1: %w", convErr)
+				}
+
+				convertedToV1 = true
+			}
+
+			return nil, nil
+		}
+	}
+
+	err = walletMgr.GetTxPool().SendTransaction(ctx, txWallet, tx, sendOpts)
 	if err != nil {
 		txWallet.MarkSkippedNonce(tx.Nonce())
 		return err

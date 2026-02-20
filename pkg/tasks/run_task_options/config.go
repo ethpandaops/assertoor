@@ -17,6 +17,7 @@ type Config struct {
 	// Result transformation
 	InvertResult  bool `yaml:"invertResult" json:"invertResult" desc:"If true, swap success and failure results."`
 	IgnoreResult  bool `yaml:"ignoreResult" json:"ignoreResult" desc:"If true, always report success regardless of child task result."`
+	IgnoreFailure bool `yaml:"ignoreFailure" json:"ignoreFailure" desc:"If true, ignore the failure of the child task."`
 	ExpectFailure bool `yaml:"expectFailure" json:"expectFailure" desc:"Alias for invertResult - expect the task to fail."`
 }
 

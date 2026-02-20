@@ -79,6 +79,7 @@ tasks:
                 indexCount: 200
               configVars:
                 mnemonic: "validatorMnemonic"
+                clientPattern: "clientPairName"
             foregroundTask:
               name: check_consensus_block_proposals
               title: "Wait for block proposal with exits"

@@ -207,16 +207,21 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
+	spamoorClients := make([]*spamoor.Client, len(clients))
+	for i, c := range clients {
+		spamoorClients[i] = walletMgr.GetClient(c)
+	}
 
-	for i := 0; i < len(clients); i++ {
-		client := clients[i%len(clients)]
+	for i := 0; i < len(spamoorClients); i++ {
+		clientIdx := i % len(spamoorClients)
 
 		t.logger.WithFields(logrus.Fields{
-			"client": client.GetName(),
+			"client": spamoorClients[clientIdx].GetName(),
 		}).Infof("sending tx: %v", tx.Hash().Hex())
 
 		err = walletMgr.GetTxPool().SendTransaction(ctx, t.wallet, tx, &spamoor.SendTransactionOptions{
-			Client:             walletMgr.GetClient(client),
+			Client:             spamoorClients[clientIdx],
+			ClientList:         spamoorClients,
 			ClientsStartOffset: i,
 		})
 		if err == nil {

@@ -121,6 +121,10 @@ func (t *Task) Execute(ctx context.Context) error {
 		return nil
 	}
 
+	if t.config.IgnoreFailure && taskErr != nil {
+		return nil
+	}
+
 	// ExpectFailure is an alias for InvertResult
 	if t.config.ExpectFailure || t.config.InvertResult {
 		if taskErr != nil {

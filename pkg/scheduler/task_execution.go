@@ -273,25 +273,3 @@ func (ts *TaskScheduler) emitTaskProgress(taskState *taskState, percent float64,
 		message,
 	)
 }
-
-func (ts *TaskScheduler) WatchTaskPass(ctx context.Context, cancelFn context.CancelFunc, taskIndex types.TaskIndex) {
-	taskState := ts.GetTaskState(taskIndex)
-
-	// poll task result and cancel context when task result is passed or failed
-	for {
-		updateChan := taskState.GetTaskResultUpdateChan(types.TaskResultNone)
-		if updateChan != nil {
-			select {
-			case <-ctx.Done():
-				return
-			case <-updateChan:
-			}
-		}
-
-		taskStatus := taskState.GetTaskStatus()
-		if taskStatus.Result != types.TaskResultNone {
-			cancelFn()
-			return
-		}
-	}
-}

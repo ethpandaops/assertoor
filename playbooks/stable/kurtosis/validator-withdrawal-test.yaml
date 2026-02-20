@@ -91,6 +91,7 @@ tasks:
                 targetAddress: 0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA
               configVars:
                 mnemonic: "validatorMnemonic"
+                clientPattern: "clientPairName"
             foregroundTask:
               name: check_consensus_block_proposals
               title: "Wait for block proposal with BLS changes"

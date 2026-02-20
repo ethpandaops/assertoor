@@ -167,7 +167,7 @@ taskLoop:
 		progress := float64(i) / float64(totalTasks) * 100
 		t.ctx.ReportProgress(progress, fmt.Sprintf("Executing task %d/%d...", i+1, totalTasks))
 
-		err := t.ctx.Scheduler.ExecuteTask(ctx, task, t.ctx.Scheduler.WatchTaskPass)
+		err := t.ctx.Scheduler.ExecuteTask(ctx, task, nil)
 
 		switch {
 		case t.config.IgnoreFailure:
@@ -188,7 +188,7 @@ taskLoop:
 			return ctx.Err()
 		}
 
-		err := t.ctx.Scheduler.ExecuteTask(ctx, task, t.ctx.Scheduler.WatchTaskPass)
+		err := t.ctx.Scheduler.ExecuteTask(ctx, task, nil)
 		if err != nil {
 			t.logger.Warnf("cleanup task #%v failed: %w", i+1, err)
 		}

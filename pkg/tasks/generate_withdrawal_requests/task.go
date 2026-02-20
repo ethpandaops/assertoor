@@ -194,8 +194,6 @@ func (t *Task) Execute(ctx context.Context) error {
 			// Note: onComplete callback is still called by spamoor even on error,
 			// so we don't drain pendingChan or call pendingWg.Done() here
 		} else {
-			t.ctx.SetResult(types.TaskResultSuccess)
-
 			perSlotCount++
 			totalCount++
 
@@ -366,6 +364,11 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onComp
 
 	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
 
+	spamoorClients := make([]*spamoor.Client, len(clients))
+	for i, c := range clients {
+		spamoorClients[i] = walletMgr.GetClient(c)
+	}
+
 	txWallet, err := walletMgr.GetWalletByPrivkey(ctx, t.walletPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize wallet: %w", err)
@@ -397,10 +400,9 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onComp
 		return nil, fmt.Errorf("cannot build withdrawal transaction: %w", err)
 	}
 
-	client := walletMgr.GetClient(clients[0])
-
 	err = walletMgr.GetTxPool().SendTransaction(ctx, txWallet, tx, &spamoor.SendTransactionOptions{
-		Client:      client,
+		Client:      spamoorClients[0],
+		ClientList:  spamoorClients,
 		Rebroadcast: true,
 		OnComplete:  onComplete,
 		LogFn: func(client *spamoor.Client, _ int, rebroadcast int, err error) {

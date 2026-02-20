@@ -18,7 +18,6 @@ type TaskSchedulerRunner interface {
 	GetTestRunCtx() context.Context
 	ParseTaskOptions(rawtask helper.IRawMessage) (*TaskOptions, error)
 	ExecuteTask(ctx context.Context, taskIndex TaskIndex, taskWatchFn func(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)) error
-	WatchTaskPass(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)
 }
 
 type TaskScheduler interface {
