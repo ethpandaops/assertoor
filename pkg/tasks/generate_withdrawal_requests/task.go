@@ -348,7 +348,10 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onComp
 	var clients []*execution.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		clients = clientPool.GetExecutionPool().GetReadyEndpoints(true)
+		clients = clientPool.GetExecutionPool().AwaitReadyEndpoints(ctx, true)
+		if len(clients) == 0 {
+			return nil, ctx.Err()
+		}
 	} else {
 		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(poolClients) == 0 {
@@ -359,10 +362,6 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onComp
 		for i, c := range poolClients {
 			clients[i] = c.ExecutionClient
 		}
-	}
-
-	if len(clients) == 0 {
-		return nil, fmt.Errorf("no ready clients available")
 	}
 
 	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
@@ -421,6 +420,7 @@ func (t *Task) generateWithdrawal(ctx context.Context, accountIdx uint64, onComp
 		},
 	})
 	if err != nil {
+		txWallet.MarkSkippedNonce(tx.Nonce())
 		return nil, fmt.Errorf("failed sending withdrawal transaction: %w", err)
 	}
 
