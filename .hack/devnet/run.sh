@@ -79,6 +79,9 @@ done
 echo "$config_content" > "${__dir}/generated-assertoor-config.yaml"
 
 if [ -f "${__dir}/custom-ai-config.yaml" ]; then
+  # Remove existing 'ai' object from the generated config file
+  yq 'del(.ai)' "${__dir}/generated-assertoor-config.yaml" > "${__dir}/generated-assertoor-config.yaml.tmp" && mv "${__dir}/generated-assertoor-config.yaml.tmp" "${__dir}/generated-assertoor-config.yaml"
+
   ai_config_file="${__dir}/custom-ai-config.yaml"
   cat "$ai_config_file" | envsubst >> "${__dir}/generated-assertoor-config.yaml"
 fi

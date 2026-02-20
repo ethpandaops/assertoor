@@ -1,0 +1,35 @@
+id: builder-deposit
+name: Validator Deposit with 0x03 Builder Credentials
+timeout: 30m
+config:
+  walletPrivkey: ''
+  depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'  # Mainnet deposit contract
+tasks:
+  - name: check_clients_are_healthy
+    title: Check if at least one client is ready
+    timeout: 5m
+    config:
+      minClientCount: 1
+  - name: generate_child_wallet
+    id: test_wallet
+    title: Generate wallet for deposit operations
+    config:
+      walletSeed: builder-deposit-test
+      prefundMinBalance: 10000000000000000000
+    configVars:
+      privateKey: walletPrivkey
+  - name: get_random_mnemonic
+    id: test_mnemonic
+    title: Generate random mnemonic for test validator
+  - name: generate_deposits
+    title: Generate validator deposit with 0x03 credentials
+    config:
+      limitTotal: 1
+      depositAmount: 5
+      awaitReceipt: true
+      awaitInclusion: true
+    configVars:
+      walletPrivkey: tasks.test_wallet.outputs.childWallet.privkey
+      mnemonic: tasks.test_mnemonic.outputs.mnemonic
+      depositContract: depositContract
+      withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
