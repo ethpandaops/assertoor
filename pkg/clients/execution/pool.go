@@ -108,6 +108,21 @@ func (pool *Pool) AwaitReadyEndpoint(ctx context.Context, clientType ClientType)
 	}
 }
 
+func (pool *Pool) AwaitReadyEndpoints(ctx context.Context, shuffle bool) []*Client {
+	for {
+		clients := pool.GetReadyEndpoints(shuffle)
+		if len(clients) > 0 {
+			return clients
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(1 * time.Second):
+		}
+	}
+}
+
 func (pool *Pool) GetReadyEndpoints(shuffle bool) []*Client {
 	canonicalFork := pool.GetCanonicalFork(-1)
 	if canonicalFork == nil {

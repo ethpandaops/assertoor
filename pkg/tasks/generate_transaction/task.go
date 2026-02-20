@@ -163,6 +163,29 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", t.wallet.GetAddress().Hex(), t.wallet.GetNonce(), t.wallet.GetReadableBalance(18, 0, 4, false, false))
 
+	t.ctx.ReportProgress(0, "Waiting for ready clients...")
+
+	var clients []*execution.Client
+
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
+
+	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
+		clients = clientPool.GetExecutionPool().AwaitReadyEndpoints(ctx, true)
+		if len(clients) == 0 {
+			return ctx.Err()
+		}
+	} else {
+		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
+		if len(poolClients) == 0 {
+			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+		}
+
+		clients = make([]*execution.Client, len(poolClients))
+		for i, c := range poolClients {
+			clients[i] = c.ExecutionClient
+		}
+	}
+
 	t.ctx.ReportProgress(0, "Generating transaction...")
 
 	tx, err := t.generateTransaction()
@@ -181,28 +204,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		t.logger.Warnf("Failed setting `transactionHex` output: %v", err)
 	} else {
 		t.ctx.Outputs.SetVar("transactionHex", hexutil.Encode(txBytes))
-	}
-
-	var clients []*execution.Client
-
-	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
-
-	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		clients = clientPool.GetExecutionPool().GetReadyEndpoints(true)
-	} else {
-		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
-		if len(poolClients) == 0 {
-			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
-		}
-
-		clients = make([]*execution.Client, len(poolClients))
-		for i, c := range poolClients {
-			clients[i] = c.ExecutionClient
-		}
-	}
-
-	if len(clients) == 0 {
-		return fmt.Errorf("no ready clients available")
 	}
 
 	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
@@ -224,6 +225,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	if err != nil {
+		t.wallet.MarkSkippedNonce(tx.Nonce())
 		return err
 	}
 

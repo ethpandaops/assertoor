@@ -293,6 +293,27 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		txData = t.transactionData
 	}
 
+	var clients []*execution.Client
+
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
+
+	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
+		clients = clientPool.GetExecutionPool().AwaitReadyEndpoints(ctx, true)
+		if len(clients) == 0 {
+			return ctx.Err()
+		}
+	} else {
+		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
+		if len(poolClients) == 0 {
+			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+		}
+
+		clients = make([]*execution.Client, len(poolClients))
+		for i, c := range poolClients {
+			clients[i] = c.ExecutionClient
+		}
+	}
+
 	var tx *ethtypes.Transaction
 
 	var err error
@@ -330,32 +351,10 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 		return fmt.Errorf("cannot build transaction: %w", err)
 	}
 
-	var clients []*execution.Client
-
-	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
-
-	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		clients = clientPool.GetExecutionPool().GetReadyEndpoints(true)
-	} else {
-		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
-		if len(poolClients) == 0 {
-			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
-		}
-
-		clients = make([]*execution.Client, len(poolClients))
-		for i, c := range poolClients {
-			clients[i] = c.ExecutionClient
-		}
-	}
-
-	if len(clients) == 0 {
-		return fmt.Errorf("no ready clients available")
-	}
-
 	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
 	client := walletMgr.GetClient(clients[transactionIdx%uint64(len(clients))])
 
-	return walletMgr.GetTxPool().SendTransaction(ctx, txWallet, tx, &spamoor.SendTransactionOptions{
+	err = walletMgr.GetTxPool().SendTransaction(ctx, txWallet, tx, &spamoor.SendTransactionOptions{
 		Client:      client,
 		Rebroadcast: true,
 		OnComplete:  completeFn,
@@ -383,4 +382,10 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 			logEntry.Infof("submitted tx %v: %v", transactionIdx, tx.Hash().Hex())
 		},
 	})
+	if err != nil {
+		txWallet.MarkSkippedNonce(tx.Nonce())
+		return err
+	}
+
+	return nil
 }
