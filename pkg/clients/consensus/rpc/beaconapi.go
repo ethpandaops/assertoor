@@ -489,11 +489,26 @@ func (bc *BeaconClient) SubmitVoluntaryExits(ctx context.Context, exit *phase0.S
 
 func (bc *BeaconClient) SubmitAttesterSlashing(ctx context.Context, slashing *phase0.AttesterSlashing) error {
 	err := bc.postJSON(ctx, fmt.Sprintf("%s/eth/v1/beacon/pool/attester_slashings", bc.endpoint), slashing, nil)
-	if err != nil {
-		return err
+	if err == nil {
+		return nil
 	}
 
-	return nil
+	// Prysm removed the v1 endpoint post-Electra, fall back to v2 with version header.
+	if err.Error() == "not found" {
+		v2Err := bc.postJSONWithHeaders(
+			ctx,
+			fmt.Sprintf("%s/eth/v2/beacon/pool/attester_slashings", bc.endpoint),
+			slashing, nil,
+			map[string]string{"Eth-Consensus-Version": "electra"},
+		)
+		if v2Err != nil {
+			return v2Err
+		}
+
+		return nil
+	}
+
+	return err
 }
 
 func (bc *BeaconClient) SubmitProposerSlashing(ctx context.Context, slashing *phase0.ProposerSlashing) error {
