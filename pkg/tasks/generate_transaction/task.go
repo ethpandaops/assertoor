@@ -208,6 +208,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
 	spamoorClients := make([]*spamoor.Client, len(clients))
+
 	for i, c := range clients {
 		spamoorClients[i] = walletMgr.GetClient(c)
 	}
