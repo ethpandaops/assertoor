@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -20,6 +21,7 @@ type Spamoor struct {
 	clientPool    *spamoor.ClientPool
 	txpool        *spamoor.TxPool
 	clients       map[*execution.Client]*spamoor.Client
+	clientIdx     atomic.Uint64
 }
 
 func NewSpamoor(ctx context.Context, logger logrus.FieldLogger, executionPool *execution.Pool) (*Spamoor, error) {
@@ -143,7 +145,8 @@ func (s *Spamoor) GetTxPool() *spamoor.TxPool {
 }
 
 func (s *Spamoor) GetReadyClient() *spamoor.Client {
-	return s.clientPool.GetClient()
+	idx := s.clientIdx.Add(1)
+	return s.clientPool.GetClient(spamoor.WithClientSelectionMode(spamoor.SelectClientByIndex, int(idx%1000000))) //nolint:gosec // bounded before conversion
 }
 
 func (s *Spamoor) GetClient(client *execution.Client) *spamoor.Client {
