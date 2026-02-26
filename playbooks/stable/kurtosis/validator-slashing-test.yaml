@@ -83,6 +83,7 @@ tasks:
                 indexCount: 100
               configVars:
                 mnemonic: "validatorMnemonic"
+                clientPattern: "clientPairName"
             foregroundTask:
               name: check_consensus_block_proposals
               title: "Wait for block proposal with attestation slashings"

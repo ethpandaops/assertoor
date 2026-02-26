@@ -92,7 +92,7 @@ func (ts *TaskScheduler) RunTasks(testRunCtx context.Context, timeout time.Durat
 	defer ts.cancelTaskCtx()
 
 	for _, task := range ts.rootTasks {
-		err := ts.ExecuteTask(tasksCtx, task, ts.WatchTaskPass)
+		err := ts.ExecuteTask(tasksCtx, task, nil)
 		if err != nil {
 			return err
 		}
@@ -111,7 +111,7 @@ func (ts *TaskScheduler) runCleanupTasks(ctx context.Context) {
 			return
 		}
 
-		err := ts.ExecuteTask(ctx, taskIndex, ts.WatchTaskPass)
+		err := ts.ExecuteTask(ctx, taskIndex, nil)
 		if err != nil {
 			taskState := ts.getTaskState(taskIndex)
 			taskState.logger.GetLogger().Errorf("cleanup task failed: %v", err)

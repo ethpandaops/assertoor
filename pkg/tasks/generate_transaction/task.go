@@ -207,17 +207,45 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
+	spamoorClients := make([]*spamoor.Client, len(clients))
 
-	for i := 0; i < len(clients); i++ {
-		client := clients[i%len(clients)]
+	for i, c := range clients {
+		spamoorClients[i] = walletMgr.GetClient(c)
+	}
+
+	// For blob transactions after Fulu, use v1 sidecars (cell proofs).
+	var blobV1OnEncode func(tx *ethtypes.Transaction) ([]byte, error)
+
+	if t.config.BlobTxType && t.isFuluActive() {
+		convertedToV1 := false
+
+		blobV1OnEncode = func(tx *ethtypes.Transaction) ([]byte, error) {
+			if !convertedToV1 {
+				if convErr := tx.BlobTxSidecar().ToV1(); convErr != nil {
+					return nil, fmt.Errorf(
+						"cannot convert blob sidecar to v1: %w", convErr,
+					)
+				}
+
+				convertedToV1 = true
+			}
+
+			return nil, nil
+		}
+	}
+
+	for i := 0; i < len(spamoorClients); i++ {
+		clientIdx := i % len(spamoorClients)
 
 		t.logger.WithFields(logrus.Fields{
-			"client": client.GetName(),
+			"client": spamoorClients[clientIdx].GetName(),
 		}).Infof("sending tx: %v", tx.Hash().Hex())
 
 		err = walletMgr.GetTxPool().SendTransaction(ctx, t.wallet, tx, &spamoor.SendTransactionOptions{
-			Client:             walletMgr.GetClient(client),
+			Client:             spamoorClients[clientIdx],
+			ClientList:         spamoorClients,
 			ClientsStartOffset: i,
+			OnEncode:           blobV1OnEncode,
 		})
 		if err == nil {
 			break
@@ -321,6 +349,48 @@ func (t *Task) Execute(ctx context.Context) error {
 	t.ctx.ReportProgress(100, fmt.Sprintf("Transaction completed: %s", tx.Hash().Hex()))
 
 	return nil
+}
+
+// isFuluActive checks whether the Fulu fork is active by comparing the
+// current wallclock epoch against FULU_FORK_EPOCH from the consensus specs.
+func (t *Task) isFuluActive() bool {
+	blockCache := t.ctx.Scheduler.GetServices().ClientPool().
+		GetConsensusPool().GetBlockCache()
+
+	specValues := blockCache.GetSpecValues()
+	if specValues == nil {
+		return false
+	}
+
+	fuluEpochVal, ok := specValues["FULU_FORK_EPOCH"]
+	if !ok {
+		return false
+	}
+
+	var fuluEpoch uint64
+
+	switch v := fuluEpochVal.(type) {
+	case uint64:
+		fuluEpoch = v
+	case string:
+		if _, err := fmt.Sscanf(v, "%d", &fuluEpoch); err != nil {
+			return false
+		}
+	default:
+		return false
+	}
+
+	wallclock := blockCache.GetWallclock()
+	if wallclock == nil {
+		return false
+	}
+
+	_, currentEpoch, err := wallclock.Now()
+	if err != nil {
+		return false
+	}
+
+	return currentEpoch.Number() >= fuluEpoch
 }
 
 //nolint:gocyclo // transaction generation has multiple branches for different tx types

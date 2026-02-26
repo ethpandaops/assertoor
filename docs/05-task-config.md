@@ -88,4 +88,4 @@ The categorization serves as a general guide to understanding the nature and pur
 
 The following sections will detail individual tasks within these categories, providing insights into their specific functions, configurations, and use cases.
 
-#!! cat pkg/coordinator/tasks/*/README.md
+#!! cat pkg/tasks/*/README.md

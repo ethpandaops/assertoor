@@ -352,10 +352,15 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 	}
 
 	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
-	client := walletMgr.GetClient(clients[transactionIdx%uint64(len(clients))])
+
+	spamoorClients := make([]*spamoor.Client, len(clients))
+	for i, c := range clients {
+		spamoorClients[i] = walletMgr.GetClient(c)
+	}
 
 	err = walletMgr.GetTxPool().SendTransaction(ctx, txWallet, tx, &spamoor.SendTransactionOptions{
-		Client:      client,
+		Client:      spamoorClients[transactionIdx%uint64(len(spamoorClients))],
+		ClientList:  spamoorClients,
 		Rebroadcast: true,
 		OnComplete:  completeFn,
 		LogFn: func(client *spamoor.Client, retry int, rebroadcast int, err error) {
