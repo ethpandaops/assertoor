@@ -116,6 +116,10 @@ func (block *Block) EnsureHeader(loadHeader func() (*phase0.SignedBeaconBlockHea
 		return err
 	}
 
+	if header == nil {
+		return nil
+	}
+
 	block.header = header
 	close(block.headerChan)
 
@@ -137,6 +141,10 @@ func (block *Block) EnsureBlock(loadBlock func() (*spec.VersionedSignedBeaconBlo
 	blockBody, err := loadBlock()
 	if err != nil {
 		return false, err
+	}
+
+	if blockBody == nil {
+		return false, nil
 	}
 
 	block.block = blockBody
@@ -181,6 +189,10 @@ func (block *Block) EnsurePayload(loadPayload func() (*gloas.SignedExecutionPayl
 	payload, err := loadPayload()
 	if err != nil {
 		return false, err
+	}
+
+	if payload == nil {
+		return false, nil
 	}
 
 	block.payload = payload
