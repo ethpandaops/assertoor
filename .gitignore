@@ -7,7 +7,6 @@ test-*.yaml
 
 .hack/devnet/generated-**
 .hack/devnet/custom-**
-CLAUDE.md
 
 # Web UI
 web-ui/node_modules/
