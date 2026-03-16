@@ -282,51 +282,91 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 		return 0, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
 	}
 
-	// select validator
-	var validator *v1.Validator
-
 	validatorPubkey := validatorPrivkey.PublicKey().Marshal()
-	for _, val := range t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet() {
-		if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
-			validator = val
-			break
+
+	var exitIndex phase0.ValidatorIndex
+
+	if t.config.BuilderExit {
+		// Look up builder by pubkey in the builder set
+		builderSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBuilderSet()
+
+		var found bool
+
+		for _, info := range builderSet {
+			if bytes.Equal(info.Builder.PublicKey[:], validatorPubkey) {
+				exitIndex = consensus.ConvertBuilderIndexToValidatorIndex(info.Index)
+				found = true
+
+				t.logger.Infof("found builder: index %v, flagged index %v", info.Index, exitIndex)
+
+				break
+			}
 		}
-	}
 
-	// check validator status
-	if validator == nil {
-		return 0, fmt.Errorf("validator not found: 0x%x", validatorPubkey)
-	}
-
-	if validator.Validator.ExitEpoch != 18446744073709551615 {
-		return 0, fmt.Errorf("validator %v is already exited", validator.Index)
-	}
-
-	// select client
-	var client *consensus.Client
-
-	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
-	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
-		client = clientPool.GetConsensusPool().GetReadyEndpoint(consensus.AnyClient)
+		if !found {
+			return 0, fmt.Errorf("builder not found: 0x%x", validatorPubkey)
+		}
 	} else {
-		clients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
-		if len(clients) == 0 {
-			return 0, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+		// Look up validator by pubkey in the validator set
+		var validator *v1.Validator
+
+		for _, val := range t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet() {
+			if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
+				validator = val
+				break
+			}
 		}
 
-		client = clients[0].ConsensusClient
+		if validator == nil {
+			return 0, fmt.Errorf("validator not found: 0x%x", validatorPubkey)
+		}
+
+		if validator.Validator.ExitEpoch != 18446744073709551615 {
+			return 0, fmt.Errorf("validator %v is already exited", validator.Index)
+		}
+
+		exitIndex = validator.Index
+	}
+
+	// select clients
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
+
+	var clients []*consensus.Client
+
+	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
+		if t.config.SendToAllClients {
+			for _, c := range clientPool.GetConsensusPool().GetAllEndpoints() {
+				if clientPool.GetConsensusPool().IsClientReady(c) {
+					clients = append(clients, c)
+				}
+			}
+		} else {
+			client := clientPool.GetConsensusPool().GetReadyEndpoint(consensus.AnyClient)
+			if client != nil {
+				clients = []*consensus.Client{client}
+			}
+		}
+	} else {
+		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
+		for _, c := range poolClients {
+			clients = append(clients, c.ConsensusClient)
+		}
+	}
+
+	if len(clients) == 0 {
+		return 0, fmt.Errorf("no ready client found")
 	}
 
 	// build voluntary exit message
 	specs := clientPool.GetConsensusPool().GetBlockCache().GetSpecs()
 	operation := &phase0.VoluntaryExit{
-		ValidatorIndex: validator.Index,
+		ValidatorIndex: exitIndex,
 	}
 
 	if t.config.ExitEpoch >= 0 {
 		operation.Epoch = phase0.Epoch(t.config.ExitEpoch) //nolint:gosec // no overflow possible
 	} else {
-		currentSlot, _ := client.GetLastHead()
+		currentSlot, _ := clients[0].GetLastHead()
 		operation.Epoch = phase0.Epoch(currentSlot / phase0.Slot(specs.SlotsPerEpoch))
 	}
 
@@ -357,14 +397,31 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	signedMsg.Message = operation
 	copy(signedMsg.Signature[:], sig.Serialize())
 
-	t.logger.WithField("client", client.GetName()).Infof("sending voluntary exit for validator %v", validator.Index)
+	// Submit to all selected clients
+	var lastErr error
 
-	err = client.GetRPCClient().SubmitVoluntaryExits(ctx, &signedMsg)
-	if err != nil {
-		return 0, err
+	successCount := 0
+
+	for _, client := range clients {
+		submitErr := client.GetRPCClient().SubmitVoluntaryExits(ctx, &signedMsg)
+		if submitErr != nil {
+			t.logger.WithField("client", client.GetName()).Warnf("failed submitting voluntary exit: %v", submitErr)
+
+			lastErr = submitErr
+		} else {
+			t.logger.WithField("client", client.GetName()).Infof("sent voluntary exit for index %v (builder: %v)", exitIndex, t.config.BuilderExit)
+
+			successCount++
+		}
 	}
 
-	return validator.Index, nil
+	if successCount == 0 {
+		return 0, fmt.Errorf("all clients rejected voluntary exit: %w", lastErr)
+	}
+
+	t.logger.Infof("voluntary exit accepted by %d/%d clients", successCount, len(clients))
+
+	return exitIndex, nil
 }
 
 func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {

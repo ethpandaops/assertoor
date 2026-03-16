@@ -365,6 +365,31 @@ Checks validator status on the beacon chain.
 
 ---
 
+### check_consensus_builder_status
+
+Checks builder status on the beacon chain by loading the full beacon state. Builders are a GLOAS-specific concept stored in a separate section of the state.
+
+**Config:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `builderPubKey` | string | "" | Builder public key to check |
+| `builderIndex` | *uint64 | nil | Builder index to check |
+| `minBuilderBalance` | uint64 | 0 | Min balance in gwei |
+| `maxBuilderBalance` | *uint64 | nil | Max balance in gwei |
+| `expectActive` | bool | false | Expect active builder (withdrawable_epoch == FAR_FUTURE) |
+| `expectExiting` | bool | false | Expect exiting/exited builder (withdrawable_epoch != FAR_FUTURE) |
+| `failOnCheckMiss` | bool | false | Fail on condition miss |
+| `continueOnPass` | bool | false | Keep monitoring |
+
+**Outputs:**
+| Variable | Type | Description |
+|----------|------|-------------|
+| `builder` | object | Full builder information (pubkey, balance, deposit_epoch, withdrawable_epoch) |
+| `builderIndex` | number | Builder's index in the builder list |
+| `pubkey` | string | Builder public key |
+
+---
+
 ### check_consensus_attestation_stats
 
 Monitors attestation statistics per epoch.
@@ -686,6 +711,7 @@ Generates voluntary validator exits.
 | `mnemonic` | string | required | Validator key mnemonic |
 | `startIndex` | int | 0 | Start index in mnemonic |
 | `indexCount` | int | required | Number of validator keys |
+| `builderExit` | bool | false | Generate builder exits instead of validator exits (uses BUILDER_INDEX_FLAG) |
 | `exitEpoch` | int64 | -1 | Exit epoch (-1 = current) |
 | `clientPattern` | string | "" | Client selection regex |
 | `excludeClientPattern` | string | "" | Client exclusion regex |
