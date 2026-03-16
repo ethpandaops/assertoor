@@ -712,6 +712,7 @@ Generates voluntary validator exits.
 | `startIndex` | int | 0 | Start index in mnemonic |
 | `indexCount` | int | required | Number of validator keys |
 | `builderExit` | bool | false | Generate builder exits instead of validator exits (uses BUILDER_INDEX_FLAG) |
+| `sendToAllClients` | bool | false | Submit exit to all ready CL clients in parallel (succeeds if any accepts) |
 | `exitEpoch` | int64 | -1 | Exit epoch (-1 = current) |
 | `clientPattern` | string | "" | Client selection regex |
 | `excludeClientPattern` | string | "" | Client exclusion regex |

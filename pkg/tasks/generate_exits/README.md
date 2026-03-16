@@ -23,6 +23,9 @@ The `generate_exits` task is designed to create and send voluntary exit transact
 - **`builderExit`**:\
   If set to `true`, generates builder exits instead of validator exits. Builder exits use the `BUILDER_INDEX_FLAG` (2^40) OR'd with the builder index in the `ValidatorIndex` field of the voluntary exit message. The task looks up the pubkey in the shared builder set cache instead of the validator set. Default: `false`.
 
+- **`sendToAllClients`**:\
+  If set to `true`, submits the voluntary exit to all ready consensus clients in parallel instead of just one. Useful when not all clients support a particular exit type (e.g. builder exits). The task succeeds if at least one client accepts the exit. Default: `false`.
+
 - **`exitEpoch`**:\
   The exit epoch number set within the exit message. (defaults to head epoch)
 
@@ -56,6 +59,7 @@ Default settings for the `generate_exits` task:
     startIndex: 0
     indexCount: 0
     builderExit: false
+    sendToAllClients: false
     exitEpoch: -1
     clientPattern: ""
     excludeClientPattern: ""
