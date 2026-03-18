@@ -90,12 +90,12 @@ func (ah *APIHandler) GetTestRunTaskDetails(w http.ResponseWriter, r *http.Reque
 	case taskStatus.IsRunning:
 		taskData.Status = "running"
 		taskData.StartTime = taskStatus.StartTime.UnixMilli()
-		taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // no overflow possible
+		taskData.RunTime = uint64(time.Since(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // G115: duration in ms is always non-negative
 	default:
 		taskData.Status = "complete"
 		taskData.StartTime = taskStatus.StartTime.UnixMilli()
 		taskData.StopTime = taskStatus.StopTime.UnixMilli()
-		taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // no overflow possible
+		taskData.RunTime = uint64(taskStatus.StopTime.Sub(taskStatus.StartTime).Round(1 * time.Millisecond).Milliseconds()) //nolint:gosec // G115: duration in ms is always non-negative
 	}
 
 	switch taskStatus.Result {

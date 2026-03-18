@@ -549,7 +549,7 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 		}
 	}
 
-	votes := []*epochVotes{}
+	votes := make([]*epochVotes, 0, len(allHeads))
 	for root := range allHeads {
 		votes = append(votes, allVotes[root])
 	}
@@ -565,7 +565,7 @@ func (t *Task) aggregateAttestationVotes(votes *epochVotes, slot, committee uint
 
 	for bitIdx, attDuty := range voteValidators {
 		validatorIdx := attDuty.validator
-		if aggregationBits.BitAt(uint64(bitIdx) + aggregationBitsOffset) { //nolint:gosec // no overflow possible
+		if aggregationBits.BitAt(uint64(bitIdx) + aggregationBitsOffset) {
 			if votes.activityMap[validatorIdx] {
 				continue
 			}

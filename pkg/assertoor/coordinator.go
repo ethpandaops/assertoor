@@ -369,7 +369,7 @@ func (c *Coordinator) runEpochGC(ctx context.Context) {
 		if networkTime < 0 {
 			sleepTime = networkTime.Abs()
 		} else {
-			currentSlot := uint64(networkTime / specs.SecondsPerSlot) //nolint:gosec // no overflow possible
+			currentSlot := uint64(networkTime / specs.SecondsPerSlot) //nolint:gosec // G115: networkTime is checked non-negative above
 			currentEpoch := currentSlot / specs.SlotsPerEpoch
 			currentSlotIndex := currentSlot % specs.SlotsPerEpoch
 			nextGcSlot := uint64(0)
@@ -388,7 +388,7 @@ func (c *Coordinator) runEpochGC(ctx context.Context) {
 				case <-time.After(specs.SecondsPerSlot / 2):
 				}
 
-				nextEpochDuration := time.Until(genesis.GenesisTime.Add(time.Duration((currentEpoch+1)*specs.SlotsPerEpoch) * specs.SecondsPerSlot)) //nolint:gosec // no overflow possible
+				nextEpochDuration := time.Until(genesis.GenesisTime.Add(time.Duration((currentEpoch+1)*specs.SlotsPerEpoch) * specs.SecondsPerSlot)) //nolint:gosec // G115: epoch*slots product won't overflow
 
 				c.log.GetLogger().Infof("run GC (slot %v, %v sec before epoch %v)", currentSlot, nextEpochDuration.Seconds(), currentEpoch+1)
 				runtime.GC()
@@ -402,7 +402,7 @@ func (c *Coordinator) runEpochGC(ctx context.Context) {
 				}
 			}
 
-			nextRunTime := genesis.GenesisTime.Add(time.Duration(nextGcSlot) * specs.SecondsPerSlot) //nolint:gosec // no overflow possible
+			nextRunTime := genesis.GenesisTime.Add(time.Duration(nextGcSlot) * specs.SecondsPerSlot) //nolint:gosec // G115: slot number won't overflow int64
 			sleepTime = time.Until(nextRunTime)
 		}
 

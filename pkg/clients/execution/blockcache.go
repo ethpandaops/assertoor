@@ -73,7 +73,7 @@ func (cache *BlockCache) SetMinFollowDistance(followDistance uint64) {
 		followDistance = 10000
 	}
 
-	followDistance32 := uint32(followDistance) //nolint:gosec // no overflow possible
+	followDistance32 := uint32(followDistance)
 
 	if followDistance32 > cache.followDistance {
 		cache.followDistance = followDistance32
@@ -148,7 +148,7 @@ func (cache *BlockCache) AddBlock(hash common.Hash, number uint64) (*Block, bool
 	}
 
 	if cache.maxSlotIdx < 0 || number > uint64(cache.maxSlotIdx) {
-		cache.maxSlotIdx = int64(number) //nolint:gosec // no overflow possible
+		cache.maxSlotIdx = int64(number) //nolint:gosec // G115: block numbers won't exceed int64 max
 	}
 
 	return cacheBlock, true
@@ -165,8 +165,8 @@ func (cache *BlockCache) GetCachedBlocks() []*Block {
 	cache.cacheMutex.RLock()
 	defer cache.cacheMutex.RUnlock()
 
-	blocks := []*Block{}
-	slots := []uint64{}
+	blocks := make([]*Block, 0, len(cache.numberMap))
+	slots := make([]uint64, 0, len(cache.numberMap))
 
 	for slot := range cache.numberMap {
 		slots = append(slots, slot)

@@ -200,7 +200,7 @@ func (t *Task) processClientCheck(client *clients.PoolClient, syncStatus *rpc.Sy
 		return false
 	}
 
-	if int64(syncStatus.HeadSlot) < int64(t.config.MinSlotHeight) { //nolint:gosec // no overflow possible
+	if int64(syncStatus.HeadSlot) < int64(t.config.MinSlotHeight) { //nolint:gosec // G115: slot values won't exceed int64 max
 		checkLogger.Debugf("check failed. check: MinSlotHeight, expected: >= %v, got: %v", t.config.MinSlotHeight, syncStatus.HeadSlot)
 		return false
 	}

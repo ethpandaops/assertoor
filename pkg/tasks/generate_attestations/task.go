@@ -265,10 +265,10 @@ func (t *Task) initValidatorKeys() error {
 
 	startIndex := uint64(0)
 	if t.config.StartIndex > 0 {
-		startIndex = uint64(t.config.StartIndex) //nolint:gosec // no overflow possible
+		startIndex = uint64(t.config.StartIndex)
 	}
 
-	endIndex := startIndex + uint64(t.config.IndexCount) //nolint:gosec // no overflow possible
+	endIndex := startIndex + uint64(t.config.IndexCount) //nolint:gosec // G115: config value is validated non-negative
 
 	for accountIdx := startIndex; accountIdx < endIndex; accountIdx++ {
 		validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
@@ -419,7 +419,7 @@ func (t *Task) findSlotDuties(slot uint64, duties []*v1.BeaconCommittee) []*vali
 					validatorIndex:      valIdx,
 					committeeIndex:      committee.Index,
 					committeeLength:     uint64(len(committee.Validators)),
-					positionInCommittee: uint64(position), //nolint:gosec // position from range is always non-negative
+					positionInCommittee: uint64(position),
 				})
 			}
 		}

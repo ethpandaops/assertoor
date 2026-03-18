@@ -187,9 +187,9 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) setMatchingBlocksOutput(blocks []*consensus.Block) {
-	blockRoots := []string{}
-	blockHeaders := []any{}
-	blockBodies := []any{}
+	blockRoots := make([]string, 0, len(blocks))
+	blockHeaders := make([]any, 0, len(blocks))
+	blockBodies := make([]any, 0, len(blocks))
 
 	for _, block := range blocks {
 		blockRoots = append(blockRoots, block.Root.String())

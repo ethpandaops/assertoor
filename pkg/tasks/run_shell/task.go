@@ -378,6 +378,7 @@ func (t *Task) storeTaskResults(summaryFile *resultFile, resultDir string) {
 		fileIdx := uint64(0)
 
 		var storeResultFilesFn func(path string, prefix string)
+
 		storeResultFilesFn = func(path string, prefix string) {
 			if prefix != "" {
 				prefix += "/"

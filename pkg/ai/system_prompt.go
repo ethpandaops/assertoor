@@ -345,7 +345,7 @@ func buildTaskDocumentation() string {
 	}
 
 	builder.WriteString("\n```\n\n")
-	builder.WriteString(fmt.Sprintf("Total: %d tasks available\n\n", len(allTaskNames)))
+	fmt.Fprintf(&builder, "Total: %d tasks available\n\n", len(allTaskNames))
 
 	// Define category order
 	categoryOrder := []string{"check", "generate", "get", "run", "validator", "utility", "other"}
@@ -358,11 +358,11 @@ func buildTaskDocumentation() string {
 			continue
 		}
 
-		builder.WriteString(fmt.Sprintf("### %s Tasks\n\n", titleCaser.String(category)))
+		fmt.Fprintf(&builder, "### %s Tasks\n\n", titleCaser.String(category))
 
 		for _, desc := range descs {
-			builder.WriteString(fmt.Sprintf("#### %s\n", desc.Name))
-			builder.WriteString(fmt.Sprintf("**Description:** %s\n\n", desc.Description))
+			fmt.Fprintf(&builder, "#### %s\n", desc.Name)
+			fmt.Fprintf(&builder, "**Description:** %s\n\n", desc.Description)
 
 			// Add config inputs (from JSON schema)
 			writeConfigInputs(&builder, desc.ConfigSchema)
@@ -372,7 +372,7 @@ func buildTaskDocumentation() string {
 				builder.WriteString("**Outputs:**\n")
 
 				for _, output := range desc.Outputs {
-					builder.WriteString(fmt.Sprintf("- `%s` (%s): %s\n", output.Name, output.Type, output.Description))
+					fmt.Fprintf(&builder, "- `%s` (%s): %s\n", output.Name, output.Type, output.Description)
 				}
 
 				builder.WriteString("\n")
