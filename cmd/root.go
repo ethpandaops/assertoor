@@ -40,6 +40,7 @@ var rootCmd = &cobra.Command{
 		default:
 			logr.Fatalf("Invalid log format: %s", logFormat)
 		}
+
 		if verbose {
 			logr.SetLevel(logrus.DebugLevel)
 		}
@@ -49,7 +50,6 @@ var rootCmd = &cobra.Command{
 		if err := coord.Run(cmd.Context()); err != nil {
 			logr.Fatal(err)
 		}
-
 	},
 }
 

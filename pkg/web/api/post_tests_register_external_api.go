@@ -76,7 +76,7 @@ func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.R
 		Schedule:   req.Schedule,
 	}
 	if req.Timeout > 0 {
-		extTestCfg.Timeout = &helper.Duration{Duration: time.Duration(req.Timeout) * time.Second} //nolint:gosec // no overflow possible
+		extTestCfg.Timeout = &helper.Duration{Duration: time.Duration(req.Timeout) * time.Second} //nolint:gosec // G115: timeout value is bounded by API input validation
 	}
 
 	// add test descriptor

@@ -225,7 +225,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		configIndex := 1
 		for config, clientNames := range configMap {
-			diffBuilder.WriteString(fmt.Sprintf("Config variant #%d (clients: %v):\n", configIndex, clientNames))
+			fmt.Fprintf(&diffBuilder, "Config variant #%d (clients: %v):\n", configIndex, clientNames)
 			diffBuilder.WriteString(config)
 			diffBuilder.WriteString("\n\n")
 

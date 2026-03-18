@@ -453,9 +453,9 @@ func FormatValidationIssues(issues []ValidationIssue) string {
 		}
 
 		if issue.Path != "" {
-			sb.WriteString(fmt.Sprintf("%s [%s] %s\n", prefix, issue.Path, issue.Message))
+			fmt.Fprintf(&sb, "%s [%s] %s\n", prefix, issue.Path, issue.Message)
 		} else {
-			sb.WriteString(fmt.Sprintf("%s %s\n", prefix, issue.Message))
+			fmt.Fprintf(&sb, "%s %s\n", prefix, issue.Message)
 		}
 	}
 

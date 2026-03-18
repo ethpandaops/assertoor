@@ -121,11 +121,11 @@ func (t *Task) LoadConfig() error {
 //nolint:gocyclo // no need to reduce complexity
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.SourceStartIndex > 0 {
-		t.nextIndex = uint64(t.config.SourceStartIndex) //nolint:gosec // no overflow possible
+		t.nextIndex = uint64(t.config.SourceStartIndex)
 	}
 
 	if t.config.SourceIndexCount > 0 {
-		t.lastIndex = t.nextIndex + uint64(t.config.SourceIndexCount) //nolint:gosec // no overflow possible
+		t.lastIndex = t.nextIndex + uint64(t.config.SourceIndexCount)
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
@@ -204,7 +204,7 @@ func (t *Task) Execute(ctx context.Context) error {
 				progress := float64(totalCount) / float64(t.config.LimitTotal) * 100
 				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d consolidations", totalCount, t.config.LimitTotal))
 			case t.lastIndex > 0:
-				indexTotal := t.lastIndex - uint64(t.config.SourceStartIndex) //nolint:gosec // no overflow possible
+				indexTotal := t.lastIndex - uint64(t.config.SourceStartIndex) //nolint:gosec // G115: config value is validated non-negative
 				progress := float64(totalCount) / float64(indexTotal) * 100
 				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d consolidations", totalCount, indexTotal))
 			default:

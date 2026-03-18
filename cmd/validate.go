@@ -16,6 +16,7 @@ var validateCmd = &cobra.Command{
 	Run: func(_ *cobra.Command, _ []string) {
 		// Set up minimal logging for error output
 		logrus.SetLevel(logrus.ErrorLevel)
+
 		if verbose {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
