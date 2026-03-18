@@ -36,7 +36,7 @@ func NewDescriptor(testID, testSrc, basePath string, config *types.TestConfig, v
 }
 
 func LoadTestDescriptors(ctx context.Context, globalVars types.Variables, localTests []*types.TestConfig, externalTests []*types.ExternalTestConfig) []types.TestDescriptor {
-	descriptors := []types.TestDescriptor{}
+	descriptors := make([]types.TestDescriptor, 0, len(localTests)+len(externalTests))
 
 	workingDir, err := os.Getwd()
 	if err != nil {

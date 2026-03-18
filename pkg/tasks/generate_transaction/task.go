@@ -402,7 +402,6 @@ func (t *Task) generateTransaction() (*ethtypes.Transaction, error) {
 
 		if t.config.RandomTarget {
 			addrBytes := make([]byte, 20)
-			//nolint:errcheck // ignore
 			rand.Read(addrBytes)
 			addr = common.Address(addrBytes)
 		} else if t.config.TargetAddress != "" {

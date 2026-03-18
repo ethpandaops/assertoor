@@ -102,11 +102,11 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.StartIndex > 0 {
-		t.nextIndex = uint64(t.config.StartIndex) //nolint:gosec // no overflow possible
+		t.nextIndex = uint64(t.config.StartIndex)
 	}
 
 	if t.config.IndexCount > 0 {
-		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount) //nolint:gosec // no overflow possible
+		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount)
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
@@ -132,7 +132,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	if t.config.LimitTotal > 0 {
 		targetCount = t.config.LimitTotal
 	} else if t.lastIndex > 0 {
-		targetCount = int(t.lastIndex - t.nextIndex) //nolint:gosec // no overflow possible
+		targetCount = int(t.lastIndex - t.nextIndex) //nolint:gosec // G115: difference is bounded by config values
 	}
 
 	t.ctx.ReportProgress(0, "Starting voluntary exit generation")
@@ -324,7 +324,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	}
 
 	if t.config.ExitEpoch >= 0 {
-		operation.Epoch = phase0.Epoch(t.config.ExitEpoch) //nolint:gosec // no overflow possible
+		operation.Epoch = phase0.Epoch(t.config.ExitEpoch)
 	} else {
 		currentSlot, _ := client.GetLastHead()
 		operation.Epoch = phase0.Epoch(currentSlot / phase0.Slot(specs.SlotsPerEpoch))

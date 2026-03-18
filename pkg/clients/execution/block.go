@@ -25,7 +25,7 @@ func (block *Block) GetSeenBy() []*Client {
 	block.seenMutex.RLock()
 	defer block.seenMutex.RUnlock()
 
-	clients := []*Client{}
+	clients := make([]*Client, 0, len(block.seenMap))
 	for _, client := range block.seenMap {
 		clients = append(clients, client)
 	}

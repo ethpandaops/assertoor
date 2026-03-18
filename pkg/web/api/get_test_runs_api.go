@@ -31,9 +31,8 @@ func (ah *APIHandler) GetTestRuns(w http.ResponseWriter, r *http.Request) {
 
 	q := r.URL.Query()
 	filterTestID := q.Get("test_id")
-	testRuns := []*GetTestRunsResponse{}
-
 	testInstances, _ := ah.coordinator.GetTestHistory(filterTestID, 0, 0, 100)
+	testRuns := make([]*GetTestRunsResponse, 0, len(testInstances))
 
 	for _, testInstance := range testInstances {
 		testRun := &GetTestRunsResponse{

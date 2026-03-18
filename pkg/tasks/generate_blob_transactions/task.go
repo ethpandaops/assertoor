@@ -308,7 +308,6 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 
 	if t.config.RandomTarget {
 		addrBytes := make([]byte, 20)
-		//nolint:errcheck // ignore
 		rand.Read(addrBytes)
 		toAddr = common.Address(addrBytes)
 	} else if t.config.TargetAddress != "" {
