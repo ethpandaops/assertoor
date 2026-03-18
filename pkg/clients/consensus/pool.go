@@ -113,7 +113,7 @@ func (pool *Pool) GetBuilderSet() []*BuilderInfo {
 		builders := make([]*BuilderInfo, len(state.Gloas.Builders))
 		for i, b := range state.Gloas.Builders {
 			builders[i] = &BuilderInfo{
-				Index:   gloas.BuilderIndex(i),
+				Index:   gloas.BuilderIndex(uint64(i)),
 				Builder: b,
 			}
 		}
@@ -147,7 +147,7 @@ func (pool *Pool) updateValidatorSetFromState(state *spec.VersionedBeaconState) 
 
 	valset := make(map[phase0.ValidatorIndex]*v1.Validator, len(validators))
 	for i, val := range validators {
-		idx := phase0.ValidatorIndex(i)
+		idx := phase0.ValidatorIndex(uint64(i))
 
 		balance := phase0.Gwei(0)
 		if i < len(balances) {
