@@ -25,9 +25,22 @@ type ChainSpec struct {
 	BellatrixForkEpoch   uint64         `yaml:"BELLATRIX_FORK_EPOCH"`
 	CappellaForkVersion  phase0.Version `yaml:"CAPELLA_FORK_VERSION"`
 	CappellaForkEpoch    uint64         `yaml:"CAPELLA_FORK_EPOCH"`
+	DenebForkEpoch       uint64         `yaml:"DENEB_FORK_EPOCH"`
+	ElectraForkEpoch     uint64         `yaml:"ELECTRA_FORK_EPOCH"`
+	FuluForkEpoch        uint64         `yaml:"FULU_FORK_EPOCH"`
+	GloasForkEpoch       uint64         `yaml:"GLOAS_FORK_EPOCH"`
 	SecondsPerSlot       time.Duration  `yaml:"SECONDS_PER_SLOT"`
 	SlotsPerEpoch        uint64         `yaml:"SLOTS_PER_EPOCH"`
 	MaxCommitteesPerSlot uint64         `yaml:"MAX_COMMITTEES_PER_SLOT"`
+}
+
+// IsGloasActive returns true if the gloas fork is active at the given slot.
+func (chain *ChainSpec) IsGloasActive(slot phase0.Slot) bool {
+	if chain.GloasForkEpoch == 0 || chain.SlotsPerEpoch == 0 {
+		return false
+	}
+
+	return uint64(slot) >= chain.GloasForkEpoch*chain.SlotsPerEpoch
 }
 
 func (chain *ChainSpec) CheckMismatch(chain2 *ChainSpec) []string {

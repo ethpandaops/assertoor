@@ -7,6 +7,8 @@ import (
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
+	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/attestantio/go-eth2-client/spec/gloas"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/sirupsen/logrus"
 )
@@ -85,6 +87,120 @@ func (pool *Pool) GetValidatorSet() map[phase0.ValidatorIndex]*v1.Validator {
 
 		return valset
 	})
+}
+
+func (pool *Pool) GetBuilderSet() []*BuilderInfo {
+	return pool.blockCache.getCachedBuilderSet(func() []*BuilderInfo {
+		client := pool.GetReadyEndpoint(AnyClient)
+		if client == nil {
+			pool.logger.Errorf("could not load builder set: no ready client")
+			return nil
+		}
+
+		state, err := client.GetRPCClient().GetState(client.clientCtx, "head")
+		if err != nil {
+			pool.logger.Errorf("could not load beacon state for builder set: %v", err)
+			return nil
+		}
+
+		if state.Version < spec.DataVersionGloas || state.Gloas == nil {
+			return nil
+		}
+
+		// Update validator set cache from the same state
+		pool.updateValidatorSetFromState(state)
+
+		builders := make([]*BuilderInfo, len(state.Gloas.Builders))
+		for i, b := range state.Gloas.Builders {
+			builders[i] = &BuilderInfo{
+				Index:   gloas.BuilderIndex(i),
+				Builder: b,
+			}
+		}
+
+		return builders
+	})
+}
+
+func (pool *Pool) updateValidatorSetFromState(state *spec.VersionedBeaconState) {
+	validators, err := state.Validators()
+	if err != nil || len(validators) == 0 {
+		return
+	}
+
+	balances, err := state.ValidatorBalances()
+	if err != nil {
+		return
+	}
+
+	currentSlot, err := state.Slot()
+	if err != nil {
+		return
+	}
+
+	specs := pool.blockCache.GetSpecs()
+	if specs == nil {
+		return
+	}
+
+	currentEpoch := phase0.Epoch(uint64(currentSlot) / specs.SlotsPerEpoch)
+
+	valset := make(map[phase0.ValidatorIndex]*v1.Validator, len(validators))
+	for i, val := range validators {
+		idx := phase0.ValidatorIndex(i)
+
+		balance := phase0.Gwei(0)
+		if i < len(balances) {
+			balance = balances[i]
+		}
+
+		valset[idx] = &v1.Validator{
+			Index:     idx,
+			Balance:   balance,
+			Status:    computeValidatorStatus(val, currentEpoch),
+			Validator: val,
+		}
+	}
+
+	pool.blockCache.SetValidatorSet(valset)
+}
+
+func computeValidatorStatus(val *phase0.Validator, epoch phase0.Epoch) v1.ValidatorState {
+	farFuture := phase0.Epoch(0xFFFFFFFFFFFFFFFF)
+
+	if val.ActivationEligibilityEpoch == farFuture {
+		return v1.ValidatorStatePendingInitialized
+	}
+
+	if val.ActivationEpoch > epoch {
+		return v1.ValidatorStatePendingQueued
+	}
+
+	if val.ExitEpoch > epoch {
+		if val.Slashed {
+			return v1.ValidatorStateActiveSlashed
+		}
+
+		if val.ExitEpoch == farFuture {
+			return v1.ValidatorStateActiveOngoing
+		}
+
+		return v1.ValidatorStateActiveExiting
+	}
+
+	if val.WithdrawableEpoch > epoch {
+		if val.Slashed {
+			return v1.ValidatorStateExitedSlashed
+		}
+
+		return v1.ValidatorStateExitedUnslashed
+	}
+
+	if val.EffectiveBalance != 0 {
+		return v1.ValidatorStateWithdrawalPossible
+	}
+
+	return v1.ValidatorStateWithdrawalDone
 }
 
 func (pool *Pool) AddEndpoint(endpoint *ClientConfig) (*Client, error) {

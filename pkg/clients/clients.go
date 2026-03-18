@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
@@ -123,35 +124,61 @@ func (pool *ClientPool) processConsensusBlockNotification(poolClient *PoolClient
 		}
 	}()
 
-	subscription := poolClient.ConsensusClient.SubscribeBlockEvent(100)
-	defer subscription.Unsubscribe()
+	blockSubscription := poolClient.ConsensusClient.SubscribeBlockEvent(100)
+	defer blockSubscription.Unsubscribe()
+
+	payloadSubscription := pool.consensusPool.GetBlockCache().SubscribePayloadEvent(100)
+	defer payloadSubscription.Unsubscribe()
 
 	for {
 		select {
 		case <-pool.ctx.Done():
 			return
-		case block := <-subscription.Channel():
-			versionedBlock := block.AwaitBlock(context.Background(), 2*time.Second)
-			if versionedBlock == nil {
-				pool.logger.Warnf("cl/el block notification failed: AwaitBlock timeout (client: %v, slot: %v, root: 0x%x)", poolClient.Config.Name, block.Slot, block.Root)
-				break
-			}
-
-			hash, err := versionedBlock.ExecutionBlockHash()
-			if err != nil {
-				pool.logger.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
-				break
-			}
-
-			number, err := versionedBlock.ExecutionBlockNumber()
-			if err != nil {
-				pool.logger.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
-				break
-			}
-
-			poolClient.ExecutionClient.NotifyNewBlock(common.Hash(hash), number)
+		case block := <-blockSubscription.Channel():
+			pool.notifyELBlockFromBeaconBlock(poolClient, block)
+		case block := <-payloadSubscription.Channel():
+			pool.notifyELBlockFromPayload(poolClient, block)
 		}
 	}
+}
+
+func (pool *ClientPool) notifyELBlockFromBeaconBlock(poolClient *PoolClient, block *consensus.Block) {
+	versionedBlock := block.AwaitBlock(context.Background(), 2*time.Second)
+	if versionedBlock == nil {
+		pool.logger.Warnf("cl/el block notification failed: AwaitBlock timeout (client: %v, slot: %v, root: 0x%x)", poolClient.Config.Name, block.Slot, block.Root)
+		return
+	}
+
+	// For gloas+ blocks, EL info comes from the payload, not the block body
+	if versionedBlock.Version >= spec.DataVersionGloas {
+		return
+	}
+
+	hash, err := versionedBlock.ExecutionBlockHash()
+	if err != nil {
+		pool.logger.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
+		return
+	}
+
+	number, err := versionedBlock.ExecutionBlockNumber()
+	if err != nil {
+		pool.logger.Warnf("cl/el block notification failed: %s (client: %v, slot: %v, root: 0x%x)", err, poolClient.Config.Name, block.Slot, block.Root)
+		return
+	}
+
+	poolClient.ExecutionClient.NotifyNewBlock(common.Hash(hash), number)
+}
+
+func (pool *ClientPool) notifyELBlockFromPayload(poolClient *PoolClient, block *consensus.Block) {
+	payload := block.GetPayload()
+	if payload == nil || payload.Message == nil || payload.Message.Payload == nil {
+		return
+	}
+
+	hash := common.Hash(payload.Message.Payload.BlockHash)
+	number := payload.Message.Payload.BlockNumber
+
+	poolClient.ExecutionClient.NotifyNewBlock(hash, number)
 }
 
 func (pool *ClientPool) GetConsensusPool() *consensus.Pool {

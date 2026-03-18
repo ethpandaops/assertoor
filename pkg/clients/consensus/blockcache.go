@@ -39,12 +39,17 @@ type BlockCache struct {
 	valsetEpoch phase0.Epoch
 	valsetMap   map[phase0.ValidatorIndex]*v1.Validator
 
+	builderMutex sync.Mutex
+	builderEpoch phase0.Epoch
+	builderSet   []*BuilderInfo
+
 	blockMutex   sync.RWMutex
 	blockSlotMap map[phase0.Slot][]*Block
 	blockRootMap map[phase0.Root]*Block
 	maxSlotIdx   int64
 
 	blockDispatcher          Dispatcher[*Block]
+	payloadDispatcher        Dispatcher[*Block]
 	checkpointDispatcher     Dispatcher[*FinalizedCheckpoint]
 	wallclockEpochDispatcher Dispatcher[*ethwallclock.Epoch]
 	wallclockSlotDispatcher  Dispatcher[*ethwallclock.Slot]
@@ -97,6 +102,14 @@ func (cache *BlockCache) SubscribeWallclockSlotEvent(capacity int) *Subscription
 
 func (cache *BlockCache) notifyBlockReady(block *Block) {
 	cache.blockDispatcher.Fire(block)
+}
+
+func (cache *BlockCache) SubscribePayloadEvent(capacity int) *Subscription[*Block] {
+	return cache.payloadDispatcher.Subscribe(capacity)
+}
+
+func (cache *BlockCache) notifyPayloadReady(block *Block) {
+	cache.payloadDispatcher.Fire(block)
 }
 
 func (cache *BlockCache) SetMinFollowDistance(followDistance uint64) {
@@ -266,11 +279,12 @@ func (cache *BlockCache) AddBlock(root phase0.Root, slot phase0.Slot) (*Block, b
 	}
 
 	cacheBlock := &Block{
-		Root:       root,
-		Slot:       slot,
-		seenMap:    make(map[uint16]*Client),
-		headerChan: make(chan bool),
-		blockChan:  make(chan bool),
+		Root:        root,
+		Slot:        slot,
+		seenMap:     make(map[uint16]*Client),
+		headerChan:  make(chan bool),
+		blockChan:   make(chan bool),
+		payloadChan: make(chan bool),
 	}
 	cache.blockRootMap[root] = cacheBlock
 
@@ -341,6 +355,7 @@ func (cache *BlockCache) runCacheCleanup(ctx context.Context) {
 
 		cache.cleanupBlockCache()
 		cache.cleanupValsetCache()
+		cache.cleanupBuilderCache()
 	}
 }
 
@@ -363,6 +378,93 @@ func (cache *BlockCache) cleanupBlockCache() {
 		}
 
 		delete(cache.blockSlotMap, slot)
+	}
+}
+
+func (cache *BlockCache) getCachedBuilderSet(loadFn func() []*BuilderInfo) []*BuilderInfo {
+	wallclock := cache.GetWallclock()
+
+	cache.builderMutex.Lock()
+	defer cache.builderMutex.Unlock()
+
+	epoch := phase0.Epoch(0)
+
+	if wallclock != nil {
+		_, e, _ := wallclock.Now()
+		if e.Number() < math.MaxInt64 {
+			epoch = phase0.Epoch(e.Number())
+		}
+	}
+
+	if cache.builderSet == nil || cache.builderEpoch < epoch {
+		builderSet := loadFn()
+		if builderSet != nil {
+			cache.builderSet = builderSet
+			cache.builderEpoch = epoch
+		}
+	}
+
+	return cache.builderSet
+}
+
+func (cache *BlockCache) SetBuilderSet(builders []*BuilderInfo) {
+	wallclock := cache.GetWallclock()
+
+	cache.builderMutex.Lock()
+	defer cache.builderMutex.Unlock()
+
+	epoch := phase0.Epoch(0)
+
+	if wallclock != nil {
+		_, e, _ := wallclock.Now()
+		if e.Number() < math.MaxInt64 {
+			epoch = phase0.Epoch(e.Number())
+		}
+	}
+
+	cache.builderSet = builders
+	cache.builderEpoch = epoch
+}
+
+func (cache *BlockCache) SetValidatorSet(valset map[phase0.ValidatorIndex]*v1.Validator) {
+	wallclock := cache.GetWallclock()
+
+	cache.valsetMutex.Lock()
+	defer cache.valsetMutex.Unlock()
+
+	epoch := phase0.Epoch(0)
+
+	if wallclock != nil {
+		_, e, _ := wallclock.Now()
+		if e.Number() < math.MaxInt64 {
+			epoch = phase0.Epoch(e.Number())
+		}
+	}
+
+	cache.valsetMap = valset
+	cache.valsetEpoch = epoch
+}
+
+func (cache *BlockCache) cleanupBuilderCache() {
+	if cache.builderSet == nil {
+		return
+	}
+
+	wallclock := cache.GetWallclock()
+	epoch := phase0.Epoch(0)
+
+	if wallclock != nil {
+		_, e, _ := wallclock.Now()
+		if e.Number() < math.MaxInt64 {
+			epoch = phase0.Epoch(e.Number())
+		}
+	}
+
+	cache.builderMutex.Lock()
+	defer cache.builderMutex.Unlock()
+
+	if epoch-cache.builderEpoch >= 2 {
+		cache.builderSet = nil
 	}
 }
 

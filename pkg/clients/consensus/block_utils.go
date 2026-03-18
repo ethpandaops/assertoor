@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/attestantio/go-eth2-client/spec/gloas"
 )
 
 func GetExecutionExtraData(v *spec.VersionedSignedBeaconBlock) ([]byte, error) {
@@ -23,13 +24,36 @@ func GetExecutionExtraData(v *spec.VersionedSignedBeaconBlock) ([]byte, error) {
 		return v.Capella.Message.Body.ExecutionPayload.ExtraData, nil
 	case spec.DataVersionDeneb:
 		if v.Deneb == nil || v.Deneb.Message == nil || v.Deneb.Message.Body == nil || v.Deneb.Message.Body.ExecutionPayload == nil {
-			return nil, errors.New("no denb block")
+			return nil, errors.New("no deneb block")
 		}
 
 		return v.Deneb.Message.Body.ExecutionPayload.ExtraData, nil
+	case spec.DataVersionElectra:
+		if v.Electra == nil || v.Electra.Message == nil || v.Electra.Message.Body == nil || v.Electra.Message.Body.ExecutionPayload == nil {
+			return nil, errors.New("no electra block")
+		}
+
+		return v.Electra.Message.Body.ExecutionPayload.ExtraData, nil
+	case spec.DataVersionFulu:
+		if v.Fulu == nil || v.Fulu.Message == nil || v.Fulu.Message.Body == nil || v.Fulu.Message.Body.ExecutionPayload == nil {
+			return nil, errors.New("no fulu block")
+		}
+
+		return v.Fulu.Message.Body.ExecutionPayload.ExtraData, nil
+	case spec.DataVersionGloas:
+		return nil, errors.New("gloas extra data is in separate payload")
 	default:
 		return nil, errors.New("unknown version")
 	}
+}
+
+// GetPayloadExtraData returns the extra data from a gloas execution payload envelope.
+func GetPayloadExtraData(payload *gloas.SignedExecutionPayloadEnvelope) ([]byte, error) {
+	if payload == nil || payload.Message == nil || payload.Message.Payload == nil {
+		return nil, errors.New("no payload")
+	}
+
+	return payload.Message.Payload.ExtraData, nil
 }
 
 func GetBlockBody(v *spec.VersionedSignedBeaconBlock) any {
@@ -45,6 +69,12 @@ func GetBlockBody(v *spec.VersionedSignedBeaconBlock) any {
 		return v.Capella
 	case spec.DataVersionDeneb:
 		return v.Deneb
+	case spec.DataVersionElectra:
+		return v.Electra
+	case spec.DataVersionFulu:
+		return v.Fulu
+	case spec.DataVersionGloas:
+		return v.Gloas
 	default:
 		return nil
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/attestantio/go-eth2-client/http"
 	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/capella"
+	"github.com/attestantio/go-eth2-client/spec/gloas"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/rs/zerolog"
 	"github.com/sirupsen/logrus"
@@ -332,6 +333,29 @@ func (bc *BeaconClient) GetBlockHeaderBySlot(ctx context.Context, slot phase0.Sl
 		},
 	})
 	if err != nil {
+		return nil, err
+	}
+
+	return result.Data, nil
+}
+
+func (bc *BeaconClient) GetExecutionPayloadByBlockroot(ctx context.Context, blockroot phase0.Root) (*gloas.SignedExecutionPayloadEnvelope, error) {
+	provider, isProvider := bc.clientSvc.(eth2client.ExecutionPayloadProvider)
+	if !isProvider {
+		return nil, fmt.Errorf("get execution payload not supported")
+	}
+
+	result, err := provider.SignedExecutionPayloadEnvelope(ctx, &api.SignedExecutionPayloadEnvelopeOpts{
+		Block: fmt.Sprintf("0x%x", blockroot),
+		Common: api.CommonOpts{
+			Timeout: 0,
+		},
+	})
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "GET failed with status 404") {
+			return nil, nil
+		}
+
 		return nil, err
 	}
 
