@@ -145,6 +145,14 @@ func (cache *BlockCache) SetClientSpecs(specValues map[string]interface{}) error
 		return err
 	}
 
+	if specs.SlotDurationMs == 0 {
+		if secondsPerSlot, ok := specValues["SECONDS_PER_SLOT"]; ok {
+			if v, vOk := secondsPerSlot.(time.Duration); vOk {
+				specs.SlotDurationMs = uint64(v.Milliseconds()) //nolint:gosec // G115: SECONDS_PER_SLOT is always a small positive value
+			}
+		}
+	}
+
 	if cache.specs != nil {
 		mismatches := cache.specs.CheckMismatch(&specs)
 		if len(mismatches) > 0 {
@@ -185,7 +193,12 @@ func (cache *BlockCache) InitWallclock() {
 		return
 	}
 
-	cache.wallclock = ethwallclock.NewEthereumBeaconChain(cache.genesis.GenesisTime, specs.SecondsPerSlot, specs.SlotsPerEpoch)
+	if specs.SlotDurationMs == 0 || specs.SlotsPerEpoch == 0 {
+		return
+	}
+
+	slotDuration := time.Duration(specs.SlotDurationMs) * time.Millisecond //nolint:gosec // G115: slot duration values won't overflow int64
+	cache.wallclock = ethwallclock.NewEthereumBeaconChain(cache.genesis.GenesisTime, slotDuration, specs.SlotsPerEpoch)
 	cache.wallclock.OnEpochChanged(func(current ethwallclock.Epoch) {
 		cache.wallclockEpochDispatcher.Fire(&current)
 	})
