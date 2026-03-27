@@ -196,7 +196,7 @@ func (cache *BlockCache) InitWallclock() {
 	}
 
 	if specs.SlotDurationMs == 0 || specs.SlotsPerEpoch == 0 {
-		cache.logger.Errorf("cannot initialize wallclock: SlotDurationMs=%d, SlotsPerEpoch=%d", specs.SlotDurationMs, specs.SlotsPerEpoch)
+		cache.logger.Errorf("cannot initialize wallclock: neither SLOT_DURATION_MS nor SECONDS_PER_SLOT are available from the beacon API (SlotDurationMs=%d, SlotsPerEpoch=%d)", specs.SlotDurationMs, specs.SlotsPerEpoch)
 		return
 	}
 
