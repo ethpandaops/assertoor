@@ -19,6 +19,7 @@ import (
 )
 
 type BlockCache struct {
+	logger         logrus.FieldLogger
 	followDistance uint32
 
 	specMutex sync.RWMutex
@@ -56,6 +57,7 @@ func NewBlockCache(ctx context.Context, logger logrus.FieldLogger, followDistanc
 	}
 
 	cache := BlockCache{
+		logger:         logger,
 		followDistance: followDistance,
 		blockSlotMap:   make(map[phase0.Slot][]*Block),
 		blockRootMap:   make(map[phase0.Root]*Block),
@@ -194,6 +196,7 @@ func (cache *BlockCache) InitWallclock() {
 	}
 
 	if specs.SlotDurationMs == 0 || specs.SlotsPerEpoch == 0 {
+		cache.logger.Errorf("cannot initialize wallclock: SlotDurationMs=%d, SlotsPerEpoch=%d", specs.SlotDurationMs, specs.SlotsPerEpoch)
 		return
 	}
 
