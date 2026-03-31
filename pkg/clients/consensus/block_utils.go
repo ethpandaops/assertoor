@@ -6,6 +6,7 @@ import (
 	"github.com/attestantio/go-eth2-client/spec"
 )
 
+//nolint:gocyclo // switch over all fork versions
 func GetExecutionExtraData(v *spec.VersionedSignedBeaconBlock) ([]byte, error) {
 	//nolint:exhaustive // ignore
 	switch v.Version {
