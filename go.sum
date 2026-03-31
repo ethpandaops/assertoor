@@ -13,8 +13,6 @@ github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608
 github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6/go.mod h1:ioLG6R+5bUSO1oeGSDxOV3FADARuMoytZCSX6MEMQkI=
 github.com/VictoriaMetrics/fastcache v1.13.0 h1:AW4mheMR5Vd9FkAPUv+NH6Nhw+fmbTMGMsNAoA/+4G0=
 github.com/VictoriaMetrics/fastcache v1.13.0/go.mod h1:hHXhl4DA2fTL2HTZDJFXWgW0LNjo6B+4aj2Wmng3TjU=
-github.com/barnabasbusa/go-eth2-client v0.0.0-20260331081005-db190554167c h1:zufrjIDjhR9OJxBNHq4tHwm9Lzx4YlmoYlmLbrbJcM0=
-github.com/barnabasbusa/go-eth2-client v0.0.0-20260331081005-db190554167c/go.mod h1:lwj0l8l51hIjqdQpODPea01JfE33nyM++1VGjBZau08=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bits-and-blooms/bitset v1.20.0 h1:2F+rfL86jE2d/bmw7OhqUg2Sj/1rURkBn3MdfoPyRVU=
@@ -258,6 +256,8 @@ github.com/pion/transport/v3 v3.0.1 h1:gDTlPJwROfSfz6QfSi0ZmeCSkFcnWWiiR9ES0ouAN
 github.com/pion/transport/v3 v3.0.1/go.mod h1:UY7kiITrlMv7/IKgd5eTUcaahZx5oUN3l9SzK5f5xE0=
 github.com/pk910/dynamic-ssz v1.2.2 h1:dyvewnBFKGJQUVQjGhS0+LdX95xhFRh7+d7hIq3OnvQ=
 github.com/pk910/dynamic-ssz v1.2.2/go.mod h1:HXRWLNcgj3DL65Kznrb+RdL3DEKw2JBZ/6crooqGoII=
+github.com/pk910/go-eth2-client v0.0.0-20260331085057-05aefaa5ce81 h1:mHgrerDiro/np9FCoJ19EYsCyl/CXMHFi34o+j3T+rE=
+github.com/pk910/go-eth2-client v0.0.0-20260331085057-05aefaa5ce81/go.mod h1:lwj0l8l51hIjqdQpODPea01JfE33nyM++1VGjBZau08=
 github.com/pk910/hashtree-bindings v0.0.1 h1:Sw+UlPlrBle4LUg04kqLFybVQcfmamwKL1QsrR3GU0g=
 github.com/pk910/hashtree-bindings v0.0.1/go.mod h1:eayIpxMFkWzMsydESu/5bV8wglZzSE/c9mq6DQdn204=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
