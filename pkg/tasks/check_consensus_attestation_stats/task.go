@@ -469,27 +469,21 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 
 			attestationsVersioned, err := blockBody.Attestations()
 			if err != nil {
-				t.logger.Warnf("aggregateEpochVotes slot %v: Attestations() error: %v", slot, err)
 				continue
 			}
-
-			t.logger.Infof("aggregateEpochVotes slot %v: %v attestations, version %v, maxCommittees %v", slot, len(attestationsVersioned), blockBody.Version, specs.MaxCommitteesPerSlot)
 
 			for attIdx, att := range attestationsVersioned {
 				attData, err1 := att.Data()
 				if err1 != nil {
-					t.logger.Warnf("aggregateEpochVotes slot %v att %v: Data() error: %v", slot, attIdx, err1)
 					continue
 				}
 
 				if uint64(attData.Slot)/specs.SlotsPerEpoch != epoch {
-					t.logger.Infof("aggregateEpochVotes slot %v att %v: skip epoch mismatch (att epoch %v, want %v)", slot, attIdx, uint64(attData.Slot)/specs.SlotsPerEpoch, epoch)
 					continue
 				}
 
 				attAggregationBits, err := att.AggregationBits()
 				if err != nil {
-					t.logger.Warnf("aggregateEpochVotes slot %v att %v: AggregationBits() error: %v", slot, attIdx, err)
 					continue
 				}
 
@@ -501,25 +495,26 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 					// there can now be attestations from all committees aggregated into a single attestation aggregate
 					committeeBits, err := att.CommitteeBits()
 					if err != nil {
-						t.logger.Warnf("aggregateEpochVotes slot %v att %v: CommitteeBits() error: %v", slot, attIdx, err)
+						t.logger.Debugf("aggregateEpochVotes slot %v failed, can't get committeeBits for attestation %v: %v", slot, attIdx, err)
 						continue
 					}
-
-					t.logger.Infof("aggregateEpochVotes slot %v att %v: electra+ path, committeeBits=%x, aggBitsLen=%v, attSlot=%v", slot, attIdx, []byte(committeeBits), attAggregationBits.Len(), attData.Slot)
 
 					aggregationBitsOffset := uint64(0)
 
 					for committee := uint64(0); committee < specs.MaxCommitteesPerSlot; committee++ {
-						if !committeeBits.BitAt(committee) {
-							continue
+						// Workaround for go-bitfield Bitvector64 requiring exactly 8 bytes.
+						// With minimal preset, committeeBits may be shorter. Check raw bytes directly.
+						byteIdx := committee / 8
+						bitIdx := committee % 8
+
+						hasBit := false
+						if int(byteIdx) < len(committeeBits) {
+							hasBit = committeeBits[byteIdx]&(1<<bitIdx) != 0
 						}
 
-						attKey := fmt.Sprintf("%v-%v", uint64(attData.Slot), committee)
-						dutyCount := 0
-						if votes.attesterDuties != nil && votes.attesterDuties.duties[attKey] != nil {
-							dutyCount = len(votes.attesterDuties.duties[attKey])
+						if !hasBit {
+							continue
 						}
-						t.logger.Infof("aggregateEpochVotes slot %v att %v committee %v: key=%v, duties=%v", slot, attIdx, committee, attKey, dutyCount)
 
 						voteAmt, voteCnt, committeeSize := t.aggregateAttestationVotes(votes, uint64(attData.Slot), committee, attAggregationBits, 0)
 						voteAmount += voteAmt
