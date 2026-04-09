@@ -29,7 +29,7 @@ type ChainSpec struct {
 	ElectraForkEpoch     uint64         `yaml:"ELECTRA_FORK_EPOCH"`
 	FuluForkEpoch        uint64         `yaml:"FULU_FORK_EPOCH"`
 	GloasForkEpoch       uint64         `yaml:"GLOAS_FORK_EPOCH"`
-	SecondsPerSlot       time.Duration  `yaml:"SECONDS_PER_SLOT"`
+	SlotDurationMs       uint64         `yaml:"SLOT_DURATION_MS"`
 	SlotsPerEpoch        uint64         `yaml:"SLOTS_PER_EPOCH"`
 	MaxCommitteesPerSlot uint64         `yaml:"MAX_COMMITTEES_PER_SLOT"`
 }
