@@ -25,7 +25,7 @@ type ChainSpec struct {
 	BellatrixForkEpoch   uint64         `yaml:"BELLATRIX_FORK_EPOCH"`
 	CappellaForkVersion  phase0.Version `yaml:"CAPELLA_FORK_VERSION"`
 	CappellaForkEpoch    uint64         `yaml:"CAPELLA_FORK_EPOCH"`
-	SecondsPerSlot       time.Duration  `yaml:"SECONDS_PER_SLOT"`
+	SlotDurationMs       uint64         `yaml:"SLOT_DURATION_MS"`
 	SlotsPerEpoch        uint64         `yaml:"SLOTS_PER_EPOCH"`
 	MaxCommitteesPerSlot uint64         `yaml:"MAX_COMMITTEES_PER_SLOT"`
 }
