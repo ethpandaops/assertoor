@@ -215,11 +215,14 @@ func (t *Task) processClientCheck(client *clients.PoolClient, syncStatus *rpc.Sy
 
 func (t *Task) getClientInfo(client *clients.PoolClient, syncStatus *rpc.SyncStatus) *ClientInfo {
 	clientInfo := &ClientInfo{
-		Name:          client.Config.Name,
-		Synchronizing: syncStatus.IsSyncing,
-		Optimistic:    syncStatus.IsOptimistic,
-		SyncHead:      syncStatus.HeadSlot,
-		SyncDistance:  syncStatus.SyncDistance,
+		Name: client.Config.Name,
+	}
+
+	if syncStatus != nil {
+		clientInfo.Synchronizing = syncStatus.IsSyncing
+		clientInfo.Optimistic = syncStatus.IsOptimistic
+		clientInfo.SyncHead = syncStatus.HeadSlot
+		clientInfo.SyncDistance = syncStatus.SyncDistance
 	}
 
 	return clientInfo
