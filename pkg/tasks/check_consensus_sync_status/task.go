@@ -214,16 +214,21 @@ func (t *Task) processClientCheck(client *clients.PoolClient, syncStatus *rpc.Sy
 }
 
 func (t *Task) getClientInfo(client *clients.PoolClient, syncStatus *rpc.SyncStatus) *ClientInfo {
-	clientInfo := &ClientInfo{
-		Name: client.Config.Name,
+	if syncStatus == nil {
+		// RPC failed — return skeletal info without dereferencing.
+		return &ClientInfo{
+			Name:          client.Config.Name,
+			Synchronizing: true, // assume unhealthy when status is unknown
+			SyncHead:      0,
+			SyncDistance:  0,
+		}
 	}
 
-	if syncStatus != nil {
-		clientInfo.Synchronizing = syncStatus.IsSyncing
-		clientInfo.Optimistic = syncStatus.IsOptimistic
-		clientInfo.SyncHead = syncStatus.HeadSlot
-		clientInfo.SyncDistance = syncStatus.SyncDistance
+	return &ClientInfo{
+		Name:          client.Config.Name,
+		Synchronizing: syncStatus.IsSyncing,
+		Optimistic:    syncStatus.IsOptimistic,
+		SyncHead:      syncStatus.HeadSlot,
+		SyncDistance:  syncStatus.SyncDistance,
 	}
-
-	return clientInfo
 }
