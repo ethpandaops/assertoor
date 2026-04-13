@@ -36,7 +36,7 @@ tasks:
     config:
       testFile: /tests/execution-spec-tests-execute.yaml
       testConfig:
-        gitRepo: https://github.com/ethereum/execution-spec.git
+        gitRepo: https://github.com/ethereum/execution-specs.git
         runTests: false
       testConfigVars:
         specTestsPath: "tasks.tempdir.outputs.path"

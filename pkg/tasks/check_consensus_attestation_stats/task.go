@@ -502,7 +502,17 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 					aggregationBitsOffset := uint64(0)
 
 					for committee := uint64(0); committee < specs.MaxCommitteesPerSlot; committee++ {
-						if !committeeBits.BitAt(committee) {
+						// Workaround for go-bitfield Bitvector64 requiring exactly 8 bytes.
+						// With minimal preset, committeeBits may be shorter. Check raw bytes directly.
+						byteIdx := committee / 8
+						bitIdx := committee % 8
+
+						hasBit := false
+						if int(byteIdx) < len(committeeBits) {
+							hasBit = committeeBits[byteIdx]&(1<<bitIdx) != 0
+						}
+
+						if !hasBit {
 							continue
 						}
 
