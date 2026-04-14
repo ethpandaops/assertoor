@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -20,6 +19,8 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/types"
+	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
+	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/ethpandaops/spamoor/spamoor"
 	"github.com/ethpandaops/spamoor/txbuilder"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
@@ -151,6 +152,14 @@ func (t *Task) Execute(ctx context.Context) error {
 	if t.config.LimitPerSlot > 0 {
 		subscription = t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
 		defer subscription.Unsubscribe()
+	}
+
+	// Subscribe early so we don't miss the block containing the deposit.
+	// With EIP-6110, deposits are included in the same beacon block as the EL transaction.
+	var inclusionSubscription *consensus.Subscription[*consensus.Block]
+	if t.config.AwaitInclusion {
+		inclusionSubscription = t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
+		defer inclusionSubscription.Unsubscribe()
 	}
 
 	var pendingChan chan bool
@@ -328,7 +337,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	// Await inclusion in beacon blocks if configured
 	if t.config.AwaitInclusion && len(validatorPubkeys) > 0 {
-		err := t.awaitInclusion(ctx, validatorPubkeys, totalCount)
+		err := t.awaitInclusion(ctx, inclusionSubscription, validatorPubkeys, totalCount)
 		if err != nil {
 			return err
 		}
@@ -337,10 +346,7 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) awaitInclusion(ctx context.Context, validatorPubkeys []string, totalCount int) error {
-	blockSubscription := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
-	defer blockSubscription.Unsubscribe()
-
+func (t *Task) awaitInclusion(ctx context.Context, blockSubscription *consensus.Subscription[*consensus.Block], validatorPubkeys []string, totalCount int) error {
 	// Create a map of pending pubkeys for faster lookup
 	pendingPubkeys := make(map[string]bool, len(validatorPubkeys))
 	for _, pubkey := range validatorPubkeys {
@@ -363,30 +369,57 @@ func (t *Task) awaitInclusion(ctx context.Context, validatorPubkeys []string, to
 				continue
 			}
 
+			// Check old-style deposits (pre-Electra)
 			deposits, err := blockData.Deposits()
-			if err != nil {
-				t.logger.Warnf("could not get deposits from block %v: %v", block.Slot, err)
-				continue
+			if err == nil {
+				for _, deposit := range deposits {
+					pubkeyStr := deposit.Data.PublicKey.String()
+					if pendingPubkeys[pubkeyStr] {
+						delete(pendingPubkeys, pubkeyStr)
+
+						includedCount++
+					}
+				}
 			}
 
-			for _, deposit := range deposits {
-				pubkeyStr := deposit.Data.PublicKey.String()
-				if !pendingPubkeys[pubkeyStr] {
-					continue
+			// Check EIP-6110 deposit requests from execution requests
+			if blockData.Version >= spec.DataVersionGloas {
+				// GLOAS: execution requests are in the separate payload envelope
+				payload := block.AwaitPayload(ctx, 2*time.Second)
+				if payload != nil && payload.Message != nil && payload.Message.ExecutionRequests != nil {
+					for _, depositReq := range payload.Message.ExecutionRequests.Deposits {
+						pubkeyStr := depositReq.Pubkey.String()
+						if pendingPubkeys[pubkeyStr] {
+							delete(pendingPubkeys, pubkeyStr)
+
+							includedCount++
+						}
+					}
 				}
+			} else {
+				// Electra: execution requests are in the beacon block body
+				execRequests, err := blockData.ExecutionRequests()
+				if err == nil && execRequests != nil {
+					for _, depositReq := range execRequests.Deposits {
+						pubkeyStr := depositReq.Pubkey.String()
+						if pendingPubkeys[pubkeyStr] {
+							delete(pendingPubkeys, pubkeyStr)
 
-				delete(pendingPubkeys, pubkeyStr)
+							includedCount++
+						}
+					}
+				}
+			}
 
-				includedCount++
+			t.ctx.Outputs.SetVar("includedDeposits", includedCount)
 
-				t.ctx.Outputs.SetVar("includedDeposits", includedCount)
-				t.logger.Infof("Deposit for validator %s included in block %d (%d/%d)",
-					pubkeyStr, block.Slot, includedCount, totalCount)
-
-				// Calculate progress: 50% for generation + 50% for inclusion
+			if includedCount > 0 {
 				inclusionProgress := float64(includedCount) / float64(totalCount) * 50
 				t.ctx.ReportProgress(50+inclusionProgress,
 					fmt.Sprintf("Awaiting inclusion: %d/%d deposits included", includedCount, totalCount))
+
+				t.logger.Infof("deposits included in block %d (%d/%d)",
+					block.Slot, includedCount, totalCount)
 			}
 		}
 	}

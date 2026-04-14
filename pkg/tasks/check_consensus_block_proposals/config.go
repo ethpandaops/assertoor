@@ -5,6 +5,7 @@ import "math/big"
 type Config struct {
 	CheckLookback                int    `yaml:"checkLookback" json:"checkLookback" desc:"Number of slots to look back when checking for block proposals."`
 	BlockCount                   int    `yaml:"blockCount" json:"blockCount" desc:"Number of matching blocks required to pass the check."`
+	PayloadTimeout               int    `yaml:"payloadTimeout" json:"payloadTimeout" desc:"Timeout in seconds to wait for execution payload (gloas+). Default: 12"`
 	GraffitiPattern              string `yaml:"graffitiPattern" json:"graffitiPattern" desc:"Regex pattern to match block graffiti."`
 	ValidatorNamePattern         string `yaml:"validatorNamePattern" json:"validatorNamePattern" desc:"Regex pattern to match validator names."`
 	ExtraDataPattern             string `yaml:"extraDataPattern" json:"extraDataPattern" desc:"Regex pattern to match execution payload extra data."`

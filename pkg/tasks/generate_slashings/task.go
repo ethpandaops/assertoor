@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/attestantio/go-eth2-client/api/v1"
-	"github.com/attestantio/go-eth2-client/spec"
-	"github.com/attestantio/go-eth2-client/spec/phase0"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/types"
+	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
+	"github.com/ethpandaops/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/tree"
@@ -224,8 +224,8 @@ func (t *Task) awaitInclusion(ctx context.Context, pendingValidators map[phase0.
 			// Check attester slashings
 			attSlashings, err := blockData.AttesterSlashings()
 			if err == nil {
-				for _, slashing := range attSlashings {
-					t.checkAttesterSlashing(slashing, pendingValidators, &includedCount, totalCount, block.Slot)
+				for i := range attSlashings {
+					t.checkAttesterSlashing(&attSlashings[i], pendingValidators, &includedCount, totalCount, block.Slot)
 				}
 			}
 
@@ -259,7 +259,7 @@ func (t *Task) awaitInclusion(ctx context.Context, pendingValidators map[phase0.
 	return nil
 }
 
-func (t *Task) checkAttesterSlashing(slashing spec.VersionedAttesterSlashing, pendingValidators map[phase0.ValidatorIndex]bool, includedCount *int, totalCount int, slot phase0.Slot) {
+func (t *Task) checkAttesterSlashing(slashing *spec.VersionedAttesterSlashing, pendingValidators map[phase0.ValidatorIndex]bool, includedCount *int, totalCount int, slot phase0.Slot) {
 	att1, err1 := slashing.Attestation1()
 	att2, err2 := slashing.Attestation2()
 
