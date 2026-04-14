@@ -224,8 +224,8 @@ func (t *Task) awaitInclusion(ctx context.Context, pendingValidators map[phase0.
 			// Check attester slashings
 			attSlashings, err := blockData.AttesterSlashings()
 			if err == nil {
-				for _, slashing := range attSlashings {
-					t.checkAttesterSlashing(slashing, pendingValidators, &includedCount, totalCount, block.Slot)
+				for i := range attSlashings {
+					t.checkAttesterSlashing(&attSlashings[i], pendingValidators, &includedCount, totalCount, block.Slot)
 				}
 			}
 
@@ -259,7 +259,7 @@ func (t *Task) awaitInclusion(ctx context.Context, pendingValidators map[phase0.
 	return nil
 }
 
-func (t *Task) checkAttesterSlashing(slashing spec.VersionedAttesterSlashing, pendingValidators map[phase0.ValidatorIndex]bool, includedCount *int, totalCount int, slot phase0.Slot) {
+func (t *Task) checkAttesterSlashing(slashing *spec.VersionedAttesterSlashing, pendingValidators map[phase0.ValidatorIndex]bool, includedCount *int, totalCount int, slot phase0.Slot) {
 	att1, err1 := slashing.Attestation1()
 	att2, err2 := slashing.Attestation2()
 
