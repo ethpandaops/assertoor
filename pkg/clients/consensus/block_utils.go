@@ -3,8 +3,8 @@ package consensus
 import (
 	"errors"
 
-	"github.com/attestantio/go-eth2-client/spec"
-	"github.com/attestantio/go-eth2-client/spec/gloas"
+	"github.com/ethpandaops/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec/gloas"
 )
 
 func GetExecutionExtraData(v *spec.VersionedSignedBeaconBlock) ([]byte, error) {

@@ -7,11 +7,11 @@ import (
 	"runtime/debug"
 	"time"
 
-	v1 "github.com/attestantio/go-eth2-client/api/v1"
-	"github.com/attestantio/go-eth2-client/spec"
-	"github.com/attestantio/go-eth2-client/spec/gloas"
-	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus/rpc"
+	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
+	"github.com/ethpandaops/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec/gloas"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
 func (client *Client) runClientLoop() {
@@ -61,7 +61,7 @@ func (client *Client) checkClient() error {
 
 	err := client.rpcClient.Initialize(ctx)
 	if err != nil {
-		return fmt.Errorf("initialization of attestantio/go-eth2-client failed: %w", err)
+		return fmt.Errorf("initialization of ethpandaops/go-eth2-client failed: %w", err)
 	}
 
 	// get node version
