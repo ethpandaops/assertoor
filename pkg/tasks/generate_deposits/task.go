@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
-	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -21,6 +19,8 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/types"
+	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
+	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/ethpandaops/spamoor/spamoor"
 	"github.com/ethpandaops/spamoor/txbuilder"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"

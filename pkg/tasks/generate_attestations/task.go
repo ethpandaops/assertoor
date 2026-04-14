@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
-	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus/rpc"
 	"github.com/ethpandaops/assertoor/pkg/types"
+	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/tree"

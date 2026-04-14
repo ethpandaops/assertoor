@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"time"
 
-	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/types"
+	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/sirupsen/logrus"
 )
 

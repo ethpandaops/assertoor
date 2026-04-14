@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethpandaops/go-eth2-client/spec"
-	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/types"
+	"github.com/ethpandaops/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/prysmaticlabs/go-bitfield"
 	"github.com/sirupsen/logrus"
 )

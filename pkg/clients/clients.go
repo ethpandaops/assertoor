@@ -9,11 +9,11 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/events"
+	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/sirupsen/logrus"
 )
 
