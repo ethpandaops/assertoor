@@ -77,8 +77,8 @@ github.com/ethpandaops/ethwallclock v0.4.0 h1:+sgnhf4pk6hLPukP076VxkiLloE4L0Yk1y
 github.com/ethpandaops/ethwallclock v0.4.0/go.mod h1:y0Cu+mhGLlem19vnAV2x0hpFS5KZ7oOi2SWYayv9l24=
 github.com/ethpandaops/go-eth2-client v0.1.0 h1:migUQIIL3fcWWMmIwF4Rh05rvJPuj+LOgDJkIWZ+gIE=
 github.com/ethpandaops/go-eth2-client v0.1.0/go.mod h1:9BBd/XIw1egZTkxtFGMvgXnsxX6ypKHKNKD7itqjmNQ=
-github.com/ethpandaops/spamoor v1.1.18-0.20260421141019-5ecd3bd1d0df h1:ZM/fQG/aWrlXx0Xz+Kbwe9bcRqq1VsC4qE8EJF7lynY=
-github.com/ethpandaops/spamoor v1.1.18-0.20260421141019-5ecd3bd1d0df/go.mod h1:yIlLAi2zE4ZPdXT0m3QrhXmr7kQ6CMizWqsTg0KdS7U=
+github.com/ethpandaops/spamoor v1.1.18-0.20260421142639-8bafea9ccf8b h1:JIqvxvjPSJhTZFyFowjwnBkcB/4NiwexUdc286yLves=
+github.com/ethpandaops/spamoor v1.1.18-0.20260421142639-8bafea9ccf8b/go.mod h1:yIlLAi2zE4ZPdXT0m3QrhXmr7kQ6CMizWqsTg0KdS7U=
 github.com/fatih/color v1.16.0 h1:zmkK9Ngbjj+K0yRhTVONQh1p/HknKYSlNT+vZCzyokM=
 github.com/fatih/color v1.16.0/go.mod h1:fL2Sau1YI5c0pdGEVCbKQbLXB6edEj1ZgiY4NijnWvE=
 github.com/ferranbt/fastssz v0.1.4 h1:OCDB+dYDEQDvAgtAGnTSidK1Pe2tW3nFV40XyMkTeDY=
