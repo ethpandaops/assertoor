@@ -89,7 +89,7 @@ tasks:
               title: "Send tx from wallet ${walletIndex}"
               config:
                 feeCap: 5000000000 # 5 gwei
-                gasLimit: 21000
+                gasLimit: 150000
                 value: 100000000000000000 # 0.1 ETH
                 targetAddress: "0x1111111111111111111111111111111111111111"
                 awaitReceipt: true
@@ -226,7 +226,7 @@ tasks:
               title: "Send tx from wallet ${walletIndex}"
               config:
                 feeCap: 5000000000 # 5 gwei
-                gasLimit: 21000
+                gasLimit: 150000
                 value: 100000000000000000 # 0.1 ETH
                 targetAddress: "0x1111111111111111111111111111111111111111"
                 awaitReceipt: true
