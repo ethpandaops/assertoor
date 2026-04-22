@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation, useMatch, matchPath } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme';
 import { UserDisplay } from '../auth/UserDisplay';
+import { getVersion } from '../../api/client';
+import type { VersionResponse } from '../../types/api';
 
 const navItems = [
   { path: '/', label: 'Dashboard' },
@@ -15,6 +18,13 @@ function Layout() {
   const { theme, toggleTheme } = useTheme();
   const isTestRunPage = useMatch('/run/:runId');
   const isBuilderPage = matchPath('/builder', location.pathname);
+  const [version, setVersion] = useState<VersionResponse | null>(null);
+
+  useEffect(() => {
+    getVersion()
+      .then(setVersion)
+      .catch(() => setVersion(null));
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -83,6 +93,20 @@ function Layout() {
         <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-6">
           <p className="text-center text-sm text-[var(--color-text-tertiary)]">
             Assertoor - Ethereum Test Orchestration
+            {version?.version && (
+              <>
+                {' | '}
+                {version.release ? `${version.release} ` : ''}
+                <a
+                  href={`https://github.com/ethpandaops/assertoor/commit/${version.version}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono hover:underline"
+                >
+                  git-{version.version}
+                </a>
+              </>
+            )}
           </p>
         </div>
       </footer>

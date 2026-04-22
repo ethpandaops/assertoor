@@ -1119,6 +1119,39 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/v1/version": {
+            "get": {
+                "description": "Returns the build version (commit hash) and release of the running Assertoor binary.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Config"
+                ],
+                "summary": "Get build version information",
+                "operationId": "getVersion",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.GetVersionResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1606,6 +1639,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "source": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetVersionResponse": {
+            "type": "object",
+            "properties": {
+                "release": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "string"
                 }
             }

@@ -181,6 +181,12 @@ export interface GlobalVariablesResponse {
   names: string[];
 }
 
+// Build version info (from /api/v1/version)
+export interface VersionResponse {
+  version: string;
+  release: string;
+}
+
 // Client data
 export interface ClientData {
   index: number;
