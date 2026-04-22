@@ -10,6 +10,7 @@ import type {
   ClientsPage,
   GlobalVariablesResponse,
   ScheduleTestRunRequest,
+  VersionResponse,
 } from '../types/api';
 import { authStore } from '../stores/authStore';
 
@@ -119,6 +120,11 @@ export async function getTaskDescriptor(name: string): Promise<TaskDescriptor> {
 // Global variable names (auth required)
 export async function getGlobalVariables(): Promise<GlobalVariablesResponse> {
   return fetchApiWithAuth<GlobalVariablesResponse>('/global_variables');
+}
+
+// Build version info
+export async function getVersion(): Promise<VersionResponse> {
+  return fetchApi<VersionResponse>('/version');
 }
 
 // Admin operations (require authentication)

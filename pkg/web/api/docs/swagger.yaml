@@ -323,6 +323,13 @@ definitions:
       source:
         type: string
     type: object
+  web_api.GetVersionResponse:
+    properties:
+      release:
+        type: string
+      version:
+        type: string
+    type: object
   web_api.LogEntry:
     properties:
       data:
@@ -1185,6 +1192,26 @@ paths:
       summary: Register new test via external test configuration
       tags:
       - Test
+  /api/v1/version:
+    get:
+      description: Returns the build version (commit hash) and release of the running
+        Assertoor binary.
+      operationId: getVersion
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetVersionResponse'
+              type: object
+      summary: Get build version information
+      tags:
+      - Config
 swagger: "2.0"
 tags:
 - description: All endpoints related to test definitions
