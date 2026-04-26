@@ -1,0 +1,461 @@
+id: bal-devnet-4-eels-tests
+name: "bal-devnet-4: Run EELS execution spec tests (all EIPs, tests-bal@v5.7.0)"
+timeout: 4h
+config:
+  walletPrivkey: ""
+  walletSeed: "spectests-bal4"
+  # Pin to the v5.7.0 release tag for determinism (commit 524b446 on devnets/bal/4).
+  specTestsBranch: "tests-bal@v5.7.0"
+tasks:
+  # install python + deps
+  - name: run_shell
+    title: "Install Python and build dependencies"
+    id: deps
+    timeout: 10m
+    config:
+      shell: bash
+      command: |
+        set -e
+        sudo dpkg --add-architecture amd64
+        sudo apt-get update
+        sudo apt-get install -y build-essential python3 python3-pip python3-dev libc6:amd64 autoconf automake libffi-dev libtool pkg-config
+        sudo rm /usr/lib/python3*/EXTERNALLY-MANAGED 2>/dev/null || true
+        pip install uv
+
+  # clone EELS repo
+  - name: run_shell
+    title: "Clone EELS (execution-specs)"
+    id: setup
+    timeout: 10m
+    config:
+      shell: bash
+      shellArgs: [--login]
+      envVars:
+        GIT_BRANCH: specTestsBranch
+      command: |
+        set -e
+        GIT_BRANCH=$(echo $GIT_BRANCH | jq -r)
+
+        EELS_DIR=$(mktemp -d -t eels-bal4-XXXXXXXXXX)
+        echo "::set-var eelsDir ${EELS_DIR}"
+        echo "${EELS_DIR}" > $ASSERTOOR_SUMMARY
+
+        git clone https://github.com/ethereum/execution-specs.git \
+          --depth 1 --branch ${GIT_BRANCH} --single-branch ${EELS_DIR}
+
+        cd ${EELS_DIR}
+        export HOME=${EELS_DIR}
+        export PATH=$PATH:$HOME/.local/bin
+        uv sync --all-extras
+
+        echo "EELS environment ready at ${EELS_DIR}"
+
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    id: clientCheck
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  - name: generate_child_wallet
+    id: specTestsWallet
+    title: "Generate funded wallet for tests"
+    config:
+      prefundMinBalance: 1000000000000000000000000 # 1000000 ETH
+    configVars:
+      privateKey: "walletPrivkey"
+      walletSeed: "walletSeed"
+
+  # wait for gloas activation
+  - name: get_consensus_specs
+    id: consensusSpecs
+    title: "Get consensus chain specs"
+  - name: check_consensus_slot_range
+    title: "Wait for Gloas activation"
+    timeout: 1h
+    configVars:
+      minEpochNumber: "tasks.consensusSpecs.outputs.specs.GLOAS_FORK_EPOCH"
+
+  # run tests per EIP sequentially
+  - name: run_tasks
+    title: "Run bal-devnet-4 EELS tests"
+    id: tests
+    config:
+      continueOnFailure: true
+      tasks:
+        - name: run_shell
+          title: "EIP-7708: ETH transfers emit a log (incl. CREATE/CREATE2)"
+          id: eip7708
+          timeout: 30m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EELS_DIR: eelsDir
+              CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
+              RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+            command: |
+              set -e
+              EELS_DIR=$(echo $EELS_DIR | jq -r)
+              CHAIN_ID=$(echo $CHAIN_ID | jq -r)
+              RPC_ENDPOINT=$(echo $RPC_ENDPOINT | jq -r)
+              PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
+
+              cd ${EELS_DIR}
+              export HOME=${EELS_DIR}
+              export PATH=$PATH:$HOME/.local/bin
+
+              uv run execute remote ./tests/amsterdam/eip7708_eth_transfer_logs \
+                --fork=Amsterdam \
+                --chain-id=${CHAIN_ID} \
+                --rpc-endpoint=${RPC_ENDPOINT} \
+                --rpc-seed-key=${PRIVATE_KEY} \
+                --seed-account-sweep-amount="100 ether" \
+                --sender-fund-refund-gas-limit=200000 \
+                --json-report --json-report-file=${ASSERTOOR_RESULT_DIR}/eip7708.json \
+                --html=${ASSERTOOR_RESULT_DIR}/eip7708.html \
+                || true
+
+              TOTAL=$(jq '.tests | length' ${ASSERTOOR_RESULT_DIR}/eip7708.json)
+              PASSED=$(jq '[.tests[] | select(.outcome == "passed")] | length' ${ASSERTOOR_RESULT_DIR}/eip7708.json)
+              echo "EIP-7708: ${PASSED}/${TOTAL}"
+              echo "::set-output passed ${PASSED}"
+              echo "::set-output total ${TOTAL}"
+
+        - name: run_shell
+          title: "EIP-7778: Block gas accounting without refunds"
+          id: eip7778
+          timeout: 30m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EELS_DIR: eelsDir
+              CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
+              RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+            command: |
+              set -e
+              EELS_DIR=$(echo $EELS_DIR | jq -r)
+              CHAIN_ID=$(echo $CHAIN_ID | jq -r)
+              RPC_ENDPOINT=$(echo $RPC_ENDPOINT | jq -r)
+              PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
+
+              cd ${EELS_DIR}
+              export HOME=${EELS_DIR}
+              export PATH=$PATH:$HOME/.local/bin
+
+              uv run execute remote ./tests/amsterdam/eip7778_block_gas_accounting_without_refunds \
+                --fork=Amsterdam \
+                --chain-id=${CHAIN_ID} \
+                --rpc-endpoint=${RPC_ENDPOINT} \
+                --rpc-seed-key=${PRIVATE_KEY} \
+                --seed-account-sweep-amount="100 ether" \
+                --sender-fund-refund-gas-limit=200000 \
+                --json-report --json-report-file=${ASSERTOOR_RESULT_DIR}/eip7778.json \
+                --html=${ASSERTOOR_RESULT_DIR}/eip7778.html \
+                || true
+
+              TOTAL=$(jq '.tests | length' ${ASSERTOOR_RESULT_DIR}/eip7778.json)
+              PASSED=$(jq '[.tests[] | select(.outcome == "passed")] | length' ${ASSERTOOR_RESULT_DIR}/eip7778.json)
+              echo "EIP-7778: ${PASSED}/${TOTAL}"
+              echo "::set-output passed ${PASSED}"
+              echo "::set-output total ${TOTAL}"
+
+        - name: run_shell
+          title: "EIP-7843: SLOTNUM opcode"
+          id: eip7843
+          timeout: 30m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EELS_DIR: eelsDir
+              CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
+              RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+            command: |
+              set -e
+              EELS_DIR=$(echo $EELS_DIR | jq -r)
+              CHAIN_ID=$(echo $CHAIN_ID | jq -r)
+              RPC_ENDPOINT=$(echo $RPC_ENDPOINT | jq -r)
+              PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
+
+              cd ${EELS_DIR}
+              export HOME=${EELS_DIR}
+              export PATH=$PATH:$HOME/.local/bin
+
+              uv run execute remote ./tests/amsterdam/eip7843_slotnum \
+                --fork=Amsterdam \
+                --chain-id=${CHAIN_ID} \
+                --rpc-endpoint=${RPC_ENDPOINT} \
+                --rpc-seed-key=${PRIVATE_KEY} \
+                --seed-account-sweep-amount="100 ether" \
+                --sender-fund-refund-gas-limit=200000 \
+                --json-report --json-report-file=${ASSERTOOR_RESULT_DIR}/eip7843.json \
+                --html=${ASSERTOOR_RESULT_DIR}/eip7843.html \
+                || true
+
+              TOTAL=$(jq '.tests | length' ${ASSERTOOR_RESULT_DIR}/eip7843.json)
+              PASSED=$(jq '[.tests[] | select(.outcome == "passed")] | length' ${ASSERTOOR_RESULT_DIR}/eip7843.json)
+              echo "EIP-7843: ${PASSED}/${TOTAL}"
+              echo "::set-output passed ${PASSED}"
+              echo "::set-output total ${TOTAL}"
+
+        - name: run_shell
+          title: "EIP-7928: Block-level access lists (BAL, uint32 index)"
+          id: eip7928
+          timeout: 2h
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EELS_DIR: eelsDir
+              CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
+              RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+            command: |
+              set -e
+              EELS_DIR=$(echo $EELS_DIR | jq -r)
+              CHAIN_ID=$(echo $CHAIN_ID | jq -r)
+              RPC_ENDPOINT=$(echo $RPC_ENDPOINT | jq -r)
+              PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
+
+              cd ${EELS_DIR}
+              export HOME=${EELS_DIR}
+              export PATH=$PATH:$HOME/.local/bin
+
+              uv run execute remote ./tests/amsterdam/eip7928_block_level_access_lists \
+                --fork=Amsterdam \
+                --chain-id=${CHAIN_ID} \
+                --rpc-endpoint=${RPC_ENDPOINT} \
+                --rpc-seed-key=${PRIVATE_KEY} \
+                --seed-account-sweep-amount="100 ether" \
+                --sender-fund-refund-gas-limit=200000 \
+                -n 16 \
+                --json-report --json-report-file=${ASSERTOOR_RESULT_DIR}/eip7928.json \
+                --html=${ASSERTOOR_RESULT_DIR}/eip7928.html \
+                || true
+
+              TOTAL=$(jq '.tests | length' ${ASSERTOOR_RESULT_DIR}/eip7928.json)
+              PASSED=$(jq '[.tests[] | select(.outcome == "passed")] | length' ${ASSERTOOR_RESULT_DIR}/eip7928.json)
+              echo "EIP-7928: ${PASSED}/${TOTAL}"
+              echo "::set-output passed ${PASSED}"
+              echo "::set-output total ${TOTAL}"
+
+        - name: run_shell
+          title: "EIP-7954: Increase maximum contract size (24K → 32K)"
+          id: eip7954
+          timeout: 30m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EELS_DIR: eelsDir
+              CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
+              RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+            command: |
+              set -e
+              EELS_DIR=$(echo $EELS_DIR | jq -r)
+              CHAIN_ID=$(echo $CHAIN_ID | jq -r)
+              RPC_ENDPOINT=$(echo $RPC_ENDPOINT | jq -r)
+              PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
+
+              cd ${EELS_DIR}
+              export HOME=${EELS_DIR}
+              export PATH=$PATH:$HOME/.local/bin
+
+              uv run execute remote ./tests/amsterdam/eip7954_increase_max_contract_size \
+                --fork=Amsterdam \
+                --chain-id=${CHAIN_ID} \
+                --rpc-endpoint=${RPC_ENDPOINT} \
+                --rpc-seed-key=${PRIVATE_KEY} \
+                --seed-account-sweep-amount="100 ether" \
+                --sender-fund-refund-gas-limit=200000 \
+                --json-report --json-report-file=${ASSERTOOR_RESULT_DIR}/eip7954.json \
+                --html=${ASSERTOOR_RESULT_DIR}/eip7954.html \
+                || true
+
+              TOTAL=$(jq '.tests | length' ${ASSERTOOR_RESULT_DIR}/eip7954.json)
+              PASSED=$(jq '[.tests[] | select(.outcome == "passed")] | length' ${ASSERTOOR_RESULT_DIR}/eip7954.json)
+              echo "EIP-7954: ${PASSED}/${TOTAL}"
+              echo "::set-output passed ${PASSED}"
+              echo "::set-output total ${TOTAL}"
+
+        - name: run_shell
+          title: "EIP-7976: Increase calldata floor cost (NEW for devnet-4)"
+          id: eip7976
+          timeout: 30m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EELS_DIR: eelsDir
+              CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
+              RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+            command: |
+              set -e
+              EELS_DIR=$(echo $EELS_DIR | jq -r)
+              CHAIN_ID=$(echo $CHAIN_ID | jq -r)
+              RPC_ENDPOINT=$(echo $RPC_ENDPOINT | jq -r)
+              PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
+
+              cd ${EELS_DIR}
+              export HOME=${EELS_DIR}
+              export PATH=$PATH:$HOME/.local/bin
+
+              uv run execute remote ./tests/amsterdam/eip7976_increase_calldata_floor_cost \
+                --fork=Amsterdam \
+                --chain-id=${CHAIN_ID} \
+                --rpc-endpoint=${RPC_ENDPOINT} \
+                --rpc-seed-key=${PRIVATE_KEY} \
+                --seed-account-sweep-amount="100 ether" \
+                --sender-fund-refund-gas-limit=200000 \
+                --json-report --json-report-file=${ASSERTOOR_RESULT_DIR}/eip7976.json \
+                --html=${ASSERTOOR_RESULT_DIR}/eip7976.html \
+                || true
+
+              TOTAL=$(jq '.tests | length' ${ASSERTOOR_RESULT_DIR}/eip7976.json)
+              PASSED=$(jq '[.tests[] | select(.outcome == "passed")] | length' ${ASSERTOOR_RESULT_DIR}/eip7976.json)
+              echo "EIP-7976: ${PASSED}/${TOTAL}"
+              echo "::set-output passed ${PASSED}"
+              echo "::set-output total ${TOTAL}"
+
+        - name: run_shell
+          title: "EIP-7981: Increase access list cost (NEW for devnet-4)"
+          id: eip7981
+          timeout: 30m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EELS_DIR: eelsDir
+              CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
+              RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+            command: |
+              set -e
+              EELS_DIR=$(echo $EELS_DIR | jq -r)
+              CHAIN_ID=$(echo $CHAIN_ID | jq -r)
+              RPC_ENDPOINT=$(echo $RPC_ENDPOINT | jq -r)
+              PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
+
+              cd ${EELS_DIR}
+              export HOME=${EELS_DIR}
+              export PATH=$PATH:$HOME/.local/bin
+
+              uv run execute remote ./tests/amsterdam/eip7981_increase_access_list_cost \
+                --fork=Amsterdam \
+                --chain-id=${CHAIN_ID} \
+                --rpc-endpoint=${RPC_ENDPOINT} \
+                --rpc-seed-key=${PRIVATE_KEY} \
+                --seed-account-sweep-amount="100 ether" \
+                --sender-fund-refund-gas-limit=200000 \
+                --json-report --json-report-file=${ASSERTOOR_RESULT_DIR}/eip7981.json \
+                --html=${ASSERTOOR_RESULT_DIR}/eip7981.html \
+                || true
+
+              TOTAL=$(jq '.tests | length' ${ASSERTOOR_RESULT_DIR}/eip7981.json)
+              PASSED=$(jq '[.tests[] | select(.outcome == "passed")] | length' ${ASSERTOOR_RESULT_DIR}/eip7981.json)
+              echo "EIP-7981: ${PASSED}/${TOTAL}"
+              echo "::set-output passed ${PASSED}"
+              echo "::set-output total ${TOTAL}"
+
+        - name: run_shell
+          title: "EIP-8024: Backward compatible SWAPN, DUPN, EXCHANGE"
+          id: eip8024
+          timeout: 30m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EELS_DIR: eelsDir
+              CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
+              RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+            command: |
+              set -e
+              EELS_DIR=$(echo $EELS_DIR | jq -r)
+              CHAIN_ID=$(echo $CHAIN_ID | jq -r)
+              RPC_ENDPOINT=$(echo $RPC_ENDPOINT | jq -r)
+              PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
+
+              cd ${EELS_DIR}
+              export HOME=${EELS_DIR}
+              export PATH=$PATH:$HOME/.local/bin
+
+              uv run execute remote ./tests/amsterdam/eip8024_dupn_swapn_exchange \
+                --fork=Amsterdam \
+                --chain-id=${CHAIN_ID} \
+                --rpc-endpoint=${RPC_ENDPOINT} \
+                --rpc-seed-key=${PRIVATE_KEY} \
+                --seed-account-sweep-amount="100 ether" \
+                --sender-fund-refund-gas-limit=200000 \
+                --json-report --json-report-file=${ASSERTOOR_RESULT_DIR}/eip8024.json \
+                --html=${ASSERTOOR_RESULT_DIR}/eip8024.html \
+                || true
+
+              TOTAL=$(jq '.tests | length' ${ASSERTOOR_RESULT_DIR}/eip8024.json)
+              PASSED=$(jq '[.tests[] | select(.outcome == "passed")] | length' ${ASSERTOOR_RESULT_DIR}/eip8024.json)
+              echo "EIP-8024: ${PASSED}/${TOTAL}"
+              echo "::set-output passed ${PASSED}"
+              echo "::set-output total ${TOTAL}"
+
+        - name: run_shell
+          title: "EIP-8037: State creation gas cost increase (dynamic cpsb)"
+          id: eip8037
+          timeout: 2h
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EELS_DIR: eelsDir
+              CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
+              RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+            command: |
+              set -e
+              EELS_DIR=$(echo $EELS_DIR | jq -r)
+              CHAIN_ID=$(echo $CHAIN_ID | jq -r)
+              RPC_ENDPOINT=$(echo $RPC_ENDPOINT | jq -r)
+              PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
+
+              cd ${EELS_DIR}
+              export HOME=${EELS_DIR}
+              export PATH=$PATH:$HOME/.local/bin
+
+              uv run execute remote ./tests/amsterdam/eip8037_state_creation_gas_cost_increase \
+                --fork=Amsterdam \
+                --chain-id=${CHAIN_ID} \
+                --rpc-endpoint=${RPC_ENDPOINT} \
+                --rpc-seed-key=${PRIVATE_KEY} \
+                --seed-account-sweep-amount="100 ether" \
+                --sender-fund-refund-gas-limit=200000 \
+                -n 16 \
+                --json-report --json-report-file=${ASSERTOOR_RESULT_DIR}/eip8037.json \
+                --html=${ASSERTOOR_RESULT_DIR}/eip8037.html \
+                || true
+
+              TOTAL=$(jq '.tests | length' ${ASSERTOOR_RESULT_DIR}/eip8037.json)
+              PASSED=$(jq '[.tests[] | select(.outcome == "passed")] | length' ${ASSERTOOR_RESULT_DIR}/eip8037.json)
+              echo "EIP-8037: ${PASSED}/${TOTAL}"
+              echo "::set-output passed ${PASSED}"
+              echo "::set-output total ${TOTAL}"
+
+cleanupTasks:
+  - name: run_shell
+    title: "Cleanup EELS temp dir"
+    config:
+      shell: bash
+      envVars:
+        EELS_DIR: eelsDir
+      command: |
+        set -e
+        EELS_DIR=$(echo $EELS_DIR | jq -r)
+        if [ ! -z "$EELS_DIR" ] && [ -d "$EELS_DIR" ]; then
+          rm -rf $EELS_DIR
+          echo "Cleaned up ${EELS_DIR}"
+        fi
