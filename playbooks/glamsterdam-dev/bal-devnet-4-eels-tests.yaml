@@ -44,8 +44,10 @@ tasks:
           --depth 1 --branch ${GIT_BRANCH} --single-branch ${EELS_DIR}
 
         cd ${EELS_DIR}
-        export HOME=${EELS_DIR}
+        # Capture uv on PATH using the original $HOME (where pip --user installed it)
+        # BEFORE overriding HOME to isolate uv's cache to EELS_DIR.
         export PATH=$PATH:$HOME/.local/bin
+        export HOME=${EELS_DIR}
         uv sync --all-extras
 
         echo "EELS environment ready at ${EELS_DIR}"
@@ -103,8 +105,8 @@ tasks:
               PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
 
               cd ${EELS_DIR}
-              export HOME=${EELS_DIR}
               export PATH=$PATH:$HOME/.local/bin
+              export HOME=${EELS_DIR}
 
               uv run execute remote ./tests/amsterdam/eip7708_eth_transfer_logs \
                 --fork=Amsterdam \
@@ -143,8 +145,8 @@ tasks:
               PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
 
               cd ${EELS_DIR}
-              export HOME=${EELS_DIR}
               export PATH=$PATH:$HOME/.local/bin
+              export HOME=${EELS_DIR}
 
               uv run execute remote ./tests/amsterdam/eip7778_block_gas_accounting_without_refunds \
                 --fork=Amsterdam \
@@ -183,8 +185,8 @@ tasks:
               PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
 
               cd ${EELS_DIR}
-              export HOME=${EELS_DIR}
               export PATH=$PATH:$HOME/.local/bin
+              export HOME=${EELS_DIR}
 
               uv run execute remote ./tests/amsterdam/eip7843_slotnum \
                 --fork=Amsterdam \
@@ -223,8 +225,8 @@ tasks:
               PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
 
               cd ${EELS_DIR}
-              export HOME=${EELS_DIR}
               export PATH=$PATH:$HOME/.local/bin
+              export HOME=${EELS_DIR}
 
               uv run execute remote ./tests/amsterdam/eip7928_block_level_access_lists \
                 --fork=Amsterdam \
@@ -264,8 +266,8 @@ tasks:
               PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
 
               cd ${EELS_DIR}
-              export HOME=${EELS_DIR}
               export PATH=$PATH:$HOME/.local/bin
+              export HOME=${EELS_DIR}
 
               uv run execute remote ./tests/amsterdam/eip7954_increase_max_contract_size \
                 --fork=Amsterdam \
@@ -304,8 +306,8 @@ tasks:
               PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
 
               cd ${EELS_DIR}
-              export HOME=${EELS_DIR}
               export PATH=$PATH:$HOME/.local/bin
+              export HOME=${EELS_DIR}
 
               uv run execute remote ./tests/amsterdam/eip7976_increase_calldata_floor_cost \
                 --fork=Amsterdam \
@@ -344,8 +346,8 @@ tasks:
               PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
 
               cd ${EELS_DIR}
-              export HOME=${EELS_DIR}
               export PATH=$PATH:$HOME/.local/bin
+              export HOME=${EELS_DIR}
 
               uv run execute remote ./tests/amsterdam/eip7981_increase_access_list_cost \
                 --fork=Amsterdam \
@@ -384,8 +386,8 @@ tasks:
               PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
 
               cd ${EELS_DIR}
-              export HOME=${EELS_DIR}
               export PATH=$PATH:$HOME/.local/bin
+              export HOME=${EELS_DIR}
 
               uv run execute remote ./tests/amsterdam/eip8024_dupn_swapn_exchange \
                 --fork=Amsterdam \
@@ -424,8 +426,8 @@ tasks:
               PRIVATE_KEY=$(echo $PRIVATE_KEY | jq -r)
 
               cd ${EELS_DIR}
-              export HOME=${EELS_DIR}
               export PATH=$PATH:$HOME/.local/bin
+              export HOME=${EELS_DIR}
 
               uv run execute remote ./tests/amsterdam/eip8037_state_creation_gas_cost_increase \
                 --fork=Amsterdam \
