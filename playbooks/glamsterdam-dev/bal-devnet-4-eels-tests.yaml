@@ -16,9 +16,15 @@ tasks:
       shell: bash
       command: |
         set -e
-        sudo dpkg --add-architecture amd64
-        sudo apt-get update
-        sudo apt-get install -y build-essential python3 python3-pip python3-dev libc6:amd64 autoconf automake libffi-dev libtool pkg-config
+        # apt-get / dpkg can consume stdin during package configure when run via
+        # assertoor's stdin-pipe shell; that swallows the rest of this script
+        # silently (script ends before pip install uv). Force non-interactive
+        # mode and redirect stdin from /dev/null on every apt invocation so
+        # nothing reads our pipe.
+        export DEBIAN_FRONTEND=noninteractive
+        sudo dpkg --add-architecture amd64 < /dev/null
+        sudo apt-get update < /dev/null
+        sudo apt-get install -y build-essential python3 python3-pip python3-dev libc6:amd64 autoconf automake libffi-dev libtool pkg-config < /dev/null
         sudo rm /usr/lib/python3*/EXTERNALLY-MANAGED 2>/dev/null || true
         pip install uv
 
