@@ -91,6 +91,14 @@ tasks:
     config:
       continueOnFailure: true
       tasks:
+        - name: generate_child_wallet
+          id: walletEip7708
+          title: "Generate fresh wallet for EIP-7708"
+          config:
+            prefundMinBalance: 1000000000000000000000000 # 1M ETH
+            walletSeed: "spectests-bal4-eip7708"
+          configVars:
+            privateKey: "walletPrivkey"
         - name: run_shell
           title: "EIP-7708: ETH transfers emit a log (incl. CREATE/CREATE2)"
           id: eip7708
@@ -102,7 +110,7 @@ tasks:
               EELS_DIR: eelsDir
               CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
               RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
-              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+              PRIVATE_KEY: tasks.walletEip7708.outputs.childWallet.privkey
             command: |
               set -e
               EELS_DIR=$(echo $EELS_DIR | jq -r)
@@ -131,6 +139,14 @@ tasks:
               echo "::set-output passed ${PASSED}"
               echo "::set-output total ${TOTAL}"
 
+        - name: generate_child_wallet
+          id: walletEip7778
+          title: "Generate fresh wallet for EIP-7778"
+          config:
+            prefundMinBalance: 1000000000000000000000000 # 1M ETH
+            walletSeed: "spectests-bal4-eip7778"
+          configVars:
+            privateKey: "walletPrivkey"
         - name: run_shell
           title: "EIP-7778: Block gas accounting without refunds"
           id: eip7778
@@ -142,7 +158,7 @@ tasks:
               EELS_DIR: eelsDir
               CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
               RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
-              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+              PRIVATE_KEY: tasks.walletEip7778.outputs.childWallet.privkey
             command: |
               set -e
               EELS_DIR=$(echo $EELS_DIR | jq -r)
@@ -171,6 +187,14 @@ tasks:
               echo "::set-output passed ${PASSED}"
               echo "::set-output total ${TOTAL}"
 
+        - name: generate_child_wallet
+          id: walletEip7843
+          title: "Generate fresh wallet for EIP-7843"
+          config:
+            prefundMinBalance: 1000000000000000000000000 # 1M ETH
+            walletSeed: "spectests-bal4-eip7843"
+          configVars:
+            privateKey: "walletPrivkey"
         - name: run_shell
           title: "EIP-7843: SLOTNUM opcode"
           id: eip7843
@@ -182,7 +206,7 @@ tasks:
               EELS_DIR: eelsDir
               CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
               RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
-              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+              PRIVATE_KEY: tasks.walletEip7843.outputs.childWallet.privkey
             command: |
               set -e
               EELS_DIR=$(echo $EELS_DIR | jq -r)
@@ -211,6 +235,14 @@ tasks:
               echo "::set-output passed ${PASSED}"
               echo "::set-output total ${TOTAL}"
 
+        - name: generate_child_wallet
+          id: walletEip7928
+          title: "Generate fresh wallet for EIP-7928"
+          config:
+            prefundMinBalance: 1000000000000000000000000 # 1M ETH
+            walletSeed: "spectests-bal4-eip7928"
+          configVars:
+            privateKey: "walletPrivkey"
         - name: run_shell
           title: "EIP-7928: Block-level access lists (BAL, uint32 index)"
           id: eip7928
@@ -222,7 +254,7 @@ tasks:
               EELS_DIR: eelsDir
               CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
               RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
-              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+              PRIVATE_KEY: tasks.walletEip7928.outputs.childWallet.privkey
             command: |
               set -e
               EELS_DIR=$(echo $EELS_DIR | jq -r)
@@ -252,6 +284,14 @@ tasks:
               echo "::set-output passed ${PASSED}"
               echo "::set-output total ${TOTAL}"
 
+        - name: generate_child_wallet
+          id: walletEip7954
+          title: "Generate fresh wallet for EIP-7954"
+          config:
+            prefundMinBalance: 1000000000000000000000000 # 1M ETH
+            walletSeed: "spectests-bal4-eip7954"
+          configVars:
+            privateKey: "walletPrivkey"
         - name: run_shell
           title: "EIP-7954: Increase maximum contract size (24K → 32K)"
           id: eip7954
@@ -263,7 +303,7 @@ tasks:
               EELS_DIR: eelsDir
               CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
               RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
-              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+              PRIVATE_KEY: tasks.walletEip7954.outputs.childWallet.privkey
             command: |
               set -e
               EELS_DIR=$(echo $EELS_DIR | jq -r)
@@ -292,6 +332,14 @@ tasks:
               echo "::set-output passed ${PASSED}"
               echo "::set-output total ${TOTAL}"
 
+        - name: generate_child_wallet
+          id: walletEip7976
+          title: "Generate fresh wallet for EIP-7976"
+          config:
+            prefundMinBalance: 1000000000000000000000000 # 1M ETH
+            walletSeed: "spectests-bal4-eip7976"
+          configVars:
+            privateKey: "walletPrivkey"
         - name: run_shell
           title: "EIP-7976: Increase calldata floor cost (NEW for devnet-4)"
           id: eip7976
@@ -303,7 +351,7 @@ tasks:
               EELS_DIR: eelsDir
               CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
               RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
-              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+              PRIVATE_KEY: tasks.walletEip7976.outputs.childWallet.privkey
             command: |
               set -e
               EELS_DIR=$(echo $EELS_DIR | jq -r)
@@ -332,6 +380,14 @@ tasks:
               echo "::set-output passed ${PASSED}"
               echo "::set-output total ${TOTAL}"
 
+        - name: generate_child_wallet
+          id: walletEip7981
+          title: "Generate fresh wallet for EIP-7981"
+          config:
+            prefundMinBalance: 1000000000000000000000000 # 1M ETH
+            walletSeed: "spectests-bal4-eip7981"
+          configVars:
+            privateKey: "walletPrivkey"
         - name: run_shell
           title: "EIP-7981: Increase access list cost (NEW for devnet-4)"
           id: eip7981
@@ -343,7 +399,7 @@ tasks:
               EELS_DIR: eelsDir
               CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
               RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
-              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+              PRIVATE_KEY: tasks.walletEip7981.outputs.childWallet.privkey
             command: |
               set -e
               EELS_DIR=$(echo $EELS_DIR | jq -r)
@@ -372,6 +428,14 @@ tasks:
               echo "::set-output passed ${PASSED}"
               echo "::set-output total ${TOTAL}"
 
+        - name: generate_child_wallet
+          id: walletEip8024
+          title: "Generate fresh wallet for EIP-8024"
+          config:
+            prefundMinBalance: 1000000000000000000000000 # 1M ETH
+            walletSeed: "spectests-bal4-eip8024"
+          configVars:
+            privateKey: "walletPrivkey"
         - name: run_shell
           title: "EIP-8024: Backward compatible SWAPN, DUPN, EXCHANGE"
           id: eip8024
@@ -383,7 +447,7 @@ tasks:
               EELS_DIR: eelsDir
               CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
               RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
-              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+              PRIVATE_KEY: tasks.walletEip8024.outputs.childWallet.privkey
             command: |
               set -e
               EELS_DIR=$(echo $EELS_DIR | jq -r)
@@ -412,6 +476,14 @@ tasks:
               echo "::set-output passed ${PASSED}"
               echo "::set-output total ${TOTAL}"
 
+        - name: generate_child_wallet
+          id: walletEip8037
+          title: "Generate fresh wallet for EIP-8037"
+          config:
+            prefundMinBalance: 1000000000000000000000000 # 1M ETH
+            walletSeed: "spectests-bal4-eip8037"
+          configVars:
+            privateKey: "walletPrivkey"
         - name: run_shell
           title: "EIP-8037: State creation gas cost increase (dynamic cpsb)"
           id: eip8037
@@ -423,7 +495,7 @@ tasks:
               EELS_DIR: eelsDir
               CHAIN_ID: tasks.consensusSpecs.outputs.specs.DEPOSIT_CHAIN_ID
               RPC_ENDPOINT: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
-              PRIVATE_KEY: tasks.specTestsWallet.outputs.childWallet.privkey
+              PRIVATE_KEY: tasks.walletEip8037.outputs.childWallet.privkey
             command: |
               set -e
               EELS_DIR=$(echo $EELS_DIR | jq -r)
