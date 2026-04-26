@@ -101,6 +101,12 @@ func (t *Task) Execute(ctx context.Context) error {
 	//nolint:gosec // ignore
 	command := exec.CommandContext(ctx, t.config.Shell, t.config.ShellArgs...)
 
+	// Inherit parent environment so spawned shells have HOME/PATH/USER set.
+	// Without this, scripts like `export PATH=$PATH:$HOME/.local/bin` resolve
+	// $HOME to "" and never find user-installed binaries (e.g. uv from
+	// `pip install --user uv`). User-supplied envVars below still override.
+	command.Env = append(command.Env, os.Environ()...)
+
 	stdin, err := command.StdinPipe()
 	if err != nil {
 		cmdLogger.Errorf("failed getting stdin pipe")
