@@ -66,33 +66,6 @@ tasks:
     config:
       minClientCount: 1
 
-  # Wait for Gloas/Amsterdam activation BEFORE generate_child_wallet. Spamoor's
-  # WalletPool.FundingGasFor() reads cpsb from the latest observed block, which
-  # is 0 until processBlock receives a post-Gloas block. If we generate the
-  # funding tx in the [genesis, first-post-Gloas-block-observed] window on a
-  # chain with non-zero gloas_fork_epoch, the funding tx is sized at 21000 gas
-  # while geth's tx pool already requires 23333 (110% of intrinsic, post-EIP-8037).
-  # Result: "intrinsic gas too low: gas 21000, minimum needed 23333" on geth.
-  # By the time check_consensus_slot_range returns, several post-Gloas blocks
-  # have been streamed and spamoor's IsAmsterdam is true.
-  - name: get_consensus_specs
-    id: consensusSpecs
-    title: "Get consensus chain specs"
-  - name: check_consensus_slot_range
-    title: "Wait for Gloas activation"
-    timeout: 1h
-    configVars:
-      minEpochNumber: "tasks.consensusSpecs.outputs.specs.GLOAS_FORK_EPOCH"
-
-  # check_consensus_slot_range returns the moment the wallclock crosses the
-  # target epoch, but spamoor's processBlock needs an actual EL block (with
-  # BlockAccessListHash != nil) to flip isAmsterdam. Pause 30s so at least
-  # 5 post-Gloas EL blocks (6s slot time) propagate to spamoor's TxPool.
-  - name: sleep
-    title: "Let spamoor observe a post-Gloas EL block"
-    config:
-      duration: 30s
-
   - name: generate_child_wallet
     id: specTestsWallet
     title: "Generate funded wallet for tests"
@@ -101,6 +74,16 @@ tasks:
     configVars:
       privateKey: "walletPrivkey"
       walletSeed: "walletSeed"
+
+  # wait for gloas activation
+  - name: get_consensus_specs
+    id: consensusSpecs
+    title: "Get consensus chain specs"
+  - name: check_consensus_slot_range
+    title: "Wait for Gloas activation"
+    timeout: 1h
+    configVars:
+      minEpochNumber: "tasks.consensusSpecs.outputs.specs.GLOAS_FORK_EPOCH"
 
   # run tests per EIP sequentially
   - name: run_tasks

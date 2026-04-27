@@ -72,8 +72,6 @@ github.com/ethereum/go-ethereum v1.17.3-0.20260421080339-499762852cf2 h1:PPbNu5N
 github.com/ethereum/go-ethereum v1.17.3-0.20260421080339-499762852cf2/go.mod h1:KHcRXfGOUfUmKg51IhQ0IowiqZ6PqZf08CMtk0g5K1o=
 github.com/ethpandaops/ethwallclock v0.4.0 h1:+sgnhf4pk6hLPukP076VxkiLloE4L0Yk1yat+ZyHh1g=
 github.com/ethpandaops/ethwallclock v0.4.0/go.mod h1:y0Cu+mhGLlem19vnAV2x0hpFS5KZ7oOi2SWYayv9l24=
-github.com/ethpandaops/spamoor v1.1.18-0.20260427075552-dcdec39f6332 h1:EXwsdYQmFzvCmYIExZ+yiRz+eIO+KPPfa6kyxV7KYjs=
-github.com/ethpandaops/spamoor v1.1.18-0.20260427075552-dcdec39f6332/go.mod h1:LBTplm930TuSBdpYvV1ICDR5GfL3MkUpH7/P+HvJEEU=
 github.com/fatih/color v1.16.0 h1:zmkK9Ngbjj+K0yRhTVONQh1p/HknKYSlNT+vZCzyokM=
 github.com/fatih/color v1.16.0/go.mod h1:fL2Sau1YI5c0pdGEVCbKQbLXB6edEj1ZgiY4NijnWvE=
 github.com/ferranbt/fastssz v0.1.4 h1:OCDB+dYDEQDvAgtAGnTSidK1Pe2tW3nFV40XyMkTeDY=

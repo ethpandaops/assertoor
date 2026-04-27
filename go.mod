@@ -124,3 +124,7 @@ require (
 )
 
 replace github.com/attestantio/go-eth2-client => github.com/qu0b/go-eth2-client v0.0.0-20260211134817-89b1d064a7e5
+
+// Local fork carrying spamoor effectiveCpsb fork-boundary fix
+// (qu0b/fix/effective-cpsb-fork-race). Drop once upstreamed.
+replace github.com/ethpandaops/spamoor => /home/ubuntu/repos/spamoor
