@@ -1,0 +1,240 @@
+id: gloas-exit-conflict
+name: "GLOAS: EL-triggered vs voluntary exit conflict"
+# 28h+ accommodates the SHARD_COMMITTEE_PERIOD wait on a freshly-genesis devnet;
+# on a long-running devnet the test finishes in minutes.
+timeout: 30h
+config:
+  walletPrivkey: ""
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  validatorStartIndex: 0
+  validatorCount: 4
+  withdrawalContract: "0x00000961Ef480Eb55e80D19ad83579A64c007002"
+
+tasks:
+
+##
+## Phase 1: setup -- wait for chain readiness, derive validators, prepare funding wallet
+##
+
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+
+# the conflict only manifests under ePBS process_previous_payload ordering
+- name: check_consensus_slot_range
+  title: "Wait for GLOAS activation (epoch >= ${{ tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH }})"
+  timeout: 1h
+  configVars:
+    minEpochNumber: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
+
+- name: generate_child_wallet
+  id: test_wallet
+  title: "Generate funding wallet for exit-conflict test"
+  config:
+    walletSeed: gloas-exit-conflict
+    prefundMinBalance: 5000000000000000000  # 5 ETH (covers withdrawal-contract calls)
+  configVars:
+    privateKey: walletPrivkey
+
+- name: get_pubkeys_from_mnemonic
+  id: test_pubkeys
+  title: "Derive ${validatorCount} test validator pubkeys"
+  configVars:
+    mnemonic: validatorMnemonic
+    startIndex: validatorStartIndex
+    count: validatorCount
+
+# voluntary exits require validator.active_for >= SHARD_COMMITTEE_PERIOD epochs
+- name: check_consensus_validator_status
+  id: last_validator
+  title: "Get info for last test validator (for exitability check)"
+  timeout: 5m
+  config:
+    validatorStatus: ["active_ongoing"]
+  configVars:
+    validatorPubKey: "tasks.test_pubkeys.outputs.pubkeys[-1]"
+
+- name: check_consensus_slot_range
+  title: "Wait for SHARD_COMMITTEE_PERIOD (epoch >= ${{ |(.tasks.last_validator.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber) }})"
+  timeout: 28h
+  configVars:
+    minEpochNumber: "|(.tasks.last_validator.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber)"
+
+# EL exits only work if request.source_address == validator.withdrawal_credentials[12:].
+# Genesis validators have 0x00 BLS credentials -- swap them to 0x01 pointing at the test wallet.
+- name: generate_bls_changes
+  id: bls_changes
+  title: "BLS-change ${validatorCount} validators to 0x01 (target: ${{tasks.test_wallet.outputs.childWallet.address}})"
+  timeout: 30m
+  config:
+    awaitInclusion: true
+  configVars:
+    mnemonic: validatorMnemonic
+    startIndex: validatorStartIndex
+    indexCount: validatorCount
+    limitTotal: validatorCount
+    limitPerSlot: validatorCount
+    targetAddress: "tasks.test_wallet.outputs.childWallet.address"
+
+# build a worker list mapping each validator's iteration idx -> mnemonic idx + pubkey
+- name: run_shell
+  id: workers
+  title: "Build worker list for ${validatorCount} validators"
+  config:
+    envVars:
+      pubkeys: "tasks.test_pubkeys.outputs.pubkeys"
+      startIndex: "validatorStartIndex"
+    command: |
+      set -e
+      workers=$(echo "$pubkeys" | jq -c --argjson base "$startIndex" '
+        [to_entries[] | {idx: .key, mnemonicIdx: (.key + $base), pubkey: .value}]
+      ')
+      echo "Workers: $workers"
+      echo "::set-out-json workers $workers"
+
+# Capture a baseline slot used to stagger submissions across slots so each
+# EL exit lands in a different CL block payload instead of one bundled payload.
+- name: check_consensus_slot_range
+  id: matrix_start
+  title: "Capture baseline slot for staggered EL exit submissions"
+
+##
+## Phase 2: per-validator conflict scenario, run concurrently
+##
+## For each validator:
+##   1. Submit EL-triggered exit (full exit, amount=0).
+##   2. Wait for the request to be in a CL block's payload (slot S).
+##   3. Immediately submit voluntary exit so it lands in the operations pool
+##      before slot S+1's proposer builds. Validator state at slot S still has
+##      validator.exit_epoch == FAR_FUTURE, so CLs accept and gossip the exit.
+##   4. Slot S+1: process_previous_payload runs FIRST -> EL exit applied,
+##      validator.exit_epoch set. Then operations processing sees the voluntary
+##      exit as invalid and skips it. Subsequent proposers also reject it.
+##   5. Wait 10 slots, then scan the last 10 cached blocks for the voluntary
+##      exit. If it appears anywhere -> failure. Bypasses validator-state cache
+##      lag entirely; the chain is the source of truth.
+##
+
+- name: run_task_matrix
+  title: "Run EL vs voluntary exit conflict for ${validatorCount} validators"
+  configVars:
+    matrixValues: "tasks.workers.outputs.workers"
+  config:
+    runConcurrent: true
+    matrixVar: validator
+    task:
+      name: run_tasks
+      title: "Validator #${{validator.mnemonicIdx}} (${{validator.pubkey}})"
+      config:
+        tasks:
+
+        # Stagger by `idx` slots so submissions hit distinct mempool windows.
+        # Iteration 0 starts immediately at the baseline slot; iteration N
+        # starts N slots later. Each tx is then mined into a separate EL
+        # block, producing N distinct CL payloads with one EL exit each.
+        - name: check_consensus_slot_range
+          title: "Wait for submission slot baseline+${{validator.idx}}"
+          timeout: 10m
+          configVars:
+            minSlotNumber: "| (.tasks.matrix_start.outputs.currentSlot | tonumber) + (.validator.idx | tonumber)"
+
+        - name: generate_withdrawal_requests
+          id: el_exit
+          title: "Submit EL-triggered exit transaction"
+          config:
+            limitTotal: 1
+            limitPerSlot: 1
+            withdrawAmount: 0  # 0 = full exit
+            awaitReceipt: true
+            failOnReject: true
+          configVars:
+            sourcePubkey: "validator.pubkey"
+            walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+            withdrawalContract: "withdrawalContract"
+
+        - name: check_consensus_block_proposals
+          id: el_inclusion
+          title: "Wait for EL exit in CL block payload (slot S)"
+          timeout: 10m
+          config:
+            minWithdrawalRequestCount: 1
+          configVars:
+            expectWithdrawalRequests: "| [{validatorPubkey: .validator.pubkey, sourceAddress: .tasks.test_wallet.outputs.childWallet.address, amount: 0}]"
+
+        - name: run_shell
+          id: track
+          title: "Track inclusion slot S and predicted processing slot S+1"
+          config:
+            envVars:
+              header: "tasks.el_inclusion.outputs.matchingBlockHeaders[0]"
+              pubkey: "validator.pubkey"
+            command: |
+              set -e
+              # header schema is {message:{slot,...},...}; fall back to nested header if shape differs
+              inclusionSlot=$(echo "$header" | jq -r '.message.slot // .header.message.slot // .slot')
+              processingSlot=$((inclusionSlot + 1))
+              pk=$(echo "$pubkey" | jq -r .)
+              echo "Validator $pk:"
+              echo "  EL exit included in CL block @ slot $inclusionSlot"
+              echo "  Predicted processing (process_previous_payload) @ slot $processingSlot"
+              echo "::set-out-json inclusionSlot $inclusionSlot"
+              echo "::set-out-json processingSlot $processingSlot"
+
+        # Submit voluntary exit NOW. Window: from "slot S CL block + payload published"
+        # until "slot S+1 proposer starts building" (~slot duration).
+        # sendToAllClients=true broadcasts in parallel for fast gossip.
+        # If we are too late and CLs already saw EL exit applied, generate_exits
+        # will fail (all CLs reject) -- that surfaces as a test failure, which
+        # correctly flags broken timing rather than a silent pass.
+        - name: generate_exits
+          id: voluntary_exit
+          title: "Submit voluntary exit (must reach pool before slot S+1 builds)"
+          config:
+            limitTotal: 1
+            limitPerSlot: 1
+            indexCount: 1
+            sendToAllClients: true
+          configVars:
+            mnemonic: validatorMnemonic
+            startIndex: "validator.mnemonicIdx"
+
+        # Wait ~10 slots after voluntary exit submission. By slot S+1 the EL
+        # exit has been applied (process_previous_payload), so any subsequent
+        # proposer rejects the voluntary exit as invalid. 10 slots gives
+        # plenty of conflict window to observe.
+        - name: check_consensus_slot_range
+          id: post_submit
+          title: "Snapshot current slot after voluntary exit submission"
+
+        - name: check_consensus_slot_range
+          title: "Wait 10 slots for the conflict window"
+          timeout: 10m
+          configVars:
+            minSlotNumber: "| (.tasks.post_submit.outputs.currentSlot | tonumber) + 10"
+
+        # Scan the last 10 blocks for our voluntary exit. The inner task uses
+        # checkLookback=10 to match against cached blocks immediately:
+        #   - match found in last 10 -> inner succeeds -> expectFailure flips
+        #     to outer failure (voluntary exit was wrongly included).
+        #   - no match -> inner waits up to 10s for new blocks then times out
+        #     (validator is exiting by now, no future inclusion possible)
+        #     -> expectFailure flips to outer success.
+        - name: run_task_options
+          title: "Verify voluntary exit was NOT included in the last 10 blocks"
+          config:
+            expectFailure: true
+            task:
+              name: check_consensus_block_proposals
+              title: "Scan last 10 blocks for voluntary exit (must not appear)"
+              timeout: 10s
+              config:
+                minExitCount: 1
+                checkLookback: 10
+              configVars:
+                expectExits: "| [.validator.pubkey]"

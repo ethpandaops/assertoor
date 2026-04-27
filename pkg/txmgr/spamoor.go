@@ -71,6 +71,16 @@ func NewSpamoor(ctx context.Context, logger logrus.FieldLogger, executionPool *e
 		return nil, err
 	}
 
+	// Load chain state (gas limit, base fee, Amsterdam activation) once the
+	// client pool is healthy so subsequent task submissions observe real
+	// values instead of uninitialized defaults.
+	initStatsCtx, cancelInitStats := context.WithTimeout(ctx, 30*time.Second)
+	err = txpool.InitializeBlockStats(initStatsCtx)
+	cancelInitStats()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize block stats: %w", err)
+	}
+
 	s.clientPool = clientPool
 	s.txpool = txpool
 
