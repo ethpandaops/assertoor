@@ -1,11 +1,12 @@
 id: bal-devnet-4-eels-tests
-name: "bal-devnet-4: Run EELS execution spec tests (all EIPs, tests-bal@v5.7.0)"
+name: "bal-devnet-4: Run EELS execution spec tests (all EIPs, tests-snøbal-devnet-4@v1.0.0)"
 timeout: 4h
 config:
   walletPrivkey: ""
   walletSeed: "spectests-bal4"
-  # Pin to the v5.7.0 release tag for determinism (commit 524b446 on devnets/bal/4).
-  specTestsBranch: "tests-bal@v5.7.0"
+  # Pin to the tests-snøbal-devnet-4@v1.0.0 release tag for determinism
+  # (commit 28e6130 on devnets/snøbal/4). Reverts cpsb to static 1174.
+  specTestsBranch: "tests-snøbal-devnet-4@v1.0.0"
 tasks:
   # install python + deps
   - name: run_shell
