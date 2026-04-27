@@ -65,16 +65,15 @@ tasks:
     config:
       minClientCount: 1
 
-  - name: generate_child_wallet
-    id: specTestsWallet
-    title: "Generate funded wallet for tests"
-    config:
-      prefundMinBalance: 1000000000000000000000000 # 1000000 ETH
-    configVars:
-      privateKey: "walletPrivkey"
-      walletSeed: "walletSeed"
-
-  # wait for gloas activation
+  # Wait for Gloas/Amsterdam activation BEFORE generate_child_wallet. Spamoor's
+  # WalletPool.FundingGasFor() reads cpsb from the latest observed block, which
+  # is 0 until processBlock receives a post-Gloas block. If we generate the
+  # funding tx in the [genesis, first-post-Gloas-block-observed] window on a
+  # chain with non-zero gloas_fork_epoch, the funding tx is sized at 21000 gas
+  # while geth's tx pool already requires 23333 (110% of intrinsic, post-EIP-8037).
+  # Result: "intrinsic gas too low: gas 21000, minimum needed 23333" on geth.
+  # By the time check_consensus_slot_range returns, several post-Gloas blocks
+  # have been streamed and spamoor's IsAmsterdam is true.
   - name: get_consensus_specs
     id: consensusSpecs
     title: "Get consensus chain specs"
@@ -83,6 +82,15 @@ tasks:
     timeout: 1h
     configVars:
       minEpochNumber: "tasks.consensusSpecs.outputs.specs.GLOAS_FORK_EPOCH"
+
+  - name: generate_child_wallet
+    id: specTestsWallet
+    title: "Generate funded wallet for tests"
+    config:
+      prefundMinBalance: 1000000000000000000000000 # 1000000 ETH
+    configVars:
+      privateKey: "walletPrivkey"
+      walletSeed: "walletSeed"
 
   # run tests per EIP sequentially
   - name: run_tasks
@@ -218,6 +226,10 @@ tasks:
               export PATH=$PATH:$HOME/.local/bin
               export HOME=${EELS_DIR}
 
+              # Skip test_slotnum_value: it asserts SLOTNUM == Environment(slot_number=N),
+              # but Environment(slot_number=) is a filler-time hint and cannot be honored
+              # in execute mode against a live chain (SLOTNUM returns the actual current
+              # beacon slot). Only test_slotnum_gas_cost runs in execute mode.
               uv run execute remote ./tests/amsterdam/eip7843_slotnum \
                 --fork=Amsterdam \
                 --chain-id=${CHAIN_ID} \
@@ -225,6 +237,7 @@ tasks:
                 --rpc-seed-key=${PRIVATE_KEY} \
                 --seed-account-sweep-amount="100 ether" \
                 --sender-fund-refund-gas-limit=200000 \
+                --deselect tests/amsterdam/eip7843_slotnum/test_slotnum.py::test_slotnum_value \
                 --json-report --json-report-file=${ASSERTOOR_RESULT_DIR}/eip7843.json \
                 --html=${ASSERTOOR_RESULT_DIR}/eip7843.html \
                 || true
