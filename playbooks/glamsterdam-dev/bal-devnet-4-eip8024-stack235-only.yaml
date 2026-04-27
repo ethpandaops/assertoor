@@ -1,10 +1,13 @@
 id: bal-devnet-4-eip8024-stack235-only
-name: "bal-devnet-4: Run EELS EIP-8024 swapn_stack_235 only (debug repro)"
+name: "bal-devnet-4: Run EELS EIP-8024 swapn_stack_235 only (debug repro, EEST PR #2760)"
 timeout: 1h
 config:
   walletPrivkey: ""
-  walletSeed: "spectests-bal4-stack235"
-  specTestsBranch: "tests-bal@v5.7.0"
+  walletSeed: "spectests-bal4-stack235-fix"
+  # Pinned to qu0b/execution-specs branch that is tests-bal@v5.7.0 with the
+  # PR #2760 fix cherry-picked on top (EIP-8037 deploy_contract state-gas).
+  specTestsRepo: "https://github.com/qu0b/execution-specs.git"
+  specTestsBranch: "qu0b/tests-bal-v5.7.0-deploy-state-gas-fix"
 tasks:
   - name: run_shell
     title: "Install Python and build dependencies"
@@ -30,15 +33,17 @@ tasks:
       shellArgs: [--login]
       envVars:
         GIT_BRANCH: specTestsBranch
+        GIT_REPO: specTestsRepo
       command: |
         set -e
         GIT_BRANCH=$(echo $GIT_BRANCH | jq -r)
+        GIT_REPO=$(echo $GIT_REPO | jq -r)
 
         EELS_DIR=$(mktemp -d -t eels-bal4-XXXXXXXXXX)
         echo "::set-var eelsDir ${EELS_DIR}"
         echo "${EELS_DIR}" > $ASSERTOOR_SUMMARY
 
-        git clone https://github.com/ethereum/execution-specs.git \
+        git clone ${GIT_REPO} \
           --depth 1 --branch ${GIT_BRANCH} --single-branch ${EELS_DIR}
 
         cd ${EELS_DIR}
