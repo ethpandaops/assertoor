@@ -83,6 +83,15 @@ tasks:
     configVars:
       minEpochNumber: "tasks.consensusSpecs.outputs.specs.GLOAS_FORK_EPOCH"
 
+  # check_consensus_slot_range returns the moment the wallclock crosses the
+  # target epoch, but spamoor's processBlock needs an actual EL block (with
+  # BlockAccessListHash != nil) to flip isAmsterdam. Pause 30s so at least
+  # 5 post-Gloas EL blocks (6s slot time) propagate to spamoor's TxPool.
+  - name: sleep
+    title: "Let spamoor observe a post-Gloas EL block"
+    config:
+      duration: 30s
+
   - name: generate_child_wallet
     id: specTestsWallet
     title: "Generate funded wallet for tests"
