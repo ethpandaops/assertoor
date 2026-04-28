@@ -33,7 +33,7 @@ func DefaultConfig() Config {
 		TxAmount:           big.NewInt(1000000000000000), // 0.001 ETH
 		TxFeeCap:           big.NewInt(100000000000),     // 100 Gwei
 		TxTipCap:           big.NewInt(1000000000),       // 1 Gwei
-		TxGasLimit:         200000,
+		TxGasLimit:         400000,
 	}
 }
 
