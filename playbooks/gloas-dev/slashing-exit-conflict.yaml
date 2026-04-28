@@ -1,0 +1,201 @@
+id: slashing-exit-conflict
+name: "Slashing vs voluntary exit conflict"
+# 28h+ accommodates the SHARD_COMMITTEE_PERIOD wait on a freshly-genesis devnet;
+# on a long-running devnet the test finishes in minutes.
+timeout: 30h
+config:
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  # offset from gloas-exit-conflict's range so we don't reuse the same validators
+  validatorStartIndex: 100
+  validatorCount: 4
+  slashingType: "attester"  # "attester" or "proposer"
+
+tasks:
+
+##
+## Phase 1: setup -- wait for chain readiness, derive validators
+##
+
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+
+- name: get_pubkeys_from_mnemonic
+  id: test_pubkeys
+  title: "Derive ${validatorCount} test validator pubkeys"
+  configVars:
+    mnemonic: validatorMnemonic
+    startIndex: validatorStartIndex
+    count: validatorCount
+
+# voluntary exits require validator.active_for >= SHARD_COMMITTEE_PERIOD epochs;
+# slashings have no such requirement, but we want the voluntary exit submission
+# itself to be accepted by CLs (otherwise we are not testing a real conflict).
+- name: check_consensus_validator_status
+  id: last_validator
+  title: "Get info for last test validator (for exitability check)"
+  timeout: 5m
+  config:
+    validatorStatus: ["active_ongoing"]
+  configVars:
+    validatorPubKey: "tasks.test_pubkeys.outputs.pubkeys[-1]"
+
+- name: check_consensus_slot_range
+  title: "Wait for SHARD_COMMITTEE_PERIOD (epoch >= ${{ |(.tasks.last_validator.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber) }})"
+  timeout: 28h
+  configVars:
+    minEpochNumber: "|(.tasks.last_validator.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber)"
+
+# build a worker list mapping each validator's iteration idx -> mnemonic idx + pubkey
+- name: run_shell
+  id: workers
+  title: "Build worker list for ${validatorCount} validators"
+  config:
+    envVars:
+      pubkeys: "tasks.test_pubkeys.outputs.pubkeys"
+      startIndex: "validatorStartIndex"
+    command: |
+      set -e
+      workers=$(echo "$pubkeys" | jq -c --argjson base "$startIndex" '
+        [to_entries[] | {idx: .key, mnemonicIdx: (.key + $base), pubkey: .value}]
+      ')
+      echo "Workers: $workers"
+      echo "::set-out-json workers $workers"
+
+# Capture a baseline slot used to stagger submissions across slots so each
+# slashing lands in a different CL block instead of one bundled block.
+- name: check_consensus_slot_range
+  id: matrix_start
+  title: "Capture baseline slot for staggered slashing submissions"
+
+##
+## Phase 2: per-validator conflict scenario, run concurrently
+##
+## For each validator:
+##   1. Submit a slashing (attester by default) for the validator.
+##   2. Immediately submit a voluntary exit for the same validator.
+##      Validator state at submission time still has exit_epoch == FAR_FUTURE
+##      (the slashing has not been applied yet), so CLs accept and gossip
+##      the exit.
+##   3. Wait for the slashing to be in a CL block (slot S). When that block is
+##      processed, process_operations runs slashings BEFORE voluntary exits, so
+##      the validator becomes slashed/exiting in the same step. Honest proposers
+##      pre-validate operations, so they drop the voluntary exit rather than
+##      build an invalid block.
+##   4. Wait 10 slots, then scan the last 10 cached blocks for the voluntary
+##      exit. If it appears anywhere -> failure. The chain is the source of
+##      truth -- we don't depend on validator-state cache propagation.
+##
+
+- name: run_task_matrix
+  title: "Run slashing vs voluntary exit conflict for ${validatorCount} validators"
+  configVars:
+    matrixValues: "tasks.workers.outputs.workers"
+  config:
+    runConcurrent: true
+    matrixVar: validator
+    task:
+      name: run_tasks
+      title: "Validator #${{validator.mnemonicIdx}} (${{validator.pubkey}})"
+      config:
+        tasks:
+
+        # Stagger by `idx` slots so each submission window lines up with a
+        # distinct proposer's pool, producing N slashings in N distinct blocks.
+        - name: check_consensus_slot_range
+          title: "Wait for submission slot baseline+${{validator.idx}}"
+          timeout: 10m
+          configVars:
+            minSlotNumber: "| (.tasks.matrix_start.outputs.currentSlot | tonumber) + (.validator.idx | tonumber)"
+
+        - name: generate_slashings
+          id: slashing
+          title: "Submit ${slashingType} slashing for validator"
+          config:
+            limitTotal: 1
+            limitPerSlot: 1
+            indexCount: 1
+          configVars:
+            mnemonic: validatorMnemonic
+            startIndex: "validator.mnemonicIdx"
+            slashingType: slashingType
+
+        # Submit voluntary exit immediately. The slashing is in the gossip pool
+        # but has not been applied to head state yet, so CLs still see the
+        # validator as active and accept the exit. sendToAllClients=true gets
+        # it into every CL's operations pool fast.
+        - name: generate_exits
+          id: voluntary_exit
+          title: "Submit voluntary exit (must reach pool before any block build)"
+          config:
+            limitTotal: 1
+            limitPerSlot: 1
+            indexCount: 1
+            sendToAllClients: true
+          configVars:
+            mnemonic: validatorMnemonic
+            startIndex: "validator.mnemonicIdx"
+
+        # Wait for the slashing to actually land in a block (slot S). This is
+        # the unambiguous "slashing won" signal -- once it is on-chain the
+        # validator is slashed.
+        - name: check_consensus_block_proposals
+          id: slashing_inclusion
+          title: "Wait for ${slashingType} slashing in CL block (slot S)"
+          timeout: 10m
+          config:
+            minSlashingCount: 1
+          configVars:
+            expectSlashings: "| [{publicKey: .validator.pubkey, slashingType: .slashingType}]"
+
+        - name: run_shell
+          title: "Log slashing inclusion slot"
+          config:
+            envVars:
+              header: "tasks.slashing_inclusion.outputs.matchingBlockHeaders[0]"
+              pubkey: "validator.pubkey"
+            command: |
+              set -e
+              slot=$(echo "$header" | jq -r '.message.slot // .header.message.slot // .slot')
+              pk=$(echo "$pubkey" | jq -r .)
+              echo "Validator $pk: slashing included in CL block @ slot $slot"
+
+        # 10-slot conflict window: gives every recent proposer a chance to wrongly
+        # include the voluntary exit. By then the slashing has been applied, the
+        # validator is exiting/slashed, and any subsequent proposer rejects the
+        # voluntary exit.
+        - name: check_consensus_slot_range
+          id: post_submit
+          title: "Snapshot current slot for the watch window"
+
+        - name: check_consensus_slot_range
+          title: "Wait 10 slots for the conflict window"
+          timeout: 10m
+          configVars:
+            minSlotNumber: "| (.tasks.post_submit.outputs.currentSlot | tonumber) + 10"
+
+        # Scan last 10 blocks for our voluntary exit. checkLookback=10 matches
+        # against cached blocks immediately:
+        #   - match found -> inner succeeds -> expectFailure flips to outer
+        #     failure (voluntary exit was wrongly included).
+        #   - no match -> inner waits 10s for new blocks (no proposer will
+        #     accept it now) -> times out -> outer succeeds.
+        - name: run_task_options
+          title: "Verify voluntary exit was NOT included in the last 10 blocks"
+          config:
+            expectFailure: true
+            task:
+              name: check_consensus_block_proposals
+              title: "Scan last 10 blocks for voluntary exit (must not appear)"
+              timeout: 10s
+              config:
+                minExitCount: 1
+                checkLookback: 10
+              configVars:
+                expectExits: "| [.validator.pubkey]"
