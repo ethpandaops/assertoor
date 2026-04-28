@@ -76,7 +76,9 @@ func NewSpamoor(ctx context.Context, logger logrus.FieldLogger, executionPool *e
 	// values instead of uninitialized defaults.
 	initStatsCtx, cancelInitStats := context.WithTimeout(ctx, 30*time.Second)
 	err = txpool.InitializeBlockStats(initStatsCtx)
+
 	cancelInitStats()
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize block stats: %w", err)
 	}
