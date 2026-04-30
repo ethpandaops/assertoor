@@ -11,8 +11,7 @@ import (
 )
 
 type PostTestRunCancelRequest struct {
-	TestID      string `json:"test_id"`
-	SkipCleanup bool   `json:"skip_cleanup"`
+	SkipCleanup bool `json:"skip_cleanup"`
 }
 
 type PostTestRunCancelResponse struct {
@@ -75,12 +74,6 @@ func (ah *APIHandler) PostTestRunCancel(w http.ResponseWriter, r *http.Request) 
 	testInstance := ah.coordinator.GetTestByRunID(runID)
 	if testInstance == nil {
 		ah.sendErrorResponse(w, r.URL.String(), "test run not found", http.StatusNotFound)
-		return
-	}
-
-	// check if test ID matches
-	if testInstance.TestID() != req.TestID {
-		ah.sendErrorResponse(w, r.URL.String(), "test id does not match", http.StatusNotFound)
 		return
 	}
 

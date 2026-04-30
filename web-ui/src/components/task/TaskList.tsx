@@ -295,7 +295,12 @@ function TaskRuntime({ task }: TaskRuntimeProps) {
       // For running tasks, calculate from start_time (in ms) to now
       return now - task.start_time;
     }
-    // For completed tasks, use the pre-calculated runtime (already in ms)
+    // For completed tasks, prefer computing from start/stop timestamps so
+    // SSE-driven completions render the correct duration without waiting
+    // for the next API refresh to populate task.runtime.
+    if (task.stop_time > 0 && task.start_time > 0) {
+      return task.stop_time - task.start_time;
+    }
     return task.runtime || 0;
   };
 

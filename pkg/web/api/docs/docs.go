@@ -1685,9 +1685,6 @@ const docTemplate = `{
             "properties": {
                 "skip_cleanup": {
                     "type": "boolean"
-                },
-                "test_id": {
-                    "type": "string"
                 }
             }
         },

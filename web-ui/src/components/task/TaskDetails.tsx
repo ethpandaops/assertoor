@@ -117,10 +117,17 @@ function OverviewTab({ task }: { task: TaskState }) {
   }, [task.status]);
 
   // Calculate duration: live for running tasks, static for completed
-  const duration =
-    task.status === 'running' && task.start_time > 0
-      ? now - task.start_time
-      : task.runtime || 0;
+  const duration = (() => {
+    if (task.status === 'running' && task.start_time > 0) {
+      return now - task.start_time;
+    }
+    // Prefer computing from timestamps so SSE-driven completions render the
+    // correct duration without waiting for the next API refresh.
+    if (task.stop_time > 0 && task.start_time > 0) {
+      return task.stop_time - task.start_time;
+    }
+    return task.runtime || 0;
+  })();
 
   // Determine status display
   const getStatusText = () => {

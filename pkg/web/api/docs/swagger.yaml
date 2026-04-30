@@ -351,8 +351,6 @@ definitions:
     properties:
       skip_cleanup:
         type: boolean
-      test_id:
-        type: string
     type: object
   web_api.PostTestRunCancelResponse:
     properties:
