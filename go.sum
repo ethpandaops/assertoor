@@ -75,8 +75,8 @@ github.com/ethereum/go-ethereum v1.17.3-0.20260421080339-499762852cf2 h1:PPbNu5N
 github.com/ethereum/go-ethereum v1.17.3-0.20260421080339-499762852cf2/go.mod h1:KHcRXfGOUfUmKg51IhQ0IowiqZ6PqZf08CMtk0g5K1o=
 github.com/ethpandaops/ethwallclock v0.4.0 h1:+sgnhf4pk6hLPukP076VxkiLloE4L0Yk1yat+ZyHh1g=
 github.com/ethpandaops/ethwallclock v0.4.0/go.mod h1:y0Cu+mhGLlem19vnAV2x0hpFS5KZ7oOi2SWYayv9l24=
-github.com/ethpandaops/go-eth2-client v0.1.0 h1:migUQIIL3fcWWMmIwF4Rh05rvJPuj+LOgDJkIWZ+gIE=
-github.com/ethpandaops/go-eth2-client v0.1.0/go.mod h1:9BBd/XIw1egZTkxtFGMvgXnsxX6ypKHKNKD7itqjmNQ=
+github.com/ethpandaops/go-eth2-client v0.1.1 h1:+uaGtPiyjp8sb2K9cjeZpbHrRCu6yjHtlx4J8+bbA8U=
+github.com/ethpandaops/go-eth2-client v0.1.1/go.mod h1:qoj9ZVKydI99IuIyWt4EvGq4rGgMYfOy6q8zTtwYdy4=
 github.com/ethpandaops/spamoor v1.1.18-0.20260428200401-f2423b8e80fb h1:YwA+7Y6rYlVwHVWMJovW43qPW8vPbazJKqDHjUiawEM=
 github.com/ethpandaops/spamoor v1.1.18-0.20260428200401-f2423b8e80fb/go.mod h1:AGTwB+kRoBFF6gMn9mKDzA6Ai0qV5qfaNY6rIIvtNOU=
 github.com/fatih/color v1.16.0 h1:zmkK9Ngbjj+K0yRhTVONQh1p/HknKYSlNT+vZCzyokM=
@@ -251,8 +251,8 @@ github.com/pion/transport/v2 v2.2.1 h1:7qYnCBlpgSJNYMbLCKuSY9KbQdBFoETvPNETv0y4N
 github.com/pion/transport/v2 v2.2.1/go.mod h1:cXXWavvCnFF6McHTft3DWS9iic2Mftcz1Aq29pGcU5g=
 github.com/pion/transport/v3 v3.0.1 h1:gDTlPJwROfSfz6QfSi0ZmeCSkFcnWWiiR9ES0ouANiM=
 github.com/pion/transport/v3 v3.0.1/go.mod h1:UY7kiITrlMv7/IKgd5eTUcaahZx5oUN3l9SzK5f5xE0=
-github.com/pk910/dynamic-ssz v1.3.0 h1:b6v5v3HWAmdxSVKWk4GS7Y/lhURZPAHRQ7EEMUparQk=
-github.com/pk910/dynamic-ssz v1.3.0/go.mod h1:NmeFF4jxzVwWC8cnEhUB7xMI++8hd/0OZvZHFrUvFfs=
+github.com/pk910/dynamic-ssz v1.3.1 h1:S/no7kRA5FSORmfybG4Cs49CjPgP94fePKPxt8uKkdI=
+github.com/pk910/dynamic-ssz v1.3.1/go.mod h1:ARK5qDyrJ/MHpaZHGJYvCKElvaMYTE9pXOQbvPDeE0U=
 github.com/pk910/hashtree-bindings v0.1.0 h1:w7NyRWFi2OaYEFvo9ADcE/QU6PMuVLl3hBgx92KiH9c=
 github.com/pk910/hashtree-bindings v0.1.0/go.mod h1:zrWt88783JmhBfcgni6kkIMYRdXTZi/FL//OyI5T/l4=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=

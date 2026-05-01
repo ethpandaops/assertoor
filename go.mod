@@ -6,7 +6,7 @@ require (
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
 	github.com/ethereum/go-ethereum v1.17.3-0.20260421080339-499762852cf2
 	github.com/ethpandaops/ethwallclock v0.4.0
-	github.com/ethpandaops/go-eth2-client v0.1.0
+	github.com/ethpandaops/go-eth2-client v0.1.1
 	github.com/ethpandaops/spamoor v1.1.18-0.20260428200401-f2423b8e80fb
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -84,7 +84,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/pk910/dynamic-ssz v1.3.0 // indirect
+	github.com/pk910/dynamic-ssz v1.3.1 // indirect
 	github.com/pk910/hashtree-bindings v0.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
