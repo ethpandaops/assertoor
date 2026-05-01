@@ -40,12 +40,11 @@ tasks:
   config:
     stopChildOnResult: false
     tasks:
-    - name: run_task_background
+    - name: run_tasks_concurrent
       title: "Generate deposits & track inclusion"
       config:
-        onBackgroundComplete: failOrIgnore
-        backgroundTask:
-          name: run_tasks
+        tasks:
+        - name: run_tasks
           title: "Generate deposits"
           config:
             stopChildOnResult: false
@@ -84,8 +83,7 @@ tasks:
                 walletPrivkey: "depositorPrivateKey"
                 mnemonic: "validatorMnemonic"
                 depositContract: "depositContract"
-        foregroundTask:
-          name: run_task_matrix
+        - name: run_task_matrix
           title: "Wait for inclusion of all deposits"
           timeout: 48h
           configVars:
@@ -94,12 +92,26 @@ tasks:
             runConcurrent: true
             matrixVar: "validatorPubkey"
             task:
-              name: check_consensus_block_proposals
+              # accept either legacy CL deposits (pre-electra, via eth1 voting)
+              # or EIP-6110 deposit requests (post-electra)
+              name: run_tasks_concurrent
               title: "Wait for deposit inclusion for (${validatorPubkey})"
               config:
-                minDepositCount: 1
-              configVars:
-                expectDeposits: "| [.validatorPubkey]"
+                successThreshold: 1
+                stopOnThreshold: true
+                tasks:
+                - name: check_consensus_block_proposals
+                  title: "Wait for legacy deposit inclusion for (${validatorPubkey})"
+                  config:
+                    minDepositCount: 1
+                  configVars:
+                    expectDeposits: "| [.validatorPubkey]"
+                - name: check_consensus_block_proposals
+                  title: "Wait for deposit request inclusion for (${validatorPubkey})"
+                  config:
+                    minDepositRequestCount: 1
+                  configVars:
+                    expectDepositRequests: "| [{publicKey: .validatorPubkey}]"
 
     - name: run_task_matrix
       title: "Wait for activation of all deposited keys"

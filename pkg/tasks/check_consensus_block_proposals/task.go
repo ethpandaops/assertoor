@@ -841,7 +841,7 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 					switch {
 					case expectedDepositRequest.WithdrawalCredentials != "" && !bytes.Equal(expectedWithdrawalCreds, depositRequest.WithdrawalCredentials):
 						t.logger.Warnf("check failed: deposit request found, but withdrawal credentials do not match (have: 0x%x, want: 0x%x)", depositRequest.WithdrawalCredentials, expectedWithdrawalCreds)
-					case expectedDepositRequest.Amount.Cmp(big.NewInt(0)) > 0 && expectedDepositRequest.Amount.Cmp(depositAmount) != 0:
+					case expectedDepositRequest.Amount != nil && expectedDepositRequest.Amount.Cmp(big.NewInt(0)) > 0 && expectedDepositRequest.Amount.Cmp(depositAmount) != 0:
 						t.logger.Warnf("check failed: deposit request found, but amount does not match (have: %v, want: %v)", depositAmount, expectedDepositRequest.Amount.String())
 					default:
 						found = true
