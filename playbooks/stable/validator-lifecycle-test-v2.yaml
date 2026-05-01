@@ -25,63 +25,93 @@ tasks:
   configVars:
     privateKey: "walletPrivkey"
 
+# pre-derive pubkeys so inclusion checks can start before deposits land
+- name: get_pubkeys_from_mnemonic
+  title: "Derive validator pubkeys from mnemonic"
+  id: derive_pubkeys
+  config:
+    count: 10
+  configVars:
+    mnemonic: "validatorMnemonic"
+
 # generate deposits & wait for activation
 - name: run_tasks
-  title: "Generate deposits & track inclusion"
+  title: "Generate deposits, track inclusion & wait for activation"
   config:
     stopChildOnResult: false
     tasks:
-    - name: generate_deposits
-      title: "Generate 10 deposits"
+    - name: run_tasks_concurrent
+      title: "Generate deposits & track inclusion"
       config:
-        limitTotal: 10
-        limitPerSlot: 2
-        limitPending: 2
-        awaitReceipt: true
-        failOnReject: true
-        validatorPubkeysResultVar: "validatorPubkeys"
-      configVars:
-        walletPrivkey: "depositorPrivateKey"
-        mnemonic: "validatorMnemonic"
-        depositContract: "depositContract"
-
-    - name: generate_deposits
-      title: "Generate double deposit for index 0"
-      config:
-        limitTotal: 1
-        awaitReceipt: true
-        failOnReject: true
-      configVars:
-        walletPrivkey: "depositorPrivateKey"
-        mnemonic: "validatorMnemonic"
-        depositContract: "depositContract"
-    - name: generate_deposits
-      title: "Generate double deposit for index 5"
-      config:
-        limitTotal: 1
-        startIndex: 5
-        awaitReceipt: true
-        failOnReject: true
-      configVars:
-        walletPrivkey: "depositorPrivateKey"
-        mnemonic: "validatorMnemonic"
-        depositContract: "depositContract"
-
-    - name: run_task_matrix
-      title: "Wait for inclusion of all deposits"
-      timeout: 48h
-      configVars:
-        matrixValues: "validatorPubkeys"
-      config:
-        runConcurrent: true
-        matrixVar: "validatorPubkey"
-        task:
-          name: check_consensus_block_proposals
-          title: "Wait for deposit inclusion for (${validatorPubkey})"
+        tasks:
+        - name: run_tasks
+          title: "Generate deposits"
           config:
-            minDepositCount: 1
+            stopChildOnResult: false
+            tasks:
+            - name: generate_deposits
+              title: "Generate 10 deposits"
+              config:
+                limitTotal: 10
+                limitPerSlot: 2
+                limitPending: 2
+                awaitReceipt: true
+                failOnReject: true
+                validatorPubkeysResultVar: "validatorPubkeys"
+              configVars:
+                walletPrivkey: "depositorPrivateKey"
+                mnemonic: "validatorMnemonic"
+                depositContract: "depositContract"
+            - name: generate_deposits
+              title: "Generate double deposit for index 0"
+              config:
+                limitTotal: 1
+                awaitReceipt: true
+                failOnReject: true
+              configVars:
+                walletPrivkey: "depositorPrivateKey"
+                mnemonic: "validatorMnemonic"
+                depositContract: "depositContract"
+            - name: generate_deposits
+              title: "Generate double deposit for index 5"
+              config:
+                limitTotal: 1
+                startIndex: 5
+                awaitReceipt: true
+                failOnReject: true
+              configVars:
+                walletPrivkey: "depositorPrivateKey"
+                mnemonic: "validatorMnemonic"
+                depositContract: "depositContract"
+        - name: run_task_matrix
+          title: "Wait for inclusion of all deposits"
+          timeout: 48h
           configVars:
-            expectDeposits: "| [.validatorPubkey]"
+            matrixValues: "tasks.derive_pubkeys.outputs.pubkeys"
+          config:
+            runConcurrent: true
+            matrixVar: "validatorPubkey"
+            task:
+              # accept either legacy CL deposits (pre-electra, via eth1 voting)
+              # or EIP-6110 deposit requests (post-electra)
+              name: run_tasks_concurrent
+              title: "Wait for deposit inclusion for (${validatorPubkey})"
+              config:
+                successThreshold: 1
+                stopOnThreshold: true
+                tasks:
+                - name: check_consensus_block_proposals
+                  title: "Wait for legacy deposit inclusion for (${validatorPubkey})"
+                  config:
+                    minDepositCount: 1
+                  configVars:
+                    expectDeposits: "| [.validatorPubkey]"
+                - name: check_consensus_block_proposals
+                  title: "Wait for deposit request inclusion for (${validatorPubkey})"
+                  config:
+                    minDepositRequestCount: 1
+                  configVars:
+                    expectDepositRequests: "| [{publicKey: .validatorPubkey}]"
 
     - name: run_task_matrix
       title: "Wait for activation of all deposited keys"
