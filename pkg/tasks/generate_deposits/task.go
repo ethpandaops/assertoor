@@ -576,7 +576,7 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onComplet
 	txMeta := &txbuilder.TxMetadata{
 		GasFeeCap: uint256.MustFromBig(big.NewInt(t.config.DepositTxFeeCap)),
 		GasTipCap: uint256.MustFromBig(big.NewInt(t.config.DepositTxTipCap)),
-		Gas:       200000,
+		Gas:       400000,
 		Value:     uint256.MustFromBig(amount),
 	}
 
