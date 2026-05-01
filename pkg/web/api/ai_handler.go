@@ -25,7 +25,6 @@ type AIHandler struct {
 	database       *db.Database
 	logger         logrus.FieldLogger
 	authHandler    *auth.Handler
-	disableAuth    bool
 	sessionManager *ai.SessionManager
 }
 
@@ -35,7 +34,6 @@ func NewAIHandler(
 	database *db.Database,
 	logger logrus.FieldLogger,
 	authHandler *auth.Handler,
-	disableAuth bool,
 ) *AIHandler {
 	var client *ai.OpenRouterClient
 	if config != nil && config.Enabled && config.OpenRouterKey != "" {
@@ -48,22 +46,18 @@ func NewAIHandler(
 		database:       database,
 		logger:         logger.WithField("module", "ai"),
 		authHandler:    authHandler,
-		disableAuth:    disableAuth,
 		sessionManager: ai.NewSessionManager(),
 	}
 }
 
+// checkAuth returns true when the caller is authorized. In open mode
+// (no auth provider configured) every request is authorized.
 func (h *AIHandler) checkAuth(r *http.Request) bool {
-	if h.disableAuth {
-		return true
-	}
-
-	if h.authHandler == nil {
+	if h.authHandler == nil || h.authHandler.IsOpen() {
 		return true
 	}
 
 	token := h.authHandler.CheckAuthToken(r.Header.Get("Authorization"))
-
 	return token != nil && token.Valid
 }
 

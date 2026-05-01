@@ -1,6 +1,8 @@
 package web
 
 import (
+	"context"
+	"encoding/json"
 	"net"
 	"net/http"
 	"strconv"
@@ -77,20 +79,34 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 	isAPIEnabled := apiConfig != nil && apiConfig.Enabled
 	isFrontendEnabled := frontendConfig != nil && frontendConfig.Enabled
 
-	// Create auth handler for protected endpoints
+	// Auth handler. When AuthProviderURL is empty, the handler is in open
+	// mode and every request is authorized. When set, incoming bearer
+	// tokens are verified against the remote authenticatoor's JWKS.
 	var authHandler *auth.Handler
 	if isFrontendEnabled || isAPIEnabled {
-		authHandler = auth.NewAuthHandler(ws.serverConfig.TokenKey, ws.serverConfig.AuthHeader)
-		ws.router.HandleFunc("/auth/token", authHandler.GetToken).Methods("GET")
-		ws.router.HandleFunc("/auth/login", authHandler.GetLogin).Methods("GET")
+		ah, err := auth.NewAuthHandler(context.Background(), ws.serverConfig.AuthProviderURL)
+		if err != nil {
+			return err
+		}
+		if ah.IsOpen() {
+			ws.logger.Warn("authProviderURL is empty: API endpoints are unauthenticated. Configure an authenticatoor URL to require auth.")
+		}
+		authHandler = ah
+
+		// Public runtime config — tells the SPA which (if any) auth
+		// provider to load client.js from.
+		ws.router.HandleFunc("/api/v1/runtime-config", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Cache-Control", "no-store")
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"authProviderURL": ws.serverConfig.AuthProviderURL,
+			})
+		}).Methods("GET")
 	}
 
 	if isAPIEnabled {
-		// Check if authentication is disabled for protected APIs (auth is required by default)
-		disableAuth := apiConfig.DisableAuth
-
 		// register api routes
-		apiHandler := api.NewAPIHandler(ws.logger.WithField("module", "api"), coordinator, authHandler, disableAuth)
+		apiHandler := api.NewAPIHandler(ws.logger.WithField("module", "api"), coordinator, authHandler)
 
 		// public apis
 		ws.router.HandleFunc("/api/v1/tests", apiHandler.GetTests).Methods("GET")
@@ -107,14 +123,16 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 
 		// SSE event stream endpoints
 		if eventBus != nil {
-			// Create SSE handler with auth support for log filtering
+			// Create SSE handler with auth support for log filtering.
+			// In open mode, log events are accessible to all; otherwise
+			// they require a valid bearer token.
 			var sseHandler *events.SSEHandler
 			if authHandler != nil {
 				sseHandler = events.NewSSEHandlerWithAuth(
 					ws.logger.WithField("module", "sse"),
 					eventBus,
 					authHandler.CheckAuthToken,
-					!disableAuth, // Require auth for log events when API auth is not disabled
+					!authHandler.IsOpen(),
 				)
 			} else {
 				sseHandler = events.NewSSEHandler(ws.logger.WithField("module", "sse"), eventBus)
@@ -158,7 +176,6 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 				coordinator.Database(),
 				ws.logger.WithField("module", "ai-api"),
 				authHandler,
-				disableAuth,
 			)
 			ws.router.HandleFunc("/api/v1/ai/config", aiHandler.GetConfig).Methods("GET")
 			ws.router.HandleFunc("/api/v1/ai/system_prompt", aiHandler.GetSystemPrompt).Methods("GET")

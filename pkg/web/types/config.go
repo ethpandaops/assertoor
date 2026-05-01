@@ -22,8 +22,12 @@ type ServerConfig struct {
 	WriteTimeout time.Duration `yaml:"writeTimeout" envconfig:"WEB_SERVER_WRITE_TIMEOUT"`
 	IdleTimeout  time.Duration `yaml:"idleTimeout" envconfig:"WEB_SERVER_IDLE_TIMEOUT"`
 
-	AuthHeader string `yaml:"authHeader" envconfig:"WEB_SERVER_AUTH_HEADER"`
-	TokenKey   string `yaml:"tokenKey" envconfig:"WEB_SERVER_TOKEN_KEY"`
+	// AuthProviderURL is the canonical URL of a remote authenticatoor
+	// service. When empty, the API runs unauthenticated; when set, all
+	// protected endpoints require a JWT verified against the service's
+	// JWKS, and the SPA is told via /api/v1/runtime-config to load
+	// <url>/client.js for browser-side login.
+	AuthProviderURL string `yaml:"authProviderURL" envconfig:"WEB_SERVER_AUTH_PROVIDER_URL"`
 }
 
 type FrontendConfig struct {
@@ -35,8 +39,7 @@ type FrontendConfig struct {
 }
 
 type APIConfig struct {
-	Enabled     bool `yaml:"enabled" envconfig:"WEB_API_ENABLED"`
-	DisableAuth bool `yaml:"disableAuth" envconfig:"WEB_API_DISABLE_AUTH"`
+	Enabled bool `yaml:"enabled" envconfig:"WEB_API_ENABLED"`
 }
 
 // AIConfig holds configuration for the AI assistant feature.

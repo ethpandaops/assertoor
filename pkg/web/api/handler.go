@@ -31,34 +31,25 @@ type APIHandler struct {
 	logger      logrus.FieldLogger
 	coordinator types.Coordinator
 	authHandler *auth.Handler
-	disableAuth bool
 }
 
-func NewAPIHandler(logger logrus.FieldLogger, coordinator types.Coordinator, authHandler *auth.Handler, disableAuth bool) *APIHandler {
+func NewAPIHandler(logger logrus.FieldLogger, coordinator types.Coordinator, authHandler *auth.Handler) *APIHandler {
 	return &APIHandler{
 		logger:      logger,
 		coordinator: coordinator,
 		authHandler: authHandler,
-		disableAuth: disableAuth,
 	}
 }
 
+// checkAuth returns true when the caller is authorized. In open mode
+// (no auth provider configured) every request is authorized.
 func (ah *APIHandler) checkAuth(r *http.Request) bool {
-	// If auth is disabled, allow all requests
-	if ah.disableAuth {
+	if ah.authHandler == nil || ah.authHandler.IsOpen() {
 		return true
 	}
 
-	if ah.authHandler == nil {
-		return true // No auth handler configured, allow all
-	}
-
 	token := ah.authHandler.CheckAuthToken(r.Header.Get("Authorization"))
-	if token == nil || !token.Valid {
-		return false
-	}
-
-	return true
+	return token != nil && token.Valid
 }
 
 func (ah *APIHandler) sendUnauthorizedResponse(w http.ResponseWriter, route string) {
