@@ -34,6 +34,10 @@ tasks:
   configVars:
     mnemonic: "validatorMnemonic"
 
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+
 # generate deposits & wait for activation
 - name: run_tasks
   title: "Generate deposits, track inclusion & wait for activation"
@@ -57,7 +61,6 @@ tasks:
                 limitPending: 2
                 awaitReceipt: true
                 failOnReject: true
-                validatorPubkeysResultVar: "validatorPubkeys"
               configVars:
                 walletPrivkey: "depositorPrivateKey"
                 mnemonic: "validatorMnemonic"
@@ -116,7 +119,7 @@ tasks:
     - name: run_task_matrix
       title: "Wait for activation of all deposited keys"
       configVars:
-        matrixValues: "validatorPubkeys"
+        matrixValues: "tasks.derive_pubkeys.outputs.pubkeys"
       config:
         runConcurrent: true
         matrixVar: "validatorPubkey"
@@ -157,7 +160,7 @@ tasks:
               title: "Wait for inclusion of all BLS changes"
               timeout: 1h
               configVars:
-                matrixValues: "validatorPubkeys[:5]"
+                matrixValues: "tasks.derive_pubkeys.outputs.pubkeys[:5]"
               config:
                 runConcurrent: true
                 matrixVar: "validatorPubkey"
@@ -173,7 +176,7 @@ tasks:
               config:
                 minWithdrawalCount: 1
               configVars:
-                expectWithdrawals: "| [{publicKey: .validatorPubkeys[0], address: .depositorAddress, minAmount: 31000000000}]"
+                expectWithdrawals: "| [{publicKey: .tasks.derive_pubkeys.outputs.pubkeys[0], address: .depositorAddress, minAmount: 31000000000}]"
 
 # slash 2 validators before exitability delay (1 with withdrawal address, 1 without)
 - name: run_tasks
@@ -221,35 +224,35 @@ tasks:
                 minSlashingCount: 1
                 minAttesterSlashingCount: 1
               configVars:
-                expectSlashings: "| [{publicKey: .validatorPubkeys[2], slashingType: \"attester\"}]"
+                expectSlashings: "| [{publicKey: .tasks.derive_pubkeys.outputs.pubkeys[2], slashingType: \"attester\"}]"
             - name: check_consensus_block_proposals
               title: "Wait for slashing inclusion for key 7"
               config:
                 minSlashingCount: 1
                 minProposerSlashingCount: 1
               configVars:
-                expectSlashings: "| [{publicKey: .validatorPubkeys[7], slashingType: \"proposer\"}]"
+                expectSlashings: "| [{publicKey: .tasks.derive_pubkeys.outputs.pubkeys[7], slashingType: \"proposer\"}]"
 
 # wait 256 epochs (withdrawal delay)
 - name: run_tasks
-  title: "Wait for validators to be exitable (256 epochs)"
+  title: "Wait for validators to be exitable (${{ tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD }} epochs)"
   config:
     stopChildOnResult: true
     tasks:
     - name: check_consensus_validator_status
       title: "Get validator info for last key"
       timeout: 5m
+      id: last_validator_info
       config:
         validatorStatus:
         - active_ongoing
-        validatorInfoResultVar: "lastValidatorInfo"
       configVars:
-        validatorPubKey: "validatorPubkeys[-1]"
+        validatorPubKey: "tasks.derive_pubkeys.outputs.pubkeys[-1]"
     - name: check_consensus_slot_range
-      title: "Wait for validators to be exitable (epoch >= ${{ |(.lastValidatorInfo.validator.activation_epoch | tonumber) + 256 }})"
+      title: "Wait for validators to be exitable (epoch >= ${{ |(.tasks.last_validator_info.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber) }})"
       timeout: 28h  # 256 epochs = ~27.3h
       configVars:
-        minEpochNumber: "|(.lastValidatorInfo.validator.activation_epoch | tonumber) + 256"
+        minEpochNumber: "|(.tasks.last_validator_info.outputs.validator.validator.activation_epoch | tonumber) + (.tasks.get_specs.outputs.specs.SHARD_COMMITTEE_PERIOD | tonumber)"
 
 # generate voluntary exits
 - name: run_tasks
@@ -296,7 +299,7 @@ tasks:
           title: "Wait for inclusion of all voluntary exits"
           timeout: 2h
           configVars:
-            matrixValues: "| [.validatorPubkeys[0], .validatorPubkeys[1], .validatorPubkeys[4], .validatorPubkeys[5], .validatorPubkeys[8], .validatorPubkeys[9]]"
+            matrixValues: "| [.tasks.derive_pubkeys.outputs.pubkeys[0], .tasks.derive_pubkeys.outputs.pubkeys[1], .tasks.derive_pubkeys.outputs.pubkeys[4], .tasks.derive_pubkeys.outputs.pubkeys[5], .tasks.derive_pubkeys.outputs.pubkeys[8], .tasks.derive_pubkeys.outputs.pubkeys[9]]"
           config:
             runConcurrent: true
             matrixVar: "validatorPubkey"
@@ -316,7 +319,7 @@ tasks:
           title: "Wait for validators to become exited"
           timeout: 8h
           configVars:
-            matrixValues: "| [.validatorPubkeys[0], .validatorPubkeys[1], .validatorPubkeys[4], .validatorPubkeys[5], .validatorPubkeys[8], .validatorPubkeys[9]]"
+            matrixValues: "| [.tasks.derive_pubkeys.outputs.pubkeys[0], .tasks.derive_pubkeys.outputs.pubkeys[1], .tasks.derive_pubkeys.outputs.pubkeys[4], .tasks.derive_pubkeys.outputs.pubkeys[5], .tasks.derive_pubkeys.outputs.pubkeys[8], .tasks.derive_pubkeys.outputs.pubkeys[9]]"
           config:
             runConcurrent: true
             matrixVar: "validatorPubkey"
@@ -333,7 +336,7 @@ tasks:
         - name: run_task_matrix
           title: "Wait for full withdrawals"
           configVars:
-            matrixValues: "| [.validatorPubkeys[0], .validatorPubkeys[1], .validatorPubkeys[4]]"
+            matrixValues: "| [.tasks.derive_pubkeys.outputs.pubkeys[0], .tasks.derive_pubkeys.outputs.pubkeys[1], .tasks.derive_pubkeys.outputs.pubkeys[4]]"
           config:
             runConcurrent: true
             matrixVar: "validatorPubkey"
@@ -408,14 +411,14 @@ tasks:
                 minSlashingCount: 1
                 minAttesterSlashingCount: 1
               configVars:
-                expectSlashings: "| [{publicKey: .validatorPubkeys[3], slashingType: \"attester\"}]"
+                expectSlashings: "| [{publicKey: .tasks.derive_pubkeys.outputs.pubkeys[3], slashingType: \"attester\"}]"
             - name: check_consensus_block_proposals
               title: "Wait for slashing inclusion for key 6"
               config:
                 minSlashingCount: 1
                 minProposerSlashingCount: 1
               configVars:
-                expectSlashings: "| [{publicKey: .validatorPubkeys[6], slashingType: \"proposer\"}]"
+                expectSlashings: "| [{publicKey: .tasks.derive_pubkeys.outputs.pubkeys[6], slashingType: \"proposer\"}]"
 
 # generate bls changes
 - name: run_tasks
@@ -446,7 +449,7 @@ tasks:
               title: "Wait for inclusion of all BLS changes"
               timeout: 1h
               configVars:
-                matrixValues: "validatorPubkeys[5:]"
+                matrixValues: "tasks.derive_pubkeys.outputs.pubkeys[5:]"
               config:
                 runConcurrent: true
                 matrixVar: "validatorPubkey"
@@ -462,23 +465,23 @@ tasks:
               config:
                 tasks:
                 - name: check_consensus_block_proposals
-                  title: "Wait for partial withdrawal for ${{ validatorPubkeys[5] }}"
+                  title: "Wait for partial withdrawal for ${{ tasks.derive_pubkeys.outputs.pubkeys[5] }}"
                   config:
                     minWithdrawalCount: 1
                   configVars:
-                    expectWithdrawals: "| [{publicKey: .validatorPubkeys[5], address: .depositorAddress, minAmount: 63500000000}]"
+                    expectWithdrawals: "| [{publicKey: .tasks.derive_pubkeys.outputs.pubkeys[5], address: .depositorAddress, minAmount: 63500000000}]"
                 - name: check_consensus_block_proposals
-                  title: "Wait for partial withdrawal for ${{ validatorPubkeys[8] }}"
+                  title: "Wait for partial withdrawal for ${{ tasks.derive_pubkeys.outputs.pubkeys[8] }}"
                   config:
                     minWithdrawalCount: 1
                   configVars:
-                    expectWithdrawals: "| [{publicKey: .validatorPubkeys[8], address: .depositorAddress, minAmount: 31500000000}]"
+                    expectWithdrawals: "| [{publicKey: .tasks.derive_pubkeys.outputs.pubkeys[8], address: .depositorAddress, minAmount: 31500000000}]"
                 - name: check_consensus_block_proposals
-                  title: "Wait for partial withdrawal for ${{ validatorPubkeys[9] }}"
+                  title: "Wait for partial withdrawal for ${{ tasks.derive_pubkeys.outputs.pubkeys[9] }}"
                   config:
                     minWithdrawalCount: 1
                   configVars:
-                    expectWithdrawals: "| [{publicKey: .validatorPubkeys[9], address: .depositorAddress, minAmount: 31500000000}]"
+                    expectWithdrawals: "| [{publicKey: .tasks.derive_pubkeys.outputs.pubkeys[9], address: .depositorAddress, minAmount: 31500000000}]"
 
 
 # all keys should be extied now.

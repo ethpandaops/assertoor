@@ -23,6 +23,13 @@ import (
 	util "github.com/wealdtech/go-eth2-util"
 )
 
+// maxKeySearches caps how many mnemonic indices a single task run will probe for
+// matching validators. Without this, the loop can spin forever when deposited
+// keys have not yet appeared in the consensus validator set.
+const maxKeySearches = 1000
+
+var errValidatorNotFound = errors.New("validator not found")
+
 var (
 	TaskName       = "generate_bls_changes"
 	TaskDescriptor = &types.TaskDescriptor{
@@ -131,6 +138,8 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	perSlotCount := 0
 	totalCount := 0
+	keySearches := 0
+	foundOnChain := 0
 	blsChangesList := []any{}
 
 	// Track submitted validator indices for awaitInclusion
@@ -149,11 +158,17 @@ func (t *Task) Execute(ctx context.Context) error {
 	for {
 		accountIdx := t.nextIndex
 		t.nextIndex++
+		keySearches++
 
 		blsChange, validatorIndex, err := t.generateBlsChange(ctx, accountIdx)
 		if err != nil {
+			if !errors.Is(err, errValidatorNotFound) {
+				foundOnChain++
+			}
+
 			t.logger.Errorf("error generating bls change: %v", err.Error())
 		} else {
+			foundOnChain++
 			blsChangesList = append(blsChangesList, blsChange)
 			t.ctx.Outputs.SetVar("blsChanges", blsChangesList)
 
@@ -180,6 +195,16 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 
 		if t.config.LimitTotal > 0 && totalCount >= t.config.LimitTotal {
+			break
+		}
+
+		if keySearches >= maxKeySearches {
+			if foundOnChain == 0 {
+				return fmt.Errorf("no validator found on chain after searching %d mnemonic keys", keySearches)
+			}
+
+			t.logger.Warnf("stopping bls change generation after probing %d keys (generated %d/%d)", keySearches, totalCount, targetCount)
+
 			break
 		}
 
@@ -290,7 +315,7 @@ func (t *Task) generateBlsChange(ctx context.Context, accountIdx uint64) (any, p
 	}
 
 	if validator == nil {
-		return nil, 0, fmt.Errorf("validator not found")
+		return nil, 0, errValidatorNotFound
 	}
 
 	if validator.Validator.WithdrawalCredentials[0] != 0x00 {
