@@ -1,0 +1,75 @@
+id: builder-deposit-spam
+name: Spam chain with batched 0x03 builder deposits
+timeout: 1h
+config:
+  walletPrivkey: ''
+  depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
+  # Each batch tx fans out into batchSize deposits; CL validates every BLS signature individually.
+  batchSize: 100
+  # Total deposits to push through the chain. Set to 0 to run unbounded until timeout.
+  totalDeposits: 1000
+  # Hard cap of in-flight batches so we don't drown the mempool.
+  pendingBatches: 4
+  # Deposit amount per validator (ETH). 1 ETH keeps funding cheap on devnets.
+  depositAmount: 1
+  # Set to true to skip waiting for the GLOAS fork to activate before spamming.
+  skipForkActivationCheck: false
+tasks:
+  - name: check_clients_are_healthy
+    title: Check that at least one client is ready
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  - name: get_consensus_specs
+    id: get_specs
+    title: Get consensus chain specs
+    if: "skipForkActivationCheck == false"
+
+  - name: check_consensus_slot_range
+    title: "Wait for GLOAS activation (epoch >= ${{ tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH }})"
+    timeout: 1h
+    if: "skipForkActivationCheck == false"
+    configVars:
+      minEpochNumber: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
+
+  - name: generate_child_wallet
+    id: spam_wallet
+    title: Generate funded wallet for batched deposits
+    config:
+      walletSeed: builder-deposit-spam
+    configVars:
+      privateKey: walletPrivkey
+      # Wallet must hold totalDeposits * depositAmount + headroom for tx fees.
+      # jq expression below = (totalDeposits * depositAmount + 50) * 1e18 wei.
+      prefundMinBalance: '| ((.totalDeposits * .depositAmount + 50) * 1000000000000000000)'
+
+  - name: get_random_mnemonic
+    id: spam_mnemonic
+    title: Generate fresh mnemonic for spam validators
+
+  - name: generate_batch_deposits
+    title: Deploy BatchDeposit and spam ${totalDeposits} 0x03 builder deposits in batches of ${batchSize}
+    timeout: 45m
+    config:
+      awaitReceipt: true
+      awaitInclusion: true
+      failOnReject: true
+    configVars:
+      walletPrivkey: tasks.spam_wallet.outputs.childWallet.privkey
+      mnemonic: tasks.spam_mnemonic.outputs.mnemonic
+      depositContract: depositContract
+      batchSize: batchSize
+      limitTotal: totalDeposits
+      limitPendingBatches: pendingBatches
+      depositAmount: depositAmount
+      # 0x03 builder withdrawal credentials — version byte (0x03) + 11 zero bytes + 20-byte address.
+      withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.spam_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+
+  - name: check_consensus_finality
+    title: Verify the chain still finalizes under deposit load
+    timeout: 15m
+    config:
+      minFinalizedEpochs: 1
+      maxUnfinalizedEpochs: 4
+      failOnCheckMiss: true
