@@ -169,6 +169,7 @@ func (t *Task) Execute(ctx context.Context) error {
 			t.logger.Errorf("error generating bls change: %v", err.Error())
 		} else {
 			foundOnChain++
+
 			blsChangesList = append(blsChangesList, blsChange)
 			t.ctx.Outputs.SetVar("blsChanges", blsChangesList)
 
