@@ -177,10 +177,9 @@ func (pool *ClientPool) notifyELBlockFromPayload(poolClient *PoolClient, block *
 	}
 
 	var payloadData *gloas.SignedExecutionPayloadEnvelope
+
 	switch payload.Version {
-	case spec.DataVersionGloas:
-		payloadData = payload.Gloas
-	case spec.DataVersionHeze:
+	case spec.DataVersionGloas, spec.DataVersionHeze:
 		payloadData = payload.Gloas
 	}
 
