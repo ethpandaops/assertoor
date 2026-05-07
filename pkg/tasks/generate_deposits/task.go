@@ -386,13 +386,17 @@ func (t *Task) awaitInclusion(ctx context.Context, blockSubscription *consensus.
 			if blockData.Version >= spec.DataVersionGloas {
 				// GLOAS: execution requests are in the separate payload envelope
 				payload := block.AwaitPayload(ctx, 2*time.Second)
-				if payload != nil && payload.Message != nil && payload.Message.ExecutionRequests != nil {
-					for _, depositReq := range payload.Message.ExecutionRequests.Deposits {
-						pubkeyStr := depositReq.Pubkey.String()
-						if pendingPubkeys[pubkeyStr] {
-							delete(pendingPubkeys, pubkeyStr)
 
-							includedCount++
+				if payload != nil {
+					payloadData := payload.Gloas
+					if payloadData != nil && payloadData.Message.ExecutionRequests != nil {
+						for _, depositReq := range payloadData.Message.ExecutionRequests.Deposits {
+							pubkeyStr := depositReq.Pubkey.String()
+							if pendingPubkeys[pubkeyStr] {
+								delete(pendingPubkeys, pubkeyStr)
+
+								includedCount++
+							}
 						}
 					}
 				}

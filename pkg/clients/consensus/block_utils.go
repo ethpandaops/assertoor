@@ -8,7 +8,6 @@ import (
 )
 
 func GetExecutionExtraData(v *spec.VersionedSignedBeaconBlock) ([]byte, error) {
-	//nolint:exhaustive // ignore
 	switch v.Version {
 	case spec.DataVersionBellatrix:
 		if v.Bellatrix == nil || v.Bellatrix.Message == nil || v.Bellatrix.Message.Body == nil || v.Bellatrix.Message.Body.ExecutionPayload == nil {
@@ -57,7 +56,6 @@ func GetPayloadExtraData(payload *gloas.SignedExecutionPayloadEnvelope) ([]byte,
 }
 
 func GetBlockBody(v *spec.VersionedSignedBeaconBlock) any {
-	//nolint:exhaustive // ignore
 	switch v.Version {
 	case spec.DataVersionPhase0:
 		return v.Phase0
