@@ -45,6 +45,8 @@ import (
 	runtasks "github.com/ethpandaops/assertoor/pkg/tasks/run_tasks"
 	runtasksconcurrent "github.com/ethpandaops/assertoor/pkg/tasks/run_tasks_concurrent"
 	sleep "github.com/ethpandaops/assertoor/pkg/tasks/sleep"
+	tysmhookactivation "github.com/ethpandaops/assertoor/pkg/tasks/tysm_hook_activation"
+	tysmhookdeactivation "github.com/ethpandaops/assertoor/pkg/tasks/tysm_hook_deactivation"
 )
 
 var AvailableTaskDescriptors = []*types.TaskDescriptor{
@@ -90,6 +92,8 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	runtasks.TaskDescriptor,
 	runtasksconcurrent.TaskDescriptor,
 	sleep.TaskDescriptor,
+	tysmhookactivation.TaskDescriptor,
+	tysmhookdeactivation.TaskDescriptor,
 }
 
 func GetTaskDescriptor(name string) *types.TaskDescriptor {
