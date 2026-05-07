@@ -10,7 +10,6 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus/rpc"
 	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/ethpandaops/go-eth2-client/spec"
-	"github.com/ethpandaops/go-eth2-client/spec/gloas"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
@@ -236,7 +235,7 @@ func (client *Client) processPayloadEvent(evt *v1.ExecutionPayloadAvailableEvent
 		return nil
 	}
 
-	loaded, err := cachedBlock.EnsurePayload(func() (*gloas.SignedExecutionPayloadEnvelope, error) {
+	loaded, err := cachedBlock.EnsurePayload(func() (*spec.VersionedSignedExecutionPayloadEnvelope, error) {
 		ctx, cancel := context.WithTimeout(client.clientCtx, 10*time.Second)
 		defer cancel()
 
@@ -361,7 +360,7 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 }
 
 func (client *Client) loadBlockPayload(cachedBlock *Block) {
-	loaded, err := cachedBlock.EnsurePayload(func() (*gloas.SignedExecutionPayloadEnvelope, error) {
+	loaded, err := cachedBlock.EnsurePayload(func() (*spec.VersionedSignedExecutionPayloadEnvelope, error) {
 		ctx, cancel := context.WithTimeout(client.clientCtx, 10*time.Second)
 		defer cancel()
 

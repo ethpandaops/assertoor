@@ -253,11 +253,13 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 
 	isGloas := blockData.Version >= spec.DataVersionGloas
 	if isGloas && t.needsPayload() {
-		payload = block.AwaitPayload(ctx, t.getPayloadTimeout())
-		if payload == nil {
+		payloadEnvelope := block.AwaitPayload(ctx, t.getPayloadTimeout())
+		if payloadEnvelope == nil {
 			t.logger.Warnf("could not fetch payload for gloas block %v [0x%x]", block.Slot, block.Root)
 			return false
 		}
+
+		payload = payloadEnvelope.Gloas
 	}
 
 	// check validator name

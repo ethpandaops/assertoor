@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethpandaops/go-eth2-client/spec"
-	"github.com/ethpandaops/go-eth2-client/spec/gloas"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
@@ -22,7 +21,7 @@ type Block struct {
 	block        *spec.VersionedSignedBeaconBlock
 	payloadMutex sync.Mutex
 	payloadChan  chan bool
-	payload      *gloas.SignedExecutionPayloadEnvelope
+	payload      *spec.VersionedSignedExecutionPayloadEnvelope
 	seenMutex    sync.RWMutex
 	seenMap      map[uint16]*Client
 }
@@ -154,12 +153,12 @@ func (block *Block) EnsureBlock(loadBlock func() (*spec.VersionedSignedBeaconBlo
 }
 
 // GetPayload returns the execution payload envelope if available.
-func (block *Block) GetPayload() *gloas.SignedExecutionPayloadEnvelope {
+func (block *Block) GetPayload() *spec.VersionedSignedExecutionPayloadEnvelope {
 	return block.payload
 }
 
 // AwaitPayload waits for the execution payload envelope to become available.
-func (block *Block) AwaitPayload(ctx context.Context, timeout time.Duration) *gloas.SignedExecutionPayloadEnvelope {
+func (block *Block) AwaitPayload(ctx context.Context, timeout time.Duration) *spec.VersionedSignedExecutionPayloadEnvelope {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -174,7 +173,7 @@ func (block *Block) AwaitPayload(ctx context.Context, timeout time.Duration) *gl
 }
 
 // EnsurePayload loads and sets the execution payload envelope if not already set.
-func (block *Block) EnsurePayload(loadPayload func() (*gloas.SignedExecutionPayloadEnvelope, error)) (bool, error) {
+func (block *Block) EnsurePayload(loadPayload func() (*spec.VersionedSignedExecutionPayloadEnvelope, error)) (bool, error) {
 	if block.payload != nil {
 		return false, nil
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/events"
 	"github.com/ethpandaops/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec/gloas"
 	"github.com/sirupsen/logrus"
 )
 
@@ -171,12 +172,24 @@ func (pool *ClientPool) notifyELBlockFromBeaconBlock(poolClient *PoolClient, blo
 
 func (pool *ClientPool) notifyELBlockFromPayload(poolClient *PoolClient, block *consensus.Block) {
 	payload := block.GetPayload()
-	if payload == nil || payload.Message == nil || payload.Message.Payload == nil {
+	if payload == nil {
 		return
 	}
 
-	hash := common.Hash(payload.Message.Payload.BlockHash)
-	number := payload.Message.Payload.BlockNumber
+	var payloadData *gloas.SignedExecutionPayloadEnvelope
+	switch payload.Version {
+	case spec.DataVersionGloas:
+		payloadData = payload.Gloas
+	case spec.DataVersionHeze:
+		payloadData = payload.Gloas
+	}
+
+	if payloadData == nil {
+		return
+	}
+
+	hash := common.Hash(payloadData.Message.Payload.BlockHash)
+	number := payloadData.Message.Payload.BlockNumber
 
 	poolClient.ExecutionClient.NotifyNewBlock(hash, number)
 }
