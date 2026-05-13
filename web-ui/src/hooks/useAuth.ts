@@ -30,8 +30,12 @@ export function useAuth() {
     authStore.login();
   }, []);
 
+  const logout = useCallback(() => {
+    authStore.logout();
+  }, []);
+
   const refreshToken = useCallback(async () => {
-    await authStore.fetchToken();
+    await authStore.refreshToken();
   }, []);
 
   return {
@@ -39,6 +43,7 @@ export function useAuth() {
     loading,
     getAuthHeader,
     login,
+    logout,
     refreshToken,
   };
 }

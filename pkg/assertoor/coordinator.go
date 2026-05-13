@@ -23,6 +23,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/ethpandaops/assertoor/pkg/vars"
 	"github.com/ethpandaops/assertoor/pkg/web"
+	web_types "github.com/ethpandaops/assertoor/pkg/web/types"
 	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -179,7 +180,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				return err
 			}
 
-			err = c.webserver.ConfigureRoutes(c.Config.Web.Frontend, c.Config.Web.API, c.Config.AI, c, false, c.eventBus)
+			err = c.webserver.ConfigureRoutes(c.Config.Web, c.Config.AI, c, false, c.eventBus)
 			if err != nil {
 				return err
 			}
@@ -191,7 +192,15 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				return err
 			}
 
-			err = c.publicWebserver.ConfigureRoutes(c.Config.Web.Frontend, nil, nil, c, true, nil)
+			// Public server only serves the frontend — strip API/PublicServer
+			// references but keep AuthProviderURL so the SPA's runtime config
+			// still points at the same authenticatoor.
+			publicWeb := &web_types.WebConfig{
+				Frontend:        c.Config.Web.Frontend,
+				AuthProviderURL: c.Config.Web.AuthProviderURL,
+			}
+
+			err = c.publicWebserver.ConfigureRoutes(publicWeb, nil, c, true, nil)
 			if err != nil {
 				return err
 			}

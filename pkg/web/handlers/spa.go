@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"path"
@@ -20,8 +23,17 @@ type SPAHandler struct {
 	contentType string
 }
 
-// NewSPAHandler creates a new SPA handler.
-func NewSPAHandler(logger logrus.FieldLogger) (*SPAHandler, error) {
+// RuntimeConfig is injected into the served index.html as a nested global
+// `window.ethpandaops.assertoor.config` so the SPA can read it
+// synchronously at boot — no extra round-trip to the backend.
+type RuntimeConfig struct {
+	AuthProviderURL string `json:"authProviderURL"`
+}
+
+// NewSPAHandler creates a new SPA handler. The runtimeConfig is encoded
+// into a small <script> block injected into the <head> of index.html
+// before any other script runs.
+func NewSPAHandler(logger logrus.FieldLogger, runtimeConfig RuntimeConfig) (*SPAHandler, error) {
 	fs := http.FS(static.FS)
 
 	// Pre-load index.html for faster serving
@@ -36,12 +48,49 @@ func NewSPAHandler(logger logrus.FieldLogger) (*SPAHandler, error) {
 		return nil, err
 	}
 
+	indexHTML, err = injectHead(indexHTML, runtimeConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	return &SPAHandler{
 		logger:      logger,
 		staticFS:    fs,
 		indexHTML:   indexHTML,
 		contentType: "text/html; charset=utf-8",
 	}, nil
+}
+
+// injectHead inserts a runtime-config <script> immediately before
+// </head>. The runtime config JSON is HTML-safe (encoding/json escapes
+// <, >, & by default), so values can't break out of the script tag.
+func injectHead(html []byte, cfg RuntimeConfig) ([]byte, error) {
+	payload, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshal runtime config: %w", err)
+	}
+
+	injected := []byte(
+		"<script>" +
+			"window.ethpandaops=window.ethpandaops||{};" +
+			"window.ethpandaops.assertoor=window.ethpandaops.assertoor||{};" +
+			"window.ethpandaops.assertoor.config=" + string(payload) + ";" +
+			"</script>",
+	)
+
+	headClose := []byte("</head>")
+
+	idx := bytes.Index(html, headClose)
+	if idx < 0 {
+		return append(injected, html...), nil
+	}
+
+	out := make([]byte, 0, len(html)+len(injected))
+	out = append(out, html[:idx]...)
+	out = append(out, injected...)
+	out = append(out, html[idx:]...)
+
+	return out, nil
 }
 
 // ServeHTTP implements http.Handler.

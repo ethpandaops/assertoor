@@ -2,6 +2,7 @@ import React, { createContext, useContext, type ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
 interface AuthContextValue {
+  authEnabled: boolean;
   isLoggedIn: boolean;
   user: string | null;
   token: string | null;
@@ -9,6 +10,7 @@ interface AuthContextValue {
   loading: boolean;
   getAuthHeader: () => string | null;
   login: () => void;
+  logout: () => void;
   refreshToken: () => Promise<void>;
 }
 
