@@ -1,9 +1,21 @@
 # Auto-generated playbook index
-# Generated: 2026-05-14T00:40:37Z
+# Generated: 2026-05-14T23:32:41Z
 # DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
 
-generated: 2026-05-14T00:40:37Z
+generated: 2026-05-14T23:32:41Z
 folders:
+  - path: api-compatibility
+    name: API Compatibility
+    description: |-
+      Cross-client beacon-API compatibility playbooks. Each playbook exercises
+      the spec endpoints / SSE topics introduced (or changed) by a single
+      fork against every connected CL client, validates each response against
+      an inline JSON Schema derived from the spec, and renders a markdown
+      compatibility matrix as a result artifact.
+
+      Add a new playbook here when a future fork lands API changes — the
+      `check_consensus_api` and `generate_api_compatibility_matrix` tasks
+      are intentionally fork-agnostic.
   - path: dev
     name: Development & Utilities
     description: |-
@@ -80,6 +92,17 @@ folders:
       deployment driver that exercises a full Foundry-built protocol bundle
       against a verkle-converted EL.
 playbooks:
+  - file: api-compatibility/gloas-api-check.yaml
+    id: gloas-api-check
+    name: GLOAS Beacon-API Compatibility Matrix
+    description: "Probes every beacon-API endpoint and SSE topic added or changed by the\nGLOAS / ePBS spec PRs ([#552](https://github.com/ethereum/beacon-APIs/pull/552),\n[#580](https://github.com/ethereum/beacon-APIs/pull/580),\n[#586](https://github.com/ethereum/beacon-APIs/pull/586) /\n[#592](https://github.com/ethereum/beacon-APIs/pull/592),\n[#587](https://github.com/ethereum/beacon-APIs/pull/587),\n[#588](https://github.com/ethereum/beacon-APIs/pull/588)) against every\nconnected CL client and renders a compatibility matrix.\n\nFor each (endpoint × client) pair the result is:\n\n- ✅ — endpoint exists, response body validates against the spec schema\n  (success body **or** documented error body counts).\n- \U0001F7E1 — endpoint exists but the response body does not match the spec\n  schema, or an SSE topic was accepted but no event arrived in the wait\n  window. The note is captured as a footnote.\n- ❌ — endpoint not implemented (route not found, connection error, or\n  SSE subscription rejected).\n- ⚪ — required fork not yet active on the client (skipped)."
+    version: 1.0.0
+    tags:
+      - api
+      - compatibility
+      - gloas
+      - beacon-api
+    timeout: 30m
   - file: dev/block-proposal-with-blobs-check.yaml
     id: block-proposal-with-blobs-check
     name: Every client pair proposed a block with blobs

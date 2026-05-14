@@ -1,0 +1,480 @@
+id: gloas-api-check
+name: "GLOAS Beacon-API Compatibility Matrix"
+description: |
+  Probes every beacon-API endpoint and SSE topic added or changed by the
+  GLOAS / ePBS spec PRs ([#552](https://github.com/ethereum/beacon-APIs/pull/552),
+  [#580](https://github.com/ethereum/beacon-APIs/pull/580),
+  [#586](https://github.com/ethereum/beacon-APIs/pull/586) /
+  [#592](https://github.com/ethereum/beacon-APIs/pull/592),
+  [#587](https://github.com/ethereum/beacon-APIs/pull/587),
+  [#588](https://github.com/ethereum/beacon-APIs/pull/588)) against every
+  connected CL client and renders a compatibility matrix.
+
+  For each (endpoint × client) pair the result is:
+
+  - ✅ — endpoint exists, response body validates against the spec schema
+    (success body **or** documented error body counts).
+  - 🟡 — endpoint exists but the response body does not match the spec
+    schema, or an SSE topic was accepted but no event arrived in the wait
+    window. The note is captured as a footnote.
+  - ❌ — endpoint not implemented (route not found, connection error, or
+    SSE subscription rejected).
+  - ⚪ — required fork not yet active on the client (skipped).
+version: 1.0.0
+tags: [api, compatibility, gloas, beacon-api]
+timeout: 30m
+
+config:
+  # CL client filtering. Empty = all connected clients.
+  clientPattern: ""
+  excludeClientPattern: ""
+  # Wait this many slots after GLOAS activation before testing SSE
+  # streams. 2 slots = ~24s, enough for a few payloads to be gossiped.
+  sseWarmupSlots: 2
+  # Per-request timeout.
+  requestTimeout: "20s"
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check that at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: get_consensus_specs
+  id: specs
+  title: "Fetch consensus specs (for fork epochs)"
+
+# Wait until GLOAS is active (currentEpoch >= GLOAS_FORK_EPOCH).
+- name: run_shell
+  id: gloas_target
+  title: "Compute GLOAS activation epoch + warmup slot"
+  config:
+    envVars:
+      GLOAS_FORK_EPOCH: "tasks.specs.outputs.specs.GLOAS_FORK_EPOCH"
+      SLOTS_PER_EPOCH: "tasks.specs.outputs.specs.SLOTS_PER_EPOCH"
+      WARMUP_SLOTS: "sseWarmupSlots"
+    command: |
+      set -e
+      GFE=$(echo "$GLOAS_FORK_EPOCH" | jq -r .)
+      SPE=$(echo "$SLOTS_PER_EPOCH"  | jq -r .)
+      WS=$(echo  "$WARMUP_SLOTS"    | jq -r .)
+      ACT_SLOT=$((GFE * SPE))
+      WARMUP_SLOT=$((ACT_SLOT + WS))
+      echo "GLOAS activates at epoch $GFE / slot $ACT_SLOT; will start checks at slot $WARMUP_SLOT"
+      echo "::set-output activationSlot $ACT_SLOT"
+      echo "::set-output warmupSlot $WARMUP_SLOT"
+      echo "::set-output gloasEpoch $GFE"
+
+- name: check_consensus_slot_range
+  title: "Wait for GLOAS activation + warmup"
+  timeout: 25m
+  configVars:
+    minSlotNumber: "tasks.gloas_target.outputs.warmupSlot"
+
+##
+## ------------------------------------------------------------------
+## HTTP endpoints (rows 1-11)
+## ------------------------------------------------------------------
+##
+
+# Row 1 -- POST /eth/v2/beacon/blocks (Gloas shape)
+- name: check_consensus_api
+  id: row01_publish_block
+  title: "1. POST /eth/v2/beacon/blocks (Gloas shape)"
+  config:
+    checkId: "publish_block"
+    checkTitle: "POST /eth/v2/beacon/blocks (Gloas)"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+    method: "POST"
+    path: "/eth/v2/beacon/blocks"
+    headers:
+      Eth-Consensus-Version: "gloas"
+    body:
+      # Deliberately empty/garbage Gloas-shaped body. The endpoint should
+      # parse it as a gloas SignedBeaconBlock and reject with a well-formed
+      # ErrorMessage. That alone proves the endpoint exists.
+      message:
+        slot: "0"
+        proposer_index: "0"
+        parent_root: "0x0000000000000000000000000000000000000000000000000000000000000000"
+        state_root:  "0x0000000000000000000000000000000000000000000000000000000000000000"
+        body: {}
+      signature: "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    expectStatuses:  [200, 202, 400, 415, 503]
+    successStatuses: [200, 202]
+    errorStatuses:   [400, 415, 503]
+    requestTimeout: "20s"
+    errorSchema:
+      type: object
+      required: [code, message]
+      properties:
+        code:    { type: integer }
+        message: { type: string }
+
+# Row 2 -- GET /eth/v4/validator/blocks/{slot}
+- name: check_consensus_api
+  id: row02_produce_block_v4
+  title: "2. GET /eth/v4/validator/blocks/{slot} (produceBlockV4)"
+  config:
+    checkId: "produce_block_v4"
+    checkTitle: "GET /eth/v4/validator/blocks/{slot}"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/580"
+    method: "GET"
+    path: "/eth/v4/validator/blocks/{slot+2}"
+    queryParams:
+      randao_reveal: "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      graffiti: "0x000000000000000000000000000000000000000000000000000000000000000d"
+      skip_randao_verification: "true"
+    expectStatuses:  [200, 202, 400, 404, 503]
+    successStatuses: [200]
+    errorStatuses:   [400, 404, 503]
+    requestTimeout: "20s"
+    responseSchema:
+      type: object
+      required: [version, data]
+      properties:
+        version: { type: string }
+        data:    { type: object }
+    errorSchema:
+      type: object
+      required: [code, message]
+
+# Row 3 -- POST /eth/v1/beacon/execution_payload_bid
+- name: check_consensus_api
+  id: row03_publish_bid
+  title: "3. POST /eth/v1/beacon/execution_payload_bid"
+  config:
+    checkId: "publish_bid"
+    checkTitle: "POST /eth/v1/beacon/execution_payload_bid"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+    method: "POST"
+    path: "/eth/v1/beacon/execution_payload_bid"
+    headers:
+      Eth-Consensus-Version: "gloas"
+    body:
+      message: {}
+      signature: "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    expectStatuses:  [200, 202, 400, 404, 415, 503]
+    successStatuses: [200, 202]
+    errorStatuses:   [400, 404, 415, 503]
+    requestTimeout: "20s"
+    errorSchema:
+      type: object
+      required: [code, message]
+
+# Row 4 -- GET /eth/v1/validator/execution_payload_bid/{slot}/{builder_index}
+- name: check_consensus_api
+  id: row04_get_bid
+  title: "4. GET /eth/v1/validator/execution_payload_bid/{slot}/{builder_index}"
+  config:
+    checkId: "get_bid"
+    checkTitle: "GET /eth/v1/validator/execution_payload_bid/{slot}/{builder_index}"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+    method: "GET"
+    path: "/eth/v1/validator/execution_payload_bid/{slot+1}/0"
+    expectStatuses:  [200, 400, 404, 503]
+    successStatuses: [200]
+    errorStatuses:   [400, 404, 503]
+    requestTimeout: "20s"
+    responseSchema:
+      type: object
+      required: [version, data]
+      properties:
+        version: { type: string }
+        data:    { type: object }
+    errorSchema:
+      type: object
+      required: [code, message]
+
+# Row 5 -- POST /eth/v1/beacon/execution_payload_envelope
+- name: check_consensus_api
+  id: row05_publish_envelope
+  title: "5. POST /eth/v1/beacon/execution_payload_envelope (reveal)"
+  config:
+    checkId: "publish_envelope"
+    checkTitle: "POST /eth/v1/beacon/execution_payload_envelope"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/580"
+    method: "POST"
+    path: "/eth/v1/beacon/execution_payload_envelope"
+    headers:
+      Eth-Consensus-Version: "gloas"
+    body:
+      message: {}
+      signature: "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    expectStatuses:  [200, 202, 400, 404, 415, 503]
+    successStatuses: [200, 202]
+    errorStatuses:   [400, 404, 415, 503]
+    requestTimeout: "20s"
+    errorSchema:
+      type: object
+      required: [code, message]
+
+# Row 6 -- GET /eth/v1/beacon/execution_payload_envelope/{block_id}
+- name: check_consensus_api
+  id: row06_get_envelope_by_block
+  title: "6. GET /eth/v1/beacon/execution_payload_envelope/{block_id}"
+  config:
+    checkId: "get_envelope_by_block"
+    checkTitle: "GET /eth/v1/beacon/execution_payload_envelope/{block_id}"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+    method: "GET"
+    path: "/eth/v1/beacon/execution_payload_envelope/head"
+    expectStatuses:  [200, 400, 404, 503]
+    successStatuses: [200]
+    errorStatuses:   [400, 404, 503]
+    requestTimeout: "20s"
+    responseSchema:
+      type: object
+      required: [version, data]
+      properties:
+        version: { type: string }
+        data:    { type: object }
+    errorSchema:
+      type: object
+      required: [code, message]
+
+# Row 7 -- GET /eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}
+- name: check_consensus_api
+  id: row07_get_envelope_by_slot
+  title: "7. GET /eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}"
+  config:
+    checkId: "get_envelope_by_slot"
+    checkTitle: "GET /eth/v1/validator/execution_payload_envelope/{slot}/{root}"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/580"
+    method: "GET"
+    path: "/eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}"
+    expectStatuses:  [200, 400, 404, 503]
+    successStatuses: [200]
+    errorStatuses:   [400, 404, 503]
+    requestTimeout: "20s"
+    responseSchema:
+      type: object
+      required: [version, data]
+    errorSchema:
+      type: object
+      required: [code, message]
+
+# Row 8 -- POST /eth/v1/validator/duties/ptc/{epoch}
+- name: check_consensus_api
+  id: row08_ptc_duties
+  title: "8. POST /eth/v1/validator/duties/ptc/{epoch}"
+  config:
+    checkId: "ptc_duties"
+    checkTitle: "POST /eth/v1/validator/duties/ptc/{epoch}"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552, https://github.com/ethereum/beacon-APIs/pull/592"
+    method: "POST"
+    path: "/eth/v1/validator/duties/ptc/{epoch}"
+    body: ["0", "1", "2", "3", "4"]
+    expectStatuses:  [200, 400, 404, 503]
+    successStatuses: [200]
+    errorStatuses:   [400, 404, 503]
+    requestTimeout: "20s"
+    responseSchema:
+      type: object
+      required: [dependent_root, execution_optimistic, data]
+      properties:
+        dependent_root:       { type: string }
+        execution_optimistic: { type: boolean }
+        data:                 { type: array }
+    errorSchema:
+      type: object
+      required: [code, message]
+
+# Row 9 -- GET /eth/v1/validator/payload_attestation_data/{slot}
+- name: check_consensus_api
+  id: row09_payload_attestation_data
+  title: "9. GET /eth/v1/validator/payload_attestation_data/{slot}"
+  config:
+    checkId: "payload_attestation_data"
+    checkTitle: "GET /eth/v1/validator/payload_attestation_data/{slot}"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+    method: "GET"
+    path: "/eth/v1/validator/payload_attestation_data/{slot-1}"
+    expectStatuses:  [200, 400, 404, 503]
+    successStatuses: [200]
+    errorStatuses:   [400, 404, 503]
+    requestTimeout: "20s"
+    responseSchema:
+      type: object
+      required: [version, data]
+      properties:
+        version: { type: string }
+        data:    { type: object }
+    errorSchema:
+      type: object
+      required: [code, message]
+
+# Row 10 -- POST /eth/v1/beacon/pool/payload_attestations
+- name: check_consensus_api
+  id: row10_post_payload_attestations
+  title: "10. POST /eth/v1/beacon/pool/payload_attestations"
+  config:
+    checkId: "post_payload_attestations"
+    checkTitle: "POST /eth/v1/beacon/pool/payload_attestations"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+    method: "POST"
+    path: "/eth/v1/beacon/pool/payload_attestations"
+    headers:
+      Eth-Consensus-Version: "gloas"
+    body:
+    - message:
+        beacon_block_root: "0x0000000000000000000000000000000000000000000000000000000000000000"
+        slot: "0"
+        validator_index: "0"
+        payload_status: "0"
+      signature: "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    expectStatuses:  [200, 202, 400, 404, 415, 503]
+    successStatuses: [200, 202]
+    errorStatuses:   [400, 404, 415, 503]
+    requestTimeout: "20s"
+    errorSchema:
+      type: object
+      required: [code, message]
+
+# Row 11 -- GET /eth/v1/beacon/pool/payload_attestations
+- name: check_consensus_api
+  id: row11_get_payload_attestations
+  title: "11. GET /eth/v1/beacon/pool/payload_attestations"
+  config:
+    checkId: "get_payload_attestations"
+    checkTitle: "GET /eth/v1/beacon/pool/payload_attestations"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+    method: "GET"
+    path: "/eth/v1/beacon/pool/payload_attestations"
+    expectStatuses:  [200, 400, 404, 503]
+    successStatuses: [200]
+    errorStatuses:   [400, 404, 503]
+    requestTimeout: "20s"
+    responseSchema:
+      type: object
+      required: [version, data]
+      properties:
+        version: { type: string }
+        data:    { type: array }
+    errorSchema:
+      type: object
+      required: [code, message]
+
+##
+## ------------------------------------------------------------------
+## SSE events (rows 12-16) -- run them all concurrently to share the
+## same wait window.
+## ------------------------------------------------------------------
+##
+- name: run_tasks_concurrent
+  title: "GLOAS SSE event checks"
+  config:
+    tasks:
+    - name: check_consensus_api
+      id: row12_sse_execution_payload_bid
+      title: "12. SSE execution_payload_bid"
+      config:
+        checkId: "sse_execution_payload_bid"
+        checkTitle: "SSE execution_payload_bid"
+        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552, https://github.com/ethereum/beacon-APIs/pull/587"
+        sse:
+          topic: "execution_payload_bid"
+          timeoutSeconds: 48
+          minEvents: 1
+        overallTimeout: "60s"
+        eventSchema:
+          type: object
+          required: [version, data]
+
+    - name: check_consensus_api
+      id: row13_sse_execution_payload_available
+      title: "13. SSE execution_payload_available"
+      config:
+        checkId: "sse_execution_payload_available"
+        checkTitle: "SSE execution_payload_available"
+        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+        sse:
+          topic: "execution_payload_available"
+          timeoutSeconds: 48
+          minEvents: 1
+        overallTimeout: "60s"
+        eventSchema:
+          type: object
+
+    - name: check_consensus_api
+      id: row14_sse_payload_attestation_message
+      title: "14. SSE payload_attestation_message"
+      config:
+        checkId: "sse_payload_attestation_message"
+        checkTitle: "SSE payload_attestation_message"
+        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+        sse:
+          topic: "payload_attestation_message"
+          timeoutSeconds: 48
+          minEvents: 1
+        overallTimeout: "60s"
+        eventSchema:
+          type: object
+          required: [message, signature]
+
+    - name: check_consensus_api
+      id: row15_sse_execution_payload
+      title: "15. SSE execution_payload"
+      config:
+        checkId: "sse_execution_payload"
+        checkTitle: "SSE execution_payload"
+        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
+        sse:
+          topic: "execution_payload"
+          timeoutSeconds: 48
+          minEvents: 1
+        overallTimeout: "60s"
+        eventSchema:
+          type: object
+
+    - name: check_consensus_api
+      id: row16_sse_execution_payload_gossip
+      title: "16. SSE execution_payload_gossip"
+      config:
+        checkId: "sse_execution_payload_gossip"
+        checkTitle: "SSE execution_payload_gossip"
+        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
+        sse:
+          topic: "execution_payload_gossip"
+          timeoutSeconds: 48
+          minEvents: 1
+        overallTimeout: "60s"
+        eventSchema:
+          type: object
+
+##
+## ------------------------------------------------------------------
+## Final aggregator
+## ------------------------------------------------------------------
+##
+- name: generate_api_compatibility_matrix
+  id: matrix
+  title: "Render GLOAS API compatibility matrix"
+  config:
+    title: "GLOAS Beacon-API Compatibility Matrix"
+    description: |
+      Compatibility matrix for all beacon-API endpoints and SSE topics
+      introduced or changed by GLOAS (ePBS). Each cell records the
+      outcome of probing the endpoint against a single CL client
+      implementation. See the legend below the table for cell meanings;
+      cells with notes are footnoted by number.
+    includeCheckIds:
+      - publish_block
+      - produce_block_v4
+      - publish_bid
+      - get_bid
+      - publish_envelope
+      - get_envelope_by_block
+      - get_envelope_by_slot
+      - ptc_duties
+      - payload_attestation_data
+      - post_payload_attestations
+      - get_payload_attestations
+      - sse_execution_payload_bid
+      - sse_execution_payload_available
+      - sse_payload_attestation_message
+      - sse_execution_payload
+      - sse_execution_payload_gossip
+    includeFootnotes: true
+    includeLegend: true

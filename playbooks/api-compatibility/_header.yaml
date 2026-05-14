@@ -1,0 +1,11 @@
+name: API Compatibility
+description: |
+  Cross-client beacon-API compatibility playbooks. Each playbook exercises
+  the spec endpoints / SSE topics introduced (or changed) by a single
+  fork against every connected CL client, validates each response against
+  an inline JSON Schema derived from the spec, and renders a markdown
+  compatibility matrix as a result artifact.
+
+  Add a new playbook here when a future fork lands API changes — the
+  `check_consensus_api` and `generate_api_compatibility_matrix` tasks
+  are intentionally fork-agnostic.
