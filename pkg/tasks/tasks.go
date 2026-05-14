@@ -4,6 +4,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/types"
 
 	checkclientsarehealthy "github.com/ethpandaops/assertoor/pkg/tasks/check_clients_are_healthy"
+	checkconsensusapi "github.com/ethpandaops/assertoor/pkg/tasks/check_consensus_api"
 	checkconsensusattestationstats "github.com/ethpandaops/assertoor/pkg/tasks/check_consensus_attestation_stats"
 	checkconsensusblockproposals "github.com/ethpandaops/assertoor/pkg/tasks/check_consensus_block_proposals"
 	checkconsensusbuildersstatus "github.com/ethpandaops/assertoor/pkg/tasks/check_consensus_builder_status"
@@ -52,6 +53,7 @@ import (
 
 var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkclientsarehealthy.TaskDescriptor,
+	checkconsensusapi.TaskDescriptor,
 	checkconsensusattestationstats.TaskDescriptor,
 	checkconsensusblockproposals.TaskDescriptor,
 	checkconsensusbuildersstatus.TaskDescriptor,

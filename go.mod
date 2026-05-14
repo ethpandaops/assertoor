@@ -95,6 +95,7 @@ require (
 	github.com/protolambda/bls12-381-util v0.1.0 // indirect
 	github.com/r3labs/sse/v2 v2.10.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/supranational/blst v0.3.16 // indirect
