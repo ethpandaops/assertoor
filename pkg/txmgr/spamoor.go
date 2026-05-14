@@ -249,6 +249,18 @@ func (s *Spamoor) NewWalletPoolByPrivkey(ctx context.Context, logger logrus.Fiel
 		return nil, fmt.Errorf("cannot initialize root wallet: %w", err)
 	}
 
+	// Enable the bulk-funding batcher contract. Without this, processFundingRequests
+	// falls back to one tx per recipient with sequential nonces (e.g. funding 100 child
+	// wallets emits 100 sequential-nonce txs from the root wallet). Recent EL txpool
+	// changes (e.g. Erigon's MaxNonceGap=64 zombie-eviction landed in release/3.4 via
+	// PR #19449) treat such bursts as nonce-gapped zombies when they arrive out of
+	// order on parallel HTTP connections and reject them with
+	// "INTERNAL_ERROR: nonce gap too large", stalling the entire test. The batcher
+	// path packs all recipients into a single contract call, so funding 100 wallets
+	// uses 1-2 root-wallet nonces total. Matches the pattern used by spamoor's own
+	// CLI (cmd/spamoor/main.go) and daemon (cmd/spamoor-daemon/main.go).
+	rootWallet.InitTxBatcher(ctx, s.txpool)
+
 	walletPool := spamoor.NewWalletPool(ctx, logger, rootWallet, s.clientPool, s.txpool)
 
 	return walletPool, nil
