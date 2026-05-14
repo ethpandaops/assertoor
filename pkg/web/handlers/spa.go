@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"path"
 	"strings"
@@ -85,7 +86,12 @@ func injectHead(html []byte, cfg RuntimeConfig) ([]byte, error) {
 		return append(injected, html...), nil
 	}
 
-	out := make([]byte, 0, len(html)+len(injected))
+	if len(injected) > math.MaxInt-len(html) {
+		return nil, fmt.Errorf("injected html too large")
+	}
+	totalLen := len(html) + len(injected)
+
+	out := make([]byte, 0, totalLen)
 	out = append(out, html[:idx]...)
 	out = append(out, injected...)
 	out = append(out, html[idx:]...)
