@@ -4,6 +4,10 @@
 // library tab) read the index instead of fetching each playbook
 // individually.
 //
+// Folders may include an optional `_header.yaml` to give the folder a
+// human-readable name and description; those are emitted in the
+// `folders:` section of the generated index.
+//
 // Usage:
 //
 //	go run scripts/generate-playbook-index/generate-playbook-index.go <playbooks-dir>
@@ -22,9 +26,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// indexFileName is the name of the generated index file; it is also
-// skipped when walking the tree so generation is idempotent.
-const indexFileName = "_index.yaml"
+const (
+	// indexFileName is the name of the generated index file; it is also
+	// skipped when walking the tree so generation is idempotent.
+	indexFileName = "_index.yaml"
+
+	// headerFileName is the per-folder metadata file. It is excluded
+	// from the playbook list and surfaces as a folder entry instead.
+	headerFileName = "_header.yaml"
+)
 
 // PlaybookHeader is the subset of a playbook YAML we care about for
 // indexing. We unmarshal into this rather than the full TestConfig to
@@ -39,6 +49,12 @@ type PlaybookHeader struct {
 	Timeout     string   `yaml:"timeout"`
 }
 
+// FolderHeader is the schema parsed from each folder's _header.yaml.
+type FolderHeader struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+}
+
 // IndexEntry is the schema written to _index.yaml for each playbook.
 type IndexEntry struct {
 	File        string   `yaml:"file"`
@@ -50,10 +66,20 @@ type IndexEntry struct {
 	Timeout     string   `yaml:"timeout,omitempty"`
 }
 
+// FolderEntry is the schema written to _index.yaml for each folder
+// that has a _header.yaml. The `Path` is relative to the playbooks
+// root with forward-slash separators.
+type FolderEntry struct {
+	Path        string `yaml:"path"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description,omitempty"`
+}
+
 // Index is the top-level document written to _index.yaml.
 type Index struct {
-	Generated time.Time    `yaml:"generated"`
-	Playbooks []IndexEntry `yaml:"playbooks"`
+	Generated time.Time     `yaml:"generated"`
+	Folders   []FolderEntry `yaml:"folders,omitempty"`
+	Playbooks []IndexEntry  `yaml:"playbooks"`
 }
 
 func main() {
@@ -91,12 +117,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Generated playbook index with %d entries -> %s\n", len(index.Playbooks), outputFile)
+	fmt.Printf("Generated playbook index with %d folders and %d playbooks -> %s\n",
+		len(index.Folders), len(index.Playbooks), outputFile)
 }
 
 func buildIndex(root string) (*Index, []string, error) {
 	index := &Index{
 		Generated: time.Now().UTC().Truncate(time.Second),
+		Folders:   []FolderEntry{},
 		Playbooks: []IndexEntry{},
 	}
 
@@ -111,7 +139,6 @@ func buildIndex(root string) (*Index, []string, error) {
 			return nil
 		}
 
-		// Only consider .yaml/.yml files, and skip the index file itself.
 		base := info.Name()
 		if base == indexFileName {
 			return nil
@@ -129,6 +156,24 @@ func buildIndex(root string) (*Index, []string, error) {
 		// Always use forward slashes in the index for portability across
 		// platforms — Windows-built indexes should be readable on Linux.
 		relPath = filepath.ToSlash(relPath)
+
+		// Folder headers don't count as playbooks; harvest them into
+		// the folders list instead.
+		if base == headerFileName {
+			folder, warn, headerErr := loadFolderHeader(path, relPath)
+			if headerErr != nil {
+				warnings = append(warnings, fmt.Sprintf("%s: %v", relPath, headerErr))
+				return nil
+			}
+
+			if warn != "" {
+				warnings = append(warnings, fmt.Sprintf("%s: %s", relPath, warn))
+			}
+
+			index.Folders = append(index.Folders, folder)
+
+			return nil
+		}
 
 		entry, warn, err := loadEntry(path, relPath)
 		if err != nil {
@@ -148,7 +193,10 @@ func buildIndex(root string) (*Index, []string, error) {
 		return nil, warnings, err
 	}
 
-	// Stable order: sort by file path so diffs stay readable.
+	// Stable order: sort by path / file so diffs stay readable.
+	sort.Slice(index.Folders, func(i, j int) bool {
+		return index.Folders[i].Path < index.Folders[j].Path
+	})
 	sort.Slice(index.Playbooks, func(i, j int) bool {
 		return index.Playbooks[i].File < index.Playbooks[j].File
 	})
@@ -206,6 +254,42 @@ func loadEntry(absPath, relPath string) (IndexEntry, string, error) {
 	}
 
 	return entry, "", nil
+}
+
+// loadFolderHeader parses a _header.yaml file. The folder path returned
+// is relPath with the trailing /_header.yaml stripped (so the playbooks
+// root maps to "" — i.e. a header at the root sets the index's top-level
+// folder entry, if anyone ever wants one).
+func loadFolderHeader(absPath, relPath string) (FolderEntry, string, error) {
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		return FolderEntry{}, "", fmt.Errorf("read: %w", err)
+	}
+
+	var header FolderHeader
+	if err := yaml.Unmarshal(data, &header); err != nil {
+		return FolderEntry{}, "", fmt.Errorf("parse: %w", err)
+	}
+
+	if header.Name == "" {
+		return FolderEntry{}, "", fmt.Errorf("missing required field 'name'")
+	}
+
+	folderPath := strings.TrimSuffix(relPath, headerFileName)
+	folderPath = strings.TrimSuffix(folderPath, "/")
+
+	entry := FolderEntry{
+		Path:        folderPath,
+		Name:        header.Name,
+		Description: strings.TrimRight(header.Description, "\n"),
+	}
+
+	var warn string
+	if header.Description == "" {
+		warn = "missing description"
+	}
+
+	return entry, warn, nil
 }
 
 func writeIndex(index *Index, outputFile string) error {

@@ -1,8 +1,84 @@
 # Auto-generated playbook index
-# Generated: 2026-05-14T00:23:32Z
+# Generated: 2026-05-14T00:40:37Z
 # DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
 
-generated: 2026-05-14T00:23:32Z
+generated: 2026-05-14T00:40:37Z
+folders:
+  - path: dev
+    name: Development & Utilities
+    description: |-
+      Building-block playbooks and developer utilities — small, focused
+      tests intended to be composed into larger playbooks or run ad-hoc
+      (fund a wallet, wait for a slot, run a shell command, generate
+      attestations, etc.).
+
+      Most playbooks here use the kurtosis genesis mnemonic where validator
+      state is required.
+  - path: fusaka-dev/kurtosis
+    name: Fusaka (Kurtosis)
+    description: |-
+      Fusaka-fork tests focused on PeerDAS custody (CGC) bookkeeping and
+      RPC consistency.
+
+      Covers CGC vs. validator-balance audits, CGC growth driven by
+      deposits / credential upgrades, and `eth_config` (EIP-7910) cross-
+      client consistency. Tailored to kurtosis-launched fusaka devnets.
+  - path: glamsterdam-dev
+    name: Glamsterdam
+    description: |-
+      Glamsterdam-fork tests. Currently a thin folder — primarily wires the
+      execution-spec-tests pipeline against the Amsterdam test suite and
+      waits for the GLOAS activation epoch before running.
+  - path: gloas-dev
+    name: GLOAS (ePBS)
+    description: |-
+      GLOAS-fork tests focused on the ePBS payload-publishing model and the
+      new builder role (validators with 0x03 withdrawal credentials).
+
+      Includes builder lifecycle, builder deposit spam, and regression tests
+      for the `process_previous_payload` ordering rule that affects how
+      EL-triggered exits interact with voluntary exits and slashings.
+  - path: pectra-dev
+    name: Pectra (Electra + Prague)
+    description: |-
+      Pectra-fork tests covering the Prague execution-layer changes
+      (EIP-2537, EIP-7002, EIP-7251, EIP-7623, EIP-7702) and Electra
+      consensus-layer changes (EIP-6110, max effective balance, 0x02
+      withdrawal credentials).
+
+      Most tests require the Electra fork to have activated on the target
+      network.
+  - path: pectra-dev/kurtosis
+    name: Pectra (Kurtosis)
+    description: |-
+      Pectra playbooks tailored to kurtosis-launched devnets, including the
+      big `all.yaml` orchestrator and focused stress tests (queue fill-ups,
+      mass deposits, mass consolidations, conflict scenarios).
+
+      These assume the standard kurtosis genesis mnemonic and a fresh devnet
+      with Electra activating around the genesis-relative slots referenced
+      in each playbook.
+  - path: stable
+    name: Stable
+    description: |-
+      Production-ready playbooks that work on any mainnet-compatible network.
+      These tests are well-exercised and recommended as smoke tests for new
+      devnets and as regression coverage on stable forks.
+  - path: stable/kurtosis
+    name: Stable (Kurtosis)
+    description: |-
+      Stable playbooks tailored to kurtosis-launched devnets. They assume the
+      standard kurtosis genesis mnemonic and use fixed validator-index ranges,
+      so they will not work on networks where those validators don't exist.
+  - path: verkle-dev
+    name: Verkle
+    description: |-
+      Verkle-fork tests covering state-tree conversion and large-application
+      smoke testing on a converted chain.
+
+      Includes a state-conversion progress monitor and an AAVE v3.1
+      deployment driver that exercises a full Foundry-built protocol bundle
+      against a verkle-converted EL.
 playbooks:
   - file: dev/block-proposal-with-blobs-check.yaml
     id: block-proposal-with-blobs-check

@@ -1,0 +1,9 @@
+name: Pectra (Electra + Prague)
+description: |
+  Pectra-fork tests covering the Prague execution-layer changes
+  (EIP-2537, EIP-7002, EIP-7251, EIP-7623, EIP-7702) and Electra
+  consensus-layer changes (EIP-6110, max effective balance, 0x02
+  withdrawal credentials).
+
+  Most tests require the Electra fork to have activated on the target
+  network.

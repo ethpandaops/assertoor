@@ -1,0 +1,8 @@
+name: Fusaka (Kurtosis)
+description: |
+  Fusaka-fork tests focused on PeerDAS custody (CGC) bookkeeping and
+  RPC consistency.
+
+  Covers CGC vs. validator-balance audits, CGC growth driven by
+  deposits / credential upgrades, and `eth_config` (EIP-7910) cross-
+  client consistency. Tailored to kurtosis-launched fusaka devnets.
