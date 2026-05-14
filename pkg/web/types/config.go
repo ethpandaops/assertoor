@@ -18,6 +18,14 @@ type WebConfig struct {
 	// the service's JWKS, and the SPA loads <url>/client.js to drive
 	// login/logout. When empty, the API is unauthenticated.
 	AuthProviderURL string `yaml:"authProviderUrl" envconfig:"WEB_AUTH_PROVIDER_URL"`
+
+	// AuthProviderAudience overrides the expected JWT "aud" claim. When
+	// empty, it is derived from AuthProviderURL as the parent DNS zone of
+	// its host (e.g. "https://auth.foo.example" → "foo.example"). Set this
+	// explicitly when the issuer URL has no meaningful parent zone (e.g.
+	// when pointing at a raw IP like "http://127.0.0.1:18080" during local
+	// development).
+	AuthProviderAudience string `yaml:"authProviderAudience" envconfig:"WEB_AUTH_PROVIDER_AUDIENCE"`
 }
 
 type ServerConfig struct {

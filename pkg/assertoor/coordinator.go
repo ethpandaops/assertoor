@@ -196,8 +196,9 @@ func (c *Coordinator) Run(ctx context.Context) error {
 			// references but keep AuthProviderURL so the SPA's runtime config
 			// still points at the same authenticatoor.
 			publicWeb := &web_types.WebConfig{
-				Frontend:        c.Config.Web.Frontend,
-				AuthProviderURL: c.Config.Web.AuthProviderURL,
+				Frontend:             c.Config.Web.Frontend,
+				AuthProviderURL:      c.Config.Web.AuthProviderURL,
+				AuthProviderAudience: c.Config.Web.AuthProviderAudience,
 			}
 
 			err = c.publicWebserver.ConfigureRoutes(publicWeb, nil, c, true, nil)

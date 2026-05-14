@@ -83,7 +83,7 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 	// Build auth handler. When AuthProviderURL is empty the handler runs in
 	// open mode and every request is authorized. When set, incoming bearer
 	// tokens are verified against the remote authenticatoor's JWKS.
-	authHandler, err := auth.NewAuthHandler(context.Background(), webConfig.AuthProviderURL)
+	authHandler, err := auth.NewAuthHandler(context.Background(), ws.logger.WithField("module", "auth"), webConfig.AuthProviderURL, webConfig.AuthProviderAudience)
 	if err != nil {
 		return err
 	}

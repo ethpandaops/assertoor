@@ -35,6 +35,10 @@ func (h *Handler) CheckAuthToken(tokenStr, host string) *jwt.Token {
 
 	claims, err := h.verifier.Verify(tokenStr, authpkg.WithRequestHost(host))
 	if err != nil {
+		if h.logger != nil {
+			h.logger.WithError(err).WithField("host", host).Warn("auth: token rejected")
+		}
+
 		return nil
 	}
 

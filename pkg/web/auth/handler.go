@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ethpandaops/service-authenticatoor/pkg/auth"
+	"github.com/sirupsen/logrus"
 )
 
 // serviceName is the logical app identity passed to the verifier as
@@ -24,6 +25,7 @@ const serviceName = "assertoor"
 // returns a non-nil "valid" token.
 type Handler struct {
 	verifier *auth.JWKSVerifier // nil → open mode
+	logger   logrus.FieldLogger
 }
 
 // NewAuthHandler returns a Handler. When authProviderURL is empty the
@@ -33,10 +35,10 @@ type Handler struct {
 // verifier is configured to gate on this binary's serviceName via the
 // token's "services" claim, and to bind tokens to the request host via
 // the "scope" claim (set per-request in CheckAuthToken).
-func NewAuthHandler(ctx context.Context, authProviderURL string) (*Handler, error) {
+func NewAuthHandler(ctx context.Context, logger logrus.FieldLogger, authProviderURL, audienceOverride string) (*Handler, error) {
 	authProviderURL = strings.TrimRight(authProviderURL, "/")
 	if authProviderURL == "" {
-		return &Handler{}, nil
+		return &Handler{logger: logger}, nil
 	}
 
 	expectedIssuer := authProviderURL
@@ -47,17 +49,31 @@ func NewAuthHandler(ctx context.Context, authProviderURL string) (*Handler, erro
 		jwksURL = disc.JWKSURI
 	}
 
+	expectedAudience := audienceOverride
+	if expectedAudience == "" {
+		expectedAudience = parentZone(authProviderURL)
+	}
+
+	if logger != nil {
+		logger.WithFields(logrus.Fields{
+			"jwks_url":          jwksURL,
+			"expected_issuer":   expectedIssuer,
+			"expected_audience": expectedAudience,
+			"expected_service":  serviceName,
+		}).Info("auth: verifier configured")
+	}
+
 	verifier, err := auth.NewJWKSVerifier(ctx, auth.VerifierConfig{
 		JWKSURL:          jwksURL,
 		ExpectedIssuer:   expectedIssuer,
-		ExpectedAudience: parentZone(authProviderURL),
+		ExpectedAudience: expectedAudience,
 		ExpectedService:  serviceName,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("auth: build verifier: %w", err)
 	}
 
-	return &Handler{verifier: verifier}, nil
+	return &Handler{verifier: verifier, logger: logger}, nil
 }
 
 // IsOpen reports whether this handler is running in open mode (no auth
