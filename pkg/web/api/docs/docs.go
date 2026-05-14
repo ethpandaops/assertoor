@@ -152,6 +152,117 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/playbook_library": {
+            "get": {
+                "description": "Returns the index of playbooks available from the configured upstream\n(default: ethpandaops/assertoor master). The response includes the\nresolved base URL used to fetch individual playbooks and the folder\nmetadata harvested from ` + "`" + `_header.yaml` + "`" + ` files.\nThe index is cached server-side; a stale copy is served if a refresh fails.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PlaybookLibrary"
+                ],
+                "summary": "Get the published playbook library index",
+                "operationId": "getPlaybookLibrary",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/playbooklibrary.IndexResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Library disabled",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/playbook_library/check": {
+            "get": {
+                "description": "Fetches the remote YAML for the given library file and compares it\nagainst any locally registered test with the same id. The response\ntells the caller whether to register fresh (absent), skip registration\nand run the existing test (same), or warn before overwriting (different).\nRequires authentication because the response includes local YAML which\nmay contain sensitive configuration.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PlaybookLibrary"
+                ],
+                "summary": "Compare a library playbook against the locally-registered copy",
+                "operationId": "getPlaybookLibraryCheck",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Library file path (e.g. stable/stability-check.yaml)",
+                        "name": "file",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.GetPlaybookLibraryCheckResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Library disabled or file not in index",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/task_descriptor/{name}": {
             "get": {
                 "description": "Returns a single task descriptor by name with its JSON schema",
@@ -1158,6 +1269,75 @@ const docTemplate = `{
         "helper.RawMessage": {
             "type": "object"
         },
+        "playbooklibrary.FolderEntry": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
+        "playbooklibrary.IndexResponse": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
+                },
+                "folders": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/playbooklibrary.FolderEntry"
+                    }
+                },
+                "generated": {
+                    "type": "string"
+                },
+                "index_url": {
+                    "type": "string"
+                },
+                "playbooks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/playbooklibrary.PlaybookEntry"
+                    }
+                }
+            }
+        },
+        "playbooklibrary.PlaybookEntry": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "file": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "timeout": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
         "tasks.TaskDescriptorAPI": {
             "type": "object",
             "properties": {
@@ -1335,6 +1515,35 @@ const docTemplate = `{
                 }
             }
         },
+        "web_api.GetPlaybookLibraryCheckResponse": {
+            "type": "object",
+            "properties": {
+                "local_name": {
+                    "type": "string"
+                },
+                "local_test_id": {
+                    "type": "string"
+                },
+                "local_yaml": {
+                    "type": "string"
+                },
+                "remote_id": {
+                    "type": "string"
+                },
+                "remote_name": {
+                    "type": "string"
+                },
+                "remote_url": {
+                    "type": "string"
+                },
+                "remote_yaml": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
         "web_api.GetTestResponse": {
             "type": "object",
             "properties": {
@@ -1351,6 +1560,9 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "description": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -1363,6 +1575,12 @@ const docTemplate = `{
                 "source": {
                     "type": "string"
                 },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "timeout": {
                     "type": "integer"
                 },
@@ -1370,6 +1588,9 @@ const docTemplate = `{
                     "description": "Config with global vars merged in",
                     "type": "object",
                     "additionalProperties": {}
+                },
+                "version": {
+                    "type": "string"
                 }
             }
         },
@@ -1632,6 +1853,9 @@ const docTemplate = `{
                 "basePath": {
                     "type": "string"
                 },
+                "description": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -1639,6 +1863,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "source": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "version": {
                     "type": "string"
                 }
             }

@@ -1,6 +1,51 @@
 definitions:
   helper.RawMessage:
     type: object
+  playbooklibrary.FolderEntry:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+    type: object
+  playbooklibrary.IndexResponse:
+    properties:
+      base_url:
+        type: string
+      folders:
+        items:
+          $ref: '#/definitions/playbooklibrary.FolderEntry'
+        type: array
+      generated:
+        type: string
+      index_url:
+        type: string
+      playbooks:
+        items:
+          $ref: '#/definitions/playbooklibrary.PlaybookEntry'
+        type: array
+    type: object
+  playbooklibrary.PlaybookEntry:
+    properties:
+      description:
+        type: string
+      file:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      timeout:
+        type: string
+      version:
+        type: string
+    type: object
   tasks.TaskDescriptorAPI:
     properties:
       aliases:
@@ -120,6 +165,25 @@ definitions:
           $ref: '#/definitions/web_api.LogEntry'
         type: array
     type: object
+  web_api.GetPlaybookLibraryCheckResponse:
+    properties:
+      local_name:
+        type: string
+      local_test_id:
+        type: string
+      local_yaml:
+        type: string
+      remote_id:
+        type: string
+      remote_name:
+        type: string
+      remote_url:
+        type: string
+      remote_yaml:
+        type: string
+      state:
+        type: string
+    type: object
   web_api.GetTestResponse:
     properties:
       basePath:
@@ -131,6 +195,8 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      description:
+        type: string
       id:
         type: string
       name:
@@ -139,12 +205,18 @@ definitions:
         $ref: '#/definitions/types.TestSchedule'
       source:
         type: string
+      tags:
+        items:
+          type: string
+        type: array
       timeout:
         type: integer
       vars:
         additionalProperties: {}
         description: Config with global vars merged in
         type: object
+      version:
+        type: string
     type: object
   web_api.GetTestRunDetailedTask:
     properties:
@@ -316,11 +388,19 @@ definitions:
     properties:
       basePath:
         type: string
+      description:
+        type: string
       id:
         type: string
       name:
         type: string
       source:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      version:
         type: string
     type: object
   web_api.GetVersionResponse:
@@ -584,6 +664,85 @@ paths:
       summary: Get application logs
       tags:
       - Logs
+  /api/v1/playbook_library:
+    get:
+      description: |-
+        Returns the index of playbooks available from the configured upstream
+        (default: ethpandaops/assertoor master). The response includes the
+        resolved base URL used to fetch individual playbooks and the folder
+        metadata harvested from `_header.yaml` files.
+        The index is cached server-side; a stale copy is served if a refresh fails.
+      operationId: getPlaybookLibrary
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/playbooklibrary.IndexResponse'
+              type: object
+        "404":
+          description: Library disabled
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get the published playbook library index
+      tags:
+      - PlaybookLibrary
+  /api/v1/playbook_library/check:
+    get:
+      description: |-
+        Fetches the remote YAML for the given library file and compares it
+        against any locally registered test with the same id. The response
+        tells the caller whether to register fresh (absent), skip registration
+        and run the existing test (same), or warn before overwriting (different).
+        Requires authentication because the response includes local YAML which
+        may contain sensitive configuration.
+      operationId: getPlaybookLibraryCheck
+      parameters:
+      - description: Library file path (e.g. stable/stability-check.yaml)
+        in: query
+        name: file
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetPlaybookLibraryCheckResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "404":
+          description: Library disabled or file not in index
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Compare a library playbook against the locally-registered copy
+      tags:
+      - PlaybookLibrary
   /api/v1/task_descriptor/{name}:
     get:
       description: Returns a single task descriptor by name with its JSON schema

@@ -9,14 +9,21 @@ export const queryKeys = {
   taskDetails: (runId: number, taskIndex: number) => ['taskDetails', runId, taskIndex] as const,
   taskDescriptors: ['taskDescriptors'] as const,
   taskDescriptor: (name: string) => ['taskDescriptor', name] as const,
+  playbookLibrary: ['playbookLibrary'] as const,
+  playbookLibraryCheck: (file: string) => ['playbookLibraryCheck', file] as const,
 };
 
 // Test runs list
-export function useTestRuns(testId?: string) {
+export function useTestRuns(
+  testId?: string,
+  options?: { enabled?: boolean; refetchInterval?: number | false; staleTime?: number },
+) {
   return useQuery({
     queryKey: queryKeys.testRuns(testId),
     queryFn: () => api.getTestRuns(testId),
-    refetchInterval: 5000,
+    enabled: options?.enabled !== false,
+    refetchInterval: options?.refetchInterval ?? 5000,
+    staleTime: options?.staleTime,
   });
 }
 
@@ -169,9 +176,29 @@ export function useRegisterExternalTest() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: api.registerExternalTest,
+    mutationFn: (args: { url: string; name?: string }) =>
+      api.registerExternalTest(args.url, { name: args.name }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tests'] });
     },
+  });
+}
+
+// Playbook library hooks
+
+export function usePlaybookLibrary(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.playbookLibrary,
+    queryFn: api.getPlaybookLibrary,
+    staleTime: 5 * 60 * 1000, // 5 min; server caches with its own TTL
+    enabled: options?.enabled !== false,
+  });
+}
+
+export function useCheckPlaybookLibrary() {
+  // Mutation-shaped so callers can imperatively trigger a check on
+  // button-click without entering the query cache.
+  return useMutation({
+    mutationFn: (file: string) => api.checkPlaybookLibrary(file),
   });
 }

@@ -21,8 +21,10 @@
     "js-yaml": "^4.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.26.2",
     "reactflow": "^11.11.4",
+    "remark-gfm": "^4.0.1",
     "swagger-ui-react": "^5.18.2",
     "yaml": "^2.8.2",
     "zustand": "^4.5.5"
