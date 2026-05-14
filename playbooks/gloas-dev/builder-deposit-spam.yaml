@@ -50,7 +50,7 @@ tasks:
   - name: check_consensus_block_proposals
     title: "Wait for block proposal to fix fee estimation"
     config:
-      blockCount: 1
+      blockCount: 2
       checkLookback: 0
 
   - name: generate_child_wallet
