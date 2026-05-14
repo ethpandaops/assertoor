@@ -32,17 +32,16 @@ import (
 
 type Coordinator struct {
 	// Config is the coordinator configuration.
-	Config          *Config
-	log             *logger.LogScope
-	database        *db.Database
-	clientPool      *clients.ClientPool
-	walletManager   *txmgr.Spamoor
-	webserver       *web.Server
-	publicWebserver *web.Server
-	validatorNames  *names.ValidatorNames
-	globalVars      types.Variables
-	metricsPort     int
-	eventBus        *events.EventBus
+	Config         *Config
+	log            *logger.LogScope
+	database       *db.Database
+	clientPool     *clients.ClientPool
+	walletManager  *txmgr.Spamoor
+	webserver      *web.Server
+	validatorNames *names.ValidatorNames
+	globalVars     types.Variables
+	metricsPort    int
+	eventBus       *events.EventBus
 
 	registry *TestRegistry
 	runner   *TestRunner
@@ -172,29 +171,15 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	c.clientPool.SetEventBus(c.eventBus)
 
 	// init webserver
-	if c.Config.Web != nil {
-		if c.Config.Web.Server != nil {
-			c.webserver, err = web.NewWebServer(c.Config.Web.Server, c.log.GetLogger())
-			if err != nil {
-				return err
-			}
-
-			err = c.webserver.ConfigureRoutes(c.Config.Web.Frontend, c.Config.Web.API, c.Config.AI, c, false, c.eventBus)
-			if err != nil {
-				return err
-			}
+	if c.Config.Web != nil && c.Config.Web.Server != nil {
+		c.webserver, err = web.NewWebServer(c.Config.Web.Server, c.log.GetLogger())
+		if err != nil {
+			return err
 		}
 
-		if c.Config.Web.PublicServer != nil {
-			c.publicWebserver, err = web.NewWebServer(c.Config.Web.PublicServer, c.log.GetLogger().WithField("module", "public_web"))
-			if err != nil {
-				return err
-			}
-
-			err = c.publicWebserver.ConfigureRoutes(c.Config.Web.Frontend, nil, nil, c, true, nil)
-			if err != nil {
-				return err
-			}
+		err = c.webserver.ConfigureRoutes(c.Config.Web, c.Config.AI, c, c.eventBus)
+		if err != nil {
+			return err
 		}
 	}
 

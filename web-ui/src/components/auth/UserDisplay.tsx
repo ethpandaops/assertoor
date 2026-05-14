@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuthContext } from '../../context/AuthContext';
 
 export const UserDisplay: React.FC = () => {
-  const { isLoggedIn, user, loading, login } = useAuthContext();
+  const { authEnabled, isLoggedIn, user, loading, login, logout } = useAuthContext();
 
   if (loading) {
     return (
@@ -10,6 +10,12 @@ export const UserDisplay: React.FC = () => {
         <div className="w-4 h-4 border-2 border-[var(--color-text-tertiary)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  // Open mode — no auth provider configured. Hide user controls; the
+  // backend treats every request as authorized.
+  if (!authEnabled) {
+    return null;
   }
 
   if (!isLoggedIn) {
@@ -29,6 +35,14 @@ export const UserDisplay: React.FC = () => {
     <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
       <UserIcon className="w-4 h-4" />
       <span>{user}</span>
+      <button
+        type="button"
+        onClick={logout}
+        className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
+        title="Sign out"
+      >
+        <LogoutIcon className="w-4 h-4" />
+      </button>
     </div>
   );
 };
@@ -41,6 +55,19 @@ function LoginIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
+      />
+    </svg>
+  );
+}
+
+function LogoutIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
       />
     </svg>
   );

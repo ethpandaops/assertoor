@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"
 )
 
-// AuthTokenChecker is a function that validates an authorization token.
-type AuthTokenChecker func(tokenStr string) *jwt.Token
+// AuthTokenChecker is a function that validates an authorization token
+// for a request bound to host. host is the request Host header stripped
+// of any port — it's matched against the token's "scope" claim.
+type AuthTokenChecker func(tokenStr, host string) *jwt.Token
 
 // SSEHandler handles Server-Sent Events connections.
 type SSEHandler struct {
@@ -157,9 +160,31 @@ func (h *SSEHandler) checkAuth(r *http.Request) bool {
 		return false
 	}
 
-	token := h.authChecker(authHeader)
+	token := h.authChecker(authHeader, stripPort(r.Host))
 
 	return token != nil && token.Valid
+}
+
+// stripPort removes a trailing ":port" from a request Host header value.
+// Handles bracketed IPv6 hosts.
+func stripPort(host string) string {
+	if host == "" {
+		return host
+	}
+
+	if host[0] == '[' {
+		if i := strings.IndexByte(host, ']'); i >= 0 {
+			return host[1:i]
+		}
+
+		return host
+	}
+
+	if i := strings.LastIndexByte(host, ':'); i >= 0 {
+		return host[:i]
+	}
+
+	return host
 }
 
 // sendEvent sends an SSE event to the client.

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"strconv"
@@ -73,24 +74,27 @@ func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*Serve
 	return ws, nil
 }
 
-func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfig *types.APIConfig, aiConfig *types.AIConfig, coordinator coordinator_types.Coordinator, securityTrimmed bool, eventBus *events.EventBus) error {
+func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AIConfig, coordinator coordinator_types.Coordinator, eventBus *events.EventBus) error {
+	frontendConfig := webConfig.Frontend
+	apiConfig := webConfig.API
 	isAPIEnabled := apiConfig != nil && apiConfig.Enabled
 	isFrontendEnabled := frontendConfig != nil && frontendConfig.Enabled
 
-	// Create auth handler for protected endpoints
-	var authHandler *auth.Handler
-	if isFrontendEnabled || isAPIEnabled {
-		authHandler = auth.NewAuthHandler(ws.serverConfig.TokenKey, ws.serverConfig.AuthHeader)
-		ws.router.HandleFunc("/auth/token", authHandler.GetToken).Methods("GET")
-		ws.router.HandleFunc("/auth/login", authHandler.GetLogin).Methods("GET")
+	// Build auth handler. When AuthProviderURL is empty the handler runs in
+	// open mode and every request is authorized. When set, incoming bearer
+	// tokens are verified against the remote authenticatoor's JWKS.
+	authHandler, err := auth.NewAuthHandler(context.Background(), ws.logger.WithField("module", "auth"), webConfig.AuthProviderURL, webConfig.AuthProviderAudience)
+	if err != nil {
+		return err
+	}
+
+	if (isAPIEnabled || isFrontendEnabled) && authHandler.IsOpen() {
+		ws.logger.Warn("authProviderUrl is empty: API endpoints are unauthenticated. Configure an authenticatoor URL to require auth.")
 	}
 
 	if isAPIEnabled {
-		// Check if authentication is disabled for protected APIs (auth is required by default)
-		disableAuth := apiConfig.DisableAuth
-
 		// register api routes
-		apiHandler := api.NewAPIHandler(ws.logger.WithField("module", "api"), coordinator, authHandler, disableAuth)
+		apiHandler := api.NewAPIHandler(ws.logger.WithField("module", "api"), coordinator, authHandler)
 
 		// public apis
 		ws.router.HandleFunc("/api/v1/tests", apiHandler.GetTests).Methods("GET")
@@ -107,18 +111,12 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 
 		// SSE event stream endpoints
 		if eventBus != nil {
-			// Create SSE handler with auth support for log filtering
-			var sseHandler *events.SSEHandler
-			if authHandler != nil {
-				sseHandler = events.NewSSEHandlerWithAuth(
-					ws.logger.WithField("module", "sse"),
-					eventBus,
-					authHandler.CheckAuthToken,
-					!disableAuth, // Require auth for log events when API auth is not disabled
-				)
-			} else {
-				sseHandler = events.NewSSEHandler(ws.logger.WithField("module", "sse"), eventBus)
-			}
+			sseHandler := events.NewSSEHandlerWithAuth(
+				ws.logger.WithField("module", "sse"),
+				eventBus,
+				authHandler.CheckAuthToken,
+				!authHandler.IsOpen(), // Require auth for log events when not in open mode
+			)
 
 			ws.router.HandleFunc("/api/v1/events/stream", sseHandler.HandleGlobalStream).Methods("GET")
 			ws.router.HandleFunc("/api/v1/events/clients", sseHandler.HandleClientStream).Methods("GET")
@@ -158,7 +156,6 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 				coordinator.Database(),
 				ws.logger.WithField("module", "ai-api"),
 				authHandler,
-				disableAuth,
 			)
 			ws.router.HandleFunc("/api/v1/ai/config", aiHandler.GetConfig).Methods("GET")
 			ws.router.HandleFunc("/api/v1/ai/system_prompt", aiHandler.GetSystemPrompt).Methods("GET")
@@ -176,14 +173,20 @@ func (ws *Server) ConfigureRoutes(frontendConfig *types.FrontendConfig, apiConfi
 	}
 
 	if frontendConfig != nil {
-		if !securityTrimmed {
+		if frontendConfig.Pprof {
 			// add pprof handler
 			ws.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
 		}
 
 		if frontendConfig.Enabled {
-			// Create SPA handler for React frontend
-			spaHandler, err := handlers.NewSPAHandler(ws.logger.WithField("module", "web-spa"))
+			// Create SPA handler for React frontend, injecting the runtime
+			// config so the SPA can wire itself to the same authenticatoor.
+			spaHandler, err := handlers.NewSPAHandler(
+				ws.logger.WithField("module", "web-spa"),
+				handlers.RuntimeConfig{
+					AuthProviderURL: webConfig.AuthProviderURL,
+				},
+			)
 			if err != nil {
 				return err
 			}
