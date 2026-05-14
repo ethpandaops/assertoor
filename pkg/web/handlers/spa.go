@@ -89,6 +89,7 @@ func injectHead(html []byte, cfg RuntimeConfig) ([]byte, error) {
 	if len(injected) > math.MaxInt-len(html) {
 		return nil, fmt.Errorf("injected html too large")
 	}
+
 	totalLen := len(html) + len(injected)
 
 	out := make([]byte, 0, totalLen)

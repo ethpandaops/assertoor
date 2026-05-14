@@ -8,10 +8,9 @@ import (
 )
 
 type WebConfig struct {
-	Server       *ServerConfig   `yaml:"server"`
-	PublicServer *ServerConfig   `yaml:"publicServer"`
-	Frontend     *FrontendConfig `yaml:"frontend"`
-	API          *APIConfig      `yaml:"api"`
+	Server   *ServerConfig   `yaml:"server"`
+	Frontend *FrontendConfig `yaml:"frontend"`
+	API      *APIConfig      `yaml:"api"`
 
 	// AuthProviderURL is the canonical URL of a remote authenticatoor
 	// service. When set, API requests must carry a JWT verified against

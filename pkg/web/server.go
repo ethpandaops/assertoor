@@ -74,7 +74,7 @@ func NewWebServer(config *types.ServerConfig, logger logrus.FieldLogger) (*Serve
 	return ws, nil
 }
 
-func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AIConfig, coordinator coordinator_types.Coordinator, securityTrimmed bool, eventBus *events.EventBus) error {
+func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AIConfig, coordinator coordinator_types.Coordinator, eventBus *events.EventBus) error {
 	frontendConfig := webConfig.Frontend
 	apiConfig := webConfig.API
 	isAPIEnabled := apiConfig != nil && apiConfig.Enabled
@@ -88,7 +88,7 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 		return err
 	}
 
-	if !securityTrimmed && (isAPIEnabled || isFrontendEnabled) && authHandler.IsOpen() {
+	if (isAPIEnabled || isFrontendEnabled) && authHandler.IsOpen() {
 		ws.logger.Warn("authProviderUrl is empty: API endpoints are unauthenticated. Configure an authenticatoor URL to require auth.")
 	}
 
@@ -173,7 +173,7 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 	}
 
 	if frontendConfig != nil {
-		if !securityTrimmed {
+		if frontendConfig.Pprof {
 			// add pprof handler
 			ws.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
 		}

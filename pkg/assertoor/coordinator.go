@@ -23,7 +23,6 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/ethpandaops/assertoor/pkg/vars"
 	"github.com/ethpandaops/assertoor/pkg/web"
-	web_types "github.com/ethpandaops/assertoor/pkg/web/types"
 	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -33,17 +32,16 @@ import (
 
 type Coordinator struct {
 	// Config is the coordinator configuration.
-	Config          *Config
-	log             *logger.LogScope
-	database        *db.Database
-	clientPool      *clients.ClientPool
-	walletManager   *txmgr.Spamoor
-	webserver       *web.Server
-	publicWebserver *web.Server
-	validatorNames  *names.ValidatorNames
-	globalVars      types.Variables
-	metricsPort     int
-	eventBus        *events.EventBus
+	Config         *Config
+	log            *logger.LogScope
+	database       *db.Database
+	clientPool     *clients.ClientPool
+	walletManager  *txmgr.Spamoor
+	webserver      *web.Server
+	validatorNames *names.ValidatorNames
+	globalVars     types.Variables
+	metricsPort    int
+	eventBus       *events.EventBus
 
 	registry *TestRegistry
 	runner   *TestRunner
@@ -173,38 +171,15 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	c.clientPool.SetEventBus(c.eventBus)
 
 	// init webserver
-	if c.Config.Web != nil {
-		if c.Config.Web.Server != nil {
-			c.webserver, err = web.NewWebServer(c.Config.Web.Server, c.log.GetLogger())
-			if err != nil {
-				return err
-			}
-
-			err = c.webserver.ConfigureRoutes(c.Config.Web, c.Config.AI, c, false, c.eventBus)
-			if err != nil {
-				return err
-			}
+	if c.Config.Web != nil && c.Config.Web.Server != nil {
+		c.webserver, err = web.NewWebServer(c.Config.Web.Server, c.log.GetLogger())
+		if err != nil {
+			return err
 		}
 
-		if c.Config.Web.PublicServer != nil {
-			c.publicWebserver, err = web.NewWebServer(c.Config.Web.PublicServer, c.log.GetLogger().WithField("module", "public_web"))
-			if err != nil {
-				return err
-			}
-
-			// Public server only serves the frontend — strip API/PublicServer
-			// references but keep AuthProviderURL so the SPA's runtime config
-			// still points at the same authenticatoor.
-			publicWeb := &web_types.WebConfig{
-				Frontend:             c.Config.Web.Frontend,
-				AuthProviderURL:      c.Config.Web.AuthProviderURL,
-				AuthProviderAudience: c.Config.Web.AuthProviderAudience,
-			}
-
-			err = c.publicWebserver.ConfigureRoutes(publicWeb, nil, c, true, nil)
-			if err != nil {
-				return err
-			}
+		err = c.webserver.ConfigureRoutes(c.Config.Web, c.Config.AI, c, c.eventBus)
+		if err != nil {
+			return err
 		}
 	}
 
