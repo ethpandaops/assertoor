@@ -1,6 +1,16 @@
 
 id: el-triggered-exit
-name: "EL-triggered exit test"
+name: "Single EL-triggered exit"
+description: |
+  Submits one EIP-7002 EL-triggered exit (withdrawAmount=0) for
+  `validatorIndex` (default 20) by sending a raw transaction to the
+  withdrawal-request contract with the pubkey + 8-byte zero amount.
+
+  Minimal building block — useful for triggering an exit deterministically
+  in larger orchestrations. Requires the validator to already have 0x01
+  or 0x02 credentials matching the caller.
+version: 1.0.0
+tags: [pectra, kurtosis, exit, eip-7002, el-triggered, utility]
 timeout: 1h
 config:
   #walletPrivkey: ""

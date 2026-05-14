@@ -1,5 +1,24 @@
 id: validator-lifecycle-test-v3
-name: "Validator Lifecycle Test (v3)"
+name: "Validator Lifecycle Test (v3, Pectra)"
+description: |
+  Pectra-aware end-to-end validator lifecycle, building on v2 with
+  EIP-7251 consolidations and EIP-7002 EL-triggered operations.
+
+  Sweeps 10 fresh validators with mixed withdrawal credentials
+  (0x00 / 0x01 / 0x02) through:
+
+  1. Deposits (mix of legacy & EIP-6110), activation wait.
+  2. BLS changes → consolidations (EIP-7251), including overflow at
+     the 2048 ETH cap.
+  3. Pre-exitability slashings (attester + proposer).
+  4. SHARD_COMMITTEE_PERIOD wait.
+  5. Voluntary exits + EL-triggered exits (EIP-7002).
+  6. Post-exit slashings.
+  7. Final BLS changes + full-withdrawal verification.
+
+  Long-running (672h timeout) — use on a long-lived pectra devnet.
+version: 3.0.0
+tags: [pectra, lifecycle, deposit, withdrawal, exit, slashing, bls-change, consolidation, eip-6110, eip-7002, eip-7251, el-triggered]
 timeout: 672h
 config:
   walletPrivkey: ""

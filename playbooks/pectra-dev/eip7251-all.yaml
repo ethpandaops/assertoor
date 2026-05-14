@@ -1,5 +1,26 @@
 id: eip7251-all
-name: "EIP7251 test (consolidations)"
+name: "EIP-7251 consolidations (full suite)"
+description: |
+  Comprehensive coverage of EIP-7251 (validator consolidations and
+  0x02 effective-balance increase to 2048 ETH).
+
+  Scenarios:
+
+  1. Self-consolidation: BLS change 0x01 → 0x02 via consolidation to
+     own pubkey.
+  2. Two-validator consolidation with balance combination.
+  3. Consolidation overflow: target above 2048 ETH cap.
+  4. Consolidation followed by top-up deposit.
+  5. Source / target slashed mid-consolidation.
+  6. Invalid sources (0x00 creds, wrong source address).
+  7. Consolidation of already-exiting validator.
+  8. Consolidation that exits the source.
+  9. Top-up to a 0x02 validator increases balance immediately.
+  10. Withdrawal credential change via consolidation interaction.
+
+  Requires Electra activation. Hardcoded kurtosis mnemonic.
+version: 1.0.0
+tags: [pectra, eip-7251, consolidation, bls-change, lifecycle, kurtosis]
 timeout: 48h
 config:
   walletPrivkey: ""

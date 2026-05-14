@@ -1,5 +1,15 @@
 id: pectra-massive-deposit
-name: "Massive deposit test"
+name: "Massive deposit (2× 1000 ETH, 0x01 creds)"
+description: |
+  Submits two 1000-ETH deposits with legacy 0x01 withdrawal credentials
+  for fresh validators from a random mnemonic.
+
+  Companion to `massive-deposit-0x02.yaml`; this variant verifies the
+  protocol still caps 0x01 effective balance at 32 ETH and queues the
+  excess for withdrawal. Long timeout (672h) for activation-queue
+  patience.
+version: 1.0.0
+tags: [pectra, kurtosis, deposit, eip-6110, withdrawal]
 timeout: 672h
 config:
   #walletPrivkey: ""

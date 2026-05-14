@@ -1,5 +1,18 @@
 id: validator-exit-test
-name: "Validator Voluntary Exit Test"
+name: "Validator Voluntary Exit Test (Kurtosis)"
+description: |
+  Tests voluntary-exit generation, gossip and inclusion across all client
+  pairs.
+
+  1. Generates 50 voluntary exits (1/slot) and asserts every
+     `validatorPairName` proposes a block containing one.
+  2. For each `clientPairName`, generates 50 voluntary exits via that
+     client and asserts inclusion.
+
+  Requires the standard kurtosis genesis mnemonic. Different index ranges
+  are used per phase to avoid hitting already-exited validators.
+version: 1.0.0
+tags: [exit, voluntary, kurtosis, consistency, consensus]
 timeout: 1h
 config:
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"

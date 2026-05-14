@@ -1,5 +1,16 @@
 id: all-opcodes-test
 name: "All-Opcodes Transaction Test"
+description: |
+  Deploys a contract that exercises every EVM opcode (arithmetic, stack,
+  memory, storage, control flow, environmental, block, log, system,
+  CREATE/CREATE2, CALL/STATICCALL/DELEGATECALL, precompiles), then issues
+  a call that re-runs them.
+
+  Each opcode emits a log event with its result; the test asserts every
+  expected event (~75 entries) is present, catching opcode-level regressions
+  across EL clients.
+version: 1.0.0
+tags: [transaction, opcodes, consistency]
 timeout: 1h
 config:
   walletPrivkey: ""

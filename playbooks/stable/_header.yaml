@@ -1,0 +1,5 @@
+name: Stable
+description: |
+  Production-ready playbooks that work on any mainnet-compatible network.
+  These tests are well-exercised and recommended as smoke tests for new
+  devnets and as regression coverage on stable forks.

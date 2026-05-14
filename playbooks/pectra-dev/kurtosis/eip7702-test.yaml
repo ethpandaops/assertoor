@@ -1,6 +1,16 @@
 
 id: eip7702-test
-name: "EIP7702 test"
+name: "EIP-7702 set-code transaction basics"
+description: |
+  Verifies basic EIP-7702 (set-code transaction) flow: a freshly funded
+  EOA signs an authorization to delegate to a deployed implementation
+  contract, then a transaction calls the EOA and observes delegated
+  execution.
+
+  Covers the happy-path; for txpool re-validation behavior see
+  `eip7702-txpool-invalidation.yaml`.
+version: 1.0.0
+tags: [pectra, kurtosis, eip-7702, transaction]
 timeout: 1h
 config:
   #walletPrivkey: ""

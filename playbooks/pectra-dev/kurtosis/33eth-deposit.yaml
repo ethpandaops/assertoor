@@ -1,5 +1,14 @@
 id: pectra-33eth-deposit
-name: "33eth-deposit"
+name: "33 ETH first-deposit edge case"
+description: |
+  Verifies the Electra deposit rule: a validator's *first* deposit must be
+  at least 32 ETH to register a new validator (deposits below 32 ETH on a
+  new pubkey are queued as pending until the threshold is met).
+
+  Sends 10 deposits of 33 ETH each from a fresh mnemonic and checks the
+  resulting validator activation behavior. Runs on a kurtosis devnet.
+version: 1.0.0
+tags: [pectra, kurtosis, deposit, eip-6110]
 timeout: 278h
 config:
   #walletPrivkey: ""

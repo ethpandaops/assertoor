@@ -1,5 +1,25 @@
 id: builder-lifecycle
-name: "Builder Lifecycle Test (GLOAS)"
+name: "GLOAS: Builder Lifecycle Test"
+description: |
+  End-to-end lifecycle for GLOAS builders (validators with 0x03
+  withdrawal credentials). Walks 10 builder keys through:
+
+  1. Deposit 6 builders across the GLOAS activation boundary (3 before,
+     3 after).
+  2. Wait for all 6 to become active.
+  3. Exit them with alternating voluntary / EL-triggered exits, 10 slots
+     apart, ensuring exits span at least 2 epochs.
+  4. Wait for builders 0–2 to be fully withdrawn (balance == 0).
+  5. Deposit 4 new builders (keys 6–9) and verify **builder index reuse**:
+     keys 6/7/8 get the now-empty indices 0/1/2; key 9 gets a new index.
+  6. Send no-op partial withdrawal & consolidation requests against
+     active builders (should have no effect).
+  7. EL-triggered exit all newly-deposited builders.
+
+  Verifies the GLOAS builder pool tracks deposits / exits / index reuse
+  correctly across epoch boundaries.
+version: 1.0.0
+tags: [gloas, builder, lifecycle, deposit, exit, withdrawal, el-triggered, voluntary]
 timeout: 24h
 config:
   walletPrivkey: ''

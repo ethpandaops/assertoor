@@ -1,6 +1,17 @@
 
-id: el-triggered-consolidation
-name: "EL-triggered consolidation test"
+id: el-triggered-consolidation-chain
+name: "Chained EL-triggered consolidations"
+description: |
+  Tests consolidation-of-a-consolidation: first consolidate
+  `initialSourceValidatorIndex` into `initialTargetValidatorIndex`, then
+  before that consolidation completes, consolidate the *intermediate
+  target* into `finalTargetValidatorIndex`.
+
+  Verifies the protocol correctly handles a validator that is both an
+  outgoing consolidation source and an incoming consolidation target.
+  Kurtosis-specific default indices.
+version: 1.0.0
+tags: [pectra, kurtosis, consolidation, eip-7251, el-triggered]
 timeout: 1h
 config:
   #walletPrivkey: ""

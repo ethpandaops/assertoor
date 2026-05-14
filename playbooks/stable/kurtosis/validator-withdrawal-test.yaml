@@ -1,5 +1,25 @@
 id: validator-withdrawal-test
-name: "Validator BLS Change & Withdrawal Test"
+name: "Validator BLS Change & Withdrawal Test (Kurtosis)"
+description: |
+  Verifies BLS-to-execution credential changes (0x00 → 0x01) propagate
+  and trigger withdrawals across all client pairs.
+
+  Phases:
+
+  1. **BLS-change broadcast** — emits 50 BLS changes (1/slot) for genesis
+     validators and asserts every `validatorPairName` proposes a block
+     containing one.
+  2. **Force-feed** — sends 50 more BLS changes for the first 50 keys to
+     guarantee they have a 0x01 withdrawal address.
+  3. **Per-client BLS-change RPC** — for each `clientPairName`, submits
+     50 BLS changes via that client and verifies inclusion.
+  4. **Withdrawal observation** — asserts every `validatorPairName`
+     proposes at least one block with a withdrawal.
+
+  Requires the standard kurtosis genesis mnemonic and a known target
+  address; does not work on networks without those validators.
+version: 1.0.0
+tags: [withdrawal, bls-change, kurtosis, consistency, consensus]
 timeout: 1h
 config:
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"

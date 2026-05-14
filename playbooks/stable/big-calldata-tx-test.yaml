@@ -1,5 +1,18 @@
 id: big-calldata-tx-test
-name: "Big Calldata TX Test"
+name: "Big Calldata Transaction Test"
+description: |
+  Stress test for large-calldata transactions. Sends `transactionCount`
+  (default 1000) transactions each carrying `calldataSize` zero bytes of
+  calldata (default 1000) at `transactionsPerBlock` throughput, then
+  verifies the chain stayed healthy:
+
+  - finality continues (>= 2 finalized, <= 3 unfinalized epochs)
+  - attestation participation stays high
+  - no excessive reorgs or forks
+
+  Use to gauge EL/CL behavior under sustained large-payload load.
+version: 1.0.0
+tags: [transaction, calldata, spam, stability]
 timeout: 30m
 config:
   walletPrivkey: ""

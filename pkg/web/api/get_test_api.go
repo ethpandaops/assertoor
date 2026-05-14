@@ -8,15 +8,18 @@ import (
 )
 
 type GetTestResponse struct {
-	ID         string              `json:"id"`
-	Source     string              `json:"source"`
-	BasePath   string              `json:"basePath"`
-	Name       string              `json:"name"`
-	Timeout    uint64              `json:"timeout"`
-	Config     map[string]any      `json:"config"`
-	ConfigVars map[string]string   `json:"configVars"`
-	Schedule   *types.TestSchedule `json:"schedule"`
-	Vars       map[string]any      `json:"vars,omitempty"` // Config with global vars merged in
+	ID          string              `json:"id"`
+	Source      string              `json:"source"`
+	BasePath    string              `json:"basePath"`
+	Name        string              `json:"name"`
+	Description string              `json:"description,omitempty"`
+	Version     string              `json:"version,omitempty"`
+	Tags        []string            `json:"tags,omitempty"`
+	Timeout     uint64              `json:"timeout"`
+	Config      map[string]any      `json:"config"`
+	ConfigVars  map[string]string   `json:"configVars"`
+	Schedule    *types.TestSchedule `json:"schedule"`
+	Vars        map[string]any      `json:"vars,omitempty"` // Config with global vars merged in
 }
 
 // GetTest godoc
@@ -60,12 +63,15 @@ func (ah *APIHandler) GetTest(w http.ResponseWriter, r *http.Request) {
 	testConfig := testDescriptor.Config()
 
 	response := &GetTestResponse{
-		ID:       testDescriptor.ID(),
-		Source:   testDescriptor.Source(),
-		BasePath: testDescriptor.BasePath(),
-		Name:     testConfig.Name,
-		Timeout:  uint64(testConfig.Timeout.Seconds()),
-		Schedule: testConfig.Schedule,
+		ID:          testDescriptor.ID(),
+		Source:      testDescriptor.Source(),
+		BasePath:    testDescriptor.BasePath(),
+		Name:        testConfig.Name,
+		Description: testConfig.Description,
+		Version:     testConfig.Version,
+		Tags:        testConfig.Tags,
+		Timeout:     uint64(testConfig.Timeout.Seconds()),
+		Schedule:    testConfig.Schedule,
 	}
 
 	// Config, ConfigVars, and Vars contain potentially sensitive information

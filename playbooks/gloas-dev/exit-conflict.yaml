@@ -1,5 +1,24 @@
 id: gloas-exit-conflict
 name: "GLOAS: EL-triggered vs voluntary exit conflict"
+description: |
+  Regression test for the ePBS `process_previous_payload` ordering rule
+  introduced by GLOAS. Under ePBS, the EL exit request is processed
+  *before* operations (voluntary exits), so a voluntary exit submitted
+  after an EL exit for the same validator must be dropped.
+
+  For each of `validatorCount` validators concurrently:
+
+  1. Submit an EL-triggered full exit (amount=0).
+  2. Wait for the request to land in a CL block (slot S).
+  3. Immediately submit a voluntary exit (must reach the gossip pool
+     before slot S+1 builds).
+  4. Wait 10 slots, then scan the last 10 blocks for the voluntary
+     exit — it **must not** appear.
+
+  The chain itself is the source of truth; we don't depend on
+  validator-state cache propagation timing.
+version: 1.0.0
+tags: [gloas, exit, conflict, eip-7002, el-triggered, voluntary]
 # 28h+ accommodates the SHARD_COMMITTEE_PERIOD wait on a freshly-genesis devnet;
 # on a long-running devnet the test finishes in minutes.
 timeout: 30h

@@ -1,5 +1,15 @@
 id: execution-spec-tests-dependencies
-name: "Setup dependencies for execution spec tests"
+name: "Install execution-spec-tests dependencies"
+description: |
+  Helper playbook that `apt-get install`s build tools (gcc, python3,
+  pip, autotools, libffi, libtool) needed to run
+  [execution-spec-tests](https://github.com/ethereum/execution-spec-tests)
+  inside an assertoor container.
+
+  Run once before invoking the execute/spec-tests playbooks. Requires
+  the container to allow sudo. Not a network test on its own.
+version: 1.0.0
+tags: [execution-spec-tests, utility]
 timeout: 1h
 tasks:
   - name: run_shell

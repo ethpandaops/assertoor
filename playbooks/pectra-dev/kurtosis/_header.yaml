@@ -1,0 +1,9 @@
+name: Pectra (Kurtosis)
+description: |
+  Pectra playbooks tailored to kurtosis-launched devnets, including the
+  big `all.yaml` orchestrator and focused stress tests (queue fill-ups,
+  mass deposits, mass consolidations, conflict scenarios).
+
+  These assume the standard kurtosis genesis mnemonic and a fresh devnet
+  with Electra activating around the genesis-relative slots referenced
+  in each playbook.

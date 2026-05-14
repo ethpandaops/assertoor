@@ -37,6 +37,9 @@ interface YamlTask {
 interface YamlTest {
   id?: string;
   name: string;
+  description?: string;
+  version?: string;
+  tags?: string[];
   timeout?: string;
   config?: Record<string, unknown>;
   configVars?: Record<string, string>;
@@ -180,6 +183,18 @@ export function serializeToYaml(config: TestConfig): string {
     name: config.name,
   };
 
+  if (config.description) {
+    yamlConfig.description = config.description;
+  }
+
+  if (config.version) {
+    yamlConfig.version = config.version;
+  }
+
+  if (config.tags && config.tags.length > 0) {
+    yamlConfig.tags = config.tags;
+  }
+
   if (config.timeout) {
     yamlConfig.timeout = config.timeout;
   }
@@ -239,6 +254,18 @@ export function deserializeFromYaml(yamlString: string): DeserializeResult {
       name: parsed.name || 'Untitled Test',
       tasks: [],
     };
+
+    if (parsed.description) {
+      config.description = parsed.description;
+    }
+
+    if (parsed.version) {
+      config.version = parsed.version;
+    }
+
+    if (parsed.tags && Array.isArray(parsed.tags)) {
+      config.tags = parsed.tags.filter((t): t is string => typeof t === 'string');
+    }
 
     if (parsed.timeout) {
       config.timeout = parsed.timeout;

@@ -1,6 +1,17 @@
 
 id: 64-el-triggered-consolidation
-name: "EL-triggered consolidation test"
+name: "Mass EL-triggered consolidations (64 sources → 1 target)"
+description: |
+  Stress test for EIP-7251 consolidation queue. BLS-changes 300 validators
+  to 0x01 then submits `consolidationNumber` (default 64) EL-triggered
+  consolidations from sources at index `sourceValidatorIndex+` into one
+  `targetValidatorIndex`.
+
+  Verifies the consolidation pipeline handles many parallel sources
+  feeding the same target. Hardcoded kurtosis mnemonic; runs on Electra
+  devnets.
+version: 1.0.0
+tags: [pectra, kurtosis, consolidation, eip-7251, el-triggered, spam]
 timeout: 1h
 config:
   walletPrivkey: ""

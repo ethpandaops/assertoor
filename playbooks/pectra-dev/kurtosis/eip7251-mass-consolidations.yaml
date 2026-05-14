@@ -1,6 +1,15 @@
 
 id: eip7251-mass-consolidations
-name: "EIP7251 mass consolidations test"
+name: "Mass EIP-7251 self-consolidations"
+description: |
+  Submits 100 EL-triggered consolidation requests where source == target
+  to stress the consolidation queue with self-consolidations (these
+  upgrade a validator to 0x02 credentials).
+
+  Verifies the queue drains correctly and credential upgrades complete
+  without duplicates. Hardcoded kurtosis mnemonic.
+version: 1.0.0
+tags: [pectra, kurtosis, eip-7251, consolidation, el-triggered, spam]
 timeout: 38h
 config:
   walletPrivkey: ""

@@ -23,6 +23,9 @@ function ConfigPanel({ taskId }: ConfigPanelProps) {
 function TestHeaderConfig() {
   const testConfig = useBuilderStore((state) => state.testConfig);
   const setTestName = useBuilderStore((state) => state.setTestName);
+  const setTestDescription = useBuilderStore((state) => state.setTestDescription);
+  const setTestVersion = useBuilderStore((state) => state.setTestVersion);
+  const setTestTags = useBuilderStore((state) => state.setTestTags);
   const setTestTimeout = useBuilderStore((state) => state.setTestTimeout);
   const setTestVars = useBuilderStore((state) => state.setTestVars);
   const setTestId = useBuilderStore((state) => state.setTestId);
@@ -31,6 +34,29 @@ function TestHeaderConfig() {
 
   const [newVarKey, setNewVarKey] = useState('');
   const [newVarValue, setNewVarValue] = useState('');
+  const [newTag, setNewTag] = useState('');
+
+  const handleAddTag = useCallback(
+    (raw?: string) => {
+      const value = (raw ?? newTag).trim().toLowerCase();
+      if (!value) return;
+      const existing = testConfig.tags ?? [];
+      if (existing.includes(value)) {
+        setNewTag('');
+        return;
+      }
+      setTestTags([...existing, value]);
+      setNewTag('');
+    },
+    [newTag, testConfig.tags, setTestTags],
+  );
+
+  const handleRemoveTag = useCallback(
+    (tag: string) => {
+      setTestTags((testConfig.tags ?? []).filter((t) => t !== tag));
+    },
+    [testConfig.tags, setTestTags],
+  );
 
   // Handle adding a new variable
   const handleAddVar = useCallback(() => {
@@ -141,6 +167,84 @@ function TestHeaderConfig() {
                 onChange={(e) => setTestName(e.target.value)}
                 placeholder="Test name"
                 className="w-full px-2 py-1.5 text-sm bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded focus:outline-hidden focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
+                Description <span className="text-[var(--color-text-tertiary)]">(optional)</span>
+              </label>
+              <textarea
+                value={testConfig.description || ''}
+                onChange={(e) => setTestDescription(e.target.value)}
+                placeholder="Markdown-formatted description shown in the Library tab"
+                rows={4}
+                className="w-full px-2 py-1.5 text-sm bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded focus:outline-hidden focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono resize-y"
+              />
+              <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                Supports Markdown (headings, lists, code).
+              </p>
+            </div>
+
+            {/* Version */}
+            <div>
+              <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
+                Version <span className="text-[var(--color-text-tertiary)]">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={testConfig.version || ''}
+                onChange={(e) => setTestVersion(e.target.value)}
+                placeholder="e.g., 1.0.0"
+                className="w-full px-2 py-1.5 text-sm bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded focus:outline-hidden focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                0.x = in development; 1.x+ = production-ready.
+              </p>
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
+                Tags <span className="text-[var(--color-text-tertiary)]">(optional)</span>
+              </label>
+              <div className="flex flex-wrap gap-1 mb-1.5 min-h-[1.5rem]">
+                {(testConfig.tags ?? []).map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] rounded-xs text-xs"
+                  >
+                    {tag}
+                    <button
+                      onClick={() => handleRemoveTag(tag)}
+                      className="hover:text-red-500"
+                      title={`Remove tag '${tag}'`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {(testConfig.tags ?? []).length === 0 && (
+                  <span className="text-xs text-[var(--color-text-tertiary)] italic">No tags</span>
+                )}
+              </div>
+              <input
+                type="text"
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    handleAddTag();
+                  } else if (e.key === 'Backspace' && newTag === '' && (testConfig.tags ?? []).length > 0) {
+                    const tags = testConfig.tags ?? [];
+                    handleRemoveTag(tags[tags.length - 1]);
+                  }
+                }}
+                onBlur={() => newTag.trim() && handleAddTag()}
+                placeholder="Add tag (Enter or comma to confirm)"
+                className="w-full px-2 py-1.5 text-xs bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded focus:outline-hidden focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
 

@@ -18,6 +18,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/events"
 	"github.com/ethpandaops/assertoor/pkg/logger"
 	"github.com/ethpandaops/assertoor/pkg/names"
+	"github.com/ethpandaops/assertoor/pkg/playbooklibrary"
 	"github.com/ethpandaops/assertoor/pkg/test"
 	"github.com/ethpandaops/assertoor/pkg/txmgr"
 	"github.com/ethpandaops/assertoor/pkg/types"
@@ -32,16 +33,17 @@ import (
 
 type Coordinator struct {
 	// Config is the coordinator configuration.
-	Config         *Config
-	log            *logger.LogScope
-	database       *db.Database
-	clientPool     *clients.ClientPool
-	walletManager  *txmgr.Spamoor
-	webserver      *web.Server
-	validatorNames *names.ValidatorNames
-	globalVars     types.Variables
-	metricsPort    int
-	eventBus       *events.EventBus
+	Config          *Config
+	log             *logger.LogScope
+	database        *db.Database
+	clientPool      *clients.ClientPool
+	walletManager   *txmgr.Spamoor
+	webserver       *web.Server
+	validatorNames  *names.ValidatorNames
+	globalVars      types.Variables
+	metricsPort     int
+	eventBus        *events.EventBus
+	playbookLibrary playbooklibrary.Service
 
 	registry *TestRegistry
 	runner   *TestRunner
@@ -190,6 +192,13 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	c.validatorNames = names.NewValidatorNames(c.Config.ValidatorNames, c.log.GetLogger())
 	c.validatorNames.LoadValidatorNames()
 
+	// init playbook library service (UI's Library tab)
+	c.playbookLibrary = playbooklibrary.NewService(
+		c.Config.PlaybookLibrary,
+		c.log.GetLogger(),
+		&coordinatorLocalTestProvider{coordinator: c},
+	)
+
 	// init test registry
 	c.registry = NewTestRegistry(c)
 	c.registry.LoadTests(ctx, c.Config.Tests, c.Config.ExternalTests)
@@ -249,6 +258,10 @@ func (c *Coordinator) TestRegistry() types.TestRegistry {
 
 func (c *Coordinator) EventBus() *events.EventBus {
 	return c.eventBus
+}
+
+func (c *Coordinator) PlaybookLibrary() playbooklibrary.Service {
+	return c.playbookLibrary
 }
 
 func (c *Coordinator) GetTestByRunID(runID uint64) types.Test {

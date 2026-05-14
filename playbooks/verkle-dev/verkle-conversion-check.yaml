@@ -1,5 +1,19 @@
 id: verkle-conversion-check
-name: "Check verkle state conversion"
+name: "Verify verkle state-conversion progress"
+description: |
+  Tracks the verkle state-conversion process across all EL clients.
+
+  Concurrently runs:
+
+  - `check_clients_are_healthy` so we notice if a client dies mid-way.
+  - A matrix over EL clients calling `check_execution_conversion_state`,
+    which polls the verkle-conversion RPC until every client reports
+    completion.
+
+  Long timeout — conversion can take many hours on a populated chain.
+version: 1.0.0
+tags: [verkle, execution, health-check, stability]
+timeout: 12h
 
 tasks:
 - name: check_clients_are_healthy

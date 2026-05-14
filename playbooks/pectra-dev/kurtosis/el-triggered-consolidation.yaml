@@ -1,6 +1,16 @@
 
 id: el-triggered-consolidation
-name: "EL-triggered consolidation test"
+name: "Single EL-triggered consolidation"
+description: |
+  Submits one EIP-7251 EL-triggered consolidation from
+  `sourceValidatorIndex` into `targetValidatorIndex` and waits for the
+  receipt.
+
+  Smallest possible consolidation test — useful as a quick sanity check
+  on Electra activation. Defaults to validators 6610 → 6611 (kurtosis
+  default ranges).
+version: 1.0.0
+tags: [pectra, kurtosis, consolidation, eip-7251, el-triggered, utility]
 timeout: 1h
 config:
   #walletPrivkey: ""

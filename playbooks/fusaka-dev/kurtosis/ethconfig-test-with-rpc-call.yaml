@@ -1,6 +1,15 @@
 
 id: ethconfig-test
-name: "eth_config RPC consistency test (EIP-7910)"
+name: "eth_config RPC consistency (EIP-7910)"
+description: |
+  Calls the EIP-7910 `eth_config` RPC on every configured EL client and
+  asserts the responses are byte-identical.
+
+  `eth_config` is a chain-fingerprint endpoint that exposes the active
+  chain config so clients can detect mismatched genesis / fork
+  parameters. Divergence here is a serious operational bug.
+version: 1.0.0
+tags: [fusaka, kurtosis, eip-7910, rpc, consistency, execution]
 timeout: 1h
 config:
 #walletPrivkey: ""

@@ -1,0 +1,5 @@
+name: Glamsterdam
+description: |
+  Glamsterdam-fork tests. Currently a thin folder — primarily wires the
+  execution-spec-tests pipeline against the Amsterdam test suite and
+  waits for the GLOAS activation epoch before running.

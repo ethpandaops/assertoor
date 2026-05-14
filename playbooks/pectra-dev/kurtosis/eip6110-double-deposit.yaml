@@ -1,6 +1,16 @@
 
 id: eip6110-double-deposit
-name: "EIP6110 double deposit test"
+name: "EIP-6110 double-deposit handling"
+description: |
+  Submits two 2 ETH deposits for the same fresh pubkey in the same slot
+  via concurrent `generate_deposits` tasks. Verifies EIP-6110 handling
+  when two deposits for the same pubkey appear in the deposit-requests
+  list of a single block.
+
+  Expected behavior: both deposits are processed, but the validator only
+  activates once with combined balance.
+version: 1.0.0
+tags: [pectra, kurtosis, deposit, eip-6110]
 timeout: 1h
 config:
   walletPrivkey: ""

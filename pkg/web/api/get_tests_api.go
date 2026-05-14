@@ -5,10 +5,13 @@ import (
 )
 
 type GetTestsResponse struct {
-	ID       string `json:"id"`
-	Source   string `json:"source"`
-	BasePath string `json:"basePath"`
-	Name     string `json:"name"`
+	ID          string   `json:"id"`
+	Source      string   `json:"source"`
+	BasePath    string   `json:"basePath"`
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Version     string   `json:"version,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
 }
 
 // GetTests godoc
@@ -31,11 +34,15 @@ func (ah *APIHandler) GetTests(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		cfg := testDescr.Config()
 		tests = append(tests, &GetTestsResponse{
-			ID:       testDescr.ID(),
-			Source:   testDescr.Source(),
-			BasePath: testDescr.BasePath(),
-			Name:     testDescr.Config().Name,
+			ID:          testDescr.ID(),
+			Source:      testDescr.Source(),
+			BasePath:    testDescr.BasePath(),
+			Name:        cfg.Name,
+			Description: cfg.Description,
+			Version:     cfg.Version,
+			Tags:        cfg.Tags,
 		})
 	}
 

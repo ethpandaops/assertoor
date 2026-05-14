@@ -61,6 +61,9 @@ export interface BuilderTask {
 export interface TestConfig {
   id: string;
   name: string;
+  description?: string;
+  version?: string;
+  tags?: string[];
   timeout?: string;
   testVars?: Record<string, unknown>;
   tasks: BuilderTask[];
@@ -101,6 +104,9 @@ export interface BuilderState {
   // Actions
   setTestConfig: (config: TestConfig) => void;
   setTestName: (name: string) => void;
+  setTestDescription: (description: string) => void;
+  setTestVersion: (version: string) => void;
+  setTestTags: (tags: string[]) => void;
   setTestTimeout: (timeout: string) => void;
   setTestVars: (vars: Record<string, unknown>) => void;
   setTestId: (id: string) => void;
@@ -256,6 +262,21 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
   // Update test metadata
   setTestName: (name) => set((state) => ({
     testConfig: { ...state.testConfig, name },
+    isDirty: true,
+  })),
+
+  setTestDescription: (description) => set((state) => ({
+    testConfig: { ...state.testConfig, description: description || undefined },
+    isDirty: true,
+  })),
+
+  setTestVersion: (version) => set((state) => ({
+    testConfig: { ...state.testConfig, version: version || undefined },
+    isDirty: true,
+  })),
+
+  setTestTags: (tags) => set((state) => ({
+    testConfig: { ...state.testConfig, tags: tags.length > 0 ? tags : undefined },
     isDirty: true,
   })),
 

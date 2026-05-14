@@ -1,5 +1,21 @@
 id: execution-spec-tests-execute
-name: "Run 'execute' on execution spec tests"
+name: "Run execution-spec-tests on a live RPC"
+description: |
+  Clones [`execution-specs`](https://github.com/ethereum/execution-specs),
+  installs its `uv`-managed Python deps and runs `execute remote` for a
+  configurable `testPath` against a live `rpcEndpoint`.
+
+  Output:
+
+  - `report.html` and `report.json` are exported to the assertoor result
+    dir for browsing in the UI.
+  - The check task fails the playbook if any test failed.
+
+  Configure `gitRepo`, `gitBranch`, `chainID`, `seedPrivateKey` and the
+  desired `testPath`. Run `dev/execution-spec-tests-dependencies.yaml`
+  first to install build prerequisites.
+version: 1.0.0
+tags: [execution-spec-tests, rpc, utility]
 timeout: 1h
 config:
   gitRepo: https://github.com/ethereum/execution-specs.git

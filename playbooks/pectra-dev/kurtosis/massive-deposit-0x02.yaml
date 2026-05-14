@@ -1,5 +1,14 @@
 id: pectra-massive-deposit-0x02
-name: "Massive deposit with 0x02 creds"
+name: "Massive deposit (2× 1000 ETH, 0x02 creds)"
+description: |
+  Submits two 1000-ETH deposits with 0x02 withdrawal credentials
+  (Pectra-only) for fresh validators from a random mnemonic.
+
+  Verifies the EIP-7251 max effective balance behavior: a 0x02 validator
+  can accept large initial deposits up to the 2048 ETH cap. Long timeout
+  (672h) to accommodate the activation queue on a busy devnet.
+version: 1.0.0
+tags: [pectra, kurtosis, deposit, eip-6110, eip-7251]
 timeout: 672h
 config:
   #walletPrivkey: ""
