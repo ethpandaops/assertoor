@@ -47,6 +47,12 @@ tasks:
     configVars:
       minEpochNumber: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
 
+  - name: check_consensus_block_proposals
+    title: "Wait for block proposal to fix fee estimation"
+    configVars:
+      blockCount: 1
+      checkLookback: 0
+
   - name: generate_child_wallet
     id: spam_wallet
     title: Generate funded wallet for batched deposits
