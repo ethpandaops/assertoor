@@ -49,7 +49,7 @@ tasks:
 
   - name: check_consensus_block_proposals
     title: "Wait for block proposal to fix fee estimation"
-    configVars:
+    config:
       blockCount: 1
       checkLookback: 0
 
