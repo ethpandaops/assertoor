@@ -5,14 +5,11 @@ export interface ApiResponse<T> {
 }
 
 // Auth types
-export interface AuthTokenResponse {
-  token: string;
-  user: string;
-  expr: string;  // Unix timestamp as string
-  now: string;   // Server's current time as string
-}
-
 export interface AuthState {
+  // True when an auth provider is configured. False = open mode (no auth
+  // required); the UI should hide login controls and treat the user as
+  // authorized.
+  authEnabled: boolean;
   isLoggedIn: boolean;
   user: string | null;
   token: string | null;
