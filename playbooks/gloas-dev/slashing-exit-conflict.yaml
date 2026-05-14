@@ -1,5 +1,22 @@
 id: slashing-exit-conflict
-name: "Slashing vs voluntary exit conflict"
+name: "GLOAS: Slashing vs voluntary exit conflict"
+description: |
+  Verifies that a voluntary exit submitted alongside a slashing for the
+  same validator does **not** end up on-chain. `process_operations`
+  applies slashings before voluntary exits, so honest proposers must
+  pre-validate operations and drop the now-invalid voluntary exit.
+
+  For each of `validatorCount` validators concurrently:
+
+  1. Submit a slashing (attester by default; configurable via
+     `slashingType`).
+  2. Immediately submit a voluntary exit for the same validator while
+     it still looks active in head state.
+  3. Wait for the slashing to land in a CL block (slot S).
+  4. Wait 10 slots after submission, then scan the last 10 blocks for
+     the voluntary exit — it **must not** appear.
+version: 1.0.0
+tags: [gloas, slashing, exit, conflict, voluntary]
 # 28h+ accommodates the SHARD_COMMITTEE_PERIOD wait on a freshly-genesis devnet;
 # on a long-running devnet the test finishes in minutes.
 timeout: 30h

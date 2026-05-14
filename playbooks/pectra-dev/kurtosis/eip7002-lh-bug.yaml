@@ -1,6 +1,18 @@
 
 id: eip7002-lh-bug
-name: "devnet3-lh-bug"
+name: "EIP-7002 regression suite (devnet3 LH bug)"
+description: |
+  Regression test originally written for a Lighthouse bug on
+  pectra-devnet-3 around EIP-7002 EL-triggered withdrawal handling. The
+  playbook has since grown into a broad EIP-7002 cover-all and is kept
+  as a guardrail.
+
+  Walks 10 fresh validator pubkeys (derived from kurtosis genesis
+  mnemonic at `validatorStartIndex`) through credential changes
+  (0x00 → 0x01 → 0x02 via deposit), partial withdrawals and EL-triggered
+  exits, asserting the right validator state transitions at each step.
+version: 1.0.0
+tags: [pectra, kurtosis, eip-7002, eip-7251, withdrawal, exit, consolidation, el-triggered, lifecycle]
 timeout: 38h
 config:
   walletPrivkey: ""

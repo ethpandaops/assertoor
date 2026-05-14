@@ -1,6 +1,27 @@
 
 id: eip7002-all
-name: "EIP7002 test (el triggerable exits)"
+name: "EIP-7002 EL-triggered exits & withdrawals (full suite)"
+description: |
+  Comprehensive coverage of EIP-7002 (execution-layer triggered exits
+  and partial withdrawals).
+
+  Walks one validator per scenario through:
+
+  1. Exit request from a 0x01-credentialed address → assert exit.
+  2. Exit request after self-consolidation to 0x02 → assert exit.
+  3. Switch to 0x02 via top-up deposit, then EL-triggered exit.
+  4. Partial withdrawal from a 0x02 address → assert balance drop.
+  5. Exit request from wrong source address → assert no exit.
+  6. Exit request without credential change → assert no exit.
+  7. Partial withdrawal without sufficient balance → assert no effect.
+  8. Top-up via deposit on an already-exiting validator.
+  9. EL exit followed by a duplicate request.
+  10. Combined exit + immediate consolidation, conflict handling.
+
+  Requires Electra activation. Hardcoded kurtosis mnemonic; pubkeys are
+  derived from `validatorStartIndex`.
+version: 1.0.0
+tags: [pectra, eip-7002, eip-7251, withdrawal, exit, consolidation, el-triggered, lifecycle, kurtosis]
 timeout: 72h
 config:
   walletPrivkey: ""

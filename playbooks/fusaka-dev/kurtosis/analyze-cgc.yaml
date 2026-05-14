@@ -1,5 +1,15 @@
 id: analyze-cgc
-name: "CGC Analysis - Validate CGC vs Validator Balances"
+name: "CGC vs validator balance audit (Fusaka)"
+description: |
+  Per `validatorPairName`, fetches the client's published `custody_group_count`
+  (CGC) and the total active validator balance from the consensus state,
+  then verifies the CGC is high enough to cover the assigned balances.
+
+  CGC underpins PeerDAS sampling on Fusaka: a custodian that advertises
+  fewer columns than its balance requires is liveness-incorrect, even if
+  it follows the chain.
+version: 1.0.0
+tags: [fusaka, kurtosis, cgc, peerdas, consensus, health-check]
 timeout: 30m
 
 config:

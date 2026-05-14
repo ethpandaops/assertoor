@@ -1,6 +1,15 @@
 
 id: dev-deposits
-name: "Dev deposits test"
+name: "Generate Deposits"
+description: |
+  Minimal deposit generator. Sends `depositCount` deposits of
+  `depositAmount` ETH each via the given mnemonic to `depositContract`,
+  awaiting receipts. Optionally waits for the Electra fork first.
+
+  Use as a building block on a fresh devnet to seed validators, or as a
+  smoke test of the deposit pipeline.
+version: 1.0.0
+tags: [deposit, utility]
 timeout: 1h
 config:
   walletPrivkey: ""

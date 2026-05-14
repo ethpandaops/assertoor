@@ -5,7 +5,7 @@ GOLDFLAGS += -X 'github.com/ethpandaops/assertoor/pkg/buildinfo.BuildRelease="$(
 CURRENT_UID := $(shell id -u)
 CURRENT_GID := $(shell id -g)
 
-.PHONY: all docs test clean ui ui-install ui-dev ui-clean
+.PHONY: all docs test clean ui ui-install ui-dev ui-clean generate-playbook-index
 
 all: docs ui build
 
@@ -18,6 +18,10 @@ build:
 
 docs:
 	go install github.com/swaggo/swag/cmd/swag@v1.16.3 && swag init -g web/api/handler.go -d pkg --parseDependency -o pkg/web/api/docs
+
+generate-playbook-index:
+	@echo "Generating playbook index..."
+	@scripts/generate-playbook-index.sh playbooks
 
 clean: ui-clean
 	rm -f bin/*

@@ -1,5 +1,21 @@
 id: dencun-opcodes-test
-name: "Dencun Test"
+name: "Dencun Opcodes Test"
+description: |
+  Exercises every new opcode/precompile introduced by the Dencun (Deneb +
+  Cancun) fork. Deploys one test contract per EIP and calls it with
+  verifying log events:
+
+  - **EIP-1153** — Transient storage (`TSTORE` / `TLOAD`) across calls and
+    across transactions in the same block.
+  - **EIP-4844** — `BLOBHASH` opcode and `BLOBBASEFEE` (EIP-7516) with 3
+    blob sidecars attached.
+  - **EIP-5656** — `MCOPY` memory copy instruction.
+  - **EIP-4788** — Beacon block root precompile, called via a stored
+    address in the parent contract.
+
+  Closes with a reorg/fork sanity check.
+version: 1.0.0
+tags: [dencun, opcodes, eip-1153, eip-4844, eip-5656, eip-4788, eip-7516]
 timeout: 1h
 config:
   walletPrivkey: ""

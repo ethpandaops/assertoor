@@ -1,5 +1,19 @@
 id: validator-lifecycle-test
-name: "Validator Lifecycle Test"
+name: "Validator Lifecycle Test (Un-finality Stress)"
+description: |
+  Original lifecycle test, retained for un-finality regression coverage.
+  Pumps 300 fresh deposits at once to push the chain into un-finality,
+  then exercises BLS changes, slashings and exits while finality has
+  stopped.
+
+  Most users should pick `stable/validator-lifecycle-test-v2.yaml`
+  instead; this variant exists specifically to test client behavior
+  during prolonged un-finality.
+
+  Uses a hardcoded mnemonic + pubkey, so it only runs on networks
+  whose genesis state contains those validators.
+version: 1.0.0
+tags: [lifecycle, deposit, withdrawal, exit, slashing, bls-change, stability, kurtosis]
 timeout: 72h
 config:
   walletPrivkey: ""

@@ -1,5 +1,19 @@
 id: builder-deposit-spam
-name: Spam chain with batched 0x03 builder deposits
+name: "GLOAS: Spam batched 0x03 builder deposits"
+description: |
+  Stress test for the GLOAS builder deposit path. Deploys a tiny batch
+  contract and uses it to register `totalDeposits` (default 1000)
+  builders with 0x03 credentials at `batchSize` (default 100) deposits
+  per tx, capped at `pendingBatches` in-flight.
+
+  After spamming, asserts the chain still finalizes (1 finalized epoch,
+  no more than 4 unfinalized) — i.e. the deposit storm does not break
+  finality.
+
+  Optional `skipForkActivationCheck` to bypass the GLOAS-epoch wait on
+  long-running devnets.
+version: 1.0.0
+tags: [gloas, builder, deposit, eip-6110, spam, stability]
 timeout: 1h
 config:
   walletPrivkey: ''

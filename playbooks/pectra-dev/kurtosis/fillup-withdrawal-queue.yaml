@@ -1,6 +1,15 @@
 
 id: fillup-withdrawal-queue
-name: "Fillup withdrawal queue"
+name: "Fill withdrawal queue"
+description: |
+  Spams `withdrawalCount` (default 1000) EIP-7002 EL-triggered partial
+  withdrawals (1 wei each by default) from `withdrawalMaxIndex` child
+  wallets in parallel.
+
+  Stress-tests the withdrawal-request queue. Building block used by
+  `fillup-all-el-queues.yaml`.
+version: 1.0.0
+tags: [pectra, kurtosis, withdrawal, eip-7002, el-triggered, spam]
 timeout: 1h
 config:
   walletPrivkey: ""

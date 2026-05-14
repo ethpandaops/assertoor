@@ -1,5 +1,22 @@
 id: eoa-transactions-test
-name: "Transaction Test"
+name: "EOA Transaction Test"
+description: |
+  Generates EOA transactions and verifies they propagate through every
+  EL/CL client pair. Covers both transaction types:
+
+  - **Legacy** (pre-EIP-1559)
+  - **Dynamic-fee** (EIP-1559)
+
+  For each type the test runs two phases:
+
+  1. Send transactions while all clients propose blocks, asserting every
+     `validatorPairName` produces a block with >= 5 transactions.
+  2. Send the same transactions targeted at each `clientPairName` in turn
+     to verify per-client RPC ingest.
+
+  Use to validate basic EL transaction handling and CL inclusion paths.
+version: 1.0.0
+tags: [transaction, consistency, consensus, execution]
 timeout: 30m
 config:
   walletPrivkey: ""

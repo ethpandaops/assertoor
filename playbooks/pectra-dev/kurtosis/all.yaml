@@ -1,5 +1,24 @@
 id: pectra-all
-name: "All pectra tests"
+name: "Pectra all-in-one suite (Kurtosis)"
+description: |
+  Orchestrator playbook that runs the full pectra-kurtosis test pipeline
+  in sequence by fetching each sub-playbook from the master branch via
+  `run_external_tasks`:
+
+  1. BLS changes for validators 0–30 (slot >= 34)
+  2. Massive deposit with 0x02 creds (slot >= 38)
+  3. BLOCKHASH / EIP-2935 contract test (slot >= 42)
+  4. Voluntary exits for validators 0–10 (slot >= 46)
+  5. EL-triggered exit for validator 20 (slot >= 50)
+  6. Self-consolidation for validator 25 → 0x02 (slot >= 54)
+  7. EL-triggered consolidation v21 → v25 (slot >= 58)
+  8. EIP-7002-all and EIP-7251-all (slot >= 64)
+  9. Final block-proposal sanity check.
+
+  Slot-gated steps assume a fresh kurtosis genesis with Electra activating
+  around slot 30. Long-running; expect ~2h on a normal devnet.
+version: 1.0.0
+tags: [pectra, kurtosis, lifecycle, deposit, withdrawal, exit, consolidation, bls-change, eip-2935, eip-6110, eip-7002, eip-7251]
 timeout: 2h
 config:
   #walletPrivkey: ""

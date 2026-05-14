@@ -1,5 +1,18 @@
 id: pectra-execution-spec-tests
-name: "Run execution spec tests"
+name: "Pectra execution-spec-tests (concurrent)"
+description: |
+  Runs the Prague subset of [execution-spec-tests](https://github.com/ethereum/execution-spec-tests)
+  against a live RPC. All 5 EIP classes run **concurrently** in a single
+  task group:
+
+  EIP-2537 (BLS12-381), EIP-7002 (EL-triggered withdrawals),
+  EIP-7251 (consolidations), EIP-7623 (calldata cost),
+  EIP-7702 (set-code transactions).
+
+  Faster end-to-end than the sequential variant but heavier on the
+  network. Pair with `execution-spec-tests-dependencies.yaml` first.
+version: 1.0.0
+tags: [pectra, execution-spec-tests, eip-2537, eip-7002, eip-7251, eip-7623, eip-7702, rpc]
 timeout: 4h
 config:
   #walletPrivkey: ""

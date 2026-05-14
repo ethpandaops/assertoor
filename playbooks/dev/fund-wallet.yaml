@@ -1,5 +1,13 @@
 id: fund-wallet
-name: "Send funds to a wallet"
+name: "Send funds to an address"
+description: |
+  Single-shot utility that transfers `amount` wei from `walletPrivkey`
+  to `targetAddress`, awaiting the receipt.
+
+  Use this to seed test wallets manually or as a building block when
+  composing other playbooks via `run_external_tasks`.
+version: 1.0.0
+tags: [utility, transaction]
 timeout: 12h
 config:
   targetAddress: "0x000000000000000000000000000000000000dEaD"

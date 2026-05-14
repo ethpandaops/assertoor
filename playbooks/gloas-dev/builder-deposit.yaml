@@ -1,5 +1,14 @@
 id: builder-deposit
-name: Validator Deposit with 0x03 Builder Credentials
+name: "GLOAS: Builder Deposit (0x03 credentials)"
+description: |
+  Minimal deposit test for the GLOAS builder role. Generates a fresh
+  wallet + mnemonic and submits a single 5-ETH deposit with 0x03
+  withdrawal credentials (i.e. `0x03 || 11×0x00 || 20-byte address`).
+
+  Verifies the deposit pipeline accepts builder-tagged credentials
+  on a GLOAS devnet. Awaits both EL receipt and CL inclusion.
+version: 1.0.0
+tags: [gloas, builder, deposit, eip-6110]
 timeout: 30m
 config:
   walletPrivkey: ''

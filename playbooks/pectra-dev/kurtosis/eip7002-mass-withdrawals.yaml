@@ -1,6 +1,15 @@
 
 id: eip7002-mass-withdrawals
-name: "EIP7002 mass withdrawal test"
+name: "Mass EIP-7002 partial withdrawals"
+description: |
+  Submits 100 EL-triggered partial-withdrawal requests (1 ETH each)
+  against a single validator pubkey to stress the withdrawal queue.
+
+  Useful to verify proposers correctly drain the withdrawal-request
+  queue in fork-rule order without losing or duplicating requests.
+  Hardcoded kurtosis mnemonic.
+version: 1.0.0
+tags: [pectra, kurtosis, eip-7002, withdrawal, el-triggered, spam]
 timeout: 38h
 config:
   walletPrivkey: ""

@@ -1,5 +1,14 @@
 id: mev-block-proposal-check
-name: "Every client pair proposed a block"
+name: "Every client pair proposed an MEV-built block"
+description: |
+  Verifies that every configured `validatorPairNames` entry has proposed at
+  least one block whose `extra_data` matches `mevExtraDataPattern` (default
+  "hello world"). This pattern is typically set by a mock MEV-boost relay.
+
+  Use this to confirm builder-API integration is working end-to-end for every
+  CL client and validator pair.
+version: 1.0.0
+tags: [health-check, mev, consensus]
 timeout: 20m
 disable: false
 config:

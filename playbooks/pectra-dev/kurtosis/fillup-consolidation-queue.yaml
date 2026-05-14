@@ -1,6 +1,14 @@
 
 id: fillup-consolidation-queue
-name: "Fillup consolidation queue"
+name: "Fill consolidation queue"
+description: |
+  Spams `consolidationCount` (default 1000) EIP-7251 consolidation
+  requests from `consolidationMaxIndex` child wallets in parallel.
+
+  Verifies the consolidation queue can absorb sustained load without
+  dropping requests. Building block used by `fillup-all-el-queues.yaml`.
+version: 1.0.0
+tags: [pectra, kurtosis, consolidation, eip-7251, el-triggered, spam]
 timeout: 1h
 config:
   walletPrivkey: ""

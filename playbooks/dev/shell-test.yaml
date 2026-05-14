@@ -1,5 +1,11 @@
 id: shell-test
-name: "Run shell test"
+name: "Shell task smoke test"
+description: |
+  Trivial smoke test that writes `Hello` to `$ASSERTOOR_SUMMARY` via the
+  `run_shell` task. Useful only as a sanity check that shell tasks work
+  on the assertoor instance — not a real network test.
+version: 0.1.0
+tags: [utility]
 timeout: 4h
 config:
   #walletPrivkey: ""

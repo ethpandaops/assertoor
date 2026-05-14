@@ -1,5 +1,17 @@
 id: blob-transactions-test
 name: "Blob Transaction Test"
+description: |
+  Generates EIP-4844 blob transactions and verifies they propagate through
+  every EL/CL client pair. Two phases:
+
+  1. Send blob transactions while all clients propose blocks, asserting
+     every `validatorPairName` includes >= 1 blob in a proposed block.
+  2. Send blob transactions targeted at each `clientPairName` to verify
+     per-client RPC ingest and gossip.
+
+  Each transaction carries 1 blob sidecar; 2 blob tx per block target.
+version: 1.0.0
+tags: [blob, transaction, eip-4844, dencun, consistency, consensus]
 timeout: 30m
 config:
   walletPrivkey: ""

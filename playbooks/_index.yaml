@@ -1,0 +1,1437 @@
+# Auto-generated playbook index
+# Generated: 2026-05-14T00:23:32Z
+# DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
+
+generated: 2026-05-14T00:23:32Z
+playbooks:
+  - file: dev/block-proposal-with-blobs-check.yaml
+    id: block-proposal-with-blobs-check
+    name: Every client pair proposed a block with blobs
+    description: |-
+      Verifies that every configured `validatorPairName` proposes at least
+      one block carrying `minBlobCount` blobs (default 3).
+
+      Pair this with a blob-spam source running in parallel to confirm
+      blob propagation end-to-end across all clients.
+    version: 1.0.0
+    tags:
+      - health-check
+      - blob
+      - eip-4844
+      - consensus
+    timeout: 20m
+  - file: dev/dev-deposits.yaml
+    id: dev-deposits
+    name: Generate Deposits
+    description: |-
+      Minimal deposit generator. Sends `depositCount` deposits of
+      `depositAmount` ETH each via the given mnemonic to `depositContract`,
+      awaiting receipts. Optionally waits for the Electra fork first.
+
+      Use as a building block on a fresh devnet to seed validators, or as a
+      smoke test of the deposit pipeline.
+    version: 1.0.0
+    tags:
+      - deposit
+      - utility
+    timeout: 1h
+  - file: dev/execution-spec-tests-dependencies.yaml
+    id: execution-spec-tests-dependencies
+    name: Install execution-spec-tests dependencies
+    description: |-
+      Helper playbook that `apt-get install`s build tools (gcc, python3,
+      pip, autotools, libffi, libtool) needed to run
+      [execution-spec-tests](https://github.com/ethereum/execution-spec-tests)
+      inside an assertoor container.
+
+      Run once before invoking the execute/spec-tests playbooks. Requires
+      the container to allow sudo. Not a network test on its own.
+    version: 1.0.0
+    tags:
+      - execution-spec-tests
+      - utility
+    timeout: 1h
+  - file: dev/execution-spec-tests-execute.yaml
+    id: execution-spec-tests-execute
+    name: Run execution-spec-tests on a live RPC
+    description: |-
+      Clones [`execution-specs`](https://github.com/ethereum/execution-specs),
+      installs its `uv`-managed Python deps and runs `execute remote` for a
+      configurable `testPath` against a live `rpcEndpoint`.
+
+      Output:
+
+      - `report.html` and `report.json` are exported to the assertoor result
+        dir for browsing in the UI.
+      - The check task fails the playbook if any test failed.
+
+      Configure `gitRepo`, `gitBranch`, `chainID`, `seedPrivateKey` and the
+      desired `testPath`. Run `dev/execution-spec-tests-dependencies.yaml`
+      first to install build prerequisites.
+    version: 1.0.0
+    tags:
+      - execution-spec-tests
+      - rpc
+      - utility
+    timeout: 1h
+  - file: dev/fund-wallet.yaml
+    id: fund-wallet
+    name: Send funds to an address
+    description: |-
+      Single-shot utility that transfers `amount` wei from `walletPrivkey`
+      to `targetAddress`, awaiting the receipt.
+
+      Use this to seed test wallets manually or as a building block when
+      composing other playbooks via `run_external_tasks`.
+    version: 1.0.0
+    tags:
+      - utility
+      - transaction
+    timeout: 12h
+  - file: dev/generate-attestations.yaml
+    id: generate-attestations
+    name: Generate Attestations
+    description: |-
+      Generates attestations for `validatorCount` validators over
+      `attestationEpochs` epochs using the configured mnemonic.
+
+      Supports controlled mis-behavior knobs for stress / fault-injection
+      testing:
+
+      - `lastEpochAttestations` / `sendAllLastEpoch` — late attestations
+      - `lateHead` / `randomLateHead` / `lateHeadClusterSize` — late head
+        distance
+
+      Defaults to the standard kurtosis genesis mnemonic.
+    version: 1.0.0
+    tags:
+      - attestation
+      - kurtosis
+      - consensus
+    timeout: 1h
+  - file: dev/shell-test.yaml
+    id: shell-test
+    name: Shell task smoke test
+    description: |-
+      Trivial smoke test that writes `Hello` to `$ASSERTOOR_SUMMARY` via the
+      `run_shell` task. Useful only as a sanity check that shell tasks work
+      on the assertoor instance — not a real network test.
+    version: 0.1.0
+    tags:
+      - utility
+    timeout: 4h
+  - file: dev/synchronized-check.yaml
+    id: synchronized-check
+    name: Check client pairs are in sync
+    description: |-
+      For every `clientPairName`, concurrently checks that both its CL and
+      EL clients are synchronized (not stuck, not syncing). Long-running
+      (12h timeout) — re-checks continuously until cancelled or all clients
+      remain in sync.
+
+      Useful as a background test on a live devnet to catch nodes that fall
+      behind.
+    version: 1.0.0
+    tags:
+      - health-check
+      - stability
+      - consensus
+      - execution
+    timeout: 12h
+  - file: dev/validator-lifecycle-test.yaml
+    id: validator-lifecycle-test
+    name: Validator Lifecycle Test (Un-finality Stress)
+    description: |-
+      Original lifecycle test, retained for un-finality regression coverage.
+      Pumps 300 fresh deposits at once to push the chain into un-finality,
+      then exercises BLS changes, slashings and exits while finality has
+      stopped.
+
+      Most users should pick `stable/validator-lifecycle-test-v2.yaml`
+      instead; this variant exists specifically to test client behavior
+      during prolonged un-finality.
+
+      Uses a hardcoded mnemonic + pubkey, so it only runs on networks
+      whose genesis state contains those validators.
+    version: 1.0.0
+    tags:
+      - lifecycle
+      - deposit
+      - withdrawal
+      - exit
+      - slashing
+      - bls-change
+      - stability
+      - kurtosis
+    timeout: 72h
+  - file: dev/validator-proposer-slashing-test.yaml
+    id: validator-proposer-slashing-test
+    name: Proposer Slashing Test
+    description: |-
+      Variant of the kurtosis slashing test focused on **proposer**
+      slashings only (no attester half). Generates 50 proposer slashings
+      per phase and asserts every client pair both proposes and accepts
+      them.
+
+      Indices 500–649 are used — keep this range untouched on the target
+      devnet. Hardcoded kurtosis mnemonic.
+    version: 1.0.0
+    tags:
+      - slashing
+      - kurtosis
+      - consistency
+      - consensus
+    timeout: 1h
+  - file: dev/validator-slashing-single.yaml
+    id: validator-slashing-single
+    name: Slash a single validator
+    description: |-
+      Generates a single proposer slashing for `validatorIndex`
+      (default 0). Waits to epoch >= 4 before submitting.
+
+      Tiny utility playbook — handy when you want one validator slashed
+      on a kurtosis devnet without running the full slashing suite. Uses
+      the hardcoded kurtosis mnemonic.
+    version: 1.0.0
+    tags:
+      - slashing
+      - kurtosis
+      - utility
+      - consensus
+    timeout: 1h
+  - file: dev/validator-withdrawal-test-v2.yaml
+    id: validator-withdrawal-test-v2
+    name: Validator BLS Change & Withdrawal Test (Per-proposer)
+    description: |-
+      Variant of the kurtosis BLS-change + withdrawal test that targets each
+      proposer slot precisely:
+
+      1. For every `validatorPairName`, wait until it's the next-slot
+         proposer, then submit BLS changes **directly** to that client and
+         assert the produced block contains a BLS change.
+      2. Repeat, but submit BLS changes via a **different** client to verify
+         gossip propagation reaches the target proposer in time.
+      3. Force-feed BLS changes for indices 50–250 so 0x01 credentials are
+         set, then check withdrawals appear in every pair's blocks.
+
+      Tighter signal than the basic kurtosis test — confirms per-proposer
+      inclusion rather than just "some proposer in the matrix". Uses the
+      hardcoded kurtosis mnemonic.
+    version: 2.0.0
+    tags:
+      - withdrawal
+      - bls-change
+      - kurtosis
+      - consistency
+      - consensus
+    timeout: 1h
+  - file: dev/wait-for-slot.yaml
+    id: wait-for-slot
+    name: Wait for specific slot
+    description: |-
+      Utility playbook that blocks until the chain reaches `slot`.
+
+      Useful as a building block in larger orchestrations or as a quick way
+      to delay other tests until the chain is far enough along.
+    version: 1.0.0
+    tags:
+      - utility
+    timeout: 2h
+  - file: fusaka-dev/kurtosis/analyze-cgc.yaml
+    id: analyze-cgc
+    name: CGC vs validator balance audit (Fusaka)
+    description: |-
+      Per `validatorPairName`, fetches the client's published `custody_group_count`
+      (CGC) and the total active validator balance from the consensus state,
+      then verifies the CGC is high enough to cover the assigned balances.
+
+      CGC underpins PeerDAS sampling on Fusaka: a custodian that advertises
+      fewer columns than its balance requires is liveness-incorrect, even if
+      it follows the chain.
+    version: 1.0.0
+    tags:
+      - fusaka
+      - kurtosis
+      - cgc
+      - peerdas
+      - consensus
+      - health-check
+    timeout: 30m
+  - file: fusaka-dev/kurtosis/cgc-validation-test.yaml
+    id: cgc-validation-test
+    name: CGC growth via deposits / credential upgrades (Fusaka)
+    description: |-
+      Verifies the Fusaka `custody_group_count` (CGC) recomputes correctly
+      as a validator's effective balance changes via deposits and credential
+      upgrades.
+
+      Walks `validatorCount` (default 2) test validators through:
+
+      1. BLS-change 0x00 → 0x01.
+      2. Self-consolidation 0x01 → 0x02.
+      3. Top-up deposit of `depositAmount` ETH (default 1024 ETH).
+      4. Snapshot CGC before / after and assert it grew by the expected
+         custody-group count for the new balance bucket.
+
+      Pair with `analyze-cgc.yaml` for the per-client CGC audit.
+    version: 1.0.0
+    tags:
+      - fusaka
+      - kurtosis
+      - cgc
+      - peerdas
+      - consolidation
+      - deposit
+      - bls-change
+    timeout: 12h
+  - file: fusaka-dev/kurtosis/ethconfig-test-with-rpc-call.yaml
+    id: ethconfig-test
+    name: eth_config RPC consistency (EIP-7910)
+    description: |-
+      Calls the EIP-7910 `eth_config` RPC on every configured EL client and
+      asserts the responses are byte-identical.
+
+      `eth_config` is a chain-fingerprint endpoint that exposes the active
+      chain config so clients can detect mismatched genesis / fork
+      parameters. Divergence here is a serious operational bug.
+    version: 1.0.0
+    tags:
+      - fusaka
+      - kurtosis
+      - eip-7910
+      - rpc
+      - consistency
+      - execution
+    timeout: 1h
+  - file: glamsterdam-dev/execution-sec-tests-sequential.yaml
+    id: glamsterdam-execution-spec-tests-sequential-glamsterdam
+    name: Glamsterdam execution-spec-tests (sequential)
+    description: |-
+      Runs the Amsterdam / GLOAS subset of
+      [execution-spec-tests](https://github.com/ethereum/execution-spec-tests)
+      against a live RPC, sequentially.
+
+      Waits for GLOAS activation before running, then executes the BLS12-381
+      precompile (EIP-2537) test suite. Pair with
+      `execution-spec-tests-dependencies.yaml` first to install build deps.
+    version: 1.0.0
+    tags:
+      - glamsterdam
+      - gloas
+      - execution-spec-tests
+      - eip-2537
+      - rpc
+    timeout: 4h
+  - file: gloas-dev/builder-deposit-spam.yaml
+    id: builder-deposit-spam
+    name: 'GLOAS: Spam batched 0x03 builder deposits'
+    description: |-
+      Stress test for the GLOAS builder deposit path. Deploys a tiny batch
+      contract and uses it to register `totalDeposits` (default 1000)
+      builders with 0x03 credentials at `batchSize` (default 100) deposits
+      per tx, capped at `pendingBatches` in-flight.
+
+      After spamming, asserts the chain still finalizes (1 finalized epoch,
+      no more than 4 unfinalized) — i.e. the deposit storm does not break
+      finality.
+
+      Optional `skipForkActivationCheck` to bypass the GLOAS-epoch wait on
+      long-running devnets.
+    version: 1.0.0
+    tags:
+      - gloas
+      - builder
+      - deposit
+      - eip-6110
+      - spam
+      - stability
+    timeout: 1h
+  - file: gloas-dev/builder-deposit.yaml
+    id: builder-deposit
+    name: 'GLOAS: Builder Deposit (0x03 credentials)'
+    description: |-
+      Minimal deposit test for the GLOAS builder role. Generates a fresh
+      wallet + mnemonic and submits a single 5-ETH deposit with 0x03
+      withdrawal credentials (i.e. `0x03 || 11×0x00 || 20-byte address`).
+
+      Verifies the deposit pipeline accepts builder-tagged credentials
+      on a GLOAS devnet. Awaits both EL receipt and CL inclusion.
+    version: 1.0.0
+    tags:
+      - gloas
+      - builder
+      - deposit
+      - eip-6110
+    timeout: 30m
+  - file: gloas-dev/builder-lifecycle.yaml
+    id: builder-lifecycle
+    name: 'GLOAS: Builder Lifecycle Test'
+    description: |-
+      End-to-end lifecycle for GLOAS builders (validators with 0x03
+      withdrawal credentials). Walks 10 builder keys through:
+
+      1. Deposit 6 builders across the GLOAS activation boundary (3 before,
+         3 after).
+      2. Wait for all 6 to become active.
+      3. Exit them with alternating voluntary / EL-triggered exits, 10 slots
+         apart, ensuring exits span at least 2 epochs.
+      4. Wait for builders 0–2 to be fully withdrawn (balance == 0).
+      5. Deposit 4 new builders (keys 6–9) and verify **builder index reuse**:
+         keys 6/7/8 get the now-empty indices 0/1/2; key 9 gets a new index.
+      6. Send no-op partial withdrawal & consolidation requests against
+         active builders (should have no effect).
+      7. EL-triggered exit all newly-deposited builders.
+
+      Verifies the GLOAS builder pool tracks deposits / exits / index reuse
+      correctly across epoch boundaries.
+    version: 1.0.0
+    tags:
+      - gloas
+      - builder
+      - lifecycle
+      - deposit
+      - exit
+      - withdrawal
+      - el-triggered
+      - voluntary
+    timeout: 24h
+  - file: gloas-dev/exit-conflict.yaml
+    id: gloas-exit-conflict
+    name: 'GLOAS: EL-triggered vs voluntary exit conflict'
+    description: |-
+      Regression test for the ePBS `process_previous_payload` ordering rule
+      introduced by GLOAS. Under ePBS, the EL exit request is processed
+      *before* operations (voluntary exits), so a voluntary exit submitted
+      after an EL exit for the same validator must be dropped.
+
+      For each of `validatorCount` validators concurrently:
+
+      1. Submit an EL-triggered full exit (amount=0).
+      2. Wait for the request to land in a CL block (slot S).
+      3. Immediately submit a voluntary exit (must reach the gossip pool
+         before slot S+1 builds).
+      4. Wait 10 slots, then scan the last 10 blocks for the voluntary
+         exit — it **must not** appear.
+
+      The chain itself is the source of truth; we don't depend on
+      validator-state cache propagation timing.
+    version: 1.0.0
+    tags:
+      - gloas
+      - exit
+      - conflict
+      - eip-7002
+      - el-triggered
+      - voluntary
+    timeout: 30h
+  - file: gloas-dev/slashing-exit-conflict.yaml
+    id: slashing-exit-conflict
+    name: 'GLOAS: Slashing vs voluntary exit conflict'
+    description: |-
+      Verifies that a voluntary exit submitted alongside a slashing for the
+      same validator does **not** end up on-chain. `process_operations`
+      applies slashings before voluntary exits, so honest proposers must
+      pre-validate operations and drop the now-invalid voluntary exit.
+
+      For each of `validatorCount` validators concurrently:
+
+      1. Submit a slashing (attester by default; configurable via
+         `slashingType`).
+      2. Immediately submit a voluntary exit for the same validator while
+         it still looks active in head state.
+      3. Wait for the slashing to land in a CL block (slot S).
+      4. Wait 10 slots after submission, then scan the last 10 blocks for
+         the voluntary exit — it **must not** appear.
+    version: 1.0.0
+    tags:
+      - gloas
+      - slashing
+      - exit
+      - conflict
+      - voluntary
+    timeout: 30h
+  - file: pectra-dev/blockhash-test-with-rpc-call.yaml
+    id: blockhash-test
+    name: BLOCKHASH / EIP-2935 RPC consistency test
+    description: |-
+      Verifies EIP-2935 historical-block-hash precompile behavior via an
+      `eth_call` to the deployed test contract, comparing the returned
+      hash to the head block hash queried via `eth_getBlockByNumber`.
+
+      Covers the post-Prague semantics where BLOCKHASH is served from the
+      ring-buffer contract rather than the legacy 256-block limit.
+    version: 1.0.0
+    tags:
+      - pectra
+      - eip-2935
+      - opcodes
+      - rpc
+      - consistency
+    timeout: 1h
+  - file: pectra-dev/eip7002-all.yaml
+    id: eip7002-all
+    name: EIP-7002 EL-triggered exits & withdrawals (full suite)
+    description: |-
+      Comprehensive coverage of EIP-7002 (execution-layer triggered exits
+      and partial withdrawals).
+
+      Walks one validator per scenario through:
+
+      1. Exit request from a 0x01-credentialed address → assert exit.
+      2. Exit request after self-consolidation to 0x02 → assert exit.
+      3. Switch to 0x02 via top-up deposit, then EL-triggered exit.
+      4. Partial withdrawal from a 0x02 address → assert balance drop.
+      5. Exit request from wrong source address → assert no exit.
+      6. Exit request without credential change → assert no exit.
+      7. Partial withdrawal without sufficient balance → assert no effect.
+      8. Top-up via deposit on an already-exiting validator.
+      9. EL exit followed by a duplicate request.
+      10. Combined exit + immediate consolidation, conflict handling.
+
+      Requires Electra activation. Hardcoded kurtosis mnemonic; pubkeys are
+      derived from `validatorStartIndex`.
+    version: 1.0.0
+    tags:
+      - pectra
+      - eip-7002
+      - eip-7251
+      - withdrawal
+      - exit
+      - consolidation
+      - el-triggered
+      - lifecycle
+      - kurtosis
+    timeout: 72h
+  - file: pectra-dev/eip7251-all.yaml
+    id: eip7251-all
+    name: EIP-7251 consolidations (full suite)
+    description: |-
+      Comprehensive coverage of EIP-7251 (validator consolidations and
+      0x02 effective-balance increase to 2048 ETH).
+
+      Scenarios:
+
+      1. Self-consolidation: BLS change 0x01 → 0x02 via consolidation to
+         own pubkey.
+      2. Two-validator consolidation with balance combination.
+      3. Consolidation overflow: target above 2048 ETH cap.
+      4. Consolidation followed by top-up deposit.
+      5. Source / target slashed mid-consolidation.
+      6. Invalid sources (0x00 creds, wrong source address).
+      7. Consolidation of already-exiting validator.
+      8. Consolidation that exits the source.
+      9. Top-up to a 0x02 validator increases balance immediately.
+      10. Withdrawal credential change via consolidation interaction.
+
+      Requires Electra activation. Hardcoded kurtosis mnemonic.
+    version: 1.0.0
+    tags:
+      - pectra
+      - eip-7251
+      - consolidation
+      - bls-change
+      - lifecycle
+      - kurtosis
+    timeout: 48h
+  - file: pectra-dev/execution-spec-tests-sequential.yaml
+    id: pectra-execution-spec-tests-sequential
+    name: Pectra execution-spec-tests (sequential)
+    description: |-
+      Runs the Prague subset of [execution-spec-tests](https://github.com/ethereum/execution-spec-tests)
+      against a live RPC, one EIP-class per phase, **sequentially**:
+
+      EIP-2537 (BLS12-381 precompiles) → EIP-7002 (EL-triggered withdrawals)
+      → EIP-7251 (consolidations) → EIP-7623 (calldata cost) → EIP-7702
+      (set-code transactions).
+
+      Sequential ordering is friendlier to small devnets where parallel
+      scenarios would compete for proposer slots. Pair with
+      `execution-spec-tests-dependencies.yaml` first to install deps.
+    version: 1.0.0
+    tags:
+      - pectra
+      - execution-spec-tests
+      - eip-2537
+      - eip-7002
+      - eip-7251
+      - eip-7623
+      - eip-7702
+      - rpc
+    timeout: 4h
+  - file: pectra-dev/execution-spec-tests.yaml
+    id: pectra-execution-spec-tests
+    name: Pectra execution-spec-tests (concurrent)
+    description: |-
+      Runs the Prague subset of [execution-spec-tests](https://github.com/ethereum/execution-spec-tests)
+      against a live RPC. All 5 EIP classes run **concurrently** in a single
+      task group:
+
+      EIP-2537 (BLS12-381), EIP-7002 (EL-triggered withdrawals),
+      EIP-7251 (consolidations), EIP-7623 (calldata cost),
+      EIP-7702 (set-code transactions).
+
+      Faster end-to-end than the sequential variant but heavier on the
+      network. Pair with `execution-spec-tests-dependencies.yaml` first.
+    version: 1.0.0
+    tags:
+      - pectra
+      - execution-spec-tests
+      - eip-2537
+      - eip-7002
+      - eip-7251
+      - eip-7623
+      - eip-7702
+      - rpc
+    timeout: 4h
+  - file: pectra-dev/kurtosis/33eth-deposit.yaml
+    id: pectra-33eth-deposit
+    name: 33 ETH first-deposit edge case
+    description: |-
+      Verifies the Electra deposit rule: a validator's *first* deposit must be
+      at least 32 ETH to register a new validator (deposits below 32 ETH on a
+      new pubkey are queued as pending until the threshold is met).
+
+      Sends 10 deposits of 33 ETH each from a fresh mnemonic and checks the
+      resulting validator activation behavior. Runs on a kurtosis devnet.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - deposit
+      - eip-6110
+    timeout: 278h
+  - file: pectra-dev/kurtosis/64-el-triggered-consolidation.yaml
+    id: 64-el-triggered-consolidation
+    name: Mass EL-triggered consolidations (64 sources → 1 target)
+    description: |-
+      Stress test for EIP-7251 consolidation queue. BLS-changes 300 validators
+      to 0x01 then submits `consolidationNumber` (default 64) EL-triggered
+      consolidations from sources at index `sourceValidatorIndex+` into one
+      `targetValidatorIndex`.
+
+      Verifies the consolidation pipeline handles many parallel sources
+      feeding the same target. Hardcoded kurtosis mnemonic; runs on Electra
+      devnets.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - consolidation
+      - eip-7251
+      - el-triggered
+      - spam
+    timeout: 1h
+  - file: pectra-dev/kurtosis/all.yaml
+    id: pectra-all
+    name: Pectra all-in-one suite (Kurtosis)
+    description: |-
+      Orchestrator playbook that runs the full pectra-kurtosis test pipeline
+      in sequence by fetching each sub-playbook from the master branch via
+      `run_external_tasks`:
+
+      1. BLS changes for validators 0–30 (slot >= 34)
+      2. Massive deposit with 0x02 creds (slot >= 38)
+      3. BLOCKHASH / EIP-2935 contract test (slot >= 42)
+      4. Voluntary exits for validators 0–10 (slot >= 46)
+      5. EL-triggered exit for validator 20 (slot >= 50)
+      6. Self-consolidation for validator 25 → 0x02 (slot >= 54)
+      7. EL-triggered consolidation v21 → v25 (slot >= 58)
+      8. EIP-7002-all and EIP-7251-all (slot >= 64)
+      9. Final block-proposal sanity check.
+
+      Slot-gated steps assume a fresh kurtosis genesis with Electra activating
+      around slot 30. Long-running; expect ~2h on a normal devnet.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - lifecycle
+      - deposit
+      - withdrawal
+      - exit
+      - consolidation
+      - bls-change
+      - eip-2935
+      - eip-6110
+      - eip-7002
+      - eip-7251
+    timeout: 2h
+  - file: pectra-dev/kurtosis/blockhash-test.yaml
+    id: blockhash-test
+    name: BLOCKHASH / EIP-2935 contract test
+    description: |-
+      Deploys the EIP-2935 BLOCKHASH-via-contract test fixture and calls
+      `test1(10)` to walk back 10 historical block hashes via the contract.
+
+      Lighter than the variant with the RPC consistency check — useful when
+      you only need to confirm the precompile responds correctly on a
+      kurtosis devnet.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - eip-2935
+      - opcodes
+    timeout: 1h
+  - file: pectra-dev/kurtosis/bls-changes.yaml
+    id: bls-changes
+    name: Generate BLS changes (Kurtosis)
+    description: |-
+      Generates `validatorCount` (default 64) BLS credential changes from
+      the kurtosis genesis mnemonic targeting `targetAddress`.
+
+      Used standalone or as a building block in larger orchestrations
+      (e.g. `pectra-all`). Does not verify inclusion — pair with a
+      `check_consensus_block_proposals` test if you need that.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - bls-change
+      - utility
+    timeout: 1h
+  - file: pectra-dev/kurtosis/consolidion-overflow-tests.yaml
+    id: consolidation_overflow_tests
+    name: Consolidation Overflow (Pectra 2048 ETH cap)
+    description: |-
+      Tests behavior when a consolidation would push the target validator
+      above the EIP-7251 effective-balance cap of 2048 ETH.
+
+      Deposits fresh validators, BLS-changes them to 0x02, then consolidates
+      multiple sources into a single target so the resulting balance crosses
+      2048 ETH. Asserts the excess is withdrawn rather than retained.
+
+      Very long timeout (672h) — designed for long-lived pectra devnets where
+      the SHARD_COMMITTEE_PERIOD-bound exits eventually settle. Uses hardcoded
+      kurtosis mnemonic.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - consolidation
+      - eip-7251
+      - withdrawal
+    timeout: 672h
+  - file: pectra-dev/kurtosis/eip6110-double-deposit.yaml
+    id: eip6110-double-deposit
+    name: EIP-6110 double-deposit handling
+    description: |-
+      Submits two 2 ETH deposits for the same fresh pubkey in the same slot
+      via concurrent `generate_deposits` tasks. Verifies EIP-6110 handling
+      when two deposits for the same pubkey appear in the deposit-requests
+      list of a single block.
+
+      Expected behavior: both deposits are processed, but the validator only
+      activates once with combined balance.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - deposit
+      - eip-6110
+    timeout: 1h
+  - file: pectra-dev/kurtosis/eip7002-lh-bug.yaml
+    id: eip7002-lh-bug
+    name: EIP-7002 regression suite (devnet3 LH bug)
+    description: |-
+      Regression test originally written for a Lighthouse bug on
+      pectra-devnet-3 around EIP-7002 EL-triggered withdrawal handling. The
+      playbook has since grown into a broad EIP-7002 cover-all and is kept
+      as a guardrail.
+
+      Walks 10 fresh validator pubkeys (derived from kurtosis genesis
+      mnemonic at `validatorStartIndex`) through credential changes
+      (0x00 → 0x01 → 0x02 via deposit), partial withdrawals and EL-triggered
+      exits, asserting the right validator state transitions at each step.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - eip-7002
+      - eip-7251
+      - withdrawal
+      - exit
+      - consolidation
+      - el-triggered
+      - lifecycle
+    timeout: 38h
+  - file: pectra-dev/kurtosis/eip7002-mass-withdrawals.yaml
+    id: eip7002-mass-withdrawals
+    name: Mass EIP-7002 partial withdrawals
+    description: |-
+      Submits 100 EL-triggered partial-withdrawal requests (1 ETH each)
+      against a single validator pubkey to stress the withdrawal queue.
+
+      Useful to verify proposers correctly drain the withdrawal-request
+      queue in fork-rule order without losing or duplicating requests.
+      Hardcoded kurtosis mnemonic.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - eip-7002
+      - withdrawal
+      - el-triggered
+      - spam
+    timeout: 38h
+  - file: pectra-dev/kurtosis/eip7251-mass-consolidations.yaml
+    id: eip7251-mass-consolidations
+    name: Mass EIP-7251 self-consolidations
+    description: |-
+      Submits 100 EL-triggered consolidation requests where source == target
+      to stress the consolidation queue with self-consolidations (these
+      upgrade a validator to 0x02 credentials).
+
+      Verifies the queue drains correctly and credential upgrades complete
+      without duplicates. Hardcoded kurtosis mnemonic.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - eip-7251
+      - consolidation
+      - el-triggered
+      - spam
+    timeout: 38h
+  - file: pectra-dev/kurtosis/eip7702-test.yaml
+    id: eip7702-test
+    name: EIP-7702 set-code transaction basics
+    description: |-
+      Verifies basic EIP-7702 (set-code transaction) flow: a freshly funded
+      EOA signs an authorization to delegate to a deployed implementation
+      contract, then a transaction calls the EOA and observes delegated
+      execution.
+
+      Covers the happy-path; for txpool re-validation behavior see
+      `eip7702-txpool-invalidation.yaml`.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - eip-7702
+      - transaction
+    timeout: 1h
+  - file: pectra-dev/kurtosis/eip7702-txpool-invalidation.yaml
+    id: eip7702-txpool-invalidation
+    name: EIP-7702 txpool invalidation scenarios
+    description: |-
+      Tests how the EL txpool reacts when an EIP-7702 set-code transaction
+      changes (or removes) the delegation of an EOA that has other pending
+      transactions in the pool.
+
+      `invalidationScenario` selects:
+
+      - `0` — all scenarios
+      - `1` — regular EOA transactions become invalid after delegation
+      - `2` — delegated-contract deployments become invalid
+
+      Confirms invalidated transactions are dropped rather than included on
+      stale assumptions.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - eip-7702
+      - transaction
+    timeout: 1h
+  - file: pectra-dev/kurtosis/el-triggered-consolidation.yaml
+    id: el-triggered-consolidation
+    name: Single EL-triggered consolidation
+    description: |-
+      Submits one EIP-7251 EL-triggered consolidation from
+      `sourceValidatorIndex` into `targetValidatorIndex` and waits for the
+      receipt.
+
+      Smallest possible consolidation test — useful as a quick sanity check
+      on Electra activation. Defaults to validators 6610 → 6611 (kurtosis
+      default ranges).
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - consolidation
+      - eip-7251
+      - el-triggered
+      - utility
+    timeout: 1h
+  - file: pectra-dev/kurtosis/el-triggered-consolidations-of-consolidations.yaml
+    id: el-triggered-consolidation-chain
+    name: Chained EL-triggered consolidations
+    description: |-
+      Tests consolidation-of-a-consolidation: first consolidate
+      `initialSourceValidatorIndex` into `initialTargetValidatorIndex`, then
+      before that consolidation completes, consolidate the *intermediate
+      target* into `finalTargetValidatorIndex`.
+
+      Verifies the protocol correctly handles a validator that is both an
+      outgoing consolidation source and an incoming consolidation target.
+      Kurtosis-specific default indices.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - consolidation
+      - eip-7251
+      - el-triggered
+    timeout: 1h
+  - file: pectra-dev/kurtosis/el-triggered-exit.yaml
+    id: el-triggered-exit
+    name: Single EL-triggered exit
+    description: |-
+      Submits one EIP-7002 EL-triggered exit (withdrawAmount=0) for
+      `validatorIndex` (default 20) by sending a raw transaction to the
+      withdrawal-request contract with the pubkey + 8-byte zero amount.
+
+      Minimal building block — useful for triggering an exit deterministically
+      in larger orchestrations. Requires the validator to already have 0x01
+      or 0x02 credentials matching the caller.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - exit
+      - eip-7002
+      - el-triggered
+      - utility
+    timeout: 1h
+  - file: pectra-dev/kurtosis/el-triggered-withdrawal.yaml
+    id: el-triggered-withdrawal
+    name: Single EL-triggered partial withdrawal
+    description: |-
+      Submits one EIP-7002 partial-withdrawal request for `validatorIndex`
+      for `withdrawAmount` ETH (default 1 ETH). Builds the calldata
+      dynamically from the validator's pubkey and the gwei-encoded amount.
+
+      Smallest possible partial-withdrawal test — useful as a quick check
+      that the withdrawal-request contract is wired correctly.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - withdrawal
+      - eip-7002
+      - el-triggered
+      - utility
+    timeout: 1h
+  - file: pectra-dev/kurtosis/fillup-all-el-queues-valid.yaml
+    id: fillup-all-el-queues-valid
+    name: Fill EL request queues with valid requests
+    description: |-
+      Stress-test variant of `fillup-all-el-queues` that only submits
+      **valid** withdrawal / consolidation / deposit requests (correctly
+      signed for the source pubkey).
+
+      Spams `requestCount` (default 500) requests in parallel across the
+      three EL queues to verify proposers drain them in fork-rule order
+      without dropping valid requests under load.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - eip-7002
+      - eip-7251
+      - eip-6110
+      - withdrawal
+      - consolidation
+      - deposit
+      - spam
+    timeout: 1h
+  - file: pectra-dev/kurtosis/fillup-all-el-queues.yaml
+    id: fillup-all-el-queues
+    name: Fill all EL request queues (mixed valid/invalid)
+    description: |-
+      Stress-test that floods the withdrawal, consolidation and deposit EL
+      queues concurrently — by chaining the three `fillup-*-queue` playbooks
+      via `run_external_tasks`.
+
+      Requests are *not* validated for source-address correctness, so a mix
+      of valid and invalid requests hit the queues; proposers must filter
+      the invalid ones rather than crash.
+
+      Use to gauge EL behavior under sustained queue pressure.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - eip-7002
+      - eip-7251
+      - eip-6110
+      - withdrawal
+      - consolidation
+      - deposit
+      - spam
+    timeout: 1h
+  - file: pectra-dev/kurtosis/fillup-consolidation-queue.yaml
+    id: fillup-consolidation-queue
+    name: Fill consolidation queue
+    description: |-
+      Spams `consolidationCount` (default 1000) EIP-7251 consolidation
+      requests from `consolidationMaxIndex` child wallets in parallel.
+
+      Verifies the consolidation queue can absorb sustained load without
+      dropping requests. Building block used by `fillup-all-el-queues.yaml`.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - consolidation
+      - eip-7251
+      - el-triggered
+      - spam
+    timeout: 1h
+  - file: pectra-dev/kurtosis/fillup-deposit-queue.yaml
+    id: fillup-deposit-queue
+    name: Fill deposit queue
+    description: |-
+      Spams `depositCount` (default 1010) deposit transactions to the
+      deposit contract from `depositMaxIndex` child wallets in parallel.
+
+      Stress-tests the EIP-6110 deposit pipeline: queue absorption, deposit
+      receipts handling, and proposer block-building under heavy deposit
+      load. Building block used by `fillup-all-el-queues.yaml`.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - deposit
+      - eip-6110
+      - spam
+    timeout: 1h
+  - file: pectra-dev/kurtosis/fillup-withdrawal-queue.yaml
+    id: fillup-withdrawal-queue
+    name: Fill withdrawal queue
+    description: |-
+      Spams `withdrawalCount` (default 1000) EIP-7002 EL-triggered partial
+      withdrawals (1 wei each by default) from `withdrawalMaxIndex` child
+      wallets in parallel.
+
+      Stress-tests the withdrawal-request queue. Building block used by
+      `fillup-all-el-queues.yaml`.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - withdrawal
+      - eip-7002
+      - el-triggered
+      - spam
+    timeout: 1h
+  - file: pectra-dev/kurtosis/massive-deposit-0x02.yaml
+    id: pectra-massive-deposit-0x02
+    name: Massive deposit (2× 1000 ETH, 0x02 creds)
+    description: |-
+      Submits two 1000-ETH deposits with 0x02 withdrawal credentials
+      (Pectra-only) for fresh validators from a random mnemonic.
+
+      Verifies the EIP-7251 max effective balance behavior: a 0x02 validator
+      can accept large initial deposits up to the 2048 ETH cap. Long timeout
+      (672h) to accommodate the activation queue on a busy devnet.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - deposit
+      - eip-6110
+      - eip-7251
+    timeout: 672h
+  - file: pectra-dev/kurtosis/massive-deposit.yaml
+    id: pectra-massive-deposit
+    name: Massive deposit (2× 1000 ETH, 0x01 creds)
+    description: |-
+      Submits two 1000-ETH deposits with legacy 0x01 withdrawal credentials
+      for fresh validators from a random mnemonic.
+
+      Companion to `massive-deposit-0x02.yaml`; this variant verifies the
+      protocol still caps 0x01 effective balance at 32 ETH and queues the
+      excess for withdrawal. Long timeout (672h) for activation-queue
+      patience.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - deposit
+      - eip-6110
+      - withdrawal
+    timeout: 672h
+  - file: pectra-dev/kurtosis/topup-deposits.yaml
+    id: topup-deposits
+    name: Top-up deposits for existing validators
+    description: |-
+      Sends `depositCount` top-up deposits (`topUpDeposit: true`) of
+      `depositAmount` ETH each to existing validators in range
+      `[validatorStartIndex, validatorStartIndex + validatorCount)`.
+
+      Verifies the deposit pipeline routes the top-up to the existing
+      validator (rather than registering a new one). Hardcoded kurtosis
+      mnemonic.
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - deposit
+      - eip-6110
+    timeout: 1h
+  - file: pectra-dev/kurtosis/voluntary-exits.yaml
+    id: voluntary-exits
+    name: Generate voluntary exits (Kurtosis)
+    description: |-
+      Generates `validatorCount` (default 64) voluntary exits starting at
+      `validatorStartIndex` using the kurtosis genesis mnemonic.
+
+      Does not verify inclusion — pair with a `check_consensus_block_proposals`
+      task or call from a larger orchestration (e.g. `pectra-all`).
+    version: 1.0.0
+    tags:
+      - pectra
+      - kurtosis
+      - exit
+      - voluntary
+      - utility
+    timeout: 1h
+  - file: pectra-dev/validator-lifecycle-test-v3.yaml
+    id: validator-lifecycle-test-v3
+    name: Validator Lifecycle Test (v3, Pectra)
+    description: |-
+      Pectra-aware end-to-end validator lifecycle, building on v2 with
+      EIP-7251 consolidations and EIP-7002 EL-triggered operations.
+
+      Sweeps 10 fresh validators with mixed withdrawal credentials
+      (0x00 / 0x01 / 0x02) through:
+
+      1. Deposits (mix of legacy & EIP-6110), activation wait.
+      2. BLS changes → consolidations (EIP-7251), including overflow at
+         the 2048 ETH cap.
+      3. Pre-exitability slashings (attester + proposer).
+      4. SHARD_COMMITTEE_PERIOD wait.
+      5. Voluntary exits + EL-triggered exits (EIP-7002).
+      6. Post-exit slashings.
+      7. Final BLS changes + full-withdrawal verification.
+
+      Long-running (672h timeout) — use on a long-lived pectra devnet.
+    version: 3.0.0
+    tags:
+      - pectra
+      - lifecycle
+      - deposit
+      - withdrawal
+      - exit
+      - slashing
+      - bls-change
+      - consolidation
+      - eip-6110
+      - eip-7002
+      - eip-7251
+      - el-triggered
+    timeout: 672h
+  - file: stable/all-opcodes-test.yaml
+    id: all-opcodes-test
+    name: All-Opcodes Transaction Test
+    description: |-
+      Deploys a contract that exercises every EVM opcode (arithmetic, stack,
+      memory, storage, control flow, environmental, block, log, system,
+      CREATE/CREATE2, CALL/STATICCALL/DELEGATECALL, precompiles), then issues
+      a call that re-runs them.
+
+      Each opcode emits a log event with its result; the test asserts every
+      expected event (~75 entries) is present, catching opcode-level regressions
+      across EL clients.
+    version: 1.0.0
+    tags:
+      - transaction
+      - opcodes
+      - consistency
+    timeout: 1h
+  - file: stable/big-calldata-tx-test.yaml
+    id: big-calldata-tx-test
+    name: Big Calldata Transaction Test
+    description: |-
+      Stress test for large-calldata transactions. Sends `transactionCount`
+      (default 1000) transactions each carrying `calldataSize` zero bytes of
+      calldata (default 1000) at `transactionsPerBlock` throughput, then
+      verifies the chain stayed healthy:
+
+      - finality continues (>= 2 finalized, <= 3 unfinalized epochs)
+      - attestation participation stays high
+      - no excessive reorgs or forks
+
+      Use to gauge EL/CL behavior under sustained large-payload load.
+    version: 1.0.0
+    tags:
+      - transaction
+      - calldata
+      - spam
+      - stability
+    timeout: 30m
+  - file: stable/blob-transactions-test.yaml
+    id: blob-transactions-test
+    name: Blob Transaction Test
+    description: |-
+      Generates EIP-4844 blob transactions and verifies they propagate through
+      every EL/CL client pair. Two phases:
+
+      1. Send blob transactions while all clients propose blocks, asserting
+         every `validatorPairName` includes >= 1 blob in a proposed block.
+      2. Send blob transactions targeted at each `clientPairName` to verify
+         per-client RPC ingest and gossip.
+
+      Each transaction carries 1 blob sidecar; 2 blob tx per block target.
+    version: 1.0.0
+    tags:
+      - blob
+      - transaction
+      - eip-4844
+      - dencun
+      - consistency
+      - consensus
+    timeout: 30m
+  - file: stable/block-proposal-check.yaml
+    id: block-proposal-check
+    name: Every client pair proposed a block
+    description: |-
+      Verifies that every configured `validatorPairNames` entry has proposed at
+      least one block. Uses a task matrix to run one wait-for-proposal check per
+      client pair concurrently.
+
+      Useful as a network-wide liveness check after starting a multi-client
+      devnet to confirm all proposer duties are firing.
+    version: 1.0.0
+    tags:
+      - health-check
+      - consensus
+    timeout: 20m
+  - file: stable/dencun-opcodes-test.yaml
+    id: dencun-opcodes-test
+    name: Dencun Opcodes Test
+    description: |-
+      Exercises every new opcode/precompile introduced by the Dencun (Deneb +
+      Cancun) fork. Deploys one test contract per EIP and calls it with
+      verifying log events:
+
+      - **EIP-1153** — Transient storage (`TSTORE` / `TLOAD`) across calls and
+        across transactions in the same block.
+      - **EIP-4844** — `BLOBHASH` opcode and `BLOBBASEFEE` (EIP-7516) with 3
+        blob sidecars attached.
+      - **EIP-5656** — `MCOPY` memory copy instruction.
+      - **EIP-4788** — Beacon block root precompile, called via a stored
+        address in the parent contract.
+
+      Closes with a reorg/fork sanity check.
+    version: 1.0.0
+    tags:
+      - dencun
+      - opcodes
+      - eip-1153
+      - eip-4844
+      - eip-5656
+      - eip-4788
+      - eip-7516
+    timeout: 1h
+  - file: stable/eoa-transactions-test.yaml
+    id: eoa-transactions-test
+    name: EOA Transaction Test
+    description: |-
+      Generates EOA transactions and verifies they propagate through every
+      EL/CL client pair. Covers both transaction types:
+
+      - **Legacy** (pre-EIP-1559)
+      - **Dynamic-fee** (EIP-1559)
+
+      For each type the test runs two phases:
+
+      1. Send transactions while all clients propose blocks, asserting every
+         `validatorPairName` produces a block with >= 5 transactions.
+      2. Send the same transactions targeted at each `clientPairName` in turn
+         to verify per-client RPC ingest.
+
+      Use to validate basic EL transaction handling and CL inclusion paths.
+    version: 1.0.0
+    tags:
+      - transaction
+      - consistency
+      - consensus
+      - execution
+    timeout: 30m
+  - file: stable/kurtosis/validator-exit-test.yaml
+    id: validator-exit-test
+    name: Validator Voluntary Exit Test (Kurtosis)
+    description: |-
+      Tests voluntary-exit generation, gossip and inclusion across all client
+      pairs.
+
+      1. Generates 50 voluntary exits (1/slot) and asserts every
+         `validatorPairName` proposes a block containing one.
+      2. For each `clientPairName`, generates 50 voluntary exits via that
+         client and asserts inclusion.
+
+      Requires the standard kurtosis genesis mnemonic. Different index ranges
+      are used per phase to avoid hitting already-exited validators.
+    version: 1.0.0
+    tags:
+      - exit
+      - voluntary
+      - kurtosis
+      - consistency
+      - consensus
+    timeout: 1h
+  - file: stable/kurtosis/validator-slashing-test.yaml
+    id: validator-slashing-test
+    name: Validator Slashing Test (Kurtosis)
+    description: |-
+      Tests attester and proposer slashing generation, gossip and inclusion
+      across all client pairs.
+
+      Two halves (attester, then proposer); each half:
+
+      1. Generates 50 slashings (1/slot) and asserts every `validatorPairName`
+         proposes a block containing one.
+      2. For each `clientPairName`, generates 50 slashings via that client
+         and asserts inclusion.
+
+      Slashings target distinct validator-index ranges per phase to avoid
+      reusing already-slashed validators. Requires the standard kurtosis
+      genesis mnemonic.
+    version: 1.0.0
+    tags:
+      - slashing
+      - kurtosis
+      - consistency
+      - consensus
+    timeout: 1h
+  - file: stable/kurtosis/validator-withdrawal-test.yaml
+    id: validator-withdrawal-test
+    name: Validator BLS Change & Withdrawal Test (Kurtosis)
+    description: |-
+      Verifies BLS-to-execution credential changes (0x00 → 0x01) propagate
+      and trigger withdrawals across all client pairs.
+
+      Phases:
+
+      1. **BLS-change broadcast** — emits 50 BLS changes (1/slot) for genesis
+         validators and asserts every `validatorPairName` proposes a block
+         containing one.
+      2. **Force-feed** — sends 50 more BLS changes for the first 50 keys to
+         guarantee they have a 0x01 withdrawal address.
+      3. **Per-client BLS-change RPC** — for each `clientPairName`, submits
+         50 BLS changes via that client and verifies inclusion.
+      4. **Withdrawal observation** — asserts every `validatorPairName`
+         proposes at least one block with a withdrawal.
+
+      Requires the standard kurtosis genesis mnemonic and a known target
+      address; does not work on networks without those validators.
+    version: 1.0.0
+    tags:
+      - withdrawal
+      - bls-change
+      - kurtosis
+      - consistency
+      - consensus
+    timeout: 1h
+  - file: stable/mev-block-proposal-check.yaml
+    id: mev-block-proposal-check
+    name: Every client pair proposed an MEV-built block
+    description: |-
+      Verifies that every configured `validatorPairNames` entry has proposed at
+      least one block whose `extra_data` matches `mevExtraDataPattern` (default
+      "hello world"). This pattern is typically set by a mock MEV-boost relay.
+
+      Use this to confirm builder-API integration is working end-to-end for every
+      CL client and validator pair.
+    version: 1.0.0
+    tags:
+      - health-check
+      - mev
+      - consensus
+    timeout: 20m
+  - file: stable/stability-check.yaml
+    id: stability-check
+    name: Check chain stability
+    description: |-
+      Long-running chain health check. Verifies that:
+
+      - all configured EL & CL clients are synced
+      - the chain finalizes (at least 2 finalized epochs, never more than 3 unfinalized)
+      - attestation participation is high (>= 98% target, >= 80% head)
+      - no excessive reorgs (<= 2 per epoch) or forks
+
+      Run this as a smoke test on a fresh devnet or as a sanity baseline before
+      more disruptive playbooks. Fails fast if the chain is unhealthy.
+    version: 1.0.0
+    tags:
+      - stability
+      - health-check
+      - consensus
+      - execution
+    timeout: 2h
+  - file: stable/validator-lifecycle-test-v2.yaml
+    id: validator-lifecycle-test-v2
+    name: Validator Lifecycle Test (v2)
+    description: |-
+      Full end-to-end validator lifecycle on a chain with the Electra fork
+      active (or pre-Electra with legacy eth1 deposits). Creates 10 fresh
+      validators from a random mnemonic and walks them through:
+
+      1. **Deposits** — 10 new validators + 2 double-deposits (keys 0 and 5).
+         Accepts both legacy eth1-voting deposits and EIP-6110 deposit requests.
+      2. **Activation** — waits for all keys to reach `active_ongoing`.
+      3. **BLS changes** (first half) — converts keys 0–4 to 0x01 withdrawal
+         credentials and verifies a partial withdrawal for key 0.
+      4. **Pre-exit slashings** — attester slash key 2, proposer slash key 7.
+      5. **Exitability wait** — sleeps `SHARD_COMMITTEE_PERIOD` epochs.
+      6. **Voluntary exits** — exits keys 0, 1, 4, 5, 8, 9 and verifies
+         post-exit full withdrawals for the 0x01-credentialed keys.
+      7. **Post-exit slashings** — attester slash key 3, proposer slash key 6.
+      8. **BLS changes** (second half) — keys 5–9 to 0x01, verifies full
+         withdrawals for keys 5, 8, 9.
+
+      Cleanup task ensures all 10 keys are exited regardless of outcome.
+
+      This is the production-ready successor to the older `dev/validator-lifecycle-test.yaml`.
+    version: 2.0.0
+    tags:
+      - lifecycle
+      - deposit
+      - withdrawal
+      - exit
+      - slashing
+      - bls-change
+      - eip-6110
+    timeout: 672h
+  - file: verkle-dev/aave-deployment.yaml
+    id: deploy-aave
+    name: Deploy AAVE v3.1 (Verkle)
+    description: |-
+      Installs Foundry + solc 0.8.19 inside the assertoor container, clones
+      the AAVE v3.1 verkle branch, and deploys the full protocol stack via
+      `forge script` against a fresh child wallet.
+
+      Used to verify a verkle-converted EL still executes a large real-world
+      application bundle end-to-end. Heavyweight — installs toolchain and
+      pulls a multi-MB repo on each run.
+    version: 1.0.0
+    tags:
+      - verkle
+      - aave
+      - deployment
+      - transaction
+    timeout: 1h
+  - file: verkle-dev/verkle-conversion-check.yaml
+    id: verkle-conversion-check
+    name: Verify verkle state-conversion progress
+    description: |-
+      Tracks the verkle state-conversion process across all EL clients.
+
+      Concurrently runs:
+
+      - `check_clients_are_healthy` so we notice if a client dies mid-way.
+      - A matrix over EL clients calling `check_execution_conversion_state`,
+        which polls the verkle-conversion RPC until every client reports
+        completion.
+
+      Long timeout — conversion can take many hours on a populated chain.
+    version: 1.0.0
+    tags:
+      - verkle
+      - execution
+      - health-check
+      - stability
+    timeout: 12h

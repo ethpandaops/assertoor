@@ -1,6 +1,18 @@
 
 id: fillup-all-el-queues
-name: "Fillup all EL request queues"
+name: "Fill all EL request queues (mixed valid/invalid)"
+description: |
+  Stress-test that floods the withdrawal, consolidation and deposit EL
+  queues concurrently — by chaining the three `fillup-*-queue` playbooks
+  via `run_external_tasks`.
+
+  Requests are *not* validated for source-address correctness, so a mix
+  of valid and invalid requests hit the queues; proposers must filter
+  the invalid ones rather than crash.
+
+  Use to gauge EL behavior under sustained queue pressure.
+version: 1.0.0
+tags: [pectra, kurtosis, eip-7002, eip-7251, eip-6110, withdrawal, consolidation, deposit, spam]
 timeout: 1h
 config:
   walletPrivkey: ""

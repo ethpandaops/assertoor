@@ -1,5 +1,15 @@
 id: validator-proposer-slashing-test
-name: "Validator Proposer Slashing Test"
+name: "Proposer Slashing Test"
+description: |
+  Variant of the kurtosis slashing test focused on **proposer**
+  slashings only (no attester half). Generates 50 proposer slashings
+  per phase and asserts every client pair both proposes and accepts
+  them.
+
+  Indices 500–649 are used — keep this range untouched on the target
+  devnet. Hardcoded kurtosis mnemonic.
+version: 1.0.0
+tags: [slashing, kurtosis, consistency, consensus]
 timeout: 1h
 config:
   #walletPrivkey: ""

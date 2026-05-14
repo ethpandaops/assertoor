@@ -1,5 +1,19 @@
 id: generate-attestations
 name: "Generate Attestations"
+description: |
+  Generates attestations for `validatorCount` validators over
+  `attestationEpochs` epochs using the configured mnemonic.
+
+  Supports controlled mis-behavior knobs for stress / fault-injection
+  testing:
+
+  - `lastEpochAttestations` / `sendAllLastEpoch` — late attestations
+  - `lateHead` / `randomLateHead` / `lateHeadClusterSize` — late head
+    distance
+
+  Defaults to the standard kurtosis genesis mnemonic.
+version: 1.0.0
+tags: [attestation, kurtosis, consensus]
 timeout: 1h
 config:
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
