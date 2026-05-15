@@ -62,9 +62,9 @@ tasks:
       ACT_SLOT=$((GFE * SPE))
       WARMUP_SLOT=$((ACT_SLOT + WS))
       echo "GLOAS activates at epoch $GFE / slot $ACT_SLOT; will start checks at slot $WARMUP_SLOT"
-      echo "::set-output activationSlot $ACT_SLOT"
-      echo "::set-output warmupSlot $WARMUP_SLOT"
-      echo "::set-output gloasEpoch $GFE"
+      echo "::set-output-json activationSlot $ACT_SLOT"
+      echo "::set-output-json warmupSlot $WARMUP_SLOT"
+      echo "::set-output-json gloasEpoch $GFE"
 
 - name: check_consensus_slot_range
   title: "Wait for GLOAS activation + warmup"
