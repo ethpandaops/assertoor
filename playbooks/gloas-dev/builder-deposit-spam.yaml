@@ -26,6 +26,8 @@ config:
   pendingBatches: 4
   # Deposit amount per validator (ETH). 1 ETH keeps funding cheap on devnets.
   depositAmount: 1
+  # Percentage (0-100) of deposits to generate with corrupted signatures.
+  invalidSigPerc: 0
   # Set to true to skip waiting for the GLOAS fork to activate before spamming.
   skipForkActivationCheck: false
 tasks:
@@ -83,6 +85,7 @@ tasks:
       limitTotal: totalDeposits
       limitPendingBatches: pendingBatches
       depositAmount: depositAmount
+      invalidSigPercent: invalidSigPerc
       # 0x03 builder withdrawal credentials — version byte (0x03) + 11 zero bytes + 20-byte address.
       withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.spam_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
