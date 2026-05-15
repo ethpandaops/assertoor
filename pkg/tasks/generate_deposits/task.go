@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -516,20 +517,36 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onComplet
 	}
 
 	if !t.config.TopUpDeposit {
-		msgRoot := depositData.ToMessage().HashTreeRoot(tree.GetHashFn())
-
-		var secKey hbls.SecretKey
-
-		err := secKey.Deserialize(validatorPrivkey.Marshal())
-		if err != nil {
-			return nil, nil, fmt.Errorf("cannot convert validator priv key")
+		makeInvalid := false
+		if t.config.InvalidSigPercent > 0 {
+			var b [1]byte
+			if _, err := cryptorand.Read(b[:]); err != nil {
+				return nil, nil, fmt.Errorf("failed to read random byte: %w", err)
+			}
+			makeInvalid = int(b[0])%100 < t.config.InvalidSigPercent
 		}
 
-		genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
-		dom := common.ComputeDomain(common.DOMAIN_DEPOSIT, common.Version(genesis.GenesisForkVersion), common.Root{})
-		msg := common.ComputeSigningRoot(msgRoot, dom)
-		sig := secKey.SignHash(msg[:])
-		copy(depositData.Signature[:], sig.Serialize())
+		if makeInvalid {
+			if _, err := cryptorand.Read(depositData.Signature[:]); err != nil {
+				return nil, nil, fmt.Errorf("failed to generate random invalid signature: %w", err)
+			}
+			t.logger.Debugf("generated deposit with invalid (random) signature for pubkey 0x%x", pub)
+		} else {
+			msgRoot := depositData.ToMessage().HashTreeRoot(tree.GetHashFn())
+
+			var secKey hbls.SecretKey
+
+			err := secKey.Deserialize(validatorPrivkey.Marshal())
+			if err != nil {
+				return nil, nil, fmt.Errorf("cannot convert validator priv key")
+			}
+
+			genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
+			dom := common.ComputeDomain(common.DOMAIN_DEPOSIT, common.Version(genesis.GenesisForkVersion), common.Root{})
+			msg := common.ComputeSigningRoot(msgRoot, dom)
+			sig := secKey.SignHash(msg[:])
+			copy(depositData.Signature[:], sig.Serialize())
+		}
 	}
 
 	dataRoot := depositData.HashTreeRoot(tree.GetHashFn())
