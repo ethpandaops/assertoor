@@ -24,6 +24,7 @@ type Config struct {
 	AwaitReceipt          bool   `yaml:"awaitReceipt" json:"awaitReceipt" desc:"Wait for transaction receipts on the execution layer before completing."`
 	FailOnReject          bool   `yaml:"failOnReject" json:"failOnReject" desc:"Fail the task if any deposit transaction is rejected."`
 	AwaitInclusion        bool   `yaml:"awaitInclusion" json:"awaitInclusion" desc:"Wait for deposits to be included in beacon blocks before completing."`
+	InvalidSigPercent     int    `yaml:"invalidSigPercent" json:"invalidSigPercent" desc:"Random percentage (0-100) of deposits to generate with corrupted signatures."`
 
 	DepositTransactionsResultVar string `yaml:"depositTransactionsResultVar" json:"depositTransactionsResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
 	DepositReceiptsResultVar     string `yaml:"depositReceiptsResultVar" json:"depositReceiptsResultVar" deprecated:"true" desc:"Deprecated: Use task outputs instead."`
@@ -62,6 +63,10 @@ func (c *Config) Validate() error {
 
 	if c.DepositAmount == 0 {
 		return errors.New("depositAmount must be > 0")
+	}
+
+	if c.InvalidSigPercent < 0 || c.InvalidSigPercent > 100 {
+		return errors.New("invalidSigPercent must be in range 0-100")
 	}
 
 	return nil

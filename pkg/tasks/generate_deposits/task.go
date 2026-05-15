@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -515,21 +516,8 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onComplet
 		Signature:             common.BLSSignature{},
 	}
 
-	if !t.config.TopUpDeposit {
-		msgRoot := depositData.ToMessage().HashTreeRoot(tree.GetHashFn())
-
-		var secKey hbls.SecretKey
-
-		err := secKey.Deserialize(validatorPrivkey.Marshal())
-		if err != nil {
-			return nil, nil, fmt.Errorf("cannot convert validator priv key")
-		}
-
-		genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
-		dom := common.ComputeDomain(common.DOMAIN_DEPOSIT, common.Version(genesis.GenesisForkVersion), common.Root{})
-		msg := common.ComputeSigningRoot(msgRoot, dom)
-		sig := secKey.SignHash(msg[:])
-		copy(depositData.Signature[:], sig.Serialize())
+	if err := t.signDepositData(&depositData, validatorPrivkey); err != nil {
+		return nil, nil, err
 	}
 
 	dataRoot := depositData.HashTreeRoot(tree.GetHashFn())
@@ -618,6 +606,56 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onComplet
 	}
 
 	return &pub, tx, nil
+}
+
+func (t *Task) signDepositData(depositData *common.DepositData, validatorPrivkey *e2types.BLSPrivateKey) error {
+	if t.config.TopUpDeposit {
+		return nil
+	}
+
+	useInvalid, err := t.shouldUseInvalidSignature()
+	if err != nil {
+		return err
+	}
+
+	if useInvalid {
+		if _, err := cryptorand.Read(depositData.Signature[:]); err != nil {
+			return fmt.Errorf("failed to generate random invalid signature: %w", err)
+		}
+
+		t.logger.Debugf("generated deposit with invalid (random) signature for pubkey 0x%x", depositData.Pubkey)
+
+		return nil
+	}
+
+	msgRoot := depositData.ToMessage().HashTreeRoot(tree.GetHashFn())
+
+	var secKey hbls.SecretKey
+	if err := secKey.Deserialize(validatorPrivkey.Marshal()); err != nil {
+		return fmt.Errorf("cannot convert validator priv key")
+	}
+
+	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
+	genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
+	dom := common.ComputeDomain(common.DOMAIN_DEPOSIT, common.Version(genesis.GenesisForkVersion), common.Root{})
+	msg := common.ComputeSigningRoot(msgRoot, dom)
+	sig := secKey.SignHash(msg[:])
+	copy(depositData.Signature[:], sig.Serialize())
+
+	return nil
+}
+
+func (t *Task) shouldUseInvalidSignature() (bool, error) {
+	if t.config.InvalidSigPercent <= 0 {
+		return false, nil
+	}
+
+	var b [1]byte
+	if _, err := cryptorand.Read(b[:]); err != nil {
+		return false, fmt.Errorf("failed to read random byte: %w", err)
+	}
+
+	return int(b[0])%100 < t.config.InvalidSigPercent, nil
 }
 
 func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {
