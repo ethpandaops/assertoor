@@ -3,6 +3,7 @@ package generatebatchdeposits
 import (
 	"context"
 	"crypto/ecdsa"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -634,16 +635,35 @@ func (t *Task) prepareSingle(accountIdx uint64, domain common.BLSDomain, amountG
 		Signature:             common.BLSSignature{},
 	}
 
-	msgRoot := depositData.ToMessage().HashTreeRoot(tree.GetHashFn())
-	signingRoot := common.ComputeSigningRoot(msgRoot, domain)
+	makeInvalid := false
 
-	var secKey hbls.SecretKey
-	if err := secKey.Deserialize(validatorPriv.Marshal()); err != nil {
-		return preparedDeposit{}, fmt.Errorf("cannot convert validator priv key: %w", err)
+	if t.config.InvalidSigPercent > 0 {
+		var b [1]byte
+		if _, err := cryptorand.Read(b[:]); err != nil {
+			return preparedDeposit{}, fmt.Errorf("failed to read random byte: %w", err)
+		}
+
+		makeInvalid = int(b[0])%100 < t.config.InvalidSigPercent
 	}
 
-	sig := secKey.SignHash(signingRoot[:])
-	copy(depositData.Signature[:], sig.Serialize())
+	if makeInvalid {
+		if _, err := cryptorand.Read(depositData.Signature[:]); err != nil {
+			return preparedDeposit{}, fmt.Errorf("failed to generate random invalid signature: %w", err)
+		}
+
+		t.logger.Debugf("generated deposit with invalid (random) signature for pubkey 0x%x", pub)
+	} else {
+		msgRoot := depositData.ToMessage().HashTreeRoot(tree.GetHashFn())
+		signingRoot := common.ComputeSigningRoot(msgRoot, domain)
+
+		var secKey hbls.SecretKey
+		if err := secKey.Deserialize(validatorPriv.Marshal()); err != nil {
+			return preparedDeposit{}, fmt.Errorf("cannot convert validator priv key: %w", err)
+		}
+
+		sig := secKey.SignHash(signingRoot[:])
+		copy(depositData.Signature[:], sig.Serialize())
+	}
 
 	dataRoot := depositData.HashTreeRoot(tree.GetHashFn())
 
