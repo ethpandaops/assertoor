@@ -18,6 +18,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/events"
 	"github.com/ethpandaops/assertoor/pkg/logger"
 	"github.com/ethpandaops/assertoor/pkg/names"
+	"github.com/ethpandaops/assertoor/pkg/playbooklibrary"
 	"github.com/ethpandaops/assertoor/pkg/test"
 	"github.com/ethpandaops/assertoor/pkg/txmgr"
 	"github.com/ethpandaops/assertoor/pkg/types"
@@ -38,11 +39,11 @@ type Coordinator struct {
 	clientPool      *clients.ClientPool
 	walletManager   *txmgr.Spamoor
 	webserver       *web.Server
-	publicWebserver *web.Server
 	validatorNames  *names.ValidatorNames
 	globalVars      types.Variables
 	metricsPort     int
 	eventBus        *events.EventBus
+	playbookLibrary playbooklibrary.Service
 
 	registry *TestRegistry
 	runner   *TestRunner
@@ -172,29 +173,15 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	c.clientPool.SetEventBus(c.eventBus)
 
 	// init webserver
-	if c.Config.Web != nil {
-		if c.Config.Web.Server != nil {
-			c.webserver, err = web.NewWebServer(c.Config.Web.Server, c.log.GetLogger())
-			if err != nil {
-				return err
-			}
-
-			err = c.webserver.ConfigureRoutes(c.Config.Web.Frontend, c.Config.Web.API, c.Config.AI, c, false, c.eventBus)
-			if err != nil {
-				return err
-			}
+	if c.Config.Web != nil && c.Config.Web.Server != nil {
+		c.webserver, err = web.NewWebServer(c.Config.Web.Server, c.log.GetLogger())
+		if err != nil {
+			return err
 		}
 
-		if c.Config.Web.PublicServer != nil {
-			c.publicWebserver, err = web.NewWebServer(c.Config.Web.PublicServer, c.log.GetLogger().WithField("module", "public_web"))
-			if err != nil {
-				return err
-			}
-
-			err = c.publicWebserver.ConfigureRoutes(c.Config.Web.Frontend, nil, nil, c, true, nil)
-			if err != nil {
-				return err
-			}
+		err = c.webserver.ConfigureRoutes(c.Config.Web, c.Config.AI, c, c.eventBus)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -204,6 +191,13 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	// load validator names
 	c.validatorNames = names.NewValidatorNames(c.Config.ValidatorNames, c.log.GetLogger())
 	c.validatorNames.LoadValidatorNames()
+
+	// init playbook library service (UI's Library tab)
+	c.playbookLibrary = playbooklibrary.NewService(
+		c.Config.PlaybookLibrary,
+		c.log.GetLogger(),
+		&coordinatorLocalTestProvider{coordinator: c},
+	)
 
 	// init test registry
 	c.registry = NewTestRegistry(c)
@@ -264,6 +258,10 @@ func (c *Coordinator) TestRegistry() types.TestRegistry {
 
 func (c *Coordinator) EventBus() *events.EventBus {
 	return c.eventBus
+}
+
+func (c *Coordinator) PlaybookLibrary() playbooklibrary.Service {
+	return c.playbookLibrary
 }
 
 func (c *Coordinator) GetTestByRunID(runID uint64) types.Test {

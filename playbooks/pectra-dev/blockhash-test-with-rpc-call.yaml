@@ -1,6 +1,15 @@
 
 id: blockhash-test
-name: "BLOCKHASH opcode test"
+name: "BLOCKHASH / EIP-2935 RPC consistency test"
+description: |
+  Verifies EIP-2935 historical-block-hash precompile behavior via an
+  `eth_call` to the deployed test contract, comparing the returned
+  hash to the head block hash queried via `eth_getBlockByNumber`.
+
+  Covers the post-Prague semantics where BLOCKHASH is served from the
+  ring-buffer contract rather than the legacy 256-block limit.
+version: 1.0.0
+tags: [pectra, eip-2935, opcodes, rpc, consistency]
 timeout: 1h
 config:
 #walletPrivkey: ""

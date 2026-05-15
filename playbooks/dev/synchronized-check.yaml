@@ -1,5 +1,15 @@
 id: synchronized-check
-name: "Check client sync status"
+name: "Check client pairs are in sync"
+description: |
+  For every `clientPairName`, concurrently checks that both its CL and
+  EL clients are synchronized (not stuck, not syncing). Long-running
+  (12h timeout) — re-checks continuously until cancelled or all clients
+  remain in sync.
+
+  Useful as a background test on a live devnet to catch nodes that fall
+  behind.
+version: 1.0.0
+tags: [health-check, stability, consensus, execution]
 timeout: 12h
 config:
   clientPairNames: []

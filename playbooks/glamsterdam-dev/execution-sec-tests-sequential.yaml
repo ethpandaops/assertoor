@@ -1,5 +1,15 @@
 id: glamsterdam-execution-spec-tests-sequential-glamsterdam
-name: "Run execution spec tests sequentially"
+name: "Glamsterdam execution-spec-tests (sequential)"
+description: |
+  Runs the Amsterdam / GLOAS subset of
+  [execution-spec-tests](https://github.com/ethereum/execution-spec-tests)
+  against a live RPC, sequentially.
+
+  Waits for GLOAS activation before running, then executes the BLS12-381
+  precompile (EIP-2537) test suite. Pair with
+  `execution-spec-tests-dependencies.yaml` first to install build deps.
+version: 1.0.0
+tags: [glamsterdam, gloas, execution-spec-tests, eip-2537, rpc]
 timeout: 4h
 config:
   walletPrivkey: ""

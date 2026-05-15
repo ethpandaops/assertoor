@@ -1,6 +1,16 @@
 
 id: fillup-all-el-queues-valid
-name: "Fillup all EL request queues with valid requests"
+name: "Fill EL request queues with valid requests"
+description: |
+  Stress-test variant of `fillup-all-el-queues` that only submits
+  **valid** withdrawal / consolidation / deposit requests (correctly
+  signed for the source pubkey).
+
+  Spams `requestCount` (default 500) requests in parallel across the
+  three EL queues to verify proposers drain them in fork-rule order
+  without dropping valid requests under load.
+version: 1.0.0
+tags: [pectra, kurtosis, eip-7002, eip-7251, eip-6110, withdrawal, consolidation, deposit, spam]
 timeout: 1h
 config:
   walletPrivkey: ""

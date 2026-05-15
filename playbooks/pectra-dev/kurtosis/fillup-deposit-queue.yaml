@@ -1,6 +1,15 @@
 
 id: fillup-deposit-queue
-name: "Fillup deposit queue"
+name: "Fill deposit queue"
+description: |
+  Spams `depositCount` (default 1010) deposit transactions to the
+  deposit contract from `depositMaxIndex` child wallets in parallel.
+
+  Stress-tests the EIP-6110 deposit pipeline: queue absorption, deposit
+  receipts handling, and proposer block-building under heavy deposit
+  load. Building block used by `fillup-all-el-queues.yaml`.
+version: 1.0.0
+tags: [pectra, kurtosis, deposit, eip-6110, spam]
 timeout: 1h
 config:
   walletPrivkey: ""

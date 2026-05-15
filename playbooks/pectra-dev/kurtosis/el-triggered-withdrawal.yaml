@@ -1,6 +1,15 @@
 
 id: el-triggered-withdrawal
-name: "EL-triggered withdrawal test"
+name: "Single EL-triggered partial withdrawal"
+description: |
+  Submits one EIP-7002 partial-withdrawal request for `validatorIndex`
+  for `withdrawAmount` ETH (default 1 ETH). Builds the calldata
+  dynamically from the validator's pubkey and the gwei-encoded amount.
+
+  Smallest possible partial-withdrawal test — useful as a quick check
+  that the withdrawal-request contract is wired correctly.
+version: 1.0.0
+tags: [pectra, kurtosis, withdrawal, eip-7002, el-triggered, utility]
 timeout: 1h
 config:
   #walletPrivkey: ""

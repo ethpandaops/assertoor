@@ -1,5 +1,18 @@
 id: consolidation_overflow_tests
-name: "consolidation overflow test"
+name: "Consolidation Overflow (Pectra 2048 ETH cap)"
+description: |
+  Tests behavior when a consolidation would push the target validator
+  above the EIP-7251 effective-balance cap of 2048 ETH.
+
+  Deposits fresh validators, BLS-changes them to 0x02, then consolidates
+  multiple sources into a single target so the resulting balance crosses
+  2048 ETH. Asserts the excess is withdrawn rather than retained.
+
+  Very long timeout (672h) — designed for long-lived pectra devnets where
+  the SHARD_COMMITTEE_PERIOD-bound exits eventually settle. Uses hardcoded
+  kurtosis mnemonic.
+version: 1.0.0
+tags: [pectra, kurtosis, consolidation, eip-7251, withdrawal]
 timeout: 672h
 config:
   walletPrivkey: ""

@@ -5,14 +5,11 @@ export interface ApiResponse<T> {
 }
 
 // Auth types
-export interface AuthTokenResponse {
-  token: string;
-  user: string;
-  expr: string;  // Unix timestamp as string
-  now: string;   // Server's current time as string
-}
-
 export interface AuthState {
+  // True when an auth provider is configured. False = open mode (no auth
+  // required); the UI should hide login controls and treat the user as
+  // authorized.
+  authEnabled: boolean;
   isLoggedIn: boolean;
   user: string | null;
   token: string | null;
@@ -65,6 +62,9 @@ export interface Test {
   source: string;
   basePath: string;
   name: string;
+  description?: string;
+  version?: string;
+  tags?: string[];
 }
 
 // Test details (from /api/v1/test/{testId})
@@ -73,6 +73,9 @@ export interface TestDetails {
   source: string;
   basePath: string;
   name: string;
+  description?: string;
+  version?: string;
+  tags?: string[];
   timeout: number;
   config: Record<string, unknown>;
   configVars: Record<string, string>;
@@ -84,6 +87,54 @@ export interface TestDetails {
 export interface TestYamlResponse {
   yaml: string;
   source: string;
+}
+
+// Response from POST /api/v1/tests/register_external
+export interface RegisterExternalTestResponse {
+  test_id: string;
+  name: string;
+  config: Record<string, unknown>;
+}
+
+// Playbook library types ////////////////////////////////////////////////
+
+export interface LibraryFolder {
+  path: string;
+  name: string;
+  description?: string;
+}
+
+export interface LibraryEntry {
+  file: string;
+  id: string;
+  name: string;
+  description?: string;
+  version?: string;
+  tags?: string[];
+  timeout?: string;
+}
+
+// Response from GET /api/v1/playbook_library
+export interface LibraryIndex {
+  generated: string;
+  base_url: string;
+  index_url: string;
+  folders: LibraryFolder[];
+  playbooks: LibraryEntry[];
+}
+
+export type LibraryCheckState = 'absent' | 'same' | 'different';
+
+// Response from GET /api/v1/playbook_library/check
+export interface LibraryCheckResponse {
+  state: LibraryCheckState;
+  remote_id: string;
+  remote_name: string;
+  remote_url: string;
+  remote_yaml: string;
+  local_test_id?: string;
+  local_name?: string;
+  local_yaml?: string;
 }
 
 // Test schedule configuration

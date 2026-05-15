@@ -11,6 +11,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/db"
 	"github.com/ethpandaops/assertoor/pkg/helper"
 	"github.com/ethpandaops/assertoor/pkg/names"
+	"github.com/ethpandaops/assertoor/pkg/playbooklibrary"
 	"github.com/ethpandaops/assertoor/pkg/test"
 	"github.com/ethpandaops/assertoor/pkg/types"
 	web_types "github.com/ethpandaops/assertoor/pkg/web/types"
@@ -39,6 +40,10 @@ type Config struct {
 	// AI assistant config
 	AI *web_types.AIConfig `yaml:"ai" json:"ai"`
 
+	// Playbook library config (controls the remote playbook index used
+	// by the web UI's Library tab).
+	PlaybookLibrary *playbooklibrary.Config `yaml:"playbookLibrary" json:"playbookLibrary"`
+
 	// List of Test configurations.
 	Tests []*types.TestConfig `yaml:"tests" json:"tests"`
 
@@ -64,11 +69,12 @@ func DefaultConfig() *Config {
 				ConsensusURL: "http://localhost:5052",
 			},
 		},
-		GlobalVars:    make(map[string]any),
-		Coordinator:   &CoordinatorConfig{},
-		AI:            web_types.DefaultAIConfig(),
-		Tests:         []*types.TestConfig{},
-		ExternalTests: []*types.ExternalTestConfig{},
+		GlobalVars:      make(map[string]any),
+		Coordinator:     &CoordinatorConfig{},
+		AI:              web_types.DefaultAIConfig(),
+		PlaybookLibrary: playbooklibrary.DefaultConfig(),
+		Tests:           []*types.TestConfig{},
+		ExternalTests:   []*types.ExternalTestConfig{},
 	}
 }
 

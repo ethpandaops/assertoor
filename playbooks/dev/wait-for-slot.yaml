@@ -1,5 +1,12 @@
 id: wait-for-slot
 name: "Wait for specific slot"
+description: |
+  Utility playbook that blocks until the chain reaches `slot`.
+
+  Useful as a building block in larger orchestrations or as a quick way
+  to delay other tests until the chain is far enough along.
+version: 1.0.0
+tags: [utility]
 timeout: 2h
 config:
   slot: 34

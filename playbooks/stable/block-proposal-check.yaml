@@ -1,5 +1,14 @@
 id: block-proposal-check
 name: "Every client pair proposed a block"
+description: |
+  Verifies that every configured `validatorPairNames` entry has proposed at
+  least one block. Uses a task matrix to run one wait-for-proposal check per
+  client pair concurrently.
+
+  Useful as a network-wide liveness check after starting a multi-client
+  devnet to confirm all proposer duties are firing.
+version: 1.0.0
+tags: [health-check, consensus]
 timeout: 20m
 disable: false
 config:

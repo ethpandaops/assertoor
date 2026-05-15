@@ -1,5 +1,21 @@
 id: validator-slashing-test
-name: "Validator Slashing Test"
+name: "Validator Slashing Test (Kurtosis)"
+description: |
+  Tests attester and proposer slashing generation, gossip and inclusion
+  across all client pairs.
+
+  Two halves (attester, then proposer); each half:
+
+  1. Generates 50 slashings (1/slot) and asserts every `validatorPairName`
+     proposes a block containing one.
+  2. For each `clientPairName`, generates 50 slashings via that client
+     and asserts inclusion.
+
+  Slashings target distinct validator-index ranges per phase to avoid
+  reusing already-slashed validators. Requires the standard kurtosis
+  genesis mnemonic.
+version: 1.0.0
+tags: [slashing, kurtosis, consistency, consensus]
 timeout: 1h
 config:
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"

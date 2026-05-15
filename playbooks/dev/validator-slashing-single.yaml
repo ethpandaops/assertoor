@@ -1,5 +1,14 @@
 id: validator-slashing-single
-name: "Validator Slashing Single"
+name: "Slash a single validator"
+description: |
+  Generates a single proposer slashing for `validatorIndex`
+  (default 0). Waits to epoch >= 4 before submitting.
+
+  Tiny utility playbook — handy when you want one validator slashed
+  on a kurtosis devnet without running the full slashing suite. Uses
+  the hardcoded kurtosis mnemonic.
+version: 1.0.0
+tags: [slashing, kurtosis, utility, consensus]
 timeout: 1h
 config:
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"

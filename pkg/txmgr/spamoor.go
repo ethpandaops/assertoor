@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -94,9 +95,12 @@ func (s *Spamoor) getClientOptions(client *execution.Client) *spamoor.ClientOpti
 	rpcURL = fmt.Sprintf("name(%s)%s", client.GetName(), rpcURL)
 
 	if headers := client.GetEndpointConfig().Headers; len(headers) > 0 {
+		headerParts := make([]string, 0, len(headers))
 		for key, value := range headers {
-			rpcURL = fmt.Sprintf("header(%s: %s)%s", key, value, rpcURL)
+			headerParts = append(headerParts, fmt.Sprintf("%s: %s", key, value))
 		}
+
+		rpcURL = fmt.Sprintf("headers(%s)%s", strings.Join(headerParts, "|"), rpcURL)
 	}
 
 	opts := &spamoor.ClientOptions{

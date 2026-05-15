@@ -1,5 +1,13 @@
 id: block-proposal-with-blobs-check
 name: "Every client pair proposed a block with blobs"
+description: |
+  Verifies that every configured `validatorPairName` proposes at least
+  one block carrying `minBlobCount` blobs (default 3).
+
+  Pair this with a blob-spam source running in parallel to confirm
+  blob propagation end-to-end across all clients.
+version: 1.0.0
+tags: [health-check, blob, eip-4844, consensus]
 timeout: 20m
 disable: false
 config:

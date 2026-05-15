@@ -129,6 +129,101 @@ body {
   @apply bg-gray-500 dark:bg-gray-500;
 }
 
+/* Markdown body — used by react-markdown output in the Library tab.
+   Inherits the surrounding font and uses our CSS variables so it
+   matches the rest of the UI without pulling in @tailwindcss/typography. */
+.markdown-body {
+  @apply text-sm leading-relaxed text-[var(--color-text-primary)];
+}
+
+.markdown-body > * + * {
+  @apply mt-3;
+}
+
+.markdown-body p {
+  @apply m-0;
+}
+
+.markdown-body h1 {
+  @apply text-base font-semibold mt-4;
+}
+
+.markdown-body h2 {
+  @apply text-base font-semibold mt-4;
+}
+
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  @apply text-sm font-semibold mt-3;
+}
+
+.markdown-body ul {
+  @apply list-disc pl-5 space-y-1;
+}
+
+.markdown-body ol {
+  @apply list-decimal pl-5 space-y-1;
+}
+
+.markdown-body li {
+  @apply leading-relaxed;
+}
+
+.markdown-body li > p {
+  @apply mt-0;
+}
+
+.markdown-body li + li {
+  @apply mt-1;
+}
+
+.markdown-body code {
+  @apply font-mono text-xs px-1 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)];
+}
+
+.markdown-body pre {
+  @apply font-mono text-xs p-3 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] overflow-x-auto;
+}
+
+.markdown-body pre code {
+  @apply bg-transparent p-0;
+}
+
+.markdown-body a {
+  @apply text-primary-600 hover:underline;
+}
+
+.markdown-body strong {
+  @apply font-semibold;
+}
+
+.markdown-body em {
+  @apply italic;
+}
+
+.markdown-body blockquote {
+  @apply border-l-2 border-[var(--color-border)] pl-3 text-[var(--color-text-secondary)] italic;
+}
+
+.markdown-body hr {
+  @apply my-4 border-[var(--color-border)];
+}
+
+.markdown-body table {
+  @apply w-full text-xs border-collapse;
+}
+
+.markdown-body th,
+.markdown-body td {
+  @apply px-2 py-1 border border-[var(--color-border)] text-left;
+}
+
+.markdown-body th {
+  @apply bg-[var(--color-bg-tertiary)] font-semibold;
+}
+
 /* Subtle pulse animation for progress indicators */
 @keyframes pulse-subtle {
   0%, 100% {

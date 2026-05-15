@@ -1,0 +1,5 @@
+name: Stable (Kurtosis)
+description: |
+  Stable playbooks tailored to kurtosis-launched devnets. They assume the
+  standard kurtosis genesis mnemonic and use fixed validator-index ranges,
+  so they will not work on networks where those validators don't exist.

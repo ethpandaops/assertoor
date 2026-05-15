@@ -1,5 +1,28 @@
 id: validator-lifecycle-test-v2
 name: "Validator Lifecycle Test (v2)"
+description: |
+  Full end-to-end validator lifecycle on a chain with the Electra fork
+  active (or pre-Electra with legacy eth1 deposits). Creates 10 fresh
+  validators from a random mnemonic and walks them through:
+
+  1. **Deposits** — 10 new validators + 2 double-deposits (keys 0 and 5).
+     Accepts both legacy eth1-voting deposits and EIP-6110 deposit requests.
+  2. **Activation** — waits for all keys to reach `active_ongoing`.
+  3. **BLS changes** (first half) — converts keys 0–4 to 0x01 withdrawal
+     credentials and verifies a partial withdrawal for key 0.
+  4. **Pre-exit slashings** — attester slash key 2, proposer slash key 7.
+  5. **Exitability wait** — sleeps `SHARD_COMMITTEE_PERIOD` epochs.
+  6. **Voluntary exits** — exits keys 0, 1, 4, 5, 8, 9 and verifies
+     post-exit full withdrawals for the 0x01-credentialed keys.
+  7. **Post-exit slashings** — attester slash key 3, proposer slash key 6.
+  8. **BLS changes** (second half) — keys 5–9 to 0x01, verifies full
+     withdrawals for keys 5, 8, 9.
+
+  Cleanup task ensures all 10 keys are exited regardless of outcome.
+
+  This is the production-ready successor to the older `dev/validator-lifecycle-test.yaml`.
+version: 2.0.0
+tags: [lifecycle, deposit, withdrawal, exit, slashing, bls-change, eip-6110]
 timeout: 672h
 config:
   walletPrivkey: ""

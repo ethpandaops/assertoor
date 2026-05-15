@@ -1,5 +1,21 @@
 id: cgc-validation-test
-name: "CGC Validation Test with Deposits"
+name: "CGC growth via deposits / credential upgrades (Fusaka)"
+description: |
+  Verifies the Fusaka `custody_group_count` (CGC) recomputes correctly
+  as a validator's effective balance changes via deposits and credential
+  upgrades.
+
+  Walks `validatorCount` (default 2) test validators through:
+
+  1. BLS-change 0x00 → 0x01.
+  2. Self-consolidation 0x01 → 0x02.
+  3. Top-up deposit of `depositAmount` ETH (default 1024 ETH).
+  4. Snapshot CGC before / after and assert it grew by the expected
+     custody-group count for the new balance bucket.
+
+  Pair with `analyze-cgc.yaml` for the per-client CGC audit.
+version: 1.0.0
+tags: [fusaka, kurtosis, cgc, peerdas, consolidation, deposit, bls-change]
 timeout: 12h
 
 config:

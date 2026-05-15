@@ -1,5 +1,13 @@
 id: voluntary-exits
-name: "Generate voluntary exits"
+name: "Generate voluntary exits (Kurtosis)"
+description: |
+  Generates `validatorCount` (default 64) voluntary exits starting at
+  `validatorStartIndex` using the kurtosis genesis mnemonic.
+
+  Does not verify inclusion — pair with a `check_consensus_block_proposals`
+  task or call from a larger orchestration (e.g. `pectra-all`).
+version: 1.0.0
+tags: [pectra, kurtosis, exit, voluntary, utility]
 timeout: 1h
 config:
   validatorCount: 64

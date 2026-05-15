@@ -1,5 +1,20 @@
 id: eip7702-txpool-invalidation
-name: "EIP7702 txpool invalidation"
+name: "EIP-7702 txpool invalidation scenarios"
+description: |
+  Tests how the EL txpool reacts when an EIP-7702 set-code transaction
+  changes (or removes) the delegation of an EOA that has other pending
+  transactions in the pool.
+
+  `invalidationScenario` selects:
+
+  - `0` — all scenarios
+  - `1` — regular EOA transactions become invalid after delegation
+  - `2` — delegated-contract deployments become invalid
+
+  Confirms invalidated transactions are dropped rather than included on
+  stale assumptions.
+version: 1.0.0
+tags: [pectra, kurtosis, eip-7702, transaction]
 timeout: 1h
 config:
   walletCount: 10 # Number of child wallets to create

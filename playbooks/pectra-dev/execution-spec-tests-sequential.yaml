@@ -1,5 +1,18 @@
 id: pectra-execution-spec-tests-sequential
-name: "Run execution spec tests sequentially"
+name: "Pectra execution-spec-tests (sequential)"
+description: |
+  Runs the Prague subset of [execution-spec-tests](https://github.com/ethereum/execution-spec-tests)
+  against a live RPC, one EIP-class per phase, **sequentially**:
+
+  EIP-2537 (BLS12-381 precompiles) → EIP-7002 (EL-triggered withdrawals)
+  → EIP-7251 (consolidations) → EIP-7623 (calldata cost) → EIP-7702
+  (set-code transactions).
+
+  Sequential ordering is friendlier to small devnets where parallel
+  scenarios would compete for proposer slots. Pair with
+  `execution-spec-tests-dependencies.yaml` first to install deps.
+version: 1.0.0
+tags: [pectra, execution-spec-tests, eip-2537, eip-7002, eip-7251, eip-7623, eip-7702, rpc]
 timeout: 4h
 config:
   #walletPrivkey: ""

@@ -1,0 +1,8 @@
+name: Verkle
+description: |
+  Verkle-fork tests covering state-tree conversion and large-application
+  smoke testing on a converted chain.
+
+  Includes a state-conversion progress monitor and an AAVE v3.1
+  deployment driver that exercises a full Foundry-built protocol bundle
+  against a verkle-converted EL.

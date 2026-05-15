@@ -1,0 +1,9 @@
+name: Development & Utilities
+description: |
+  Building-block playbooks and developer utilities — small, focused
+  tests intended to be composed into larger playbooks or run ad-hoc
+  (fund a wallet, wait for a slot, run a shell command, generate
+  attestations, etc.).
+
+  Most playbooks here use the kurtosis genesis mnemonic where validator
+  state is required.

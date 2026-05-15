@@ -11,6 +11,9 @@ import type {
   GlobalVariablesResponse,
   ScheduleTestRunRequest,
   VersionResponse,
+  LibraryIndex,
+  LibraryCheckResponse,
+  RegisterExternalTestResponse,
 } from '../types/api';
 import { authStore } from '../stores/authStore';
 
@@ -189,9 +192,24 @@ export async function registerTest(yaml: string): Promise<void> {
   }
 }
 
-export async function registerExternalTest(url: string): Promise<void> {
-  await fetchApiWithAuth<void>('/tests/register_external', {
+export async function registerExternalTest(
+  url: string,
+  options?: { name?: string },
+): Promise<RegisterExternalTestResponse> {
+  return fetchApiWithAuth<RegisterExternalTestResponse>('/tests/register_external', {
     method: 'POST',
-    body: JSON.stringify({ file: url }),
+    body: JSON.stringify({ file: url, name: options?.name }),
   });
+}
+
+// Playbook library
+
+export async function getPlaybookLibrary(): Promise<LibraryIndex> {
+  return fetchApi<LibraryIndex>('/playbook_library');
+}
+
+export async function checkPlaybookLibrary(file: string): Promise<LibraryCheckResponse> {
+  return fetchApiWithAuth<LibraryCheckResponse>(
+    `/playbook_library/check?file=${encodeURIComponent(file)}`,
+  );
 }

@@ -1,6 +1,16 @@
 
 id: deploy-aave
-name: "Deploy AAVE"
+name: "Deploy AAVE v3.1 (Verkle)"
+description: |
+  Installs Foundry + solc 0.8.19 inside the assertoor container, clones
+  the AAVE v3.1 verkle branch, and deploys the full protocol stack via
+  `forge script` against a fresh child wallet.
+
+  Used to verify a verkle-converted EL still executes a large real-world
+  application bundle end-to-end. Heavyweight — installs toolchain and
+  pulls a multi-MB repo on each run.
+version: 1.0.0
+tags: [verkle, aave, deployment, transaction]
 timeout: 1h
 config:
   #walletPrivkey: ""

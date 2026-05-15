@@ -25,7 +25,6 @@ type AIHandler struct {
 	database       *db.Database
 	logger         logrus.FieldLogger
 	authHandler    *auth.Handler
-	disableAuth    bool
 	sessionManager *ai.SessionManager
 }
 
@@ -35,7 +34,6 @@ func NewAIHandler(
 	database *db.Database,
 	logger logrus.FieldLogger,
 	authHandler *auth.Handler,
-	disableAuth bool,
 ) *AIHandler {
 	var client *ai.OpenRouterClient
 	if config != nil && config.Enabled && config.OpenRouterKey != "" {
@@ -48,21 +46,16 @@ func NewAIHandler(
 		database:       database,
 		logger:         logger.WithField("module", "ai"),
 		authHandler:    authHandler,
-		disableAuth:    disableAuth,
 		sessionManager: ai.NewSessionManager(),
 	}
 }
 
 func (h *AIHandler) checkAuth(r *http.Request) bool {
-	if h.disableAuth {
+	if h.authHandler == nil || h.authHandler.IsOpen() {
 		return true
 	}
 
-	if h.authHandler == nil {
-		return true
-	}
-
-	token := h.authHandler.CheckAuthToken(r.Header.Get("Authorization"))
+	token := h.authHandler.CheckAuthToken(r.Header.Get("Authorization"), auth.StripPort(r.Host))
 
 	return token != nil && token.Valid
 }

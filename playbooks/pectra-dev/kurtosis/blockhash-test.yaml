@@ -1,6 +1,15 @@
 
 id: blockhash-test
-name: "BLOCKHASH opcode test"
+name: "BLOCKHASH / EIP-2935 contract test"
+description: |
+  Deploys the EIP-2935 BLOCKHASH-via-contract test fixture and calls
+  `test1(10)` to walk back 10 historical block hashes via the contract.
+
+  Lighter than the variant with the RPC consistency check — useful when
+  you only need to confirm the precompile responds correctly on a
+  kurtosis devnet.
+version: 1.0.0
+tags: [pectra, kurtosis, eip-2935, opcodes]
 timeout: 1h
 config:
   #walletPrivkey: ""

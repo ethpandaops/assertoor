@@ -1,5 +1,14 @@
 id: bls-changes
-name: "Generate BLS changes"
+name: "Generate BLS changes (Kurtosis)"
+description: |
+  Generates `validatorCount` (default 64) BLS credential changes from
+  the kurtosis genesis mnemonic targeting `targetAddress`.
+
+  Used standalone or as a building block in larger orchestrations
+  (e.g. `pectra-all`). Does not verify inclusion — pair with a
+  `check_consensus_block_proposals` test if you need that.
+version: 1.0.0
+tags: [pectra, kurtosis, bls-change, utility]
 timeout: 1h
 config:
   validatorCount: 64

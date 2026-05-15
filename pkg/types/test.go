@@ -42,6 +42,9 @@ type Test interface {
 type TestConfig struct {
 	ID           string                 `yaml:"id" json:"id"`
 	Name         string                 `yaml:"name" json:"name"`
+	Description  string                 `yaml:"description" json:"description,omitempty"`
+	Version      string                 `yaml:"version" json:"version,omitempty"`
+	Tags         []string               `yaml:"tags" json:"tags,omitempty"`
 	Timeout      helper.Duration        `yaml:"timeout" json:"timeout"`
 	Config       map[string]interface{} `yaml:"config" json:"config"`
 	ConfigVars   map[string]string      `yaml:"configVars" json:"configVars"`

@@ -8,6 +8,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/events"
 	"github.com/ethpandaops/assertoor/pkg/logger"
 	"github.com/ethpandaops/assertoor/pkg/names"
+	"github.com/ethpandaops/assertoor/pkg/playbooklibrary"
 	"github.com/ethpandaops/assertoor/pkg/txmgr"
 	"github.com/sirupsen/logrus"
 )
@@ -22,6 +23,7 @@ type Coordinator interface {
 	GlobalVariables() Variables
 	TestRegistry() TestRegistry
 	EventBus() *events.EventBus
+	PlaybookLibrary() playbooklibrary.Service
 
 	GetTestByRunID(runID uint64) Test
 	GetTestQueue() []Test

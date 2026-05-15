@@ -1,5 +1,22 @@
 id: validator-withdrawal-test-v2
-name: "Validator BLS Change & Withdrawal Test"
+name: "Validator BLS Change & Withdrawal Test (Per-proposer)"
+description: |
+  Variant of the kurtosis BLS-change + withdrawal test that targets each
+  proposer slot precisely:
+
+  1. For every `validatorPairName`, wait until it's the next-slot
+     proposer, then submit BLS changes **directly** to that client and
+     assert the produced block contains a BLS change.
+  2. Repeat, but submit BLS changes via a **different** client to verify
+     gossip propagation reaches the target proposer in time.
+  3. Force-feed BLS changes for indices 50–250 so 0x01 credentials are
+     set, then check withdrawals appear in every pair's blocks.
+
+  Tighter signal than the basic kurtosis test — confirms per-proposer
+  inclusion rather than just "some proposer in the matrix". Uses the
+  hardcoded kurtosis mnemonic.
+version: 2.0.0
+tags: [withdrawal, bls-change, kurtosis, consistency, consensus]
 timeout: 1h
 config:
   validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"

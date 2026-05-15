@@ -1,5 +1,17 @@
 id: stability-check
 name: "Check chain stability"
+description: |
+  Long-running chain health check. Verifies that:
+
+  - all configured EL & CL clients are synced
+  - the chain finalizes (at least 2 finalized epochs, never more than 3 unfinalized)
+  - attestation participation is high (>= 98% target, >= 80% head)
+  - no excessive reorgs (<= 2 per epoch) or forks
+
+  Run this as a smoke test on a fresh devnet or as a sanity baseline before
+  more disruptive playbooks. Fails fast if the chain is unhealthy.
+version: 1.0.0
+tags: [stability, health-check, consensus, execution]
 timeout: 2h
 tasks:
 - name: check_clients_are_healthy
