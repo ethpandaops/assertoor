@@ -57,9 +57,9 @@ type matrixRow struct {
 }
 
 type matrixCell struct {
-	Result     string
-	Note       string
-	HTTPStatus int
+	Result     string `json:"result"`
+	Note       string `json:"note,omitempty"`
+	HTTPStatus int    `json:"httpStatus,omitempty"`
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -389,7 +389,7 @@ func (t *Task) renderMarkdown(rows []*matrixRow, columns []string) (string, map[
 		}
 		// escape pipes in title
 		title = strings.ReplaceAll(title, "|", "\\|")
-		fmt.Fprintf(&b, "| %d | `%s` |", i+1, title)
+		fmt.Fprintf(&b, "| %d | %s |", i+1, formatRowTitle(title))
 
 		for _, c := range columns {
 			cell, ok := row.Cells[c]
@@ -424,6 +424,39 @@ func (t *Task) renderMarkdown(rows []*matrixRow, columns []string) (string, map[
 	}
 
 	return b.String(), counts, counts["fail"]
+}
+
+// formatRowTitle renders the row title with the leading HTTP-method+path
+// (or SSE topic) wrapped in code-ticks and any trailing descriptor kept
+// outside the code span. Falls back to the raw title when no path is
+// detected.
+func formatRowTitle(title string) string {
+	t := strings.TrimSpace(title)
+	if t == "" {
+		return title
+	}
+	// SSE row, e.g. "SSE execution_payload"
+	if strings.HasPrefix(t, "SSE ") {
+		parts := strings.SplitN(t, " ", 2)
+		if len(parts) == 2 {
+			return parts[0] + " `" + parts[1] + "`"
+		}
+	}
+	// HTTP row: "<METHOD> /path[ (suffix)]"
+	for _, m := range []string{"GET", "POST", "PUT", "DELETE", "PATCH"} {
+		prefix := m + " "
+		if strings.HasPrefix(t, prefix) {
+			rest := t[len(prefix):]
+			suffixStart := strings.Index(rest, " (")
+			if suffixStart < 0 {
+				return "`" + t + "`"
+			}
+			pathPart := rest[:suffixStart]
+			suffix := rest[suffixStart:]
+			return "`" + m + " " + pathPart + "`" + suffix
+		}
+	}
+	return "`" + t + "`"
 }
 
 func emojiFor(result string, cfg Config) string {
