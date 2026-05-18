@@ -459,7 +459,7 @@ tasks:
     envVars:
       # Collect the rowId / rowTitle / matrixRow tuple from every task in
       # the run that emitted one. The 'tasks' scope is the parent map.
-      ROWS: "| [ tasks | to_entries[] | .value.outputs | select(.matrixRow != null) | { rowId, rowTitle, referenceUrl, matrixRow } ]"
+      ROWS: "| [ .tasks | to_entries[] | .value.outputs | select(.matrixRow != null) | { rowId, rowTitle, referenceUrl, matrixRow } ]"
     script: |
       // Canonical client-type column order. Columns absent from results
       // are dropped automatically.
