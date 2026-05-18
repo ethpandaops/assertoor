@@ -358,90 +358,88 @@ tasks:
 
 ##
 ## ------------------------------------------------------------------
-## SSE events (rows 12-16) -- run them all concurrently to share the
-## same wait window.
+## SSE events (rows 12-16). Each subscribes for 48s — flat layout so
+## the matrix renderer can find them by id in the root tasks scope
+## (children of run_tasks_concurrent register in the wrapper's scope,
+## not the root).
 ## ------------------------------------------------------------------
 ##
-- name: run_tasks_concurrent
-  title: "GLOAS SSE event checks"
+- name: check_consensus_api
+  id: row12_sse_execution_payload_bid
+  title: "12. SSE execution_payload_bid"
   config:
-    tasks:
-    - name: check_consensus_api
-      id: row12_sse_execution_payload_bid
-      title: "12. SSE execution_payload_bid"
-      config:
-        rowId: "sse_execution_payload_bid"
-        rowTitle: "SSE execution_payload_bid"
-        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552, https://github.com/ethereum/beacon-APIs/pull/587"
-        sse:
-          topic: "execution_payload_bid"
-          timeoutSeconds: 48
-          minEvents: 1
-        overallTimeout: "60s"
-        eventSchema:
-          type: object
-          required: [version, data]
+    rowId: "sse_execution_payload_bid"
+    rowTitle: "SSE execution_payload_bid"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552, https://github.com/ethereum/beacon-APIs/pull/587"
+    sse:
+      topic: "execution_payload_bid"
+      timeoutSeconds: 48
+      minEvents: 1
+    overallTimeout: "60s"
+    eventSchema:
+      type: object
+      required: [version, data]
 
-    - name: check_consensus_api
-      id: row13_sse_execution_payload_available
-      title: "13. SSE execution_payload_available"
-      config:
-        rowId: "sse_execution_payload_available"
-        rowTitle: "SSE execution_payload_available"
-        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
-        sse:
-          topic: "execution_payload_available"
-          timeoutSeconds: 48
-          minEvents: 1
-        overallTimeout: "60s"
-        eventSchema:
-          type: object
+- name: check_consensus_api
+  id: row13_sse_execution_payload_available
+  title: "13. SSE execution_payload_available"
+  config:
+    rowId: "sse_execution_payload_available"
+    rowTitle: "SSE execution_payload_available"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+    sse:
+      topic: "execution_payload_available"
+      timeoutSeconds: 48
+      minEvents: 1
+    overallTimeout: "60s"
+    eventSchema:
+      type: object
 
-    - name: check_consensus_api
-      id: row14_sse_payload_attestation_message
-      title: "14. SSE payload_attestation_message"
-      config:
-        rowId: "sse_payload_attestation_message"
-        rowTitle: "SSE payload_attestation_message"
-        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
-        sse:
-          topic: "payload_attestation_message"
-          timeoutSeconds: 48
-          minEvents: 1
-        overallTimeout: "60s"
-        eventSchema:
-          type: object
-          required: [message, signature]
+- name: check_consensus_api
+  id: row14_sse_payload_attestation_message
+  title: "14. SSE payload_attestation_message"
+  config:
+    rowId: "sse_payload_attestation_message"
+    rowTitle: "SSE payload_attestation_message"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+    sse:
+      topic: "payload_attestation_message"
+      timeoutSeconds: 48
+      minEvents: 1
+    overallTimeout: "60s"
+    eventSchema:
+      type: object
+      required: [message, signature]
 
-    - name: check_consensus_api
-      id: row15_sse_execution_payload
-      title: "15. SSE execution_payload"
-      config:
-        rowId: "sse_execution_payload"
-        rowTitle: "SSE execution_payload"
-        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
-        sse:
-          topic: "execution_payload"
-          timeoutSeconds: 48
-          minEvents: 1
-        overallTimeout: "60s"
-        eventSchema:
-          type: object
+- name: check_consensus_api
+  id: row15_sse_execution_payload
+  title: "15. SSE execution_payload"
+  config:
+    rowId: "sse_execution_payload"
+    rowTitle: "SSE execution_payload"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
+    sse:
+      topic: "execution_payload"
+      timeoutSeconds: 48
+      minEvents: 1
+    overallTimeout: "60s"
+    eventSchema:
+      type: object
 
-    - name: check_consensus_api
-      id: row16_sse_execution_payload_gossip
-      title: "16. SSE execution_payload_gossip"
-      config:
-        rowId: "sse_execution_payload_gossip"
-        rowTitle: "SSE execution_payload_gossip"
-        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
-        sse:
-          topic: "execution_payload_gossip"
-          timeoutSeconds: 48
-          minEvents: 1
-        overallTimeout: "60s"
-        eventSchema:
-          type: object
+- name: check_consensus_api
+  id: row16_sse_execution_payload_gossip
+  title: "16. SSE execution_payload_gossip"
+  config:
+    rowId: "sse_execution_payload_gossip"
+    rowTitle: "SSE execution_payload_gossip"
+    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
+    sse:
+      topic: "execution_payload_gossip"
+      timeoutSeconds: 48
+      minEvents: 1
+    overallTimeout: "60s"
+    eventSchema:
+      type: object
 
 ##
 ## ------------------------------------------------------------------
@@ -452,14 +450,6 @@ tasks:
 ## inline by the UI's markdown handler).
 ## ------------------------------------------------------------------
 ##
-- name: run_shell
-  title: "DEBUG: dump task ids"
-  config:
-    envVars:
-      KEYS: ".tasks | keys"
-    command: |
-      echo "TASK KEYS: $KEYS"
-
 - name: run_javascript
   id: matrix
   title: "Render GLOAS API compatibility matrix"
