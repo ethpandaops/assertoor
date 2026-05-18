@@ -102,11 +102,11 @@ func (t *Task) LoadConfig() error {
 
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.StartIndex > 0 {
-		t.nextIndex = uint64(t.config.StartIndex)
+		t.nextIndex = uint64(t.config.StartIndex) //nolint:gosec // guarded by > 0 above
 	}
 
 	if t.config.IndexCount > 0 {
-		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount)
+		t.lastIndex = t.nextIndex + uint64(t.config.IndexCount) //nolint:gosec // guarded by > 0 above
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
@@ -364,7 +364,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 	}
 
 	if t.config.ExitEpoch >= 0 {
-		operation.Epoch = phase0.Epoch(t.config.ExitEpoch)
+		operation.Epoch = phase0.Epoch(t.config.ExitEpoch) //nolint:gosec // guarded by >= 0 above
 	} else {
 		currentSlot, _ := clients[0].GetLastHead()
 		operation.Epoch = phase0.Epoch(currentSlot / phase0.Slot(specs.SlotsPerEpoch))

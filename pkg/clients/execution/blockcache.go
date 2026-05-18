@@ -73,7 +73,7 @@ func (cache *BlockCache) SetMinFollowDistance(followDistance uint64) {
 		followDistance = 10000
 	}
 
-	followDistance32 := uint32(followDistance)
+	followDistance32 := uint32(followDistance) //nolint:gosec // clamped to 10000 above
 
 	if followDistance32 > cache.followDistance {
 		cache.followDistance = followDistance32
