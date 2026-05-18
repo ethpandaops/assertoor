@@ -8,6 +8,8 @@ export const queryKeys = {
   testRunDetails: (id: number) => ['testRunDetails', id] as const,
   testRunResult: (id: number) => ['testRunResult', id] as const,
   testLatestResult: (testId: string) => ['testLatestResult', testId] as const,
+  testNextRun: (testId: string) => ['testNextRun', testId] as const,
+  testQueue: ['testQueue'] as const,
   taskDetails: (runId: number, taskIndex: number) => ['taskDetails', runId, taskIndex] as const,
   taskDescriptors: ['taskDescriptors'] as const,
   taskDescriptor: (name: string) => ['taskDescriptor', name] as const,
@@ -124,6 +126,42 @@ export function useGlobalVariables(options?: { enabled?: boolean }) {
     queryFn: api.getGlobalVariables,
     enabled: options?.enabled !== false,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+// Test schedule (cron + startup).
+export function useTestNextRun(testId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.testNextRun(testId),
+    queryFn: () => api.getTestNextRun(testId),
+    enabled: options?.enabled !== false && !!testId,
+    // refresh every 30s so the displayed "next run" tick moves
+    // forward at a reasonable cadence.
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+}
+
+export function useUpdateTestSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { testId: string; schedule: import('../types/api').TestSchedule | null }) =>
+      api.updateTestSchedule(args.testId, args.schedule),
+    onSuccess: (_, args) => {
+      queryClient.invalidateQueries({ queryKey: ['testDetails', args.testId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.testNextRun(args.testId) });
+    },
+  });
+}
+
+// Live runner queue (running + pending) — used by the schedule UI.
+export function useTestQueue(options?: { enabled?: boolean; refetchInterval?: number | false }) {
+  return useQuery({
+    queryKey: queryKeys.testQueue,
+    queryFn: api.getTestQueue,
+    enabled: options?.enabled !== false,
+    refetchInterval: options?.refetchInterval ?? 5_000,
+    staleTime: 2_000,
   });
 }
 

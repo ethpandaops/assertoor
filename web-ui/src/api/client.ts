@@ -10,6 +10,9 @@ import type {
   ClientsPage,
   GlobalVariablesResponse,
   ScheduleTestRunRequest,
+  TestSchedule,
+  TestNextRunResponse,
+  TestQueueResponse,
   VersionResponse,
   LibraryIndex,
   LibraryCheckResponse,
@@ -165,6 +168,29 @@ export async function getGlobalVariables(): Promise<GlobalVariablesResponse> {
 // Build version info
 export async function getVersion(): Promise<VersionResponse> {
   return fetchApi<VersionResponse>('/version');
+}
+
+// Test schedule (cron + startup) — read open, write auth-gated.
+export async function updateTestSchedule(
+  testId: string,
+  schedule: TestSchedule | null,
+): Promise<void> {
+  await fetchApiWithAuth<void>(`/test/${encodeURIComponent(testId)}/schedule`, {
+    method: 'PUT',
+    body: JSON.stringify({ schedule }),
+  });
+}
+
+export async function getTestNextRun(testId: string): Promise<TestNextRunResponse> {
+  return fetchApi<TestNextRunResponse>(
+    `/test/${encodeURIComponent(testId)}/next_run`,
+  );
+}
+
+// Live test queue (running + pending) used by the StartTestModal's
+// QueuePicker.
+export async function getTestQueue(): Promise<TestQueueResponse> {
+  return fetchApi<TestQueueResponse>('/test_queue');
 }
 
 // Admin operations (require authentication)

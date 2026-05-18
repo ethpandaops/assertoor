@@ -11,6 +11,7 @@ import SplitPane from '../components/common/SplitPane';
 import StatusBadge from '../components/common/StatusBadge';
 import Dropdown from '../components/common/Dropdown';
 import StartTestModal from '../components/test/StartTestModal';
+import ScheduleCard from '../components/schedule/ScheduleCard';
 import { formatDuration } from '../utils/time';
 import type { Test, TestRun } from '../types/api';
 
@@ -310,6 +311,14 @@ function RunsPane({ testId, tests }: RunsPaneProps) {
           </button>
         )}
       </div>
+
+      {/* Schedule banner: only shown when a specific test is selected;
+          surfaces the schedule + next firing + edit affordance. */}
+      {testId && (
+        <div className="px-2 py-2 border-b border-[var(--color-border)] flex-shrink-0">
+          <ScheduleCard testId={testId} variant="banner" />
+        </div>
+      )}
 
       <div className="flex-1 overflow-auto">
         {isLoading ? (
