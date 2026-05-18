@@ -458,8 +458,9 @@ tasks:
   config:
     envVars:
       # Collect the rowId / rowTitle / matrixRow tuple from every task in
-      # the run that emitted one. The 'tasks' scope is the parent map.
-      ROWS: "| [ .tasks | to_entries[] | .value.outputs | select(.matrixRow != null) | { rowId, rowTitle, referenceUrl, matrixRow } ]"
+      # the run that emitted one. Walks the whole variable tree so checks
+      # nested under run_tasks_concurrent (etc.) are picked up too.
+      ROWS: "| [ .. | objects | select(has(\"matrixRow\") and has(\"rowId\") and .matrixRow != null) | { rowId, rowTitle, referenceUrl, matrixRow } ] | unique_by(.rowId)"
     script: |
       // Canonical client-type column order. Columns absent from results
       // are dropped automatically.
