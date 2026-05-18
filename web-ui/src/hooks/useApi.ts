@@ -7,6 +7,7 @@ export const queryKeys = {
   tests: ['tests'] as const,
   testRunDetails: (id: number) => ['testRunDetails', id] as const,
   testRunResult: (id: number) => ['testRunResult', id] as const,
+  testLatestResult: (testId: string) => ['testLatestResult', testId] as const,
   taskDetails: (runId: number, taskIndex: number) => ['taskDetails', runId, taskIndex] as const,
   taskDescriptors: ['taskDescriptors'] as const,
   taskDescriptor: (name: string) => ['taskDescriptor', name] as const,
@@ -70,6 +71,22 @@ export function useTestRunResult(
     queryFn: () => api.getTestRunResult(runId),
     enabled: options?.enabled !== false && runId > 0,
     refetchInterval: options?.refetchInterval ?? false,
+  });
+}
+
+// Latest run-level result markdown for a test. The envelope contains
+// metadata + markdown body, or an empty envelope when no run has
+// produced a result yet.
+export function useLatestTestResult(
+  testId: string,
+  options?: { enabled?: boolean; refetchInterval?: number | false; staleTime?: number },
+) {
+  return useQuery({
+    queryKey: queryKeys.testLatestResult(testId),
+    queryFn: () => api.getLatestTestResult(testId),
+    enabled: options?.enabled !== false && !!testId,
+    refetchInterval: options?.refetchInterval ?? 30_000,
+    staleTime: options?.staleTime ?? 10_000,
   });
 }
 

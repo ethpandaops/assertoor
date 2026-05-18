@@ -89,6 +89,19 @@ export interface TestYamlResponse {
   source: string;
 }
 
+// Latest run-level result envelope returned by
+// `GET /api/v1/test/{testId}/latest_result?meta=1`. `markdown` is the
+// rendered $ASSERTOOR_TEST_RESULT blob from the newest run that
+// produced one. When no run has produced a result yet the envelope is
+// returned with `run_id === 0` and an empty markdown string.
+export interface LatestResultResponse {
+  run_id: number;
+  status: TestStatus | '';
+  start_time: number;
+  stop_time: number;
+  markdown: string;
+}
+
 // Response from POST /api/v1/tests/register_external
 export interface RegisterExternalTestResponse {
   test_id: string;

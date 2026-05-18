@@ -14,6 +14,7 @@ import type {
   LibraryIndex,
   LibraryCheckResponse,
   RegisterExternalTestResponse,
+  LatestResultResponse,
 } from '../types/api';
 import { authStore } from '../stores/authStore';
 
@@ -104,6 +105,29 @@ export async function getClients(): Promise<ClientsPage> {
 // Test run details
 export async function getTestRunDetails(runId: number): Promise<TestRunDetails> {
   return fetchApiWithAuth<TestRunDetails>(`/test_run/${runId}/details`);
+}
+
+// Latest run-level result markdown for a test (envelope form). Walks
+// the newest runs server-side and returns the first one that produced
+// a $ASSERTOOR_TEST_RESULT blob. `run_id === 0` and empty `markdown`
+// indicate "no result available across recent runs" (the dashboard
+// tile renders an empty state in that case).
+export async function getLatestTestResult(testId: string): Promise<LatestResultResponse> {
+  return fetchApi<LatestResultResponse>(
+    `/test/${encodeURIComponent(testId)}/latest_result?meta=1`,
+  ).then((data) => {
+    // Server returns `data: null` on 200 when no result exists yet —
+    // normalise to an empty envelope so callers don't have to.
+    return (
+      (data as LatestResultResponse) ?? {
+        run_id: 0,
+        status: '',
+        start_time: 0,
+        stop_time: 0,
+        markdown: '',
+      }
+    );
+  });
 }
 
 // Run-level Result markdown. Returns null when the run has not produced
