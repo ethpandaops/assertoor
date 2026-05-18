@@ -452,6 +452,14 @@ tasks:
 ## inline by the UI's markdown handler).
 ## ------------------------------------------------------------------
 ##
+- name: run_shell
+  title: "DEBUG: dump task ids"
+  config:
+    envVars:
+      KEYS: ".tasks | keys"
+    command: |
+      echo "TASK KEYS: $KEYS"
+
 - name: run_javascript
   id: matrix
   title: "Render GLOAS API compatibility matrix"
