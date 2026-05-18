@@ -152,11 +152,14 @@ eventLoop:
 
 	switch {
 	case eventsCount == 0:
-		// Subscription was accepted (we got past Subscribe) but no events.
-		r.Status = resultPartial
+		// Subscription was accepted (we got past Subscribe) but no events
+		// arrived. That's still a pass — the server understood the topic
+		// query and the route exists; the absence of events is a chain
+		// state issue, not a client compatibility issue.
+		r.Status = resultPass
 
 		if r.Note == "" {
-			r.Note = "subscription opened but no events within window"
+			r.Note = "subscription opened (no events within window)"
 		}
 
 		// HTTPStatus 200 (assumed by successful Subscribe)
