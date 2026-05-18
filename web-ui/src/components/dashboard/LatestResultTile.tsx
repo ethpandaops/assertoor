@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useLatestTestResult, useTests } from '../../hooks/useApi';
 import StatusBadge from '../common/StatusBadge';
-import type { DashboardTile, LatestResultConfig } from './types';
+import { tileHeightStyle, type DashboardTile, type LatestResultConfig } from './types';
 
 interface LatestResultTileProps {
   tile: DashboardTile;
@@ -27,7 +27,10 @@ export function LatestResultTile({ tile, config }: LatestResultTileProps) {
   const hasResult = data && data.run_id > 0 && data.markdown;
 
   return (
-    <div className="card overflow-hidden h-full flex flex-col">
+    <div
+      className="card overflow-hidden h-full flex flex-col"
+      style={tileHeightStyle(config.heightPx)}
+    >
       {config.showHeader !== false && (
         <header className="card-header flex items-center justify-between gap-2 flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">

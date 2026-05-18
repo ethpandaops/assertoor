@@ -3,6 +3,7 @@ import Modal from '../common/Modal';
 import { useTests } from '../../hooks/useApi';
 import {
   tileTypeLabel,
+  type ClientStatusConfig,
   type DashboardTile,
   type LatestResultConfig,
   type RecentRunsConfig,
@@ -107,6 +108,20 @@ function TypeSpecificEditor({
           onChange={onChange}
         />
       );
+    case 'client_status':
+      return (
+        <ClientStatusEditor
+          config={tile.config as ClientStatusConfig}
+          onChange={onChange}
+        />
+      );
+    case 'network_status':
+      // Network status has no user-tunable settings yet.
+      return (
+        <p className="text-xs text-[var(--color-text-tertiary)] italic">
+          This tile has no extra settings.
+        </p>
+      );
     case 'text':
       return <TextEditor config={tile.config as TextConfig} onChange={onChange} />;
   }
@@ -164,6 +179,10 @@ function LatestResultEditor({
         />
         Show header strip (test name, run id, status)
       </label>
+      <HeightField
+        value={config.heightPx}
+        onChange={(heightPx) => onChange({ ...config, heightPx })}
+      />
     </>
   );
 }
@@ -196,6 +215,35 @@ function RecentRunsEditor({
           className="w-32 px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
       </Field>
+      <HeightField
+        value={config.heightPx}
+        onChange={(heightPx) => onChange({ ...config, heightPx })}
+      />
+    </>
+  );
+}
+
+function ClientStatusEditor({
+  config,
+  onChange,
+}: {
+  config: ClientStatusConfig;
+  onChange: (c: ClientStatusConfig) => void;
+}) {
+  return (
+    <>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={config.showExecution !== false}
+          onChange={(e) => onChange({ ...config, showExecution: e.target.checked })}
+        />
+        Show execution-layer columns
+      </label>
+      <HeightField
+        value={config.heightPx}
+        onChange={(heightPx) => onChange({ ...config, heightPx })}
+      />
     </>
   );
 }
@@ -208,13 +256,57 @@ function TextEditor({
   onChange: (c: TextConfig) => void;
 }) {
   return (
-    <Field label="Markdown">
-      <textarea
-        value={config.markdown}
-        onChange={(e) => onChange({ ...config, markdown: e.target.value })}
-        className="w-full h-48 px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-sm font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
-        placeholder="# Heading&#10;&#10;Free-form markdown supports GFM (tables, task lists, etc.)."
+    <>
+      <Field label="Markdown">
+        <textarea
+          value={config.markdown}
+          onChange={(e) => onChange({ ...config, markdown: e.target.value })}
+          className="w-full h-48 px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-sm font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
+          placeholder="# Heading&#10;&#10;Free-form markdown supports GFM (tables, task lists, etc.)."
+        />
+      </Field>
+      <HeightField
+        value={config.heightPx}
+        onChange={(heightPx) => onChange({ ...config, heightPx })}
       />
+    </>
+  );
+}
+
+// HeightField is a shared editor input for the `heightPx` option
+// available on tiles with potentially unbounded content. Empty input
+// clears the cap (tile sizes to content); any positive integer caps
+// the body height and makes it scrollable.
+function HeightField({
+  value,
+  onChange,
+}: {
+  value: number | undefined;
+  onChange: (v: number | undefined) => void;
+}) {
+  return (
+    <Field label="Max height (px, optional)">
+      <input
+        type="number"
+        min={80}
+        max={2000}
+        step={10}
+        value={value ?? ''}
+        placeholder="auto"
+        onChange={(e) => {
+          const raw = e.target.value.trim();
+          if (raw === '') {
+            onChange(undefined);
+            return;
+          }
+          const parsed = parseInt(raw, 10);
+          onChange(Number.isFinite(parsed) && parsed > 0 ? parsed : undefined);
+        }}
+        className="w-32 px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+      />
+      <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+        Leave blank to size to content. When set, the tile body scrolls.
+      </p>
     </Field>
   );
 }

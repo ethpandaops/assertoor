@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useTestRuns, useTests } from '../../hooks/useApi';
 import StatusBadge from '../common/StatusBadge';
 import { formatDuration } from '../../utils/time';
-import type { DashboardTile, RecentRunsConfig } from './types';
+import { tileHeightStyle, type DashboardTile, type RecentRunsConfig } from './types';
 import type { TestRun } from '../../types/api';
 
 interface RecentRunsTileProps {
@@ -33,7 +33,10 @@ export function RecentRunsTile({ tile, config }: RecentRunsTileProps) {
       : 'Recent runs');
 
   return (
-    <div className="card overflow-hidden h-full flex flex-col">
+    <div
+      className="card overflow-hidden h-full flex flex-col"
+      style={tileHeightStyle(config.heightPx)}
+    >
       <header className="card-header flex items-center justify-between gap-2 flex-shrink-0">
         <span className="font-medium truncate" title={title}>
           {title}

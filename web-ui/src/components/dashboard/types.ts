@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 // Dashboard data model — rows of tiles.
 //
 // The dashboard is an ordered list of **rows**, each holding an
@@ -78,17 +80,23 @@ export interface LatestResultConfig {
   // When true the tile shows a small header strip with run-id + start
   // time above the markdown body.
   showHeader?: boolean;
+  // Optional max-height (px); the markdown body scrolls when set.
+  heightPx?: number;
 }
 
 export interface RecentRunsConfig {
   // When unset the tile shows runs across all tests.
   testId?: string;
   limit: number;
+  // Optional max-height (px); the list body scrolls when set.
+  heightPx?: number;
 }
 
 export interface ClientStatusConfig {
   // When true the tile shows EL clients in addition to CL clients.
   showExecution?: boolean;
+  // Optional max-height (px); the table body scrolls when set.
+  heightPx?: number;
 }
 
 export interface NetworkStatusConfig {
@@ -99,6 +107,27 @@ export interface NetworkStatusConfig {
 
 export interface TextConfig {
   markdown: string;
+  // Optional max-height (px); the markdown body scrolls when set.
+  heightPx?: number;
+}
+
+// supportsHeight tells the editor and tile renderers whether to show
+// the "Max height" field and apply heightPx to the tile body.
+export function supportsHeight(type: TileType): boolean {
+  return (
+    type === 'latest_result' ||
+    type === 'recent_runs' ||
+    type === 'client_status' ||
+    type === 'text'
+  );
+}
+
+// tileHeightStyle returns a style object that applies the configured
+// height as a max-height. Returns `{}` when unset so the tile sizes
+// to its content as before.
+export function tileHeightStyle(heightPx: number | undefined): CSSProperties {
+  if (!heightPx || heightPx <= 0) return {};
+  return { maxHeight: `${heightPx}px` };
 }
 
 export interface DashboardRow {

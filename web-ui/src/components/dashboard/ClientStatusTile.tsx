@@ -1,5 +1,5 @@
 import { useClients } from '../../hooks/useApi';
-import type { ClientStatusConfig, DashboardTile } from './types';
+import { tileHeightStyle, type ClientStatusConfig, type DashboardTile } from './types';
 import type { ClientData } from '../../types/api';
 
 interface ClientStatusTileProps {
@@ -19,7 +19,10 @@ export function ClientStatusTile({ tile, config }: ClientStatusTileProps) {
   const clients = data?.clients ?? [];
 
   return (
-    <div className="card overflow-hidden h-full flex flex-col">
+    <div
+      className="card overflow-hidden h-full flex flex-col"
+      style={tileHeightStyle(config.heightPx)}
+    >
       <header className="card-header flex items-center justify-between">
         <span className="font-medium">{title}</span>
         <span className="text-xs text-[var(--color-text-tertiary)]">
