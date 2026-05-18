@@ -5,6 +5,7 @@ import Layout from './components/common/Layout';
 
 // Lazy load page components for code splitting
 const Dashboard = lazy(() => import(/* webpackChunkName: "page-dashboard" */ './pages/Dashboard'));
+const Runs = lazy(() => import(/* webpackChunkName: "page-runs" */ './pages/Runs'));
 const TestRun = lazy(() => import(/* webpackChunkName: "page-testrun" */ './pages/TestRun'));
 const Registry = lazy(() => import(/* webpackChunkName: "page-registry" */ './pages/Registry'));
 const TestPage = lazy(() => import(/* webpackChunkName: "page-test" */ './pages/TestPage'));
@@ -30,6 +31,14 @@ function App() {
             element={
               <Suspense fallback={<PageLoader />}>
                 <Dashboard />
+              </Suspense>
+            }
+          />
+          <Route
+            path="runs"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <Runs />
               </Suspense>
             }
           />
