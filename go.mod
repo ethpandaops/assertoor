@@ -4,10 +4,10 @@ go 1.25.7
 
 require (
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
-	github.com/ethereum/go-ethereum v1.17.3-0.20260421080339-499762852cf2
+	github.com/ethereum/go-ethereum v1.17.3
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/ethpandaops/go-eth2-client v0.1.2
-	github.com/ethpandaops/service-authenticatoor v0.0.0-20260509005850-92ddd15b91e6
+	github.com/ethpandaops/service-authenticatoor v0.0.1
 	github.com/ethpandaops/spamoor v1.2.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
