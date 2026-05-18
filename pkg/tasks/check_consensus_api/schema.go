@@ -63,16 +63,21 @@ func flattenValidationError(err error) []string {
 
 	if ve, ok := err.(*jsonschema.ValidationError); ok {
 		out := []string{}
+
 		var walk func(e *jsonschema.ValidationError)
+
 		walk = func(e *jsonschema.ValidationError) {
 			if len(e.Causes) == 0 {
 				loc := e.InstanceLocation
 				if loc == "" {
 					loc = "/"
 				}
+
 				out = append(out, fmt.Sprintf("%s: %s", loc, e.Message))
+
 				return
 			}
+
 			for _, c := range e.Causes {
 				walk(c)
 			}

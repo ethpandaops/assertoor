@@ -83,8 +83,8 @@ tasks:
   id: row01_publish_block
   title: "1. POST /eth/v2/beacon/blocks (Gloas shape)"
   config:
-    checkId: "publish_block"
-    checkTitle: "POST /eth/v2/beacon/blocks (Gloas)"
+    rowId: "publish_block"
+    rowTitle: "POST /eth/v2/beacon/blocks (Gloas)"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
     method: "POST"
     path: "/eth/v2/beacon/blocks"
@@ -117,8 +117,8 @@ tasks:
   id: row02_produce_block_v4
   title: "2. GET /eth/v4/validator/blocks/{slot} (produceBlockV4)"
   config:
-    checkId: "produce_block_v4"
-    checkTitle: "GET /eth/v4/validator/blocks/{slot}"
+    rowId: "produce_block_v4"
+    rowTitle: "GET /eth/v4/validator/blocks/{slot}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/580"
     method: "GET"
     path: "/eth/v4/validator/blocks/{slot+2}"
@@ -145,8 +145,8 @@ tasks:
   id: row03_publish_bid
   title: "3. POST /eth/v1/beacon/execution_payload_bid"
   config:
-    checkId: "publish_bid"
-    checkTitle: "POST /eth/v1/beacon/execution_payload_bid"
+    rowId: "publish_bid"
+    rowTitle: "POST /eth/v1/beacon/execution_payload_bid"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
     method: "POST"
     path: "/eth/v1/beacon/execution_payload_bid"
@@ -168,8 +168,8 @@ tasks:
   id: row04_get_bid
   title: "4. GET /eth/v1/validator/execution_payload_bid/{slot}/{builder_index}"
   config:
-    checkId: "get_bid"
-    checkTitle: "GET /eth/v1/validator/execution_payload_bid/{slot}/{builder_index}"
+    rowId: "get_bid"
+    rowTitle: "GET /eth/v1/validator/execution_payload_bid/{slot}/{builder_index}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
     method: "GET"
     path: "/eth/v1/validator/execution_payload_bid/{slot+1}/0"
@@ -192,8 +192,8 @@ tasks:
   id: row05_publish_envelope
   title: "5. POST /eth/v1/beacon/execution_payload_envelope (reveal)"
   config:
-    checkId: "publish_envelope"
-    checkTitle: "POST /eth/v1/beacon/execution_payload_envelope"
+    rowId: "publish_envelope"
+    rowTitle: "POST /eth/v1/beacon/execution_payload_envelope"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/580"
     method: "POST"
     path: "/eth/v1/beacon/execution_payload_envelope"
@@ -215,8 +215,8 @@ tasks:
   id: row06_get_envelope_by_block
   title: "6. GET /eth/v1/beacon/execution_payload_envelope/{block_id}"
   config:
-    checkId: "get_envelope_by_block"
-    checkTitle: "GET /eth/v1/beacon/execution_payload_envelope/{block_id}"
+    rowId: "get_envelope_by_block"
+    rowTitle: "GET /eth/v1/beacon/execution_payload_envelope/{block_id}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
     method: "GET"
     path: "/eth/v1/beacon/execution_payload_envelope/head"
@@ -239,8 +239,8 @@ tasks:
   id: row07_get_envelope_by_slot
   title: "7. GET /eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}"
   config:
-    checkId: "get_envelope_by_slot"
-    checkTitle: "GET /eth/v1/validator/execution_payload_envelope/{slot}/{root}"
+    rowId: "get_envelope_by_slot"
+    rowTitle: "GET /eth/v1/validator/execution_payload_envelope/{slot}/{root}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/580"
     method: "GET"
     path: "/eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}"
@@ -260,8 +260,8 @@ tasks:
   id: row08_ptc_duties
   title: "8. POST /eth/v1/validator/duties/ptc/{epoch}"
   config:
-    checkId: "ptc_duties"
-    checkTitle: "POST /eth/v1/validator/duties/ptc/{epoch}"
+    rowId: "ptc_duties"
+    rowTitle: "POST /eth/v1/validator/duties/ptc/{epoch}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552, https://github.com/ethereum/beacon-APIs/pull/592"
     method: "POST"
     path: "/eth/v1/validator/duties/ptc/{epoch}"
@@ -286,8 +286,8 @@ tasks:
   id: row09_payload_attestation_data
   title: "9. GET /eth/v1/validator/payload_attestation_data/{slot}"
   config:
-    checkId: "payload_attestation_data"
-    checkTitle: "GET /eth/v1/validator/payload_attestation_data/{slot}"
+    rowId: "payload_attestation_data"
+    rowTitle: "GET /eth/v1/validator/payload_attestation_data/{slot}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
     method: "GET"
     path: "/eth/v1/validator/payload_attestation_data/{slot-1}"
@@ -310,8 +310,8 @@ tasks:
   id: row10_post_payload_attestations
   title: "10. POST /eth/v1/beacon/pool/payload_attestations"
   config:
-    checkId: "post_payload_attestations"
-    checkTitle: "POST /eth/v1/beacon/pool/payload_attestations"
+    rowId: "post_payload_attestations"
+    rowTitle: "POST /eth/v1/beacon/pool/payload_attestations"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
     method: "POST"
     path: "/eth/v1/beacon/pool/payload_attestations"
@@ -337,8 +337,8 @@ tasks:
   id: row11_get_payload_attestations
   title: "11. GET /eth/v1/beacon/pool/payload_attestations"
   config:
-    checkId: "get_payload_attestations"
-    checkTitle: "GET /eth/v1/beacon/pool/payload_attestations"
+    rowId: "get_payload_attestations"
+    rowTitle: "GET /eth/v1/beacon/pool/payload_attestations"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
     method: "GET"
     path: "/eth/v1/beacon/pool/payload_attestations"
@@ -370,8 +370,8 @@ tasks:
       id: row12_sse_execution_payload_bid
       title: "12. SSE execution_payload_bid"
       config:
-        checkId: "sse_execution_payload_bid"
-        checkTitle: "SSE execution_payload_bid"
+        rowId: "sse_execution_payload_bid"
+        rowTitle: "SSE execution_payload_bid"
         referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552, https://github.com/ethereum/beacon-APIs/pull/587"
         sse:
           topic: "execution_payload_bid"
@@ -386,8 +386,8 @@ tasks:
       id: row13_sse_execution_payload_available
       title: "13. SSE execution_payload_available"
       config:
-        checkId: "sse_execution_payload_available"
-        checkTitle: "SSE execution_payload_available"
+        rowId: "sse_execution_payload_available"
+        rowTitle: "SSE execution_payload_available"
         referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
         sse:
           topic: "execution_payload_available"
@@ -401,8 +401,8 @@ tasks:
       id: row14_sse_payload_attestation_message
       title: "14. SSE payload_attestation_message"
       config:
-        checkId: "sse_payload_attestation_message"
-        checkTitle: "SSE payload_attestation_message"
+        rowId: "sse_payload_attestation_message"
+        rowTitle: "SSE payload_attestation_message"
         referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
         sse:
           topic: "payload_attestation_message"
@@ -417,8 +417,8 @@ tasks:
       id: row15_sse_execution_payload
       title: "15. SSE execution_payload"
       config:
-        checkId: "sse_execution_payload"
-        checkTitle: "SSE execution_payload"
+        rowId: "sse_execution_payload"
+        rowTitle: "SSE execution_payload"
         referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
         sse:
           topic: "execution_payload"
@@ -432,8 +432,8 @@ tasks:
       id: row16_sse_execution_payload_gossip
       title: "16. SSE execution_payload_gossip"
       config:
-        checkId: "sse_execution_payload_gossip"
-        checkTitle: "SSE execution_payload_gossip"
+        rowId: "sse_execution_payload_gossip"
+        rowTitle: "SSE execution_payload_gossip"
         referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
         sse:
           topic: "execution_payload_gossip"
@@ -445,36 +445,109 @@ tasks:
 
 ##
 ## ------------------------------------------------------------------
-## Final aggregator
+## Final matrix renderer
+##
+## Walks every check_consensus_api task's outputs and renders a
+## markdown matrix table into matrix.md (downloadable + rendered
+## inline by the UI's markdown handler).
 ## ------------------------------------------------------------------
 ##
-- name: generate_api_compatibility_matrix
+- name: run_javascript
   id: matrix
   title: "Render GLOAS API compatibility matrix"
   config:
-    title: "GLOAS Beacon-API Compatibility Matrix"
-    description: |
-      Compatibility matrix for all beacon-API endpoints and SSE topics
-      introduced or changed by GLOAS (ePBS). Each cell records the
-      outcome of probing the endpoint against a single CL client
-      implementation. See the legend below the table for cell meanings;
-      cells with notes are footnoted by number.
-    includeCheckIds:
-      - publish_block
-      - produce_block_v4
-      - publish_bid
-      - get_bid
-      - publish_envelope
-      - get_envelope_by_block
-      - get_envelope_by_slot
-      - ptc_duties
-      - payload_attestation_data
-      - post_payload_attestations
-      - get_payload_attestations
-      - sse_execution_payload_bid
-      - sse_execution_payload_available
-      - sse_payload_attestation_message
-      - sse_execution_payload
-      - sse_execution_payload_gossip
-    includeFootnotes: true
-    includeLegend: true
+    envVars:
+      # Collect the rowId / rowTitle / matrixRow tuple from every task in
+      # the run that emitted one. The 'tasks' scope is the parent map.
+      ROWS: "| [ tasks | to_entries[] | .value.outputs | select(.matrixRow != null) | { rowId, rowTitle, referenceUrl, matrixRow } ]"
+    script: |
+      // Canonical client-type column order. Columns absent from results
+      // are dropped automatically.
+      const ORDER = ['lighthouse','teku','prysm','grandine','nimbus','lodestar','caplin'];
+      const ROW_ORDER = [
+        'publish_block','produce_block_v4','publish_bid','get_bid',
+        'publish_envelope','get_envelope_by_block','get_envelope_by_slot',
+        'ptc_duties','payload_attestation_data',
+        'post_payload_attestations','get_payload_attestations',
+        'sse_execution_payload_bid','sse_execution_payload_available',
+        'sse_payload_attestation_message','sse_execution_payload',
+        'sse_execution_payload_gossip',
+      ];
+
+      const SHORT = { lighthouse:'LH', teku:'Tk', prysm:'Pr', grandine:'Gr', nimbus:'Ni', lodestar:'Lo', caplin:'Ca' };
+      const EMOJI = { pass:'✅', partial:'🟡', fail:'❌', skipped:'⚪' };
+      const SUP   = ['⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹'];
+
+      const short  = t => SHORT[t] || ((t[0] || '?').toUpperCase() + (t[1] || ''));
+      const emoji  = r => EMOJI[r] || '—';
+      const sup    = n => String(n).split('').map(d => SUP[+d]).join('');
+
+      const fmtTitle = t => {
+        if (t.startsWith('SSE ')) return 'SSE `' + t.slice(4) + '`';
+        const m = t.match(/^(GET|POST|PUT|DELETE|PATCH) (.*)$/);
+        if (!m) return '`' + t + '`';
+        const sp = m[2].indexOf(' (');
+        if (sp < 0) return '`' + t + '`';
+        return '`' + m[1] + ' ' + m[2].slice(0, sp) + '`' + m[2].slice(sp);
+      };
+
+      // 1) order rows.
+      const idxOf = Object.fromEntries(ROW_ORDER.map((id, i) => [id, i]));
+      const rows = (env.ROWS || [])
+        .filter(r => ROW_ORDER.length === 0 || idxOf[r.rowId] !== undefined)
+        .sort((a, b) => (idxOf[a.rowId] ?? 1e9) - (idxOf[b.rowId] ?? 1e9));
+
+      // 2) determine used columns.
+      const used = new Set();
+      rows.forEach(r => Object.keys(r.matrixRow || {}).forEach(c => used.add(c)));
+      const cols = ORDER.filter(c => used.has(c)).concat([...used].filter(c => !ORDER.includes(c)));
+
+      // 3) collect footnotes (unique notes).
+      const footnotes = [];
+      const fnMap = new Map();
+      for (const r of rows) {
+        for (const [, cell] of Object.entries(r.matrixRow || {})) {
+          if ((cell.result === 'partial' || cell.result === 'fail') && cell.note) {
+            if (!fnMap.has(cell.note)) {
+              footnotes.push(cell.note);
+              fnMap.set(cell.note, footnotes.length);
+            }
+          }
+        }
+      }
+
+      // 4) render markdown.
+      const counts = { pass: 0, partial: 0, fail: 0, skipped: 0, absent: 0 };
+      const lines = [
+        '# GLOAS Beacon-API Compatibility Matrix',
+        '',
+        'Compatibility matrix for all beacon-API endpoints and SSE topics introduced or changed by GLOAS (ePBS). Each cell records the outcome of probing the endpoint against a single CL client implementation. See the legend below the table for cell meanings; cells with notes are footnoted by number.',
+        '',
+        '| # | Endpoint / Event | ' + cols.map(short).join(' | ') + ' |',
+        '|---|---|' + cols.map(() => '---').join('|') + '|',
+      ];
+
+      rows.forEach((r, i) => {
+        const cells = cols.map(c => {
+          const cell = r.matrixRow?.[c];
+          if (!cell || !cell.result) { counts.absent++; return '—'; }
+          counts[cell.result] = (counts[cell.result] || 0) + 1;
+          const e = emoji(cell.result);
+          if ((cell.result === 'partial' || cell.result === 'fail') && cell.note) {
+            return e + sup(fnMap.get(cell.note));
+          }
+          return e;
+        });
+        lines.push('| ' + (i + 1) + ' | ' + fmtTitle(r.rowTitle || r.rowId) + ' | ' + cells.join(' | ') + ' |');
+      });
+
+      if (footnotes.length) {
+        lines.push('');
+        footnotes.forEach((note, i) => lines.push((i + 1) + '. ' + note));
+      }
+      lines.push('', '**Legend:** ✅ pass · 🟡 partial · ❌ fail · ⚪ skipped · — absent');
+
+      writeResultFile('matrix.md', lines.join('\n') + '\n');
+      setOutputJSON('cellCounts', counts);
+      setOutputJSON('rowCount', rows.length);
+      console.log(`matrix: ${rows.length} rows × ${cols.length} cols (pass=${counts.pass} partial=${counts.partial} fail=${counts.fail})`);

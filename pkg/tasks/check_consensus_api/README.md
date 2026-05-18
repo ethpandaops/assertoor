@@ -6,12 +6,12 @@ Probes a single beacon-API endpoint or SSE topic against every connected
 consensus client (with optional include/exclude filters), classifies each
 response (pass / partial / fail / skipped), and emits both per-client
 results and a "matrix row" aggregated by client-type. The output is
-consumed by `generate_api_compatibility_matrix` to render a markdown
+consumed by `format_result_matrix` to render a markdown
 compatibility table.
 
 It is the building block of an API-compatibility playbook: instantiate
 one `check_consensus_api` task per endpoint you want to cover, then
-finish with a single `generate_api_compatibility_matrix` task.
+finish with a single `format_result_matrix` task.
 
 #### Result classification
 
@@ -27,8 +27,8 @@ finish with a single `generate_api_compatibility_matrix` task.
 ```yaml
 - name: check_consensus_api
   config:
-    checkId: "pool_payload_attestations_get"
-    checkTitle: "GET /eth/v1/beacon/pool/payload_attestations"
+    rowId: "pool_payload_attestations_get"
+    rowTitle: "GET /eth/v1/beacon/pool/payload_attestations"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
 
     method: "GET"
@@ -70,8 +70,8 @@ Omit `method`/`path` and set `sse`:
 ```yaml
 - name: check_consensus_api
   config:
-    checkId: "sse_execution_payload"
-    checkTitle: "SSE execution_payload"
+    rowId: "sse_execution_payload"
+    rowTitle: "SSE execution_payload"
     sse:
       topic: execution_payload
       timeoutSeconds: 36
@@ -85,8 +85,8 @@ Omit `method`/`path` and set `sse`:
 
 | Field                  | Type                  | Description                                                                                                                                                                                |
 |------------------------|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `checkId`              | string (required)     | Stable identifier for the check. Used by the aggregator.                                                                                                                                   |
-| `checkTitle`           | string                | Display title used in the matrix.                                                                                                                                                          |
+| `rowId`              | string (required)     | Stable identifier for the check. Used by the aggregator.                                                                                                                                   |
+| `rowTitle`           | string                | Display title used in the matrix.                                                                                                                                                          |
 | `referenceUrl`         | string                | URL to the spec PR / docs.                                                                                                                                                                 |
 | `clientPattern`        | string (regex)        | Restrict to clients whose name matches.                                                                                                                                                    |
 | `excludeClientPattern` | string (regex)        | Exclude clients whose name matches.                                                                                                                                                        |
@@ -120,4 +120,4 @@ Omit `method`/`path` and set `sse`:
 - `results` — array of per-client objects: `{client, clientType, status, httpStatus, durationMs, note, error, schemaErrors, eventCount}`
 - `matrixRow` — `map[clientType]{result, note, httpStatus}` collapsed by client type (worst-case status when multiple clients of the same type are tested)
 - `passCount`, `partialCount`, `failCount`, `skippedCount`, `totalCount` — integer counters
-- `checkId`, `checkTitle`, `referenceUrl` — echoed for downstream aggregation
+- `rowId`, `rowTitle`, `referenceUrl` — echoed for downstream aggregation

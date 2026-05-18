@@ -23,14 +23,20 @@ import (
 )
 
 const (
-	defaultRequestTimeout = 30 * time.Second
-	defaultOverallTimeout = 90 * time.Second
+	defaultRequestTimeout    = 30 * time.Second
+	defaultOverallTimeout    = 90 * time.Second
+	defaultSSETimeoutSeconds = 36
 
 	// Per-client result classifications
 	resultPass    = "pass"
 	resultPartial = "partial"
 	resultFail    = "fail"
 	resultSkipped = "skipped"
+
+	// Common literals reused across helpers.
+	methodGet      = "GET"
+	clientTypeUnk  = "unknown"
+	maxResponseLen = 256 * 1024
 )
 
 var (
@@ -77,14 +83,14 @@ var (
 				Description: "Total number of clients evaluated.",
 			},
 			{
-				Name:        "checkId",
+				Name:        "rowId",
 				Type:        "string",
-				Description: "The checkId from the config (echoed for aggregator use).",
+				Description: "The rowId from the config (echoed for aggregator use).",
 			},
 			{
-				Name:        "checkTitle",
+				Name:        "rowTitle",
 				Type:        "string",
-				Description: "The checkTitle from the config (echoed for aggregator use).",
+				Description: "The rowTitle from the config (echoed for aggregator use).",
 			},
 			{
 				Name:        "referenceUrl",
@@ -168,10 +174,12 @@ func (t *Task) Execute(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("invalid responseSchema: %w", err)
 	}
+
 	errorSchema, err := compileSchema(t.config.ErrorSchema)
 	if err != nil {
 		return fmt.Errorf("invalid errorSchema: %w", err)
 	}
+
 	eventSchema, err := compileSchema(t.config.EventSchema)
 	if err != nil {
 		return fmt.Errorf("invalid eventSchema: %w", err)
@@ -205,10 +213,12 @@ func (t *Task) Execute(ctx context.Context) error {
 		i, client := i, client
 
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 
 			sem <- struct{}{}
+
 			defer func() { <-sem }()
 
 			r := t.checkClient(overallCtx, client, resolvedPath, resolvedParams, successSchema, errorSchema, eventSchema)
@@ -235,17 +245,21 @@ func (t *Task) Execute(ctx context.Context) error {
 		if results[a] == nil {
 			return false
 		}
+
 		if results[b] == nil {
 			return true
 		}
+
 		return results[a].Client < results[b].Client
 	})
 
 	passCount, partialCount, failCount, skipCount := 0, 0, 0, 0
+
 	for _, r := range results {
 		if r == nil {
 			continue
 		}
+
 		switch r.Status {
 		case resultPass:
 			passCount++
@@ -266,28 +280,32 @@ func (t *Task) Execute(ctx context.Context) error {
 	if resultsData, err := vars.GeneralizeData(results); err == nil {
 		t.ctx.Outputs.SetVar("results", resultsData)
 	}
+
 	if rowData, err := vars.GeneralizeData(matrixRow); err == nil {
 		t.ctx.Outputs.SetVar("matrixRow", rowData)
 	}
+
 	t.ctx.Outputs.SetVar("passCount", passCount)
 	t.ctx.Outputs.SetVar("partialCount", partialCount)
 	t.ctx.Outputs.SetVar("failCount", failCount)
 	t.ctx.Outputs.SetVar("skippedCount", skipCount)
 	t.ctx.Outputs.SetVar("totalCount", len(results))
-	t.ctx.Outputs.SetVar("checkId", t.config.CheckID)
-	t.ctx.Outputs.SetVar("checkTitle", t.config.CheckTitle)
+	t.ctx.Outputs.SetVar("rowId", t.config.RowID)
+	t.ctx.Outputs.SetVar("rowTitle", t.config.RowTitle)
 	t.ctx.Outputs.SetVar("referenceUrl", t.config.ReferenceURL)
 
 	t.logger.Infof("[%s] results: %d pass, %d partial, %d fail, %d skipped (total %d)",
-		t.config.CheckID, passCount, partialCount, failCount, skipCount, len(results))
+		t.config.RowID, passCount, partialCount, failCount, skipCount, len(results))
 
 	switch {
 	case t.config.FailOnAnyError && (failCount+partialCount) > 0:
 		t.ctx.SetResult(types.TaskResultFailure)
-		return fmt.Errorf("[%s] not all clients passed (fail=%d, partial=%d)", t.config.CheckID, failCount, partialCount)
+
+		return fmt.Errorf("[%s] not all clients passed (fail=%d, partial=%d)", t.config.RowID, failCount, partialCount)
 	case t.config.FailOnAllError && passCount == 0:
 		t.ctx.SetResult(types.TaskResultFailure)
-		return fmt.Errorf("[%s] no client passed", t.config.CheckID)
+
+		return fmt.Errorf("[%s] no client passed", t.config.RowID)
 	default:
 		t.ctx.SetResult(types.TaskResultSuccess)
 	}
@@ -299,9 +317,11 @@ func (t *Task) cfgMethod() string {
 	if t.config.SSE != nil {
 		return "SSE"
 	}
+
 	if t.config.Method == "" {
-		return "GET"
+		return methodGet
 	}
+
 	return strings.ToUpper(t.config.Method)
 }
 
@@ -309,6 +329,7 @@ func (t *Task) cfgRequestTimeout() time.Duration {
 	if t.config.RequestTimeout.Duration > 0 {
 		return t.config.RequestTimeout.Duration
 	}
+
 	return defaultRequestTimeout
 }
 
@@ -316,6 +337,7 @@ func (t *Task) cfgOverallTimeout() time.Duration {
 	if t.config.OverallTimeout.Duration > 0 {
 		return t.config.OverallTimeout.Duration
 	}
+
 	return defaultOverallTimeout
 }
 
@@ -323,15 +345,16 @@ func (t *Task) cfgConcurrency() int {
 	if t.config.Concurrency > 0 {
 		return t.config.Concurrency
 	}
+
 	return 6
 }
 
 // resolvePath fills in {placeholders} from explicit pathParams and from chain
 // state where possible. Returns the templated path plus the final
 // placeholder->value map for diagnostics.
-func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient) (string, map[string]string, error) {
+func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient) (finalPath string, params map[string]string, err error) {
 	pathTpl := t.config.Path
-	params := map[string]string{}
+	params = map[string]string{}
 
 	// Start with explicit pathParams.
 	for k, v := range t.config.PathParams {
@@ -340,7 +363,9 @@ func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient
 
 	// Identify placeholders still missing.
 	placeholderRE := regexp.MustCompile(`\{([a-zA-Z0-9_+\-]+)\}`)
+
 	missing := []string{}
+
 	for _, m := range placeholderRE.FindAllStringSubmatch(pathTpl, -1) {
 		key := m[1]
 		if _, ok := params[key]; !ok {
@@ -354,20 +379,23 @@ func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient
 
 	// Need chain state. Use the first ready client we can find.
 	var refClient *clients.PoolClient
+
 	for _, c := range allClients {
 		if c.ConsensusClient != nil && c.ConsensusClient.GetStatus() == consensus.ClientStatusOnline {
 			refClient = c
 			break
 		}
 	}
+
 	if refClient == nil && len(allClients) > 0 {
 		refClient = allClients[0]
 	}
 
-	var err error
-	var headSlot, headEpoch uint64
-	var headRoot string
-	var slotsPerEpoch uint64 = 32
+	var (
+		headSlot, headEpoch uint64
+		headRoot            string
+		slotsPerEpoch       uint64 = 32
+	)
 
 	if refClient != nil && refClient.ConsensusClient != nil {
 		ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -380,6 +408,7 @@ func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient
 		} else {
 			err = herr
 		}
+
 		if specs, serr := rpc.GetConfigSpecs(ctx2); serr == nil {
 			if v, ok := specs["SLOTS_PER_EPOCH"]; ok {
 				if vu, ok := v.(uint64); ok && vu > 0 {
@@ -387,6 +416,7 @@ func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient
 				}
 			}
 		}
+
 		if slotsPerEpoch > 0 {
 			headEpoch = headSlot / slotsPerEpoch
 		}
@@ -399,7 +429,7 @@ func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient
 		}
 	}
 
-	finalPath := pathTpl
+	finalPath = pathTpl
 	for k, v := range params {
 		finalPath = strings.ReplaceAll(finalPath, "{"+k+"}", v)
 	}
@@ -411,16 +441,20 @@ func resolvePlaceholder(key string, headSlot, headEpoch uint64, headRoot string)
 	// Handle {slot+N}, {epoch+N}, etc.
 	base := key
 	offset := int64(0)
+
 	if idx := strings.IndexAny(key, "+-"); idx > 0 {
 		base = key[:idx]
 		// Parse signed offset.
 		var op rune
+
 		if key[idx] == '+' {
 			op = '+'
 		} else {
 			op = '-'
 		}
+
 		offsetStr := key[idx+1:]
+
 		var n int64
 		if _, err := fmt.Sscanf(offsetStr, "%d", &n); err == nil {
 			if op == '+' {
@@ -447,6 +481,7 @@ func resolvePlaceholder(key string, headSlot, headEpoch uint64, headRoot string)
 	case "validator_index":
 		return "0"
 	}
+
 	return ""
 }
 
@@ -456,10 +491,12 @@ func offsetUint64(v uint64, offset int64) uint64 {
 	if offset >= 0 {
 		return v + uint64(offset)
 	}
+
 	neg := uint64(-offset)
 	if neg > v {
 		return 0
 	}
+
 	return v - neg
 }
 
@@ -476,10 +513,12 @@ func buildMatrixRow(results []*PerClientResult) map[string]*MatrixCell {
 		if r == nil {
 			continue
 		}
+
 		key := r.ClientType
-		if key == "" || key == "unknown" {
-			key = "unknown"
+		if key == "" {
+			key = clientTypeUnk
 		}
+
 		existing, ok := out[key]
 		if !ok || rank[r.Status] > rank[existing.Result] {
 			out[key] = &MatrixCell{
@@ -503,6 +542,7 @@ func (t *Task) checkClient(
 	successSchema, errorSchema, eventSchema *jsonschema.Schema,
 ) *PerClientResult {
 	_ = resolvedParams // kept for future per-client placeholder overrides
+
 	r := &PerClientResult{
 		Client:     client.Config.Name,
 		ClientType: clientTypeString(client),
@@ -511,6 +551,7 @@ func (t *Task) checkClient(
 	if client.ConsensusClient == nil {
 		r.Status = resultFail
 		r.Error = "client has no consensus endpoint"
+
 		return r
 	}
 
@@ -519,6 +560,7 @@ func (t *Task) checkClient(
 		if !isForkActive(client.ConsensusClient, t.config.RequireForkActive) {
 			r.Status = resultSkipped
 			r.Note = fmt.Sprintf("fork %q not active", t.config.RequireForkActive)
+
 			return r
 		}
 	}
@@ -527,6 +569,7 @@ func (t *Task) checkClient(
 	if endpointConfig == nil || endpointConfig.URL == "" {
 		r.Status = resultFail
 		r.Error = "client has no URL configured"
+
 		return r
 	}
 
@@ -550,7 +593,7 @@ func (t *Task) checkClientHTTP(
 
 	method := strings.ToUpper(t.config.Method)
 	if method == "" {
-		method = "GET"
+		method = methodGet
 	}
 
 	// Build URL.
@@ -558,20 +601,27 @@ func (t *Task) checkClientHTTP(
 	if err != nil {
 		r.Status = resultFail
 		r.Error = fmt.Sprintf("invalid URL: %v", err)
+
 		return r
 	}
+
 	if len(t.config.QueryParams) > 0 {
 		q := u.Query()
 		for k, v := range t.config.QueryParams {
 			q.Set(k, v)
 		}
+
 		u.RawQuery = q.Encode()
 	}
+
 	r.URL = u.String()
 
 	// Build body.
-	var body io.Reader
-	var bodyBytes []byte
+	var (
+		body      io.Reader
+		bodyBytes []byte
+	)
+
 	if t.config.BodyRaw != "" {
 		bodyBytes = []byte(t.config.BodyRaw)
 	} else if t.config.Body != nil {
@@ -579,9 +629,11 @@ func (t *Task) checkClientHTTP(
 		if err != nil {
 			r.Status = resultFail
 			r.Error = fmt.Sprintf("invalid body: %v", err)
+
 			return r
 		}
 	}
+
 	if bodyBytes != nil {
 		body = bytes.NewReader(bodyBytes)
 	}
@@ -593,6 +645,7 @@ func (t *Task) checkClientHTTP(
 	if err != nil {
 		r.Status = resultFail
 		r.Error = fmt.Sprintf("could not build request: %v", err)
+
 		return r
 	}
 
@@ -615,26 +668,30 @@ func (t *Task) checkClientHTTP(
 
 	t0 := time.Now()
 	httpClient := &http.Client{Timeout: t.cfgRequestTimeout()}
+
 	resp, err := httpClient.Do(req)
 	r.DurationMs = time.Since(t0).Milliseconds()
 
 	if err != nil {
 		r.Status = resultFail
 		r.Error = fmt.Sprintf("request error: %v", err)
+
 		return r
 	}
+
 	defer resp.Body.Close()
 
-	respBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 256*1024)) // 256kb cap
+	respBytes, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseLen))
 	r.HTTPStatus = resp.StatusCode
 
-	classifyHTTPResult(r, t.config, successSchema, errorSchema, respBytes)
+	classifyHTTPResult(r, &t.config, successSchema, errorSchema, respBytes)
+
 	return r
 }
 
 func classifyHTTPResult(
 	r *PerClientResult,
-	cfg Config,
+	cfg *Config,
 	successSchema, errorSchema *jsonschema.Schema,
 	body []byte,
 ) {
@@ -647,14 +704,17 @@ func classifyHTTPResult(
 			if len(snippet) > 240 {
 				snippet = snippet[:240] + "…"
 			}
+
 			r.Error = snippet
 		}
+
 		return
 	}
 
 	if cfg.IgnoreSchema {
 		r.Status = resultPass
 		r.Note = fmt.Sprintf("status %d (schema ignored)", r.HTTPStatus)
+
 		return
 	}
 
@@ -662,16 +722,21 @@ func classifyHTTPResult(
 		if successSchema == nil {
 			r.Status = resultPass
 			r.Note = fmt.Sprintf("status %d (no schema)", r.HTTPStatus)
+
 			return
 		}
+
 		errs := validateBytes(successSchema, body)
 		if len(errs) == 0 {
 			r.Status = resultPass
+
 			return
 		}
+
 		r.Status = resultPartial
 		r.SchemaErrors = errs
 		r.Note = "response body does not match success schema"
+
 		return
 	}
 
@@ -679,17 +744,22 @@ func classifyHTTPResult(
 		if errorSchema == nil {
 			r.Status = resultPass
 			r.Note = fmt.Sprintf("status %d (no error schema)", r.HTTPStatus)
+
 			return
 		}
+
 		errs := validateBytes(errorSchema, body)
 		if len(errs) == 0 {
 			r.Status = resultPass
 			r.Note = fmt.Sprintf("well-formed error status %d", r.HTTPStatus)
+
 			return
 		}
+
 		r.Status = resultPartial
 		r.SchemaErrors = errs
 		r.Note = fmt.Sprintf("error status %d but body does not match ErrorMessage schema", r.HTTPStatus)
+
 		return
 	}
 
@@ -700,8 +770,9 @@ func classifyHTTPResult(
 
 func clientTypeString(client *clients.PoolClient) string {
 	if client == nil || client.ConsensusClient == nil {
-		return "unknown"
+		return clientTypeUnk
 	}
+
 	return client.ConsensusClient.GetClientType().String()
 }
 
@@ -712,22 +783,28 @@ func isForkActive(c *consensus.Client, forkName string) bool {
 	if headSlot == 0 {
 		return false
 	}
+
 	// Without a deep coupling to the pool's chain spec we approximate by
 	// asking the RPC client for the head's beacon-block version header.
 	// If we can't determine it, return true so we don't skip incorrectly —
 	// most playbooks will gate this on chain state separately.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	specs, err := c.GetRPCClient().GetConfigSpecs(ctx)
 	if err != nil {
 		return true
 	}
+
 	forkEpochKey := strings.ToUpper(forkName) + "_FORK_EPOCH"
+
 	forkEpochRaw, ok := specs[forkEpochKey]
 	if !ok {
 		return true
 	}
+
 	var forkEpoch uint64
+
 	switch v := forkEpochRaw.(type) {
 	case uint64:
 		forkEpoch = v
@@ -735,21 +812,26 @@ func isForkActive(c *consensus.Client, forkName string) bool {
 		if v < 0 {
 			return true
 		}
+
 		forkEpoch = uint64(v)
 	case float64:
 		if v < 0 {
 			return true
 		}
+
 		forkEpoch = uint64(v)
 	default:
 		return true
 	}
+
 	slotsPerEpoch := uint64(32)
+
 	if v, ok := specs["SLOTS_PER_EPOCH"]; ok {
 		if vu, ok := v.(uint64); ok && vu > 0 {
 			slotsPerEpoch = vu
 		}
 	}
+
 	return uint64(headSlot) >= forkEpoch*slotsPerEpoch
 }
 
@@ -759,5 +841,6 @@ func containsInt(xs []int, n int) bool {
 			return true
 		}
 	}
+
 	return false
 }

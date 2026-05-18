@@ -13,8 +13,8 @@ import (
 // aggregated matrix row.
 type Config struct {
 	// Identification & display ------------------------------------------------
-	CheckID      string `yaml:"checkId" json:"checkId" desc:"Stable short identifier for this check. Used by the aggregator/matrix tasks."`
-	CheckTitle   string `yaml:"checkTitle" json:"checkTitle" desc:"Human-friendly title for this check (used in matrix tables)."`
+	RowID        string `yaml:"rowId" json:"rowId" desc:"Stable short identifier for this check. Used by the aggregator/matrix tasks."`
+	RowTitle     string `yaml:"rowTitle" json:"rowTitle" desc:"Human-friendly title for this check (used in matrix tables)."`
 	ReferenceURL string `yaml:"referenceUrl" json:"referenceUrl" desc:"Reference URL (e.g. spec PR) for this check."`
 
 	// Client selection --------------------------------------------------------
@@ -74,20 +74,23 @@ func DefaultConfig() Config {
 }
 
 func (c *Config) Validate() error {
-	if c.CheckID == "" {
-		return fmt.Errorf("checkId is required")
+	if c.RowID == "" {
+		return fmt.Errorf("rowId is required")
 	}
 
 	if c.SSE != nil {
 		if c.SSE.Topic == "" {
 			return fmt.Errorf("sse.topic is required when sse is configured")
 		}
+
 		if c.SSE.TimeoutSeconds <= 0 {
-			c.SSE.TimeoutSeconds = 36
+			c.SSE.TimeoutSeconds = defaultSSETimeoutSeconds
 		}
+
 		if c.SSE.MinEvents <= 0 {
 			c.SSE.MinEvents = 1
 		}
+
 		return nil
 	}
 
