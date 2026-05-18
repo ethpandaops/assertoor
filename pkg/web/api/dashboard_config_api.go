@@ -1,10 +1,19 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+
+	"github.com/jmoiron/sqlx"
 )
+
+// dashboardConfigStateKey is the `assertoor_state` key under which
+// the dashboard config blob is stored. Using the existing KV store
+// avoids a dedicated table / migration just to hold one row.
+const dashboardConfigStateKey = "dashboard_config"
 
 // GetDashboardConfig godoc
 // @Id getDashboardConfig
@@ -20,22 +29,30 @@ import (
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/dashboard_config [get]
 func (ah *APIHandler) GetDashboardConfig(w http.ResponseWriter, r *http.Request) {
-	cfg, err := ah.coordinator.Database().GetDashboardConfig()
+	var raw json.RawMessage
+
+	_, err := ah.coordinator.Database().GetAssertoorState(dashboardConfigStateKey, &raw)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			w.WriteHeader(http.StatusNoContent)
+
+			return
+		}
+
 		w.Header().Set("Content-Type", contentTypeJSON)
 		ah.sendErrorResponse(w, r.URL.String(), "failed to load dashboard config", http.StatusInternalServerError)
 
 		return
 	}
 
-	if cfg == nil || len(cfg.Data) == 0 {
+	if len(raw) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 
 		return
 	}
 
 	w.Header().Set("Content-Type", contentTypeJSON)
-	_, _ = w.Write(cfg.Data)
+	_, _ = w.Write(raw)
 }
 
 // PutDashboardConfig godoc
@@ -69,16 +86,24 @@ func (ah *APIHandler) PutDashboardConfig(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Validate "is this JSON" — anything more strict belongs in the
-	// client where the schema is defined.
-	var probe any
-	if err := json.Unmarshal(body, &probe); err != nil {
+	// Validate "is this JSON" up-front — the KV store stores opaque
+	// strings, so guarding against garbage is our job.
+	if !json.Valid(body) {
 		ah.sendErrorResponse(w, r.URL.String(), "body is not valid JSON", http.StatusBadRequest)
 
 		return
 	}
 
-	if err := ah.coordinator.Database().UpsertDashboardConfig(body); err != nil {
+	// Persist as json.RawMessage so SetAssertoorState's MarshalJSON
+	// step preserves the bytes verbatim (RawMessage.MarshalJSON is
+	// the identity). That way the column ends up holding the actual
+	// dashboard JSON rather than a double-encoded string.
+	raw := json.RawMessage(body)
+
+	err = ah.coordinator.Database().RunTransaction(func(tx *sqlx.Tx) error {
+		return ah.coordinator.Database().SetAssertoorState(tx, dashboardConfigStateKey, raw)
+	})
+	if err != nil {
 		ah.sendErrorResponse(w, r.URL.String(), "failed to save dashboard config", http.StatusInternalServerError)
 
 		return

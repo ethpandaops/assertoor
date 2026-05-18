@@ -15,26 +15,26 @@ import (
 // checkpoint, queue size, etc.). Cheap to compute — no extra RPC
 // calls; everything is served from the in-process pool/cache.
 type NetworkStatusResponse struct {
-	ChainID         uint64 `json:"chain_id"`
-	NetworkName     string `json:"network_name"`
-	GenesisTime     int64  `json:"genesis_time"`
-	SlotDurationMs  uint64 `json:"slot_duration_ms"`
-	SlotsPerEpoch   uint64 `json:"slots_per_epoch"`
-	CurrentSlot     uint64 `json:"current_slot"`
-	CurrentEpoch    uint64 `json:"current_epoch"`
-	HeadSlot        uint64 `json:"head_slot"`
-	HeadRoot        string `json:"head_root"`
-	FinalizedEpoch  uint64 `json:"finalized_epoch"`
-	FinalizedRoot   string `json:"finalized_root"`
-	JustifiedEpoch  uint64 `json:"justified_epoch"`
-	JustifiedRoot   string `json:"justified_root"`
-	ClientCount     int    `json:"client_count"`
-	CLReadyCount    int    `json:"cl_ready_count"`
-	ELReadyCount    int    `json:"el_ready_count"`
-	ELHeadNumber    uint64 `json:"el_head_number"`
-	ELHeadHash      string `json:"el_head_hash"`
-	TestsRunning    int    `json:"tests_running"`
-	TestsQueued     int    `json:"tests_queued"`
+	ChainID        uint64 `json:"chain_id"`
+	NetworkName    string `json:"network_name"`
+	GenesisTime    int64  `json:"genesis_time"`
+	SlotDurationMs uint64 `json:"slot_duration_ms"`
+	SlotsPerEpoch  uint64 `json:"slots_per_epoch"`
+	CurrentSlot    uint64 `json:"current_slot"`
+	CurrentEpoch   uint64 `json:"current_epoch"`
+	HeadSlot       uint64 `json:"head_slot"`
+	HeadRoot       string `json:"head_root"`
+	FinalizedEpoch uint64 `json:"finalized_epoch"`
+	FinalizedRoot  string `json:"finalized_root"`
+	JustifiedEpoch uint64 `json:"justified_epoch"`
+	JustifiedRoot  string `json:"justified_root"`
+	ClientCount    int    `json:"client_count"`
+	CLReadyCount   int    `json:"cl_ready_count"`
+	ELReadyCount   int    `json:"el_ready_count"`
+	ELHeadNumber   uint64 `json:"el_head_number"`
+	ELHeadHash     string `json:"el_head_hash"`
+	TestsRunning   int    `json:"tests_running"`
+	TestsQueued    int    `json:"tests_queued"`
 }
 
 // GetNetworkStatus godoc
@@ -119,6 +119,9 @@ func (ah *APIHandler) GetNetworkStatus(w http.ResponseWriter, r *http.Request) {
 			resp.TestsRunning++
 		case types.TestStatusPending:
 			resp.TestsQueued++
+		case types.TestStatusSuccess, types.TestStatusFailure,
+			types.TestStatusSkipped, types.TestStatusAborted:
+			// terminal statuses — not interesting for the queue tile
 		}
 	}
 

@@ -87,8 +87,8 @@ func (ah *APIHandler) PutTestSchedule(w http.ResponseWriter, r *http.Request) {
 // is the originating cron expression. Empty list means the test has
 // no cron schedule.
 type GetTestNextRunResponse struct {
-	TestID  string                       `json:"test_id"`
-	Entries []GetTestNextRunEntry        `json:"entries"`
+	TestID   string                       `json:"test_id"`
+	Entries  []GetTestNextRunEntry        `json:"entries"`
 	Earliest *GetTestNextRunEntryEarliest `json:"earliest,omitempty"`
 }
 
