@@ -113,6 +113,9 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 		ws.router.HandleFunc("/api/v1/playbook_library", apiHandler.GetPlaybookLibrary).Methods("GET")
 		ws.router.HandleFunc("/api/v1/playbook_library/check", apiHandler.GetPlaybookLibraryCheck).Methods("GET")
 		ws.router.HandleFunc("/api/v1/network_status", apiHandler.GetNetworkStatus).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test_queue", apiHandler.GetTestQueue).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test/{testId}/next_run", apiHandler.GetTestNextRun).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test/{testId}/schedule", apiHandler.PutTestSchedule).Methods("PUT")
 		ws.router.HandleFunc("/api/v1/dashboard_config", apiHandler.GetDashboardConfig).Methods("GET")
 		ws.router.HandleFunc("/api/v1/dashboard_config", apiHandler.PutDashboardConfig).Methods("PUT")
 

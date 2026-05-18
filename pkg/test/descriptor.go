@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/types"
@@ -23,6 +24,8 @@ type Descriptor struct {
 	config   *types.TestConfig
 	vars     types.Variables
 	err      error
+
+	scheduleMutex sync.RWMutex
 }
 
 func NewDescriptor(testID, testSrc, basePath string, config *types.TestConfig, variables types.Variables) *Descriptor {
@@ -246,4 +249,23 @@ func (d *Descriptor) Vars() types.Variables {
 
 func (d *Descriptor) Err() error {
 	return d.err
+}
+
+// GetSchedule returns the current schedule under a read lock so it
+// can be safely consulted from the cron scheduler and HTTP handlers
+// while SetSchedule may be writing concurrently.
+func (d *Descriptor) GetSchedule() *types.TestSchedule {
+	d.scheduleMutex.RLock()
+	defer d.scheduleMutex.RUnlock()
+
+	return d.config.Schedule
+}
+
+// SetSchedule swaps in a new schedule pointer atomically. It does
+// not persist anywhere — callers (TestRegistry) handle DB writes.
+func (d *Descriptor) SetSchedule(schedule *types.TestSchedule) {
+	d.scheduleMutex.Lock()
+	defer d.scheduleMutex.Unlock()
+
+	d.config.Schedule = schedule
 }

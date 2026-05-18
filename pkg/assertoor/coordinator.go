@@ -328,6 +328,10 @@ func (c *Coordinator) ScheduleTest(descriptor types.TestDescriptor, configOverri
 	return c.runner.ScheduleTest(descriptor, configOverrides, allowDuplicate, skipQueue)
 }
 
+func (c *Coordinator) ScheduleTestWithOptions(descriptor types.TestDescriptor, configOverrides map[string]any, opts types.ScheduleOptions) (types.TestRunner, error) {
+	return c.runner.ScheduleTestWithOptions(descriptor, configOverrides, opts)
+}
+
 func (c *Coordinator) startMetrics() error {
 	c.log.GetLogger().
 		Info(fmt.Sprintf("Starting metrics server on :%v", c.metricsPort))
