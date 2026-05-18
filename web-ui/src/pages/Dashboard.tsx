@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -20,21 +20,20 @@ import {
   type TileType,
 } from '../components/dashboard/types';
 
-// Dashboard is the dashboard's only stateful component. It owns:
-//   - the edit-mode toggle (only accessible when logged in)
-//   - the drag-and-drop context (dispatches palette drops to addTile
-//     and tile drops to moveTile)
-//   - the editor modals for tiles and rows
-//   - the import/export controls
-//
-// Everything else is dumb: TileGrid renders, useDashboardConfig
-// persists, and the palette is drag-source-only.
-
+// Dashboard owns the edit-mode toggle plus the drag-and-drop context.
+// Mutations are local-only — the hook tracks a draft separate from
+// the server-loaded config. The user explicitly commits via "Save
+// changes"; "Discard" throws the draft away. Importing a JSON file
+// behaves the same way: it loads into the draft and is only
+// persisted when the user saves.
 function Dashboard() {
   const { isLoggedIn } = useAuthContext();
   const {
     config,
     isLoading,
+    isDirty,
+    save,
+    discard,
     isSaving,
     saveError,
     addRow,
@@ -51,6 +50,19 @@ function Dashboard() {
   } = useDashboardConfig();
 
   const [editMode, setEditMode] = useState(false);
+
+  // Anyone landing on the dashboard while a draft is in flight gets
+  // the unsaved warning before navigating away — protects users from
+  // losing edits if they accidentally close the tab.
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   // ── Editor modals ─────────────────────────────────────────────
 
@@ -117,14 +129,8 @@ function Dashboard() {
       if (fromData.kind === 'palette') {
         addTile(toData.rowId, fromData.tileType, toData.beforeIndex);
       } else if (fromData.kind === 'tile') {
-        // Reordering: when moving within the same row, dropping
-        // *after* the original position needs an index correction
-        // because the source slot is going to disappear.
         let dstIdx: number | null = toData.beforeIndex;
-        if (
-          fromData.rowId === toData.rowId &&
-          typeof dstIdx === 'number'
-        ) {
+        if (fromData.rowId === toData.rowId && typeof dstIdx === 'number') {
           const srcRow = config.rows.find((r) => r.id === fromData.rowId);
           const srcIdx = srcRow?.tiles.findIndex((t) => t.id === fromData.tileId) ?? -1;
           if (srcIdx >= 0 && dstIdx > srcIdx) dstIdx -= 1;
@@ -139,7 +145,6 @@ function Dashboard() {
 
   const handlePalettePick = useCallback(
     (type: TileType) => {
-      // Click-to-add: append to the last row, creating one if needed.
       const lastRow = config.rows[config.rows.length - 1];
       const rowId = lastRow ? lastRow.id : addRow();
       addTile(rowId, type);
@@ -148,12 +153,35 @@ function Dashboard() {
   );
 
   const handleReset = useCallback(() => {
-    if (confirm('Reset the dashboard to its defaults? This clears every row and tile.')) {
+    if (
+      confirm(
+        'Reset the dashboard to its defaults? This stages a reset locally — click "Save changes" to make it permanent.',
+      )
+    ) {
       reset();
     }
   }, [reset]);
 
-  // ── Export ─────────────────────────────────────────────────────
+  const handleExitEdit = useCallback(() => {
+    if (isDirty) {
+      if (!confirm('You have unsaved changes. Discard them?')) return;
+      discard();
+    }
+    setEditMode(false);
+  }, [isDirty, discard]);
+
+  const handleSave = useCallback(() => {
+    save();
+    // The hook clears the draft on success; we stay in edit mode so
+    // the user can keep working without losing context.
+  }, [save]);
+
+  const handleDiscard = useCallback(() => {
+    if (!confirm('Discard your unsaved changes?')) return;
+    discard();
+  }, [discard]);
+
+  // ── Export / Import ────────────────────────────────────────────
 
   const handleExport = useCallback(() => {
     const json = exportJSON();
@@ -168,15 +196,13 @@ function Dashboard() {
     URL.revokeObjectURL(url);
   }, [exportJSON]);
 
-  // ── Import ─────────────────────────────────────────────────────
-
   const importInputRef = useRef<HTMLInputElement>(null);
   const handleImportClick = useCallback(() => importInputRef.current?.click(), []);
   const handleImportFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      e.target.value = ''; // allow re-importing the same file
+      e.target.value = '';
       try {
         const text = await file.text();
         const result = importJSON(text);
@@ -190,20 +216,28 @@ function Dashboard() {
 
   // ── Render ─────────────────────────────────────────────────────
 
-  // Edit mode is only meaningful when the user is authenticated —
-  // the PUT endpoint requires auth, so an anonymous user couldn't
-  // save anything anyway. We hide the toggle entirely to keep the
-  // UX honest.
+  // Editing requires authentication: the PUT endpoint is auth-gated
+  // and we don't want to let anonymous users build edits they
+  // can't actually save.
   const canEdit = isLoggedIn;
 
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            Dashboard
+            {isDirty && (
+              <span className="text-xs px-2 py-0.5 rounded-sm bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 font-medium uppercase tracking-wider">
+                Unsaved
+              </span>
+            )}
+          </h1>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {editMode
-              ? 'Edit mode — drag tiles from the palette, rearrange existing ones, and tweak settings. Changes save automatically.'
+              ? isDirty
+                ? 'Changes are local — click "Save changes" to publish them, or "Discard" to throw them away.'
+                : 'Edit mode — drag tiles from the palette, rearrange existing ones, and tweak settings.'
               : canEdit
                 ? 'Live overview of recent test activity. Customise by clicking "Edit dashboard".'
                 : 'Live overview of recent test activity. Log in to customise.'}
@@ -211,15 +245,9 @@ function Dashboard() {
         </div>
 
         <div className="flex items-center gap-2">
-          {isSaving && (
-            <span className="text-xs text-[var(--color-text-tertiary)]">Saving…</span>
-          )}
           {saveError && (
-            <span
-              className="text-xs text-error-600"
-              title={saveError.message}
-            >
-              Save failed
+            <span className="text-xs text-error-600" title={saveError.message}>
+              Save failed — {saveError.message}
             </span>
           )}
           {editMode ? (
@@ -236,7 +264,7 @@ function Dashboard() {
                 type="button"
                 onClick={handleImportClick}
                 className="btn btn-secondary btn-sm"
-                title="Replace the dashboard with an uploaded JSON file"
+                title="Replace the dashboard (locally) with an uploaded JSON file"
               >
                 Import
               </button>
@@ -251,14 +279,33 @@ function Dashboard() {
                 type="button"
                 onClick={handleReset}
                 className="btn btn-secondary btn-sm"
-                title="Restore the default dashboard"
+                title="Stage a reset to the default dashboard (still needs to be saved)"
               >
                 Reset
               </button>
+              {isDirty && (
+                <button
+                  type="button"
+                  onClick={handleDiscard}
+                  className="btn btn-secondary btn-sm"
+                  title="Throw away your local edits and revert to the saved dashboard"
+                >
+                  Discard
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => setEditMode(false)}
-                className="btn btn-primary btn-sm"
+                onClick={handleSave}
+                disabled={!isDirty || isSaving}
+                className="btn btn-primary btn-sm disabled:opacity-50"
+              >
+                {isSaving ? 'Saving…' : 'Save changes'}
+              </button>
+              <button
+                type="button"
+                onClick={handleExitEdit}
+                className="btn btn-secondary btn-sm"
+                title="Leave edit mode (you'll be warned if there are unsaved changes)"
               >
                 Done
               </button>
@@ -344,8 +391,5 @@ function EditIcon({ className }: { className?: string }) {
   );
 }
 
-// Re-export so the file still resolves when only the type is imported
-// elsewhere (e.g. lazy imports). Not strictly needed but harmless.
 export type { DashboardTile };
-
 export default Dashboard;

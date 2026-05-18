@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   DEFAULT_DASHBOARD,
@@ -19,16 +19,34 @@ function genId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-// Imperative API exposed by the hook. Every mutator updates the
-// react-query cache immediately for snappy UI then fires an async
-// PUT to persist. The PUT is auth-required server-side; the hook
-// surfaces a `saveError` if persistence fails so callers can warn
-// the user (typically "log in to save changes").
+// Imperative API exposed by the hook.
+//
+// The hook keeps two parallel pieces of state:
+//
+// - `serverConfig` (react-query cache): the last known config from
+//   the server. This is what anonymous viewers see.
+// - `draft` (local React state): an optional in-progress edit. As
+//   soon as any mutator runs we seed `draft` from `serverConfig`
+//   and apply edits there. The UI renders `draft ?? serverConfig`,
+//   so changes appear instantly without touching the network.
+//
+// Saving is **explicit**: the user must hit "Save changes" to PUT
+// the draft to the server. Until then, navigating away or hitting
+// "Discard" simply throws the draft away — there is no implicit
+// live-save. This makes the edit flow feel like a small import:
+// you build the dashboard, then commit it as one atomic write.
 export interface DashboardConfigApi {
   config: DashboardConfig;
   isLoading: boolean;
-  saveError: Error | null;
+
+  // True iff there are unsaved local edits.
+  isDirty: boolean;
+
+  // Save / discard / progress reporting for the explicit-save flow.
+  save: () => void;
+  discard: () => void;
   isSaving: boolean;
+  saveError: Error | null;
 
   // Row mutators
   addRow: (afterRowId?: string) => string;
@@ -48,7 +66,7 @@ export interface DashboardConfigApi {
     dstIdx: number | null,
   ) => void;
 
-  // Import / export
+  // Import / export — both are local-only; they mutate the draft.
   exportJSON: () => string;
   importJSON: (json: string) => { ok: true } | { ok: false; error: string };
 
@@ -58,11 +76,7 @@ export interface DashboardConfigApi {
 export function useDashboardConfig(): DashboardConfigApi {
   const queryClient = useQueryClient();
 
-  // ── Server-backed config ──────────────────────────────────────
-  //
-  // The cache holds whatever the server has (or `null` if no
-  // config has been saved yet). We normalize that to a working
-  // `config` object so renderers don't have to deal with `null`.
+  // ── Server-fetched config (read-only baseline) ─────────────────
   const { data: serverConfig, isLoading } = useQuery<DashboardConfig | null>({
     queryKey: QUERY_KEY,
     queryFn: async () => {
@@ -70,56 +84,55 @@ export function useDashboardConfig(): DashboardConfigApi {
       if (raw === null) return null;
       return isValidConfig(raw) ? raw : null;
     },
-    staleTime: 10_000,
+    staleTime: 30_000,
   });
 
-  const config = serverConfig ?? DEFAULT_DASHBOARD;
-
-  // ── Persistence ────────────────────────────────────────────────
+  // ── Local edit draft ────────────────────────────────────────────
   //
-  // A single mutation is shared by every mutator; we coalesce
-  // rapid edits (e.g. drag-and-drop) with a 250ms debounce.
-  const persistMutation = useMutation({
+  // `null` means "no edits in progress; render the server config".
+  // Any mutator below seeds the draft from `serverConfig` (or the
+  // default dashboard) if it's still null.
+  const [draft, setDraft] = useState<DashboardConfig | null>(null);
+
+  const baseline = serverConfig ?? DEFAULT_DASHBOARD;
+  const config = draft ?? baseline;
+  const isDirty = draft !== null;
+
+  // updateDraft is the single funnel every mutator goes through.
+  // It seeds the draft on first edit and applies the user's
+  // updater to whatever the current draft (or baseline) is.
+  const updateDraft = useCallback(
+    (updater: (prev: DashboardConfig) => DashboardConfig) => {
+      setDraft((prev) => updater(prev ?? baseline));
+    },
+    [baseline],
+  );
+
+  // ── Save ───────────────────────────────────────────────────────
+  const saveMutation = useMutation({
     mutationFn: (cfg: DashboardConfig) => api.putDashboardConfig(cfg),
-    onError: () => {
-      // Roll the cache back to the server's last-known state so the
-      // UI doesn't drift away from reality after a failed save.
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    onSuccess: (_, cfg) => {
+      // Commit the draft to the react-query cache so other consumers
+      // pick up the new baseline immediately, then clear the draft.
+      queryClient.setQueryData<DashboardConfig | null>(QUERY_KEY, cfg);
+      setDraft(null);
     },
   });
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const save = useCallback(() => {
+    if (draft) saveMutation.mutate(draft);
+  }, [draft, saveMutation]);
 
-  const persist = useCallback(
-    (cfg: DashboardConfig) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        persistMutation.mutate(cfg);
-      }, 250);
-    },
-    [persistMutation],
-  );
-
-  // setLocal updates the react-query cache + queues a persistence
-  // round-trip. All mutators below funnel through it so the
-  // optimistic-update / debounce policy is in one place.
-  const setLocal = useCallback(
-    (updater: (prev: DashboardConfig) => DashboardConfig) => {
-      const prev = queryClient.getQueryData<DashboardConfig | null>(QUERY_KEY) ?? null;
-      const base = prev ?? DEFAULT_DASHBOARD;
-      const next = updater(base);
-      queryClient.setQueryData<DashboardConfig | null>(QUERY_KEY, next);
-      persist(next);
-    },
-    [queryClient, persist],
-  );
+  const discard = useCallback(() => {
+    setDraft(null);
+  }, []);
 
   // ── Row mutators ──────────────────────────────────────────────
 
   const addRow = useCallback(
     (afterRowId?: string): string => {
       const newRow: DashboardRow = { id: genId('row'), tiles: [] };
-      setLocal((prev) => {
+      updateDraft((prev) => {
         if (!afterRowId) return { ...prev, rows: [...prev.rows, newRow] };
         const idx = prev.rows.findIndex((r) => r.id === afterRowId);
         if (idx < 0) return { ...prev, rows: [...prev.rows, newRow] };
@@ -129,29 +142,29 @@ export function useDashboardConfig(): DashboardConfigApi {
       });
       return newRow.id;
     },
-    [setLocal],
+    [updateDraft],
   );
 
   const removeRow = useCallback(
     (rowId: string) => {
-      setLocal((prev) => ({ ...prev, rows: prev.rows.filter((r) => r.id !== rowId) }));
+      updateDraft((prev) => ({ ...prev, rows: prev.rows.filter((r) => r.id !== rowId) }));
     },
-    [setLocal],
+    [updateDraft],
   );
 
   const updateRow = useCallback(
     (rowId: string, patch: Partial<DashboardRow>) => {
-      setLocal((prev) => ({
+      updateDraft((prev) => ({
         ...prev,
         rows: prev.rows.map((r) => (r.id === rowId ? { ...r, ...patch } : r)),
       }));
     },
-    [setLocal],
+    [updateDraft],
   );
 
   const moveRow = useCallback(
     (rowId: string, direction: 'up' | 'down') => {
-      setLocal((prev) => {
+      updateDraft((prev) => {
         const idx = prev.rows.findIndex((r) => r.id === rowId);
         if (idx < 0) return prev;
         const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
@@ -161,12 +174,12 @@ export function useDashboardConfig(): DashboardConfigApi {
         return { ...prev, rows };
       });
     },
-    [setLocal],
+    [updateDraft],
   );
 
   const reorderRows = useCallback(
     (rowIds: string[]) => {
-      setLocal((prev) => {
+      updateDraft((prev) => {
         const byId = new Map(prev.rows.map((r) => [r.id, r] as const));
         const next = rowIds
           .map((id) => byId.get(id))
@@ -175,7 +188,7 @@ export function useDashboardConfig(): DashboardConfigApi {
         return { ...prev, rows: next };
       });
     },
-    [setLocal],
+    [updateDraft],
   );
 
   // ── Tile mutators ─────────────────────────────────────────────
@@ -188,7 +201,7 @@ export function useDashboardConfig(): DashboardConfigApi {
         width: defaultWidthForType(type),
         config: defaultConfigForType(type),
       };
-      setLocal((prev) => ({
+      updateDraft((prev) => ({
         ...prev,
         rows: prev.rows.map((r) => {
           if (r.id !== rowId) return r;
@@ -200,24 +213,24 @@ export function useDashboardConfig(): DashboardConfigApi {
       }));
       return newTile.id;
     },
-    [setLocal],
+    [updateDraft],
   );
 
   const removeTile = useCallback(
     (rowId: string, tileId: string) => {
-      setLocal((prev) => ({
+      updateDraft((prev) => ({
         ...prev,
         rows: prev.rows.map((r) =>
           r.id === rowId ? { ...r, tiles: r.tiles.filter((t) => t.id !== tileId) } : r,
         ),
       }));
     },
-    [setLocal],
+    [updateDraft],
   );
 
   const updateTile = useCallback(
     (rowId: string, tileId: string, patch: Partial<DashboardTile>) => {
-      setLocal((prev) => ({
+      updateDraft((prev) => ({
         ...prev,
         rows: prev.rows.map((r) =>
           r.id !== rowId
@@ -229,7 +242,7 @@ export function useDashboardConfig(): DashboardConfigApi {
         ),
       }));
     },
-    [setLocal],
+    [updateDraft],
   );
 
   const moveTile = useCallback(
@@ -239,7 +252,7 @@ export function useDashboardConfig(): DashboardConfigApi {
       dstRowId: string,
       dstIdx: number | null,
     ) => {
-      setLocal((prev) => {
+      updateDraft((prev) => {
         const srcRow = prev.rows.find((r) => r.id === srcRowId);
         if (!srcRow) return prev;
         const tile = srcRow.tiles.find((t) => t.id === tileId);
@@ -272,16 +285,14 @@ export function useDashboardConfig(): DashboardConfigApi {
         };
       });
     },
-    [setLocal],
+    [updateDraft],
   );
 
   const reset = useCallback(() => {
-    setLocal(() => DEFAULT_DASHBOARD);
-  }, [setLocal]);
+    updateDraft(() => DEFAULT_DASHBOARD);
+  }, [updateDraft]);
 
-  const exportJSON = useCallback((): string => {
-    return JSON.stringify(config, null, 2);
-  }, [config]);
+  const exportJSON = useCallback((): string => JSON.stringify(config, null, 2), [config]);
 
   const importJSON = useCallback(
     (json: string): { ok: true } | { ok: false; error: string } => {
@@ -294,7 +305,7 @@ export function useDashboardConfig(): DashboardConfigApi {
               'JSON does not match the dashboard schema (expected version: 2 with a rows array).',
           };
         }
-        setLocal(() => parsed);
+        updateDraft(() => parsed);
         return { ok: true };
       } catch (err) {
         return {
@@ -303,15 +314,19 @@ export function useDashboardConfig(): DashboardConfigApi {
         };
       }
     },
-    [setLocal],
+    [updateDraft],
   );
 
   return useMemo(
     () => ({
       config,
       isLoading,
-      saveError: persistMutation.error,
-      isSaving: persistMutation.isPending,
+      isDirty,
+
+      save,
+      discard,
+      isSaving: saveMutation.isPending,
+      saveError: saveMutation.error,
 
       addRow,
       removeRow,
@@ -332,8 +347,11 @@ export function useDashboardConfig(): DashboardConfigApi {
     [
       config,
       isLoading,
-      persistMutation.error,
-      persistMutation.isPending,
+      isDirty,
+      save,
+      discard,
+      saveMutation.isPending,
+      saveMutation.error,
       addRow,
       removeRow,
       updateRow,
