@@ -31,6 +31,7 @@ If `batchContract` is empty the task deploys a fresh forwarder bound to the conf
 - **`awaitReceipt`**: Wait for every batch transaction receipt before completing.
 - **`failOnReject`**: Fail the task if any batch transaction is rejected or reverted.
 - **`awaitInclusion`**: Wait for every individual deposit to appear in a beacon block before completing.
+- **`invalidSigPercent`**: Random percentage (0-100) of deposits to generate with corrupted signatures. Default `0`.
 
 ### Outputs
 
@@ -65,4 +66,5 @@ If `batchContract` is empty the task deploys a fresh forwarder bound to the conf
     awaitReceipt: false
     failOnReject: false
     awaitInclusion: false
+    invalidSigPercent: 0
 ```

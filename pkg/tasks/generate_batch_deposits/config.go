@@ -25,6 +25,7 @@ type Config struct {
 	AwaitReceipt          bool   `yaml:"awaitReceipt" json:"awaitReceipt" desc:"Wait for batch transaction receipts on the execution layer before completing."`
 	FailOnReject          bool   `yaml:"failOnReject" json:"failOnReject" desc:"Fail the task if any batch transaction is rejected."`
 	AwaitInclusion        bool   `yaml:"awaitInclusion" json:"awaitInclusion" desc:"Wait for all generated deposits to be included in beacon blocks before completing."`
+	InvalidSigPercent     int    `yaml:"invalidSigPercent" json:"invalidSigPercent" desc:"Random percentage (0-100) of deposits to generate with corrupted signatures."`
 }
 
 func DefaultConfig() Config {
@@ -71,6 +72,10 @@ func (c *Config) Validate() error {
 
 	if c.BatchTxGasLimit == 0 {
 		return errors.New("batchTxGasLimit must be > 0")
+	}
+
+	if c.InvalidSigPercent < 0 || c.InvalidSigPercent > 100 {
+		return errors.New("invalidSigPercent must be in range 0-100")
 	}
 
 	return nil

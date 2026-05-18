@@ -8,7 +8,7 @@ require (
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/ethpandaops/go-eth2-client v0.1.2
 	github.com/ethpandaops/service-authenticatoor v0.0.0-20260509005850-92ddd15b91e6
-	github.com/ethpandaops/spamoor v1.1.18-0.20260428200401-f2423b8e80fb
+	github.com/ethpandaops/spamoor v1.2.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
