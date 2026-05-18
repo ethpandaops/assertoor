@@ -569,7 +569,12 @@ tasks:
       }
       lines.push('', '**Legend:** ✅ pass · 🟡 partial · ❌ fail · ⚪ skipped · — absent');
 
-      writeResultFile('matrix.md', lines.join('\n') + '\n');
+      const markdown = lines.join('\n') + '\n';
+
+      // Write to both: the run-level Result panel (centrally visible on
+      // the run page) AND a downloadable matrix.md task artifact.
+      writeTestResult(markdown);
+      writeResultFile('matrix.md', markdown);
       setOutputJSON('cellCounts', counts);
       setOutputJSON('rowCount', rows.length);
       console.log(`matrix: ${rows.length} rows × ${cols.length} cols (pass=${counts.pass} partial=${counts.partial} fail=${counts.fail})`);
