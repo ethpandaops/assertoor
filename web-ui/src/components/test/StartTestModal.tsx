@@ -6,6 +6,8 @@ import CodeMirror from '@uiw/react-codemirror';
 import { yaml as yamlLang } from '@codemirror/lang-yaml';
 import { githubLight, githubDark } from '@uiw/codemirror-theme-github';
 import { useDarkMode } from '../../hooks/useDarkMode';
+import QueuePicker from './QueuePicker';
+import type { ScheduleQueueOption } from '../../types/api';
 
 interface StartTestModalProps {
   isOpen: boolean;
@@ -26,7 +28,7 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
   const [formConfig, setFormConfig] = useState<ConfigFormValues>({});
   const [yamlConfig, setYamlConfig] = useState('');
   const [allowDuplicate, setAllowDuplicate] = useState(false);
-  const [skipQueue, setSkipQueue] = useState(false);
+  const [queue, setQueue] = useState<ScheduleQueueOption>({ mode: 'end' });
   const [error, setError] = useState<string | null>(null);
   const isDarkMode = useDarkMode();
   const cmTheme = isDarkMode ? githubDark : githubLight;
@@ -51,7 +53,7 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
       setFormConfig({});
       setYamlConfig('');
       setAllowDuplicate(false);
-      setSkipQueue(false);
+      setQueue({ mode: 'end' });
       setError(null);
     }
   }, [isOpen, initialTestId]);
@@ -155,7 +157,10 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
         test_id: selectedTestId,
         config: config && Object.keys(config).length > 0 ? config : undefined,
         allow_duplicate: allowDuplicate,
-        skip_queue: skipQueue,
+        // Send the structured `queue` field. The legacy `skip_queue`
+        // boolean is still supported server-side but the modern
+        // shape is preferred.
+        queue,
       });
 
       // Navigate to the new test run
@@ -255,19 +260,26 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
                   <span className="text-[var(--color-text-secondary)]">Test ID: </span>
                   <span className="font-mono">{selectedTestId}</span>
                 </div>
-                {testDetails?.timeout && testDetails.timeout > 0 && (
+                {/* The `... && expr` form would render `0` when timeout
+                    is exactly 0 — coerce to boolean to keep React happy. */}
+                {!!(testDetails?.timeout && testDetails.timeout > 0) && (
                   <div className="text-sm mt-1">
                     <span className="text-[var(--color-text-secondary)]">Default Timeout: </span>
-                    <span>{formatTimeout(testDetails.timeout)}</span>
+                    <span>{formatTimeout(testDetails.timeout ?? 0)}</span>
                   </div>
                 )}
               </div>
 
-              {/* Configuration section */}
+              {/* Configuration section — the test's own knobs */}
               {hasConfig && (
-                <div>
+                <section className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium">Configuration Variables</h3>
+                    <div className="flex items-center gap-2">
+                      <ConfigIcon className="size-4 text-[var(--color-text-tertiary)]" />
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                        Test configuration
+                      </h3>
+                    </div>
                     <div className="flex items-center gap-1 bg-[var(--color-bg-secondary)] rounded-sm p-0.5">
                       <button
                         type="button"
@@ -331,12 +343,27 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
                       </p>
                     </div>
                   )}
-                </div>
+                </section>
               )}
 
-              {/* Options */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium">Options</h3>
+              {/* Run options — visually distinct from the per-test
+                  configuration above, since these only affect how /
+                  when the run lands on the runner, not what it does. */}
+              <section className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3 space-y-3">
+                <header className="flex items-center gap-2">
+                  <SettingsIcon className="size-4 text-[var(--color-text-tertiary)]" />
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                    Run options
+                  </h3>
+                </header>
+
+                <div>
+                  <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+                    Queue placement
+                  </label>
+                  <QueuePicker value={queue} onChange={setQueue} />
+                </div>
+
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -344,18 +371,12 @@ function StartTestModal({ isOpen, onClose, initialTestId }: StartTestModalProps)
                     onChange={(e) => setAllowDuplicate(e.target.checked)}
                     className="rounded-xs border-[var(--color-border)]"
                   />
-                  <span className="text-sm">Allow duplicate (run even if test is already running)</span>
+                  <span className="text-sm">
+                    Allow duplicate
+                    <span className="text-[var(--color-text-tertiary)]"> · run even if the test is already queued</span>
+                  </span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={skipQueue}
-                    onChange={(e) => setSkipQueue(e.target.checked)}
-                    className="rounded-xs border-[var(--color-border)]"
-                  />
-                  <span className="text-sm">Skip queue (start immediately)</span>
-                </label>
-              </div>
+              </section>
 
               {error && (
                 <div className="p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-sm">
@@ -518,6 +539,38 @@ function formatTimeout(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   return `${hours}h ${minutes}m`;
+}
+
+function ConfigIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6M9 16h6"
+      />
+    </svg>
+  );
+}
+
+function SettingsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+      />
+    </svg>
+  );
 }
 
 export default StartTestModal;
