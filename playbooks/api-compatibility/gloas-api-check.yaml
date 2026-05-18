@@ -457,11 +457,26 @@ tasks:
   title: "Render GLOAS API compatibility matrix"
   config:
     envVars:
-      # Collect the rowId / rowTitle / matrixRow tuple from every task in
-      # the run that emitted one. Children of run_tasks_concurrent register
-      # in the same scope as their parent, so a flat walk of .tasks picks
-      # them up too.
-      ROWS: "| [ .tasks | to_entries[] | .value.outputs | select(.matrixRow != null) | { rowId, rowTitle, referenceUrl, matrixRow } ]"
+      # One env var per row. Each query is a simple path expression so it
+      # never enumerates the scope wholesale — that avoids gojq panicking
+      # on time.Time values nested elsewhere in the var tree (e.g. inside
+      # get_consensus_specs's spec map).
+      ROW_01: "tasks.row01_publish_block.outputs"
+      ROW_02: "tasks.row02_produce_block_v4.outputs"
+      ROW_03: "tasks.row03_publish_bid.outputs"
+      ROW_04: "tasks.row04_get_bid.outputs"
+      ROW_05: "tasks.row05_publish_envelope.outputs"
+      ROW_06: "tasks.row06_get_envelope_by_block.outputs"
+      ROW_07: "tasks.row07_get_envelope_by_slot.outputs"
+      ROW_08: "tasks.row08_ptc_duties.outputs"
+      ROW_09: "tasks.row09_payload_attestation_data.outputs"
+      ROW_10: "tasks.row10_post_payload_attestations.outputs"
+      ROW_11: "tasks.row11_get_payload_attestations.outputs"
+      ROW_12: "tasks.row12_sse_execution_payload_bid.outputs"
+      ROW_13: "tasks.row13_sse_execution_payload_available.outputs"
+      ROW_14: "tasks.row14_sse_payload_attestation_message.outputs"
+      ROW_15: "tasks.row15_sse_execution_payload.outputs"
+      ROW_16: "tasks.row16_sse_execution_payload_gossip.outputs"
     script: |
       // Canonical client-type column order. Columns absent from results
       // are dropped automatically.
@@ -493,9 +508,16 @@ tasks:
         return '`' + m[1] + ' ' + m[2].slice(0, sp) + '`' + m[2].slice(sp);
       };
 
-      // 1) order rows.
+      // 1) collect & order rows. envVars are provided as ROW_01..ROW_16,
+      //    each pointing at one source task's outputs object.
+      const allRows = Object.keys(env)
+        .filter(k => /^ROW_\d+$/.test(k))
+        .sort()
+        .map(k => env[k])
+        .filter(o => o && typeof o === 'object' && o.matrixRow && o.rowId);
+
       const idxOf = Object.fromEntries(ROW_ORDER.map((id, i) => [id, i]));
-      const rows = (env.ROWS || [])
+      const rows = allRows
         .filter(r => ROW_ORDER.length === 0 || idxOf[r.rowId] !== undefined)
         .sort((a, b) => (idxOf[a.rowId] ?? 1e9) - (idxOf[b.rowId] ?? 1e9));
 
