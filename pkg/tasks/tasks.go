@@ -19,7 +19,6 @@ import (
 	checkethcall "github.com/ethpandaops/assertoor/pkg/tasks/check_eth_call"
 	checkethconfig "github.com/ethpandaops/assertoor/pkg/tasks/check_eth_config"
 	checkexecutionsyncstatus "github.com/ethpandaops/assertoor/pkg/tasks/check_execution_sync_status"
-	generateapicompatibilitymatrix "github.com/ethpandaops/assertoor/pkg/tasks/generate_api_compatibility_matrix"
 	generateattestations "github.com/ethpandaops/assertoor/pkg/tasks/generate_attestations"
 	generatebatchdeposits "github.com/ethpandaops/assertoor/pkg/tasks/generate_batch_deposits"
 	generateblobtransactions "github.com/ethpandaops/assertoor/pkg/tasks/generate_blob_transactions"
@@ -40,6 +39,7 @@ import (
 	getwalletdetails "github.com/ethpandaops/assertoor/pkg/tasks/get_wallet_details"
 	runcommand "github.com/ethpandaops/assertoor/pkg/tasks/run_command"
 	runexternaltasks "github.com/ethpandaops/assertoor/pkg/tasks/run_external_tasks"
+	runjavascript "github.com/ethpandaops/assertoor/pkg/tasks/run_javascript"
 	runshell "github.com/ethpandaops/assertoor/pkg/tasks/run_shell"
 	runspamoorscenario "github.com/ethpandaops/assertoor/pkg/tasks/run_spamoor_scenario"
 	runtaskbackground "github.com/ethpandaops/assertoor/pkg/tasks/run_task_background"
@@ -70,7 +70,6 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkethcall.TaskDescriptor,
 	checkethconfig.TaskDescriptor,
 	checkexecutionsyncstatus.TaskDescriptor,
-	generateapicompatibilitymatrix.TaskDescriptor,
 	generateattestations.TaskDescriptor,
 	generatebatchdeposits.TaskDescriptor,
 	generateblobtransactions.TaskDescriptor,
@@ -90,6 +89,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	getwalletdetails.TaskDescriptor,
 	runcommand.TaskDescriptor,
 	runexternaltasks.TaskDescriptor,
+	runjavascript.TaskDescriptor,
 	runshell.TaskDescriptor,
 	runspamoorscenario.TaskDescriptor,
 	runtaskbackground.TaskDescriptor,

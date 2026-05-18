@@ -16,6 +16,8 @@ COPY --from=ui-builder /src/pkg/web/static/ ./pkg/web/static/
 RUN make build
 
 FROM ubuntu:latest
+# nodejs is required by the run_javascript task; jq, git, curl, make remain
+# for run_shell / external playbook scripts.
 RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
   libssl-dev \
   ca-certificates \
@@ -24,6 +26,9 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
   curl \
   make \
   sudo \
+  gnupg \
+  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
   && update-ca-certificates
