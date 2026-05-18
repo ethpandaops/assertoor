@@ -239,6 +239,72 @@ export async function registerExternalTest(
   });
 }
 
+// Dashboard config
+//
+// The server stores an opaque JSON blob (the schema is owned by the
+// client). GET is open; PUT requires authentication. A 204 from GET
+// means "no config yet" and the UI falls back to its built-in
+// default dashboard.
+
+export async function getDashboardConfig(): Promise<unknown | null> {
+  const response = await fetch(`${API_BASE}/dashboard_config`);
+  if (response.status === 204) return null;
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function putDashboardConfig(cfg: unknown): Promise<void> {
+  const authHeader = authStore.getAuthHeader();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (authHeader) headers['Authorization'] = authHeader;
+
+  const response = await fetch(`${API_BASE}/dashboard_config`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(cfg),
+  });
+
+  if (response.status === 401) {
+    throw new Error('Unauthorized: log in to save dashboard changes');
+  }
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+}
+
+// Network status (used by the dashboard's `network_status` tile).
+export interface NetworkStatusResponse {
+  chain_id: number;
+  network_name: string;
+  genesis_time: number;
+  slot_duration_ms: number;
+  slots_per_epoch: number;
+  current_slot: number;
+  current_epoch: number;
+  head_slot: number;
+  head_root: string;
+  finalized_epoch: number;
+  finalized_root: string;
+  justified_epoch: number;
+  justified_root: string;
+  client_count: number;
+  cl_ready_count: number;
+  el_ready_count: number;
+  el_head_number: number;
+  el_head_hash: string;
+  tests_running: number;
+  tests_queued: number;
+}
+
+export async function getNetworkStatus(): Promise<NetworkStatusResponse> {
+  return fetchApi<NetworkStatusResponse>('/network_status');
+}
+
 // Playbook library
 
 export async function getPlaybookLibrary(): Promise<LibraryIndex> {
