@@ -83,8 +83,46 @@ func (db *Database) GetAllTaskResultHeaders(runID uint64) ([]TaskResultHeader, e
 
 	err := db.reader.Select(&headers, `
 		SELECT task_id, result_type, result_index, name, size FROM task_results
-		WHERE run_id = $1`,
+		WHERE run_id = $1 AND task_id != 0`,
 		runID)
 
 	return headers, err
+}
+
+// testResultTaskID and testResultType are the sentinel coordinates we use
+// to store the run-level "test result" markdown in the shared
+// task_results table. TaskID 0 is unused by real tasks (real indices
+// start at 1).
+const (
+	testResultTaskID = 0
+	testResultType   = "test_result"
+)
+
+// UpsertTestResult stores the run-level markdown blob (set by tasks that
+// write to $ASSERTOOR_TEST_RESULT). One blob per test run.
+func (db *Database) UpsertTestResult(runID uint64, data []byte) error {
+	return db.RunTransaction(func(tx *sqlx.Tx) error {
+		return db.UpsertTaskResult(tx, &TaskResult{
+			RunID:  runID,
+			TaskID: testResultTaskID,
+			Type:   testResultType,
+			Index:  0,
+			Name:   "result.md",
+			Size:   uint64(len(data)),
+			Data:   data,
+		})
+	})
+}
+
+// GetTestResult returns the run-level markdown blob, or nil + nil error
+// when none is set.
+func (db *Database) GetTestResult(runID uint64) (*TaskResult, error) {
+	result, err := db.GetTaskResultByIndex(runID, testResultTaskID, testResultType, 0)
+	if err != nil {
+		// Surface "no rows" as nil, nil so callers can distinguish "not
+		// set" from "fetch failed".
+		return nil, nil //nolint:nilerr // sql.ErrNoRows-style miss
+	}
+
+	return result, nil
 }

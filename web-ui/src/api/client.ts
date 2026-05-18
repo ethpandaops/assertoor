@@ -106,6 +106,19 @@ export async function getTestRunDetails(runId: number): Promise<TestRunDetails> 
   return fetchApiWithAuth<TestRunDetails>(`/test_run/${runId}/details`);
 }
 
+// Run-level Result markdown. Returns null when the run has not produced
+// a $ASSERTOOR_TEST_RESULT blob (server replies 204 No Content).
+export async function getTestRunResult(runId: number): Promise<string | null> {
+  const response = await fetch(`${API_BASE}/test_run/${runId}/result`);
+  if (response.status === 204) return null;
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.text();
+}
+
 // Task details
 export async function getTaskDetails(runId: number, taskIndex: number): Promise<TaskDetails> {
   return fetchApiWithAuth<TaskDetails>(`/test_run/${runId}/task/${taskIndex}/details`);

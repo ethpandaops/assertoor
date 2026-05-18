@@ -6,6 +6,7 @@ export const queryKeys = {
   testRuns: (testId?: string) => ['testRuns', testId] as const,
   tests: ['tests'] as const,
   testRunDetails: (id: number) => ['testRunDetails', id] as const,
+  testRunResult: (id: number) => ['testRunResult', id] as const,
   taskDetails: (runId: number, taskIndex: number) => ['taskDetails', runId, taskIndex] as const,
   taskDescriptors: ['taskDescriptors'] as const,
   taskDescriptor: (name: string) => ['taskDescriptor', name] as const,
@@ -53,6 +54,20 @@ export function useTestRunDetails(
   return useQuery({
     queryKey: queryKeys.testRunDetails(runId),
     queryFn: () => api.getTestRunDetails(runId),
+    enabled: options?.enabled !== false && runId > 0,
+    refetchInterval: options?.refetchInterval ?? false,
+  });
+}
+
+// Run-level Result markdown. Returns null when the run has not produced
+// a $ASSERTOOR_TEST_RESULT blob (HTTP 204).
+export function useTestRunResult(
+  runId: number,
+  options?: { enabled?: boolean; refetchInterval?: number | false }
+) {
+  return useQuery({
+    queryKey: queryKeys.testRunResult(runId),
+    queryFn: () => api.getTestRunResult(runId),
     enabled: options?.enabled !== false && runId > 0,
     refetchInterval: options?.refetchInterval ?? false,
   });

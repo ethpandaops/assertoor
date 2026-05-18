@@ -104,6 +104,7 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 
 	// Fetch all result headers in one go.
 	resultHeaderMap := map[uint64][]db.TaskResultHeader{}
+
 	if resultHeaders, err := ah.coordinator.Database().GetAllTaskResultHeaders(runID); err == nil {
 		for _, header := range resultHeaders {
 			resultHeaderMap[header.TaskID] = append(resultHeaderMap[header.TaskID], header)

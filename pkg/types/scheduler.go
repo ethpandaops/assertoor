@@ -18,6 +18,13 @@ type TaskSchedulerRunner interface {
 	GetTestRunCtx() context.Context
 	ParseTaskOptions(rawtask helper.IRawMessage) (*TaskOptions, error)
 	ExecuteTask(ctx context.Context, taskIndex TaskIndex, taskWatchFn func(ctx context.Context, cancelFn context.CancelFunc, taskIndex TaskIndex)) error
+
+	// TestResultPath returns a filesystem path to a shared markdown file
+	// that every task in this test run can write to. The file is created
+	// lazily on first call. Whatever the tasks leave in it is persisted as
+	// the test run's top-level result artifact, displayed by the UI as a
+	// Result panel on the run page.
+	TestResultPath() (string, error)
 }
 
 type TaskScheduler interface {

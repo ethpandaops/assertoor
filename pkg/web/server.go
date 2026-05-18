@@ -102,6 +102,7 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 		ws.router.HandleFunc("/api/v1/test/{testId}/yaml", apiHandler.GetTestYaml).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_runs", apiHandler.GetTestRuns).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}", apiHandler.GetTestRun).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test_run/{runId}/result", apiHandler.GetTestRunResult).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/status", apiHandler.GetTestRunStatus).Methods("GET")
 		ws.router.HandleFunc("/api/v1/task_descriptors", apiHandler.GetTaskDescriptors).Methods("GET")
 		ws.router.HandleFunc("/api/v1/task_descriptor/{name}", apiHandler.GetTaskDescriptor).Methods("GET")

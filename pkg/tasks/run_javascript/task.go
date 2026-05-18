@@ -45,9 +45,10 @@ const preamble = `
 const fs = require('fs');
 const path = require('path');
 
-const SUMMARY_FILE  = process.env.ASSERTOOR_SUMMARY  || '';
-const RESULT_DIR    = process.env.ASSERTOOR_RESULT_DIR || '';
-const __envKeys     = (process.env.__ASSERTOOR_ENV_KEYS || '').split(',').filter(Boolean);
+const SUMMARY_FILE     = process.env.ASSERTOOR_SUMMARY     || '';
+const RESULT_DIR       = process.env.ASSERTOOR_RESULT_DIR  || '';
+const TEST_RESULT_FILE = process.env.ASSERTOOR_TEST_RESULT || '';
+const __envKeys        = (process.env.__ASSERTOOR_ENV_KEYS || '').split(',').filter(Boolean);
 
 const env = {};
 for (const k of __envKeys) {
@@ -71,6 +72,18 @@ function writeResultFile(name, content) {
 function writeSummary(content) {
   if (!SUMMARY_FILE) throw new Error('ASSERTOOR_SUMMARY is not set');
   fs.writeFileSync(SUMMARY_FILE, content);
+}
+
+// writeTestResult and appendTestResult target the shared per-test-run
+// markdown file. Anything written here shows up on the run page's
+// Result panel (one centralised, easy-to-find place across all tasks).
+function writeTestResult(content) {
+  if (!TEST_RESULT_FILE) throw new Error('ASSERTOOR_TEST_RESULT is not set');
+  fs.writeFileSync(TEST_RESULT_FILE, content);
+}
+function appendTestResult(content) {
+  if (!TEST_RESULT_FILE) throw new Error('ASSERTOOR_TEST_RESULT is not set');
+  fs.appendFileSync(TEST_RESULT_FILE, content);
 }
 
 (async () => {
@@ -184,61 +197,11 @@ func (t *Task) Execute(ctx context.Context) error {
 	stderrChan, stderrCloseChan := t.readOutputStream(stderr, scriptLogger.WithField("stream", "stderr"))
 	defer close(stderrChan)
 
-	// add env vars
-	envKeys := make([]string, 0, len(t.config.EnvVars))
-
-	for envName, varName := range t.config.EnvVars {
-		varValue, varFound, err2 := t.ctx.Vars.ResolveQuery(varName)
-		if err2 != nil {
-			scriptLogger.Errorf("failed parsing var query for env variable %v: %v", envName, err2)
-
-			return err2
-		}
-
-		if !varFound {
-			continue
-		}
-
-		varJSON, err3 := json.Marshal(varValue)
-		if err3 != nil {
-			scriptLogger.Errorf("failed encoding env variable %v: %v", envName, err3)
-
-			return err3
-		}
-
-		command.Env = append(command.Env, fmt.Sprintf("%v=%v", envName, string(varJSON)))
-		envKeys = append(envKeys, envName)
+	// Assemble all process env vars (user envVars, ASSERTOOR_* paths, PATH).
+	summaryFile, resultDir, envErr := t.buildCommandEnv(taskDir, command, scriptLogger)
+	if envErr != nil {
+		return envErr
 	}
-
-	// Tell the preamble which env keys to parse as JSON values.
-	command.Env = append(command.Env, fmt.Sprintf("__ASSERTOOR_ENV_KEYS=%s", joinComma(envKeys)))
-
-	// Inherit PATH so 'node' resolves and standard libs work.
-	for _, kv := range os.Environ() {
-		if len(kv) > 5 && kv[:5] == "PATH=" {
-			command.Env = append(command.Env, kv)
-		}
-	}
-
-	// create summaries file
-	summaryFile, err := newResultFile(filepath.Join(taskDir, "summary"))
-	if err != nil {
-		scriptLogger.Errorf("failed creating summary file: %v", err)
-
-		return err
-	}
-
-	command.Env = append(command.Env, fmt.Sprintf("ASSERTOOR_SUMMARY=%v", summaryFile.FilePath()))
-
-	// create folder for result files
-	resultDir := filepath.Join(taskDir, "results")
-	if err = os.MkdirAll(resultDir, 0o700); err != nil {
-		scriptLogger.Errorf("failed creating result dir: %v", err)
-
-		return err
-	}
-
-	command.Env = append(command.Env, fmt.Sprintf("ASSERTOOR_RESULT_DIR=%v", resultDir))
 
 	defer func() {
 		t.storeTaskResults(summaryFile, resultDir)
@@ -320,6 +283,84 @@ cmdloop:
 	t.ctx.ReportProgress(100, "JavaScript completed")
 
 	return nil
+}
+
+// buildCommandEnv assembles the child process's environment:
+//   - one var per entry in t.config.EnvVars (JSON-encoded resolved value)
+//   - __ASSERTOOR_ENV_KEYS so the preamble knows which keys to JSON.parse
+//   - PATH inherited from the parent
+//   - ASSERTOOR_SUMMARY (newly-created file)
+//   - ASSERTOOR_RESULT_DIR (newly-created dir)
+//   - ASSERTOOR_TEST_RESULT (shared per-test-run file, best-effort)
+//
+// It returns the summary-file wrapper and the result-dir path the caller
+// uses to persist task results, or an error for unrecoverable setup
+// failures.
+func (t *Task) buildCommandEnv(
+	taskDir string,
+	command *exec.Cmd,
+	scriptLogger logrus.FieldLogger,
+) (*resultFile, string, error) {
+	envKeys := make([]string, 0, len(t.config.EnvVars))
+
+	for envName, varName := range t.config.EnvVars {
+		varValue, varFound, err := t.ctx.Vars.ResolveQuery(varName)
+		if err != nil {
+			scriptLogger.Errorf("failed parsing var query for env variable %v: %v", envName, err)
+
+			return nil, "", err
+		}
+
+		if !varFound {
+			continue
+		}
+
+		varJSON, err := json.Marshal(varValue)
+		if err != nil {
+			scriptLogger.Errorf("failed encoding env variable %v: %v", envName, err)
+
+			return nil, "", err
+		}
+
+		command.Env = append(command.Env, fmt.Sprintf("%v=%v", envName, string(varJSON)))
+		envKeys = append(envKeys, envName)
+	}
+
+	command.Env = append(command.Env, fmt.Sprintf("__ASSERTOOR_ENV_KEYS=%s", joinComma(envKeys)))
+
+	for _, kv := range os.Environ() {
+		if len(kv) > 5 && kv[:5] == "PATH=" {
+			command.Env = append(command.Env, kv)
+		}
+	}
+
+	summaryFile, err := newResultFile(filepath.Join(taskDir, "summary"))
+	if err != nil {
+		scriptLogger.Errorf("failed creating summary file: %v", err)
+
+		return nil, "", err
+	}
+
+	command.Env = append(command.Env, fmt.Sprintf("ASSERTOOR_SUMMARY=%v", summaryFile.FilePath()))
+
+	resultDir := filepath.Join(taskDir, "results")
+	if err := os.MkdirAll(resultDir, 0o700); err != nil {
+		scriptLogger.Errorf("failed creating result dir: %v", err)
+
+		return nil, "", err
+	}
+
+	command.Env = append(command.Env, fmt.Sprintf("ASSERTOOR_RESULT_DIR=%v", resultDir))
+
+	// Shared per-test-run markdown file. Anything the script writes to
+	// this path is persisted as the run-level Result panel content.
+	if testResultPath, terr := t.ctx.Scheduler.TestResultPath(); terr == nil {
+		command.Env = append(command.Env, fmt.Sprintf("ASSERTOOR_TEST_RESULT=%v", testResultPath))
+	} else {
+		scriptLogger.WithError(terr).Warn("failed to obtain test-result path; ASSERTOOR_TEST_RESULT will be unset")
+	}
+
+	return summaryFile, resultDir, nil
 }
 
 func joinComma(xs []string) string {
