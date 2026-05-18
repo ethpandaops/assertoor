@@ -112,6 +112,9 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 		ws.router.HandleFunc("/api/v1/version", apiHandler.GetVersion).Methods("GET")
 		ws.router.HandleFunc("/api/v1/playbook_library", apiHandler.GetPlaybookLibrary).Methods("GET")
 		ws.router.HandleFunc("/api/v1/playbook_library/check", apiHandler.GetPlaybookLibraryCheck).Methods("GET")
+		ws.router.HandleFunc("/api/v1/network_status", apiHandler.GetNetworkStatus).Methods("GET")
+		ws.router.HandleFunc("/api/v1/dashboard_config", apiHandler.GetDashboardConfig).Methods("GET")
+		ws.router.HandleFunc("/api/v1/dashboard_config", apiHandler.PutDashboardConfig).Methods("PUT")
 
 		// SSE event stream endpoints
 		if eventBus != nil {
