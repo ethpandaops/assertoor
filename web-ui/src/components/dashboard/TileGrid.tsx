@@ -98,12 +98,14 @@ function TileSlot({
   return (
     <div className={`${colSpan} ${editMode ? 'ring-1 ring-dashed ring-primary-400/40 rounded-md' : ''}`}>
       {editMode && (
-        <div className="mb-1 flex items-center justify-between gap-2 text-xs text-[var(--color-text-tertiary)] px-1">
-          <span className="font-medium uppercase tracking-wider">
+        <div className="mb-1 flex items-center justify-between gap-2 text-xs text-[var(--color-text-tertiary)] px-1 min-w-0">
+          <span
+            className="font-medium uppercase tracking-wider truncate min-w-0"
+            title={tile.title ? `${tileTypeLabel(tile.type)} · ${tile.title}` : tileTypeLabel(tile.type)}
+          >
             {tileTypeLabel(tile.type)}
-            {tile.title ? <span className="ml-1">· {tile.title}</span> : null}
           </span>
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-0.5 shrink-0">
             <WidthPicker
               value={tile.width}
               onChange={(w) => onResize?.(tile.id, w)}
@@ -201,16 +203,24 @@ function WidthPicker({
   value: DashboardTile['width'];
   onChange: (w: DashboardTile['width']) => void;
 }) {
+  // Compact width picker — symbol per width keeps the edit strip
+  // readable even on `small` (3-column) tiles.
+  const symbols: Record<DashboardTile['width'], string> = {
+    small: 'S',
+    medium: 'M',
+    large: 'L',
+    full: 'XL',
+  };
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as DashboardTile['width'])}
       className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded text-xs px-1 py-0.5 mr-1"
-      title="Tile width"
+      title={`Width: ${value} (${TILE_WIDTH_COLS[value]}/12 cols)`}
     >
       {(Object.keys(TILE_WIDTH_COLS) as DashboardTile['width'][]).map((w) => (
         <option key={w} value={w}>
-          {w} ({TILE_WIDTH_COLS[w]}/12)
+          {symbols[w]}
         </option>
       ))}
     </select>
