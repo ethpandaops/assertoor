@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:20-slim AS ui-builder
+FROM node:24-slim AS ui-builder
 WORKDIR /src
 COPY web-ui/package.json web-ui/package-lock.json ./web-ui/
 RUN cd web-ui && npm ci
@@ -16,8 +16,6 @@ COPY --from=ui-builder /src/pkg/web/static/ ./pkg/web/static/
 RUN make build
 
 FROM ubuntu:latest
-# nodejs is required by the run_javascript task; jq, git, curl, make remain
-# for run_shell / external playbook scripts.
 RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
   libssl-dev \
   ca-certificates \
@@ -27,7 +25,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
   make \
   sudo \
   gnupg \
-  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+  && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
