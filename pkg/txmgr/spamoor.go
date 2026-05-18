@@ -163,7 +163,6 @@ func (s *Spamoor) GetTxPool() *spamoor.TxPool {
 
 func (s *Spamoor) GetReadyClient() *spamoor.Client {
 	idx := s.clientIdx.Add(1)
-	//nolint:gosec // idx%1000000 fits in int on every supported platform
 	return s.clientPool.GetClient(spamoor.WithClientSelectionMode(spamoor.SelectClientByIndex, int(idx%1000000)))
 }
 

@@ -565,7 +565,7 @@ func (t *Task) aggregateAttestationVotes(votes *epochVotes, slot, committee uint
 
 	for bitIdx, attDuty := range voteValidators {
 		validatorIdx := attDuty.validator
-		if aggregationBits.BitAt(uint64(bitIdx) + aggregationBitsOffset) { //nolint:gosec // bitIdx is a non-negative slice index
+		if aggregationBits.BitAt(uint64(bitIdx) + aggregationBitsOffset) {
 			if votes.activityMap[validatorIdx] {
 				continue
 			}

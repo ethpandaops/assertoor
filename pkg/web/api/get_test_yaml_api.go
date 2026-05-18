@@ -100,11 +100,13 @@ func (ah *APIHandler) loadExternalYaml(ctx context.Context, source string) (stri
 	if strings.HasPrefix(cleanSource, "http://") || strings.HasPrefix(cleanSource, "https://") {
 		client := &http.Client{Timeout: time.Second * 120}
 
+		//nolint:gosec // G704: URL is derived from configured test sources, not user input
 		req, err := http.NewRequestWithContext(ctx, "GET", cleanSource, http.NoBody)
 		if err != nil {
 			return "", fmt.Errorf("failed to create request: %w", err)
 		}
 
+		//nolint:gosec // G704: URL is derived from configured test sources, not user input
 		resp, err := client.Do(req)
 		if err != nil {
 			return "", fmt.Errorf("failed to fetch URL: %w", err)
@@ -129,6 +131,7 @@ func (ah *APIHandler) loadExternalYaml(ctx context.Context, source string) (stri
 	}
 
 	// It's a local file path - read the file (this endpoint is auth-protected)
+	//nolint:gosec // G703: path is derived from configured test sources, not user input
 	body, err := os.ReadFile(cleanSource)
 	if err != nil {
 		return "", fmt.Errorf("cannot load local file %s: %w", cleanSource, err)

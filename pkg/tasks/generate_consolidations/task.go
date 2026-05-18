@@ -121,11 +121,11 @@ func (t *Task) LoadConfig() error {
 //nolint:gocyclo // no need to reduce complexity
 func (t *Task) Execute(ctx context.Context) error {
 	if t.config.SourceStartIndex > 0 {
-		t.nextIndex = uint64(t.config.SourceStartIndex) //nolint:gosec // guarded by > 0 above
+		t.nextIndex = uint64(t.config.SourceStartIndex)
 	}
 
 	if t.config.SourceIndexCount > 0 {
-		t.lastIndex = t.nextIndex + uint64(t.config.SourceIndexCount) //nolint:gosec // guarded by > 0 above
+		t.lastIndex = t.nextIndex + uint64(t.config.SourceIndexCount)
 	}
 
 	var subscription *consensus.Subscription[*consensus.Block]
