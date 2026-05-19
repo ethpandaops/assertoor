@@ -886,11 +886,10 @@ func extractErrorMessage(body []byte) (string, bool) {
 
 // routeMissingPatterns lists case-insensitive substrings that strongly
 // indicate a framework's generic "route not registered" reply rather
-// than a domain-specific resource-not-found error. The patterns are
-// purposely narrow — domain handlers mentioning "block not found",
-// "envelope not found", etc. must NOT match.
+// than a domain-specific resource-not-found error. Domain handlers
+// mentioning "block not found", "envelope not found", etc. must NOT
+// match — those tell us the route is registered, the resource isn't.
 var routeMissingPatterns = []string{
-	"not_found",            // Lighthouse global 404 (`NOT_FOUND`)
 	"route not found",      // Nimbus / Lodestar style
 	"unsupported endpoint", // Lighthouse "Unsupported endpoint version"
 	"endpoint not found",   // generic
@@ -901,12 +900,25 @@ var routeMissingPatterns = []string{
 	"no handler",           // generic
 }
 
+// isRouteMissingMessage reports whether the body's `message` field
+// looks like a framework-level "route not registered" reply. Domain
+// 404s like "execution payload envelope for block root X not found"
+// or "block not found at slot N" do NOT match.
 func isRouteMissingMessage(msg string) bool {
-	low := strings.ToLower(msg)
+	low := strings.ToLower(strings.TrimSpace(msg))
+
+	// Lighthouse global 404 — the message is exactly "NOT_FOUND" (or
+	// the same wrapped with a BAD_REQUEST prefix etc.). When LH
+	// rejects a SPECIFIC resource it emits "NOT_FOUND: <detail>", so
+	// only match when nothing follows.
+	switch low {
+	case "not_found", "not found":
+		return true
+	}
 
 	// Lodestar emits "Route POST:/eth/v1/foo not found" — accept any
 	// "Route … not found" form.
-	if strings.Contains(low, "route ") && strings.Contains(low, "not found") {
+	if strings.HasPrefix(low, "route ") && strings.Contains(low, "not found") {
 		return true
 	}
 
