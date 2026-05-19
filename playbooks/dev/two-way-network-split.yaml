@@ -1,23 +1,22 @@
 id: two-way-network-split
 name: "Two-Way Network Split Finality Test"
 description: |
-  Splits a Kurtosis-launched devnet into two equal halves through the
-  disruptoor HTTP API, verifies that finality stops for two epochs, heals the
-  split, waits two more epochs, and verifies finality recovers.
+  Splits a Kurtosis-launched devnet into two halves through the disruptoor
+  HTTP API, verifies that finality stops for two epochs, heals the split,
+  waits two more epochs, and verifies finality recovers.
 
-  The default participant groups assume a four-node ethereum-package devnet
-  with validator-bearing nodes 1-4 and a disruptoor service reachable at
-  `http://disruptoor:7700`. Override `splitLeftParticipants`,
-  `splitRightParticipants`, and `disruptoorUrl` when running in another
-  topology.
+  The participant groups are computed dynamically from the assertoor client
+  pool: nodes 1..floor(N/2) form the left half, nodes floor(N/2)+1..N form
+  the right half. For odd N the right half gets the extra node. The playbook
+  requires at least `minClientCount` clients (default 4) so neither half
+  retains a 2/3 finality majority. A disruptoor service is expected at
+  `disruptoorUrl` (default `http://disruptoor:7700`).
 version: 1.0.0
 tags: [disruptoor, kurtosis, finality, network-split, consensus]
 timeout: 45m
 config:
   disruptoorUrl: "http://disruptoor:7700"
   minClientCount: 4
-  splitLeftParticipants: [1, 2]
-  splitRightParticipants: [3, 4]
   partitionClientTypes: ["execution", "beacon"]
   slotsPerEpoch: 32
   splitObservationEpochs: 2
@@ -36,6 +35,7 @@ tasks:
       curl -fsS "${disruptoor_url}/v1/healthz" >/dev/null
 
 - name: check_clients_are_healthy
+  id: client_check
   title: "Wait for all devnet clients to be healthy"
   timeout: 10m
   configVars:
@@ -63,8 +63,8 @@ tasks:
   config:
     envVars:
       DISRUPTOOR_URL: disruptoorUrl
-      SPLIT_LEFT_PARTICIPANTS: splitLeftParticipants
-      SPLIT_RIGHT_PARTICIPANTS: splitRightParticipants
+      SPLIT_LEFT_PARTICIPANTS: "| [range(1; ((.tasks.client_check.outputs.totalCount / 2) | floor) + 1)]"
+      SPLIT_RIGHT_PARTICIPANTS: "| [range(((.tasks.client_check.outputs.totalCount / 2) | floor) + 1; .tasks.client_check.outputs.totalCount + 1)]"
       PARTITION_CLIENT_TYPES: partitionClientTypes
     command: |
       set -euo pipefail
@@ -72,6 +72,13 @@ tasks:
       left_participants=$(echo "$SPLIT_LEFT_PARTICIPANTS" | jq -c .)
       right_participants=$(echo "$SPLIT_RIGHT_PARTICIPANTS" | jq -c .)
       client_types=$(echo "$PARTITION_CLIENT_TYPES" | jq -c .)
+      left_count=$(echo "$left_participants" | jq 'length')
+      right_count=$(echo "$right_participants" | jq 'length')
+      echo "Splitting ${left_count} left (${left_participants}) vs ${right_count} right (${right_participants})"
+      if [ "$left_count" -lt 1 ] || [ "$right_count" -lt 1 ]; then
+        echo "Refusing to split: each side must have at least one node" >&2
+        exit 1
+      fi
       state_file=$(mktemp)
       trap 'rm -f "$state_file"' EXIT
 

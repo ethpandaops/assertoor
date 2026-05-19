@@ -1,8 +1,8 @@
 # Auto-generated playbook index
-# Generated: 2026-05-19T18:37:28Z
+# Generated: 2026-05-19T18:55:32Z
 # DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
 
-generated: 2026-05-19T18:37:28Z
+generated: 2026-05-19T18:55:32Z
 folders:
   - path: dev
     name: Development & Utilities
@@ -218,15 +218,16 @@ playbooks:
     id: two-way-network-split
     name: Two-Way Network Split Finality Test
     description: |-
-      Splits a Kurtosis-launched devnet into two equal halves through the
-      disruptoor HTTP API, verifies that finality stops for two epochs, heals the
-      split, waits two more epochs, and verifies finality recovers.
+      Splits a Kurtosis-launched devnet into two halves through the disruptoor
+      HTTP API, verifies that finality stops for two epochs, heals the split,
+      waits two more epochs, and verifies finality recovers.
 
-      The default participant groups assume a four-node ethereum-package devnet
-      with validator-bearing nodes 1-4 and a disruptoor service reachable at
-      `http://disruptoor:7700`. Override `splitLeftParticipants`,
-      `splitRightParticipants`, and `disruptoorUrl` when running in another
-      topology.
+      The participant groups are computed dynamically from the assertoor client
+      pool: nodes 1..floor(N/2) form the left half, nodes floor(N/2)+1..N form
+      the right half. For odd N the right half gets the extra node. The playbook
+      requires at least `minClientCount` clients (default 4) so neither half
+      retains a 2/3 finality majority. A disruptoor service is expected at
+      `disruptoorUrl` (default `http://disruptoor:7700`).
     version: 1.0.0
     tags:
       - disruptoor
