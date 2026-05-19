@@ -19,7 +19,13 @@ ENCLAVE_NAME="${ENCLAVE_NAME:-assertoor}"
 if kurtosis enclave inspect "$ENCLAVE_NAME" > /dev/null; then
   echo "Kurtosis enclave '$ENCLAVE_NAME' is already up."
 else
-  kurtosis run github.com/ethpandaops/ethereum-package --enclave "$ENCLAVE_NAME" --args-file "$args_file" --non-blocking-tasks --image-download always
+  kurtosis_run_flags=(--non-blocking-tasks --image-download always)
+
+  if grep -Eq '^[[:space:]]*-[[:space:]]*disruptoor([[:space:]]*(#.*)?)?$' "$args_file"; then
+    kurtosis_run_flags+=(--privileged)
+  fi
+
+  kurtosis run github.com/ethpandaops/ethereum-package --enclave "$ENCLAVE_NAME" --args-file "$args_file" "${kurtosis_run_flags[@]}"
 
   # Stop assertoor instance within ethereum-package if running
   kurtosis service stop "$ENCLAVE_NAME" assertoor > /dev/null || true
