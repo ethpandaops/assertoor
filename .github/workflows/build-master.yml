@@ -105,10 +105,6 @@ jobs:
       run: |
         cd assertoor_linux_arm64
         tar -czf ../assertoor_snapshot_linux_arm64.tar.gz .
-    - name: "Generate release package: assertoor_snapshot_darwin_amd64.tar.gz"
-      run: |
-        cd assertoor_darwin_amd64
-        tar -czf ../assertoor_snapshot_darwin_amd64.tar.gz .
     - name: "Generate release package: assertoor_snapshot_darwin_arm64.tar.gz"
       run: |
         cd assertoor_darwin_arm64
@@ -133,11 +129,9 @@ jobs:
           | [assertoor_snapshot_windows_amd64.zip](https://github.com/ethpandaops/assertoor/releases/download/snapshot/assertoor_snapshot_windows_amd64.zip) | assertoor executables for windows/amd64 |
           | [assertoor_snapshot_linux_amd64.tar.gz](https://github.com/ethpandaops/assertoor/releases/download/snapshot/assertoor_snapshot_linux_amd64.tar.gz) | assertoor executables for linux/amd64 |
           | [assertoor_snapshot_linux_arm64.tar.gz](https://github.com/ethpandaops/assertoor/releases/download/snapshot/assertoor_snapshot_linux_arm64.tar.gz) | assertoor executables for linux/arm64 |
-          | [assertoor_snapshot_darwin_amd64.tar.gz](https://github.com/ethpandaops/assertoor/releases/download/snapshot/assertoor_snapshot_darwin_amd64.tar.gz) | assertoor executable for macos/amd64 |
           | [assertoor_snapshot_darwin_arm64.tar.gz](https://github.com/ethpandaops/assertoor/releases/download/snapshot/assertoor_snapshot_darwin_arm64.tar.gz) | assertoor executable for macos/arm64 |
         files: |
           assertoor_snapshot_windows_amd64.zip
           assertoor_snapshot_linux_amd64.tar.gz
           assertoor_snapshot_linux_arm64.tar.gz
-          assertoor_snapshot_darwin_amd64.tar.gz
           assertoor_snapshot_darwin_arm64.tar.gz
