@@ -67,10 +67,6 @@ jobs:
       run: |
         cd assertoor_linux_arm64
         tar -czf ../assertoor_${{ inputs.version }}_linux_arm64.tar.gz .
-    - name: "Generate release package: assertoor_${{ inputs.version }}_darwin_amd64.tar.gz"
-      run: |
-        cd assertoor_darwin_amd64
-        tar -czf ../assertoor_${{ inputs.version }}_darwin_amd64.tar.gz .
     - name: "Generate release package: assertoor_${{ inputs.version }}_darwin_arm64.tar.gz"
       run: |
         cd assertoor_darwin_arm64
@@ -95,11 +91,9 @@ jobs:
           | [assertoor_${{ inputs.version }}_windows_amd64.zip](https://github.com/ethpandaops/assertoor/releases/download/v${{ inputs.version }}/assertoor_${{ inputs.version }}_windows_amd64.zip) | assertoor executables for windows/amd64 |
           | [assertoor_${{ inputs.version }}_linux_amd64.tar.gz](https://github.com/ethpandaops/assertoor/releases/download/v${{ inputs.version }}/assertoor_${{ inputs.version }}_linux_amd64.tar.gz) | assertoor executables for linux/amd64 |
           | [assertoor_${{ inputs.version }}_linux_arm64.tar.gz](https://github.com/ethpandaops/assertoor/releases/download/v${{ inputs.version }}/assertoor_${{ inputs.version }}_linux_arm64.tar.gz) | assertoor executables for linux/arm64 |
-          | [assertoor_${{ inputs.version }}_darwin_amd64.tar.gz](https://github.com/ethpandaops/assertoor/releases/download/v${{ inputs.version }}/assertoor_${{ inputs.version }}_darwin_amd64.tar.gz) | assertoor executable for macos/amd64 |
           | [assertoor_${{ inputs.version }}_darwin_arm64.tar.gz](https://github.com/ethpandaops/assertoor/releases/download/v${{ inputs.version }}/assertoor_${{ inputs.version }}_darwin_arm64.tar.gz) | assertoor executable for macos/arm64 |
         files: |
           assertoor_${{ inputs.version }}_windows_amd64.zip
           assertoor_${{ inputs.version }}_linux_amd64.tar.gz
           assertoor_${{ inputs.version }}_linux_arm64.tar.gz
-          assertoor_${{ inputs.version }}_darwin_amd64.tar.gz
           assertoor_${{ inputs.version }}_darwin_arm64.tar.gz

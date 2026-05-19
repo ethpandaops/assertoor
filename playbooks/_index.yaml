@@ -1,8 +1,8 @@
 # Auto-generated playbook index
-# Generated: 2026-05-14T23:32:41Z
+# Generated: 2026-05-19T21:36:30Z
 # DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
 
-generated: 2026-05-14T23:32:41Z
+generated: 2026-05-19T21:36:30Z
 folders:
   - path: api-compatibility
     name: API Compatibility
@@ -95,8 +95,8 @@ playbooks:
   - file: api-compatibility/gloas-api-check.yaml
     id: gloas-api-check
     name: GLOAS Beacon-API Compatibility Matrix
-    description: "Probes every beacon-API endpoint and SSE topic added or changed by the\nGLOAS / ePBS spec PRs ([#552](https://github.com/ethereum/beacon-APIs/pull/552),\n[#580](https://github.com/ethereum/beacon-APIs/pull/580),\n[#586](https://github.com/ethereum/beacon-APIs/pull/586) /\n[#592](https://github.com/ethereum/beacon-APIs/pull/592),\n[#587](https://github.com/ethereum/beacon-APIs/pull/587),\n[#588](https://github.com/ethereum/beacon-APIs/pull/588)) against every\nconnected CL client and renders a compatibility matrix.\n\nFor each (endpoint × client) pair the result is:\n\n- ✅ — endpoint exists, response body validates against the spec schema\n  (success body **or** documented error body counts).\n- \U0001F7E1 — endpoint exists but the response body does not match the spec\n  schema, or an SSE topic was accepted but no event arrived in the wait\n  window. The note is captured as a footnote.\n- ❌ — endpoint not implemented (route not found, connection error, or\n  SSE subscription rejected).\n- ⚪ — required fork not yet active on the client (skipped)."
-    version: 1.0.0
+    description: "Probes every beacon-API endpoint and SSE topic added or changed by the\nGLOAS / ePBS spec PRs ([#552](https://github.com/ethereum/beacon-APIs/pull/552),\n[#580](https://github.com/ethereum/beacon-APIs/pull/580),\n[#586](https://github.com/ethereum/beacon-APIs/pull/586) /\n[#592](https://github.com/ethereum/beacon-APIs/pull/592),\n[#587](https://github.com/ethereum/beacon-APIs/pull/587),\n[#588](https://github.com/ethereum/beacon-APIs/pull/588)) against every\nconnected CL client and renders a compatibility matrix.\n\nInputs are pulled from live chain state at the start of the run via two\nsmall generic tasks — `get_consensus_block_header` for a canonical\nrecent slot/root pair, and `get_consensus_proposer_duties` for a real\nfuture-slot proposer assignment plus a handful of live validator\nindices. The GET endpoints below pull those values via `configVars`\nso they answer with actual data instead of synthetic 404s.\n\nEach cell is classified as:\n\n- ✅ — endpoint exists AND the success response body validates against\n  the spec-derived schema (every required field present, types match).\n  For error responses we only check that the body is a JSON object —\n  error shapes diverge legitimately across implementations.\n- \U0001F7E1 — endpoint exists but the success body misses required spec\n  fields, or an SSE topic was accepted but no event arrived in the\n  wait window. The note is captured as a footnote.\n- ❌ — endpoint not implemented (route not found, connection error,\n  SSE subscription rejected, or unexpected 5xx outside the\n  documented error set).\n- ⚪ — required fork not yet active on the client (skipped)."
+    version: 1.3.0
     tags:
       - api
       - compatibility
@@ -237,6 +237,29 @@ playbooks:
       - consensus
       - execution
     timeout: 12h
+  - file: dev/two-way-network-split.yaml
+    id: two-way-network-split
+    name: Two-Way Network Split Finality Test
+    description: |-
+      Splits a Kurtosis-launched devnet into two halves through the disruptoor
+      HTTP API, verifies that finality stops for two epochs, heals the split,
+      waits two more epochs, and verifies finality recovers.
+
+      The participant groups are computed dynamically from the assertoor client
+      pool: nodes 1..floor(N/2) form the left half, nodes floor(N/2)+1..N form
+      the right half. For odd N the right half gets the extra node. The playbook
+      requires at least `minClientCount` clients (default 2); choosing a topology
+      where one side retains a 2/3 finality majority (e.g. 3 nodes split 1/2) is
+      the operator's call. A disruptoor service is expected at `disruptoorUrl`
+      (default `http://disruptoor:7700`).
+    version: 1.0.0
+    tags:
+      - disruptoor
+      - kurtosis
+      - finality
+      - network-split
+      - consensus
+    timeout: 45m
   - file: dev/validator-lifecycle-test.yaml
     id: validator-lifecycle-test
     name: Validator Lifecycle Test (Un-finality Stress)

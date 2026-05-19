@@ -19,7 +19,17 @@ ENCLAVE_NAME="${ENCLAVE_NAME:-assertoor}"
 if kurtosis enclave inspect "$ENCLAVE_NAME" > /dev/null; then
   echo "Kurtosis enclave '$ENCLAVE_NAME' is already up."
 else
-  kurtosis run github.com/ethpandaops/ethereum-package --enclave "$ENCLAVE_NAME" --args-file "$args_file" --non-blocking-tasks --image-download always
+  kurtosis_run_flags=(--non-blocking-tasks --image-download always)
+
+  # Disruptoor needs --privileged to manage iptables in the enclave.
+  # Pattern matches a bare YAML list entry `- disruptoor` (the form used by
+  # ethereum-package's `additional_services`); it will miss other shapes
+  # (e.g. mapping keys, quoted strings, inline flow lists) — extend if needed.
+  if grep -Eq '^[[:space:]]*-[[:space:]]*disruptoor([[:space:]]*(#.*)?)?$' "$args_file"; then
+    kurtosis_run_flags+=(--privileged)
+  fi
+
+  kurtosis run github.com/ethpandaops/ethereum-package --enclave "$ENCLAVE_NAME" --args-file "$args_file" "${kurtosis_run_flags[@]}"
 
   # Stop assertoor instance within ethereum-package if running
   kurtosis service stop "$ENCLAVE_NAME" assertoor > /dev/null || true
