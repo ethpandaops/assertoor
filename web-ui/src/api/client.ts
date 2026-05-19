@@ -10,10 +10,14 @@ import type {
   ClientsPage,
   GlobalVariablesResponse,
   ScheduleTestRunRequest,
+  TestSchedule,
+  TestNextRunResponse,
+  TestQueueResponse,
   VersionResponse,
   LibraryIndex,
   LibraryCheckResponse,
   RegisterExternalTestResponse,
+  LatestResultResponse,
 } from '../types/api';
 import { authStore } from '../stores/authStore';
 
@@ -106,6 +110,42 @@ export async function getTestRunDetails(runId: number): Promise<TestRunDetails> 
   return fetchApiWithAuth<TestRunDetails>(`/test_run/${runId}/details`);
 }
 
+// Latest run-level result markdown for a test (envelope form). Walks
+// the newest runs server-side and returns the first one that produced
+// a $ASSERTOOR_TEST_RESULT blob. `run_id === 0` and empty `markdown`
+// indicate "no result available across recent runs" (the dashboard
+// tile renders an empty state in that case).
+export async function getLatestTestResult(testId: string): Promise<LatestResultResponse> {
+  return fetchApi<LatestResultResponse>(
+    `/test/${encodeURIComponent(testId)}/latest_result?meta=1`,
+  ).then((data) => {
+    // Server returns `data: null` on 200 when no result exists yet —
+    // normalise to an empty envelope so callers don't have to.
+    return (
+      (data as LatestResultResponse) ?? {
+        run_id: 0,
+        status: '',
+        start_time: 0,
+        stop_time: 0,
+        markdown: '',
+      }
+    );
+  });
+}
+
+// Run-level Result markdown. Returns null when the run has not produced
+// a $ASSERTOOR_TEST_RESULT blob (server replies 204 No Content).
+export async function getTestRunResult(runId: number): Promise<string | null> {
+  const response = await fetch(`${API_BASE}/test_run/${runId}/result`);
+  if (response.status === 204) return null;
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.text();
+}
+
 // Task details
 export async function getTaskDetails(runId: number, taskIndex: number): Promise<TaskDetails> {
   return fetchApiWithAuth<TaskDetails>(`/test_run/${runId}/task/${taskIndex}/details`);
@@ -128,6 +168,29 @@ export async function getGlobalVariables(): Promise<GlobalVariablesResponse> {
 // Build version info
 export async function getVersion(): Promise<VersionResponse> {
   return fetchApi<VersionResponse>('/version');
+}
+
+// Test schedule (cron + startup) — read open, write auth-gated.
+export async function updateTestSchedule(
+  testId: string,
+  schedule: TestSchedule | null,
+): Promise<void> {
+  await fetchApiWithAuth<void>(`/test/${encodeURIComponent(testId)}/schedule`, {
+    method: 'PUT',
+    body: JSON.stringify({ schedule }),
+  });
+}
+
+export async function getTestNextRun(testId: string): Promise<TestNextRunResponse> {
+  return fetchApi<TestNextRunResponse>(
+    `/test/${encodeURIComponent(testId)}/next_run`,
+  );
+}
+
+// Live test queue (running + pending) used by the StartTestModal's
+// QueuePicker.
+export async function getTestQueue(): Promise<TestQueueResponse> {
+  return fetchApi<TestQueueResponse>('/test_queue');
 }
 
 // Admin operations (require authentication)
@@ -200,6 +263,72 @@ export async function registerExternalTest(
     method: 'POST',
     body: JSON.stringify({ file: url, name: options?.name }),
   });
+}
+
+// Dashboard config
+//
+// The server stores an opaque JSON blob (the schema is owned by the
+// client). GET is open; PUT requires authentication. A 204 from GET
+// means "no config yet" and the UI falls back to its built-in
+// default dashboard.
+
+export async function getDashboardConfig(): Promise<unknown | null> {
+  const response = await fetch(`${API_BASE}/dashboard_config`);
+  if (response.status === 204) return null;
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function putDashboardConfig(cfg: unknown): Promise<void> {
+  const authHeader = authStore.getAuthHeader();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (authHeader) headers['Authorization'] = authHeader;
+
+  const response = await fetch(`${API_BASE}/dashboard_config`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(cfg),
+  });
+
+  if (response.status === 401) {
+    throw new Error('Unauthorized: log in to save dashboard changes');
+  }
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+}
+
+// Network status (used by the dashboard's `network_status` tile).
+export interface NetworkStatusResponse {
+  chain_id: number;
+  network_name: string;
+  genesis_time: number;
+  slot_duration_ms: number;
+  slots_per_epoch: number;
+  current_slot: number;
+  current_epoch: number;
+  head_slot: number;
+  head_root: string;
+  finalized_epoch: number;
+  finalized_root: string;
+  justified_epoch: number;
+  justified_root: string;
+  client_count: number;
+  cl_ready_count: number;
+  el_ready_count: number;
+  el_head_number: number;
+  el_head_hash: string;
+  tests_running: number;
+  tests_queued: number;
+}
+
+export async function getNetworkStatus(): Promise<NetworkStatusResponse> {
+  return fetchApi<NetworkStatusResponse>('/network_status');
 }
 
 // Playbook library

@@ -177,6 +177,15 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 		}
 	}
 
+	// Persist the shared test-result file (if any task in this run wrote
+	// to it). We do this after every task so the UI's Result panel shows
+	// the latest content as the test progresses, not only at the end.
+	if ts.testResultExists() {
+		if err2 := ts.syncTestResult(); err2 != nil {
+			taskLogger.WithError(err2).Warn("failed syncing test-result file to db")
+		}
+	}
+
 	// set task result
 	if !taskState.updatedResult || taskState.taskResult == types.TaskResultNone {
 		// set task result if not already done by task

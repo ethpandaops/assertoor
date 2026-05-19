@@ -7,6 +7,7 @@ import type { VersionResponse } from '../../types/api';
 
 const navItems = [
   { path: '/', label: 'Dashboard' },
+  { path: '/runs', label: 'Runs' },
   { path: '/registry', label: 'Library' },
   { path: '/builder', label: 'Builder' },
   { path: '/clients', label: 'Clients' },

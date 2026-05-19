@@ -2,6 +2,9 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -25,6 +28,10 @@ type TaskScheduler struct {
 	taskStateMap     map[types.TaskIndex]*taskState
 	cancelTaskCtx    context.CancelFunc
 	cancelCleanupCtx context.CancelFunc
+
+	testResultMutex sync.Mutex
+	testResultDir   string
+	testResultPath  string
 }
 
 func NewTaskScheduler(log logrus.FieldLogger, services types.TaskServices, variables types.Variables, testRunID uint64) *TaskScheduler {
@@ -50,6 +57,89 @@ func (ts *TaskScheduler) GetTestRunID() uint64 {
 
 func (ts *TaskScheduler) GetTestRunCtx() context.Context {
 	return ts.testRunCtx
+}
+
+// TestResultPath returns a stable filesystem path to the shared test-run
+// markdown file. It is created lazily on first call.
+func (ts *TaskScheduler) TestResultPath() (string, error) {
+	ts.testResultMutex.Lock()
+	defer ts.testResultMutex.Unlock()
+
+	if ts.testResultPath != "" {
+		return ts.testResultPath, nil
+	}
+
+	dir, err := os.MkdirTemp(os.TempDir(), fmt.Sprintf("assertoor_testresult_%v_", ts.testRunID))
+	if err != nil {
+		return "", fmt.Errorf("failed to create test-result temp dir: %w", err)
+	}
+
+	path := filepath.Join(dir, "result.md")
+	if err := os.WriteFile(path, []byte{}, 0o600); err != nil {
+		return "", fmt.Errorf("failed to create test-result file: %w", err)
+	}
+
+	ts.testResultDir = dir
+	ts.testResultPath = path
+
+	return path, nil
+}
+
+// testResultExists reports whether a test-result file has been
+// created for this scheduler (i.e., at least one task asked for it).
+func (ts *TaskScheduler) testResultExists() bool {
+	ts.testResultMutex.Lock()
+	defer ts.testResultMutex.Unlock()
+
+	return ts.testResultPath != ""
+}
+
+// syncTestResult reads the shared test-result file and persists it as a
+// run-level result artifact in the database. It is a no-op if the file
+// hasn't been created yet.
+func (ts *TaskScheduler) syncTestResult() error {
+	ts.testResultMutex.Lock()
+	path := ts.testResultPath
+	ts.testResultMutex.Unlock()
+
+	if path == "" {
+		return nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		return fmt.Errorf("read test-result file: %w", err)
+	}
+
+	if ts.services == nil || ts.services.Database() == nil {
+		return nil
+	}
+
+	database := ts.services.Database()
+
+	return database.UpsertTestResult(ts.testRunID, data)
+}
+
+// cleanupTestResult deletes the test-result temp dir. Safe to call
+// multiple times.
+func (ts *TaskScheduler) cleanupTestResult() {
+	ts.testResultMutex.Lock()
+	defer ts.testResultMutex.Unlock()
+
+	if ts.testResultDir == "" {
+		return
+	}
+
+	if err := os.RemoveAll(ts.testResultDir); err != nil {
+		ts.logger.WithError(err).Warn("failed to clean up test-result temp dir")
+	}
+
+	ts.testResultDir = ""
+	ts.testResultPath = ""
 }
 
 func (ts *TaskScheduler) AddRootTask(options *types.TaskOptions) (types.TaskIndex, error) {
@@ -79,6 +169,7 @@ func (ts *TaskScheduler) RunTasks(testRunCtx context.Context, timeout time.Durat
 
 	cleanupCtx, ts.cancelCleanupCtx = context.WithCancel(testRunCtx)
 
+	defer ts.cleanupTestResult()
 	defer ts.runCleanupTasks(cleanupCtx)
 
 	ts.testRunCtx = testRunCtx

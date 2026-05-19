@@ -76,17 +76,38 @@ func (c *TestRunner) RemoveTestFromQueue(runID uint64) bool {
 	return false
 }
 
+// ScheduleTest is the legacy 4-arg entry point. New callers should
+// use ScheduleTestWithOptions; this signature is kept so any external
+// code (and the deprecated `skip_queue` request field) continues to
+// work unchanged.
 func (c *TestRunner) ScheduleTest(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate, skipQueue bool) (types.TestRunner, error) {
+	return c.ScheduleTestWithOptions(descriptor, configOverrides, types.ScheduleOptions{
+		AllowDuplicate: allowDuplicate,
+		SkipQueue:      skipQueue,
+	})
+}
+
+// ScheduleTestWithOptions adds explicit support for inserting at a
+// chosen position in the pending queue (opts.AfterRunID). Mutually
+// exclusive with SkipQueue — when AfterRunID is non-zero the test is
+// inserted into the regular queue regardless of SkipQueue.
+func (c *TestRunner) ScheduleTestWithOptions(descriptor types.TestDescriptor, configOverrides map[string]any, opts types.ScheduleOptions) (types.TestRunner, error) {
 	if descriptor.Err() != nil {
 		return nil, fmt.Errorf("cannot create test from failed test descriptor: %w", descriptor.Err())
 	}
 
-	testRef, err := c.createTestRun(descriptor, configOverrides, allowDuplicate, skipQueue)
+	// AfterRunID always wins over SkipQueue: the user explicitly asked
+	// to slot the test into the queue at a known position.
+	if opts.AfterRunID > 0 {
+		opts.SkipQueue = false
+	}
+
+	testRef, err := c.createTestRun(descriptor, configOverrides, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	if skipQueue {
+	if opts.SkipQueue {
 		c.offQueueNotificationChan <- testRef
 	} else {
 		select {
@@ -98,11 +119,11 @@ func (c *TestRunner) ScheduleTest(descriptor types.TestDescriptor, configOverrid
 	return testRef, nil
 }
 
-func (c *TestRunner) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any, allowDuplicate, skipQueue bool) (types.TestRunner, error) {
+func (c *TestRunner) createTestRun(descriptor types.TestDescriptor, configOverrides map[string]any, opts types.ScheduleOptions) (types.TestRunner, error) {
 	c.testSchedulerMutex.Lock()
 	defer c.testSchedulerMutex.Unlock()
 
-	if !allowDuplicate {
+	if !opts.AllowDuplicate {
 		for _, queuedTest := range c.GetTestQueue() {
 			if queuedTest.TestID() == descriptor.ID() {
 				return nil, fmt.Errorf("test already in queue")
@@ -120,8 +141,28 @@ func (c *TestRunner) createTestRun(descriptor types.TestDescriptor, configOverri
 
 	c.testRegistryMutex.Lock()
 
-	if !skipQueue {
-		c.testQueue = append(c.testQueue, testRef)
+	if !opts.SkipQueue {
+		insertIdx := -1
+
+		// When the user explicitly asked to slot in after a known
+		// queued run, locate it and insert just behind. If the target
+		// isn't queued any more (already started, was cancelled, etc.)
+		// we fall through to "append" — never silently drop the
+		// schedule request.
+		if opts.AfterRunID > 0 {
+			for idx, qt := range c.testQueue {
+				if qt.RunID() == opts.AfterRunID {
+					insertIdx = idx + 1
+					break
+				}
+			}
+		}
+
+		if insertIdx < 0 || insertIdx > len(c.testQueue) {
+			c.testQueue = append(c.testQueue, testRef)
+		} else {
+			c.testQueue = append(c.testQueue[:insertIdx], append([]types.TestRunner{testRef}, c.testQueue[insertIdx:]...)...)
+		}
 	}
 
 	c.testRunMap[runID] = testRef

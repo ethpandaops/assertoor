@@ -14,6 +14,7 @@ import { useAuthContext } from '../../context/AuthContext';
 import Modal from '../common/Modal';
 import StartTestModal from '../test/StartTestModal';
 import StatusBadge from '../common/StatusBadge';
+import ScheduleCard from '../schedule/ScheduleCard';
 import { formatDuration } from '../../utils/time';
 import type { Test } from '../../types/api';
 
@@ -318,6 +319,13 @@ function ExpandedTestDetails({ test }: ExpandedTestDetailsProps) {
             </>
           )}
         </dl>
+
+        <div className="pt-2">
+          <SectionHeader>Schedule</SectionHeader>
+          <div className="mt-1">
+            <ScheduleCard testId={test.id} />
+          </div>
+        </div>
       </div>
 
       <div className="p-4 space-y-2">

@@ -162,6 +162,14 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	command.Env = append(command.Env, fmt.Sprintf("ASSERTOOR_RESULT_DIR=%v", resultDir))
 
+	// Shared per-test-run markdown file. Anything the script writes to
+	// this path is persisted as the run-level Result panel content.
+	if testResultPath, err2 := t.ctx.Scheduler.TestResultPath(); err2 == nil {
+		command.Env = append(command.Env, fmt.Sprintf("ASSERTOOR_TEST_RESULT=%v", testResultPath))
+	} else {
+		cmdLogger.WithError(err2).Warn("failed to obtain test-result path; ASSERTOOR_TEST_RESULT will be unset")
+	}
+
 	defer func() {
 		t.storeTaskResults(summaryFile, resultDir)
 	}()

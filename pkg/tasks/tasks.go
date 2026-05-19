@@ -4,6 +4,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/types"
 
 	checkclientsarehealthy "github.com/ethpandaops/assertoor/pkg/tasks/check_clients_are_healthy"
+	checkconsensusapi "github.com/ethpandaops/assertoor/pkg/tasks/check_consensus_api"
 	checkconsensusattestationstats "github.com/ethpandaops/assertoor/pkg/tasks/check_consensus_attestation_stats"
 	checkconsensusblockproposals "github.com/ethpandaops/assertoor/pkg/tasks/check_consensus_block_proposals"
 	checkconsensusbuildersstatus "github.com/ethpandaops/assertoor/pkg/tasks/check_consensus_builder_status"
@@ -30,6 +31,8 @@ import (
 	generateslashings "github.com/ethpandaops/assertoor/pkg/tasks/generate_slashings"
 	generatetransaction "github.com/ethpandaops/assertoor/pkg/tasks/generate_transaction"
 	generatewithdrawalrequests "github.com/ethpandaops/assertoor/pkg/tasks/generate_withdrawal_requests"
+	getconsensusblockheader "github.com/ethpandaops/assertoor/pkg/tasks/get_consensus_block_header"
+	getconsensusproposerduties "github.com/ethpandaops/assertoor/pkg/tasks/get_consensus_proposer_duties"
 	getconsensusspecs "github.com/ethpandaops/assertoor/pkg/tasks/get_consensus_specs"
 	getconsensusvalidators "github.com/ethpandaops/assertoor/pkg/tasks/get_consensus_validators"
 	checkexecutionblock "github.com/ethpandaops/assertoor/pkg/tasks/get_execution_block"
@@ -38,6 +41,7 @@ import (
 	getwalletdetails "github.com/ethpandaops/assertoor/pkg/tasks/get_wallet_details"
 	runcommand "github.com/ethpandaops/assertoor/pkg/tasks/run_command"
 	runexternaltasks "github.com/ethpandaops/assertoor/pkg/tasks/run_external_tasks"
+	runjavascript "github.com/ethpandaops/assertoor/pkg/tasks/run_javascript"
 	runshell "github.com/ethpandaops/assertoor/pkg/tasks/run_shell"
 	runspamoorscenario "github.com/ethpandaops/assertoor/pkg/tasks/run_spamoor_scenario"
 	runtaskbackground "github.com/ethpandaops/assertoor/pkg/tasks/run_task_background"
@@ -52,6 +56,7 @@ import (
 
 var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkclientsarehealthy.TaskDescriptor,
+	checkconsensusapi.TaskDescriptor,
 	checkconsensusattestationstats.TaskDescriptor,
 	checkconsensusblockproposals.TaskDescriptor,
 	checkconsensusbuildersstatus.TaskDescriptor,
@@ -79,13 +84,16 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generateslashings.TaskDescriptor,
 	generatetransaction.TaskDescriptor,
 	generatewithdrawalrequests.TaskDescriptor,
-	getpubkeysfrommnemonic.TaskDescriptor,
+	getconsensusblockheader.TaskDescriptor,
+	getconsensusproposerduties.TaskDescriptor,
 	getconsensusspecs.TaskDescriptor,
 	getconsensusvalidators.TaskDescriptor,
+	getpubkeysfrommnemonic.TaskDescriptor,
 	getrandommnemonic.TaskDescriptor,
 	getwalletdetails.TaskDescriptor,
 	runcommand.TaskDescriptor,
 	runexternaltasks.TaskDescriptor,
+	runjavascript.TaskDescriptor,
 	runshell.TaskDescriptor,
 	runspamoorscenario.TaskDescriptor,
 	runtaskbackground.TaskDescriptor,

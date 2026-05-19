@@ -9,6 +9,7 @@ import SplitPane from '../components/common/SplitPane';
 import TaskList from '../components/task/TaskList';
 import TaskDetails from '../components/task/TaskDetails';
 import { TaskGraph } from '../components/graph';
+import RunResultPanel from '../components/run/RunResultPanel';
 import { formatDuration, formatRelativeTime } from '../utils/time';
 import type { SSEEvent, TaskLogEntry, TaskState, TestRunDetails } from '../types/api';
 
@@ -338,6 +339,10 @@ function TestRun() {
           )}
         </div>
       </div>
+
+      {/* Run-level Result panel (only renders when tasks wrote to
+          $ASSERTOOR_TEST_RESULT) */}
+      <RunResultPanel runId={runIdNum} isRunning={details.status === 'running' || details.status === 'pending'} />
 
       {/* Task list and details */}
       <SplitPane

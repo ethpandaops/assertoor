@@ -2,10 +2,12 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { yaml as yamlLang } from '@codemirror/lang-yaml';
 import { githubLight, githubDark } from '@uiw/codemirror-theme-github';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useTaskDetails } from '../../hooks/useApi';
 import { useAuthContext } from '../../context/AuthContext';
 import { useDarkMode } from '../../hooks/useDarkMode';
-import type { TaskState, TaskLogEntry } from '../../types/api';
+import type { TaskState, TaskLogEntry, TaskResultFile } from '../../types/api';
 import { formatDurationMs, formatTime } from '../../utils/time';
 
 interface TaskDetailsProps {
@@ -187,18 +189,80 @@ function OverviewTab({ task }: { task: TaskState }) {
           <h4 className="text-sm font-medium text-[var(--color-text-secondary)]">Result Files</h4>
           <ul className="mt-1 space-y-1">
             {task.result_files.map((file) => (
-              <li key={file.index}>
+              <li key={`${file.type}-${file.index}`}>
                 <a
                   href={file.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary-600 hover:underline text-xs"
                 >
-                  {file.name} ({formatFileSize(file.size)})
+                  {file.name || (file.type === 'summary' ? 'summary' : `file-${file.index}`)} ({formatFileSize(file.size)})
+                  {file.type === 'summary' && (
+                    <span className="ml-1 text-[var(--color-text-tertiary)]">[summary]</span>
+                  )}
                 </a>
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {task.result_files && task.result_files
+        .filter(isRenderableMarkdown)
+        .map((file) => (
+          <MarkdownResultPreview key={`md-${file.type}-${file.index}`} file={file} />
+        ))}
+    </div>
+  );
+}
+
+function isRenderableMarkdown(file: TaskResultFile): boolean {
+  if (file.type === 'summary') return true;
+  if (!file.name) return false;
+  const lower = file.name.toLowerCase();
+  return lower.endsWith('.md') || lower.endsWith('.markdown');
+}
+
+function MarkdownResultPreview({ file }: { file: TaskResultFile }) {
+  const [content, setContent] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setContent(null);
+    setError(null);
+    fetch(file.url, { credentials: 'include' })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status}`);
+        }
+        return resp.text();
+      })
+      .then((text) => {
+        if (!cancelled) setContent(text);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [file.url]);
+
+  const heading = file.type === 'summary' ? 'Summary' : file.name;
+
+  return (
+    <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+      <h4 className="text-sm font-medium text-[var(--color-text-secondary)] mb-2">{heading}</h4>
+      {error && (
+        <p className="text-error-600 text-xs">Failed to load: {error}</p>
+      )}
+      {!error && content === null && (
+        <p className="text-[var(--color-text-tertiary)] text-xs">Loading…</p>
+      )}
+      {content !== null && (
+        <div className="markdown-body text-sm">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
         </div>
       )}
     </div>

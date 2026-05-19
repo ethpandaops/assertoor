@@ -308,7 +308,10 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 
 	if t.config.RandomTarget {
 		addrBytes := make([]byte, 20)
-		rand.Read(addrBytes)
+		// crypto/rand.Read never fails on Linux; if it ever does the
+		// address stays zero, which is a harmless target for a spam
+		// transaction.
+		_, _ = rand.Read(addrBytes)
 		toAddr = common.Address(addrBytes)
 	} else if t.config.TargetAddress != "" {
 		toAddr = t.targetAddr

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethpandaops/assertoor/pkg/db"
 	"github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"
@@ -41,6 +42,7 @@ type GetTestRunDetailedTask struct {
 	Log             []*GetTestRunDetailedTaskLog `json:"log"`
 	ConfigYaml      string                       `json:"config_yaml"`
 	ResultYaml      string                       `json:"result_yaml"`
+	ResultFiles     []GetTestRunTaskResult       `json:"result_files"`
 }
 
 type GetTestRunDetailedTaskLog struct {
@@ -98,6 +100,15 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 
 	if !testInstance.StopTime().IsZero() {
 		response.StopTime = testInstance.StopTime().Unix()
+	}
+
+	// Fetch all result headers in one go.
+	resultHeaderMap := map[uint64][]db.TaskResultHeader{}
+
+	if resultHeaders, err := ah.coordinator.Database().GetAllTaskResultHeaders(runID); err == nil {
+		for _, header := range resultHeaders {
+			resultHeaderMap[header.TaskID] = append(resultHeaderMap[header.TaskID], header)
+		}
 	}
 
 	taskScheduler := testInstance.GetTaskScheduler()
@@ -211,6 +222,19 @@ func (ah *APIHandler) GetTestRunDetails(w http.ResponseWriter, r *http.Request) 
 				taskData.ResultYaml = fmt.Sprintf("failed marshalling result: %v", err)
 			} else {
 				taskData.ResultYaml = string(taskResult)
+			}
+
+			if headers, ok := resultHeaderMap[uint64(taskState.Index())]; ok && len(headers) > 0 {
+				taskData.ResultFiles = make([]GetTestRunTaskResult, len(headers))
+				for i, header := range headers {
+					taskData.ResultFiles[i] = GetTestRunTaskResult{
+						Type:  header.Type,
+						Index: header.Index,
+						Name:  header.Name,
+						Size:  header.Size,
+						URL:   fmt.Sprintf("/api/v1/test_run/%v/task/%v/result/%v/%v", runID, taskState.Index(), header.Type, header.Index),
+					}
+				}
 			}
 
 			response.Tasks = append(response.Tasks, taskData)

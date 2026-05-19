@@ -14,6 +14,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/test"
 	"github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/ethpandaops/assertoor/pkg/vars"
+	"github.com/gorhill/cronexpr"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/yaml.v3"
 )
@@ -391,6 +392,72 @@ func (c *TestRegistry) externalTestCfgToDB(cfgExternalTest *types.ExternalTestCo
 	dbTestCfg.ConfigVars = string(configVarsYaml)
 
 	return dbTestCfg, nil
+}
+
+// UpdateTestSchedule validates the schedule's cron expressions, then
+// swaps the schedule in on the registered descriptor and writes it
+// to the test_configs row. Returns an error without touching state
+// if any cron expression is invalid.
+func (c *TestRegistry) UpdateTestSchedule(testID string, schedule *types.TestSchedule) error {
+	// Validate up-front so we don't half-apply.
+	if schedule != nil {
+		for _, expr := range schedule.Cron {
+			if _, err := cronexpr.Parse(expr); err != nil {
+				return fmt.Errorf("invalid cron expression %q: %w", expr, err)
+			}
+		}
+	}
+
+	c.testDescriptorsMutex.Lock()
+	entry, ok := c.testDescriptors[testID]
+	c.testDescriptorsMutex.Unlock()
+
+	if !ok {
+		return fmt.Errorf("test %q not registered", testID)
+	}
+
+	// SetSchedule is on the concrete *test.Descriptor — the registry
+	// only handles its own type so the cast is safe here.
+	type scheduleSetter interface {
+		SetSchedule(s *types.TestSchedule)
+	}
+
+	setter, ok := entry.descriptor.(scheduleSetter)
+	if !ok {
+		return fmt.Errorf("descriptor for %q does not support schedule updates", testID)
+	}
+
+	setter.SetSchedule(schedule)
+
+	// Persist the change. Fetch existing row, mutate schedule fields,
+	// re-upsert — we never want to clobber yaml/config/configVars.
+	dbCfg, err := c.coordinator.Database().GetTestConfig(testID)
+	if err != nil || dbCfg == nil {
+		// No existing row — the test was registered without going
+		// through the DB path. Skip persistence; the in-memory change
+		// is still in effect for this process's lifetime.
+		return nil
+	}
+
+	dbCfg.ScheduleStartup = false
+	dbCfg.ScheduleCronYaml = ""
+
+	if schedule != nil {
+		dbCfg.ScheduleStartup = schedule.Startup
+
+		if len(schedule.Cron) > 0 {
+			cronYaml, err := yaml.Marshal(schedule.Cron)
+			if err != nil {
+				return fmt.Errorf("error encoding cron schedule: %w", err)
+			}
+
+			dbCfg.ScheduleCronYaml = string(cronYaml)
+		}
+	}
+
+	return c.coordinator.Database().RunTransaction(func(tx *sqlx.Tx) error {
+		return c.coordinator.Database().InsertTestConfig(tx, dbCfg)
+	})
 }
 
 func (c *TestRegistry) DeleteTest(testID string) error {

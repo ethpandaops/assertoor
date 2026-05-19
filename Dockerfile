@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:20-slim AS ui-builder
+FROM node:24-slim AS ui-builder
 WORKDIR /src
 COPY web-ui/package.json web-ui/package-lock.json ./web-ui/
 RUN cd web-ui && npm ci
@@ -24,6 +24,9 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
   curl \
   make \
   sudo \
+  gnupg \
+  && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
   && update-ca-certificates

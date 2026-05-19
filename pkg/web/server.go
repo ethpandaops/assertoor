@@ -100,8 +100,10 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 		ws.router.HandleFunc("/api/v1/tests", apiHandler.GetTests).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test/{testId}", apiHandler.GetTest).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test/{testId}/yaml", apiHandler.GetTestYaml).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test/{testId}/latest_result", apiHandler.GetTestLatestResult).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_runs", apiHandler.GetTestRuns).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}", apiHandler.GetTestRun).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test_run/{runId}/result", apiHandler.GetTestRunResult).Methods("GET")
 		ws.router.HandleFunc("/api/v1/test_run/{runId}/status", apiHandler.GetTestRunStatus).Methods("GET")
 		ws.router.HandleFunc("/api/v1/task_descriptors", apiHandler.GetTaskDescriptors).Methods("GET")
 		ws.router.HandleFunc("/api/v1/task_descriptor/{name}", apiHandler.GetTaskDescriptor).Methods("GET")
@@ -110,6 +112,12 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 		ws.router.HandleFunc("/api/v1/version", apiHandler.GetVersion).Methods("GET")
 		ws.router.HandleFunc("/api/v1/playbook_library", apiHandler.GetPlaybookLibrary).Methods("GET")
 		ws.router.HandleFunc("/api/v1/playbook_library/check", apiHandler.GetPlaybookLibraryCheck).Methods("GET")
+		ws.router.HandleFunc("/api/v1/network_status", apiHandler.GetNetworkStatus).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test_queue", apiHandler.GetTestQueue).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test/{testId}/next_run", apiHandler.GetTestNextRun).Methods("GET")
+		ws.router.HandleFunc("/api/v1/test/{testId}/schedule", apiHandler.PutTestSchedule).Methods("PUT")
+		ws.router.HandleFunc("/api/v1/dashboard_config", apiHandler.GetDashboardConfig).Methods("GET")
+		ws.router.HandleFunc("/api/v1/dashboard_config", apiHandler.PutDashboardConfig).Methods("PUT")
 
 		// SSE event stream endpoints
 		if eventBus != nil {

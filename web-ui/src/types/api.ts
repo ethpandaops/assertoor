@@ -89,6 +89,19 @@ export interface TestYamlResponse {
   source: string;
 }
 
+// Latest run-level result envelope returned by
+// `GET /api/v1/test/{testId}/latest_result?meta=1`. `markdown` is the
+// rendered $ASSERTOOR_TEST_RESULT blob from the newest run that
+// produced one. When no run has produced a result yet the envelope is
+// returned with `run_id === 0` and an empty markdown string.
+export interface LatestResultResponse {
+  run_id: number;
+  status: TestStatus | '';
+  start_time: number;
+  stop_time: number;
+  markdown: string;
+}
+
 // Response from POST /api/v1/tests/register_external
 export interface RegisterExternalTestResponse {
   test_id: string;
@@ -141,14 +154,60 @@ export interface LibraryCheckResponse {
 export interface TestSchedule {
   startup: boolean;
   cron: string[];
+  skipQueue?: boolean;
+}
+
+// Single planned execution for a test's cron schedule.
+export interface TestNextRunEntry {
+  expression: string;
+  next: number; // Unix seconds
+}
+
+// Response from GET /api/v1/test/{testId}/next_run
+export interface TestNextRunResponse {
+  test_id: string;
+  entries: TestNextRunEntry[];
+  earliest?: TestNextRunEntry;
+}
+
+// Queue entry returned by GET /api/v1/test_queue. The first entries
+// represent currently running tests; the rest are pending in
+// execution order.
+export interface TestQueueEntry {
+  run_id: number;
+  test_id: string;
+  name: string;
+  status: TestStatus;
+}
+
+export interface TestQueueResponse {
+  queue: TestQueueEntry[];
+}
+
+// Queue option for the new (v2) schedule POST body. The legacy
+// `skip_queue` boolean still works server-side; the typed `Queue`
+// variant is preferred by the UI.
+export type ScheduleQueueMode = 'immediate' | 'end' | 'after';
+
+export interface ScheduleQueueOption {
+  mode: ScheduleQueueMode;
+  after_run_id?: number;
 }
 
 // Schedule test run request
+//
+// The body shape is intentionally a union of legacy + v2 fields so
+// older callers keep working. New code should set `queue` and leave
+// `skip_queue` undefined; when both are provided, `queue` wins.
 export interface ScheduleTestRunRequest {
   test_id: string;
   config?: Record<string, unknown>;
   allow_duplicate?: boolean;
+
+  // Deprecated: use `queue: { mode: 'immediate' }` instead.
   skip_queue?: boolean;
+
+  queue?: ScheduleQueueOption;
 }
 
 // Test run details with tasks
