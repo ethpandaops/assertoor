@@ -101,6 +101,23 @@ func (t *Task) checkClientSSE(
 	}
 	defer stream.Close()
 
+	// eventstream.Stream.Ready is an UNBUFFERED channel that the
+	// stream goroutine writes to before it begins reading events
+	// (eventstream.go:169 — `stream.Ready <- true`). If no consumer
+	// drains it, that send blocks forever and the receive loop never
+	// starts, so we silently see zero events on every topic even
+	// when the server is gladly pushing them. Drain it here as the
+	// very first thing after Subscribe.
+	select {
+	case <-stream.Ready:
+	case <-subCtx.Done():
+		r.DurationMs = time.Since(t0).Milliseconds()
+		r.Status = resultFail
+		r.Error = "stream ready signal timed out"
+
+		return r
+	}
+
 	// Wait for first event or deadline.
 	waitTimer := time.NewTimer(wait)
 	defer waitTimer.Stop()
