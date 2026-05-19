@@ -24,6 +24,11 @@ config:
   recoveryEpochs: 2
   recoveredMaxUnfinalizedEpochs: 3
 tasks:
+- name: sleep
+  title: "Wait for disruptoor API to come up"
+  config:
+    duration: 10s
+
 - name: run_shell
   title: "Check disruptoor API health"
   timeout: 1m

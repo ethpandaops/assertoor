@@ -1,8 +1,8 @@
 # Auto-generated playbook index
-# Generated: 2026-05-19T19:00:17Z
+# Generated: 2026-05-19T19:08:17Z
 # DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
 
-generated: 2026-05-19T19:00:17Z
+generated: 2026-05-19T19:08:17Z
 folders:
   - path: dev
     name: Development & Utilities
