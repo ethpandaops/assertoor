@@ -146,7 +146,7 @@ tasks:
   id: row02_produce_block_v4
   title: "2. GET /eth/v4/validator/blocks/{slot} (produceBlockV4)"
   configVars:
-    pathParams: "{ slot: (tasks.duties.outputs.firstFutureSlot | tostring) }"
+    pathParams: "| { slot: (.tasks.duties.outputs.firstFutureSlot | tostring) }"
   config:
     rowId: "produce_block_v4"
     rowTitle: "GET /eth/v4/validator/blocks/{slot}"
@@ -261,9 +261,9 @@ tasks:
   title: "4. GET /eth/v1/validator/execution_payload_bid/{slot}/{builder_index}"
   configVars:
     pathParams: |
-      {
-        slot: (tasks.duties.outputs.firstFutureSlot | tostring),
-        builder_index: (tasks.duties.outputs.firstFutureValidatorIndex | tostring),
+      | {
+        slot: (.tasks.duties.outputs.firstFutureSlot | tostring),
+        builder_index: (.tasks.duties.outputs.firstFutureValidatorIndex | tostring),
       }
   config:
     rowId: "get_bid"
@@ -337,7 +337,7 @@ tasks:
   id: row06_get_envelope_by_block
   title: "6. GET /eth/v1/beacon/execution_payload_envelope/{block_id}"
   configVars:
-    pathParams: "{ block_id: tasks.recent.outputs.root }"
+    pathParams: "| { block_id: .tasks.recent.outputs.root }"
   config:
     rowId: "get_envelope_by_block"
     rowTitle: "GET /eth/v1/beacon/execution_payload_envelope/{block_id}"
@@ -406,9 +406,9 @@ tasks:
   title: "7. GET /eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}"
   configVars:
     pathParams: |
-      {
-        slot: (tasks.recent.outputs.slot | tostring),
-        beacon_block_root: tasks.recent.outputs.root,
+      | {
+        slot: (.tasks.recent.outputs.slot | tostring),
+        beacon_block_root: .tasks.recent.outputs.root,
       }
   config:
     rowId: "get_envelope_by_slot"
@@ -448,7 +448,7 @@ tasks:
   id: row08_ptc_duties
   title: "8. POST /eth/v1/validator/duties/ptc/{epoch}"
   configVars:
-    pathParams: "{ epoch: (tasks.duties.outputs.epoch | tostring) }"
+    pathParams: "| { epoch: (.tasks.duties.outputs.epoch | tostring) }"
     body: "tasks.duties.outputs.validatorIndices | map(tostring)"
   config:
     rowId: "ptc_duties"
@@ -483,7 +483,7 @@ tasks:
   id: row09_payload_attestation_data
   title: "9. GET /eth/v1/validator/payload_attestation_data/{slot}"
   configVars:
-    pathParams: "{ slot: (tasks.recent.outputs.slot | tostring) }"
+    pathParams: "| { slot: (.tasks.recent.outputs.slot | tostring) }"
   config:
     rowId: "payload_attestation_data"
     rowTitle: "GET /eth/v1/validator/payload_attestation_data/{slot}"
