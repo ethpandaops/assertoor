@@ -161,6 +161,21 @@ export const DEFAULT_DASHBOARD: DashboardConfig = {
               'success rates, latest test results, or recent activity.',
           },
         },
+        {
+          id: "tile-network",
+          type: "network_status",
+          width: "small",
+          config: {}
+        },
+        {
+          id: "tile-clients",
+          type: "client_status",
+          width: "large",
+          config: {
+            showExecution: true,
+            heightPx: 335
+          }
+        }
       ],
     },
     {
