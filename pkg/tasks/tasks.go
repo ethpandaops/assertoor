@@ -31,6 +31,8 @@ import (
 	generateslashings "github.com/ethpandaops/assertoor/pkg/tasks/generate_slashings"
 	generatetransaction "github.com/ethpandaops/assertoor/pkg/tasks/generate_transaction"
 	generatewithdrawalrequests "github.com/ethpandaops/assertoor/pkg/tasks/generate_withdrawal_requests"
+	getconsensusblockheader "github.com/ethpandaops/assertoor/pkg/tasks/get_consensus_block_header"
+	getconsensusproposerduties "github.com/ethpandaops/assertoor/pkg/tasks/get_consensus_proposer_duties"
 	getconsensusspecs "github.com/ethpandaops/assertoor/pkg/tasks/get_consensus_specs"
 	getconsensusvalidators "github.com/ethpandaops/assertoor/pkg/tasks/get_consensus_validators"
 	checkexecutionblock "github.com/ethpandaops/assertoor/pkg/tasks/get_execution_block"
@@ -82,9 +84,11 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generateslashings.TaskDescriptor,
 	generatetransaction.TaskDescriptor,
 	generatewithdrawalrequests.TaskDescriptor,
-	getpubkeysfrommnemonic.TaskDescriptor,
+	getconsensusblockheader.TaskDescriptor,
+	getconsensusproposerduties.TaskDescriptor,
 	getconsensusspecs.TaskDescriptor,
 	getconsensusvalidators.TaskDescriptor,
+	getpubkeysfrommnemonic.TaskDescriptor,
 	getrandommnemonic.TaskDescriptor,
 	getwalletdetails.TaskDescriptor,
 	runcommand.TaskDescriptor,
