@@ -154,9 +154,18 @@ tasks:
     method: "GET"
     path: "/eth/v4/validator/blocks/{slot}"
     queryParams:
+      # Infinity BLS signature so the randao reveal is well-formed but
+      # not actually verifiable — pair with `skip_randao_verification`
+      # so any client that respects the flag still produces a block.
       randao_reveal: "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
       graffiti: "0x000000000000000000000000000000000000000000000000000000000000000d"
-      skip_randao_verification: "true"
+      # The spec describes skip_randao_verification as a presence-only
+      # boolean flag (`skip_randao_verification=`). Lighthouse strictly
+      # rejects any non-empty value (including the obvious "true");
+      # Prysm and Lodestar accept either. Use the spec-conformant
+      # empty-value form so all clients exercise the success path
+      # rather than falling back to a query-parse 400.
+      skip_randao_verification: ""
     expectStatuses:  [200, 202, 400, 404, 500, 501, 503]
     successStatuses: [200]
     errorStatuses:   [400, 404, 500, 501, 503]
