@@ -8,15 +8,16 @@ description: |
   The participant groups are computed dynamically from the assertoor client
   pool: nodes 1..floor(N/2) form the left half, nodes floor(N/2)+1..N form
   the right half. For odd N the right half gets the extra node. The playbook
-  requires at least `minClientCount` clients (default 4) so neither half
-  retains a 2/3 finality majority. A disruptoor service is expected at
-  `disruptoorUrl` (default `http://disruptoor:7700`).
+  requires at least `minClientCount` clients (default 2); choosing a topology
+  where one side retains a 2/3 finality majority (e.g. 3 nodes split 1/2) is
+  the operator's call. A disruptoor service is expected at `disruptoorUrl`
+  (default `http://disruptoor:7700`).
 version: 1.0.0
 tags: [disruptoor, kurtosis, finality, network-split, consensus]
 timeout: 45m
 config:
   disruptoorUrl: "http://disruptoor:7700"
-  minClientCount: 4
+  minClientCount: 2
   partitionClientTypes: ["execution", "beacon"]
   slotsPerEpoch: 32
   splitObservationEpochs: 2

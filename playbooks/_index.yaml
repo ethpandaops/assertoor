@@ -1,8 +1,8 @@
 # Auto-generated playbook index
-# Generated: 2026-05-19T18:55:32Z
+# Generated: 2026-05-19T19:00:17Z
 # DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
 
-generated: 2026-05-19T18:55:32Z
+generated: 2026-05-19T19:00:17Z
 folders:
   - path: dev
     name: Development & Utilities
@@ -225,9 +225,10 @@ playbooks:
       The participant groups are computed dynamically from the assertoor client
       pool: nodes 1..floor(N/2) form the left half, nodes floor(N/2)+1..N form
       the right half. For odd N the right half gets the extra node. The playbook
-      requires at least `minClientCount` clients (default 4) so neither half
-      retains a 2/3 finality majority. A disruptoor service is expected at
-      `disruptoorUrl` (default `http://disruptoor:7700`).
+      requires at least `minClientCount` clients (default 2); choosing a topology
+      where one side retains a 2/3 finality majority (e.g. 3 nodes split 1/2) is
+      the operator's call. A disruptoor service is expected at `disruptoorUrl`
+      (default `http://disruptoor:7700`).
     version: 1.0.0
     tags:
       - disruptoor
