@@ -496,44 +496,54 @@ tasks:
     errorSchema:
       type: object
 
-# Row 7 -- GET /eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}
+# Row 7 -- GET /eth/v1/validator/execution_payload_envelope/{slot}?beacon_block_root=...
+#
+# Per beacon-APIs PR #580 the canonical layout is `{slot}` in the path
+# and `beacon_block_root` as a *query parameter* (this makes the
+# response cache lookup re-org resistant — the BN returns 404 if its
+# cached envelope was for a different block root). The response data
+# is an unwrapped `ExecutionPayloadEnvelope` (no `message`/`signature`
+# wrapping — the validator client signs the envelope client-side).
+#
+# Lodestar currently registers `{slot}/{beacon_block_root}` as path
+# segments (a real spec divergence) — that route is not reached at
+# all by the spec-conformant probe, so Lodestar 404s here. Prysm and
+# Lighthouse register the spec-conformant `{slot}` route.
 - name: check_consensus_api
   id: row07_get_envelope_by_slot
-  title: "7. GET /eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}"
+  title: "7. GET /eth/v1/validator/execution_payload_envelope/{slot}"
   configVars:
-    pathParams: |
-      | {
-        slot: (.tasks.recent.outputs.slot | tostring),
-        beacon_block_root: .tasks.recent.outputs.root,
-      }
+    pathParams: "| { slot: (.tasks.recent.outputs.slot | tostring) }"
+    queryParams: |
+      | { beacon_block_root: .tasks.recent.outputs.root }
   config:
     rowId: "get_envelope_by_slot"
-    rowTitle: "GET /eth/v1/validator/execution_payload_envelope/{slot}/{root}"
+    rowTitle: "GET /eth/v1/validator/execution_payload_envelope/{slot}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/580"
     method: "GET"
-    path: "/eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}"
+    path: "/eth/v1/validator/execution_payload_envelope/{slot}"
     expectStatuses:  [200, 400, 404, 500, 503]
     successStatuses: [200]
     errorStatuses:   [400, 404, 500, 503]
     requestTimeout: "20s"
     responseSchema:
+      # Per PR #580: response is { version, data: ExecutionPayloadEnvelope }
+      # where ExecutionPayloadEnvelope is the unwrapped struct with
+      # required fields: payload, execution_requests, builder_index,
+      # beacon_block_root, parent_beacon_block_root. NO message/signature
+      # wrapping — the validator client signs the envelope client-side.
       type: object
       required: [version, data]
       properties:
         version: { type: string }
         data:
           type: object
-          required: [message, signature]
-          properties:
-            signature: { type: string }
-            message:
-              type: object
-              required:
-                - payload
-                - execution_requests
-                - builder_index
-                - beacon_block_root
-                - parent_beacon_block_root
+          required:
+            - payload
+            - execution_requests
+            - builder_index
+            - beacon_block_root
+            - parent_beacon_block_root
     errorSchema:
       type: object
 
