@@ -92,9 +92,13 @@ tasks:
     # head - 1 is recent enough that all clients almost certainly have
     # the envelope still cached (so 200 paths can be exercised and
     # the response schema actually validated), but not the very tip
-    # where one client may be a slot ahead of another.
+    # where one client may be a slot ahead of another. The lookback
+    # window is generous so a run of missed slots (common when the
+    # devnet briefly desyncs) doesn't fail the whole playbook —
+    # `fetchHeaderBySlot` walks backward from `target` one slot at a
+    # time looking for a canonical block.
     headOffset: 1
-    maxLookback: 4
+    maxLookback: 16
 
 # A specific future-slot proposer for produceBlockV4, plus a handful
 # of real validator indices for endpoints that want a body of them.
