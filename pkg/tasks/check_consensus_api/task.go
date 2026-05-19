@@ -18,9 +18,16 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/types"
 	"github.com/ethpandaops/assertoor/pkg/vars"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	"github.com/sirupsen/logrus"
 )
+
+// recentSlotOffset is how many slots back from head the {recent_*}
+// placeholders resolve to. 4 slots ≈ 48s with a 12s slot, which is
+// well past the point where derived data like execution-payload
+// envelopes should be available.
+const recentSlotOffset = 4
 
 const (
 	defaultRequestTimeout    = 30 * time.Second
@@ -391,11 +398,7 @@ func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient
 		refClient = allClients[0]
 	}
 
-	var (
-		headSlot, headEpoch uint64
-		headRoot            string
-		slotsPerEpoch       uint64 = 32
-	)
+	pctx := pathContext{slotsPerEpoch: 32}
 
 	if refClient != nil && refClient.ConsensusClient != nil {
 		ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -403,8 +406,8 @@ func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient
 
 		rpc := refClient.ConsensusClient.GetRPCClient()
 		if header, herr := rpc.GetLatestBlockHead(ctx2); herr == nil && header != nil {
-			headSlot = uint64(header.Header.Message.Slot)
-			headRoot = fmt.Sprintf("%#x", header.Root)
+			pctx.headSlot = uint64(header.Header.Message.Slot)
+			pctx.headRoot = fmt.Sprintf("%#x", header.Root)
 		} else {
 			err = herr
 		}
@@ -412,18 +415,45 @@ func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient
 		if specs, serr := rpc.GetConfigSpecs(ctx2); serr == nil {
 			if v, ok := specs["SLOTS_PER_EPOCH"]; ok {
 				if vu, ok := v.(uint64); ok && vu > 0 {
-					slotsPerEpoch = vu
+					pctx.slotsPerEpoch = vu
 				}
 			}
 		}
 
-		if slotsPerEpoch > 0 {
-			headEpoch = headSlot / slotsPerEpoch
+		if pctx.slotsPerEpoch > 0 {
+			pctx.headEpoch = pctx.headSlot / pctx.slotsPerEpoch
+		}
+
+		// Compute a "recent" reference point a few slots back so
+		// derived data (execution-payload envelopes, attestations,
+		// etc.) is reliably available across all probed clients.
+		// Defaults to head when chain is younger than the offset.
+		if pctx.headSlot > recentSlotOffset {
+			pctx.recentSlot = pctx.headSlot - recentSlotOffset
+		} else {
+			pctx.recentSlot = pctx.headSlot
+		}
+
+		if pctx.slotsPerEpoch > 0 {
+			pctx.recentEpoch = pctx.recentSlot / pctx.slotsPerEpoch
+		}
+
+		// Fetch the canonical block root at that slot. Best-effort:
+		// fall back to the head root if the lookup fails.
+		ctx3, cancel3 := context.WithTimeout(ctx, 5*time.Second)
+		if hdr, herr := rpc.GetBlockHeaderBySlot(ctx3, phase0.Slot(pctx.recentSlot)); herr == nil && hdr != nil {
+			pctx.recentRoot = fmt.Sprintf("%#x", hdr.Root)
+		}
+
+		cancel3()
+
+		if pctx.recentRoot == "" {
+			pctx.recentRoot = pctx.headRoot
 		}
 	}
 
 	for _, key := range missing {
-		val := resolvePlaceholder(key, headSlot, headEpoch, headRoot)
+		val := resolvePlaceholder(key, pctx)
 		if val != "" {
 			params[key] = val
 		}
@@ -437,16 +467,34 @@ func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient
 	return finalPath, params, err
 }
 
-func resolvePlaceholder(key string, headSlot, headEpoch uint64, headRoot string) string {
-	// Handle {slot+N}, {epoch+N}, etc.
+// pathContext carries everything resolvePlaceholder needs to expand a
+// `{placeholder}` token. It is built once per task execution by
+// querying the first ready client; every placeholder lookup then
+// reads from it without further RPC traffic.
+type pathContext struct {
+	headSlot, headEpoch uint64
+	headRoot            string
+	recentSlot          uint64
+	recentEpoch         uint64
+	recentRoot          string
+	slotsPerEpoch       uint64
+}
+
+func resolvePlaceholder(key string, pctx pathContext) string {
+	// Handle {slot+N}, {epoch+N}, {recent_slot-N}, etc. The offset
+	// suffix is parsed first so the rest of the function operates on
+	// the bare keyword.
 	base := key
 	offset := int64(0)
 
+	// `recent_*` keys contain an underscore, so look for +/- ONLY
+	// after the keyword itself. A simple findFirst over the full key
+	// would mis-parse `recent_slot-2` because `_` doesn't separate
+	// the keyword from the offset.
 	if idx := strings.IndexAny(key, "+-"); idx > 0 {
 		base = key[:idx]
-		// Parse signed offset.
-		var op rune
 
+		var op rune
 		if key[idx] == '+' {
 			op = '+'
 		} else {
@@ -467,15 +515,21 @@ func resolvePlaceholder(key string, headSlot, headEpoch uint64, headRoot string)
 
 	switch base {
 	case "slot":
-		return fmt.Sprintf("%d", offsetUint64(headSlot, offset))
+		return fmt.Sprintf("%d", offsetUint64(pctx.headSlot, offset))
 	case "epoch":
-		return fmt.Sprintf("%d", offsetUint64(headEpoch, offset))
+		return fmt.Sprintf("%d", offsetUint64(pctx.headEpoch, offset))
+	case "recent_slot":
+		return fmt.Sprintf("%d", offsetUint64(pctx.recentSlot, offset))
+	case "recent_epoch":
+		return fmt.Sprintf("%d", offsetUint64(pctx.recentEpoch, offset))
 	case "block_id":
 		return "head"
 	case "state_id":
 		return "head"
 	case "beacon_block_root":
-		return headRoot
+		return pctx.headRoot
+	case "recent_block_root":
+		return pctx.recentRoot
 	case "builder_index":
 		return "0"
 	case "validator_index":
