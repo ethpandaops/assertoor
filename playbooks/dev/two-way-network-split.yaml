@@ -116,7 +116,6 @@ tasks:
 
 - name: check_consensus_slot_range
   title: "Wait split observation epochs with the split active"
-  timeout: 10m
   configVars:
     minSlotNumber: "| (.tasks.split_start.outputs.currentSlot | tonumber) + ((.splitObservationEpochs | tonumber) * (.tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH | tonumber))"
 
@@ -148,7 +147,6 @@ tasks:
 
 - name: check_consensus_slot_range
   title: "Wait recovery epochs after clearing the split"
-  timeout: 10m
   configVars:
     minSlotNumber: "| (.tasks.recovery_start.outputs.currentSlot | tonumber) + ((.recoveryEpochs | tonumber) * (.tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH | tonumber))"
 
