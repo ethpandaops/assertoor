@@ -162,21 +162,37 @@ tasks:
     errorStatuses:   [400, 404, 500, 501, 503]
     requestTimeout: "20s"
     responseSchema:
-      # GLOAS BeaconBlockBody (beacon-APIs types/gloas/block.yaml) —
-      # required: randao_reveal, eth1_data, graffiti, proposer_slashings,
-      # attester_slashings, attestations, deposits, voluntary_exits,
-      # sync_aggregate, bls_to_execution_changes,
-      # signed_execution_payload_bid, payload_attestations.
-      # NOTE the field is `signed_execution_payload_bid` (NOT
-      # `execution_payload_bid`); blob_kzg_commitments + execution_requests
-      # are NOT body fields in gloas (they moved into the envelope).
+      # ProduceBlockV4Response per the *current* head of beacon-APIs PR
+      # #580 (which has been revised since the initial draft):
+      #   top-level: { version, consensus_block_value,
+      #                execution_payload_included, data }
+      # `execution_payload_value` was REMOVED from the response — the
+      # API no longer returns separate consensus + execution values
+      # because the execution payload is committed to via a bid, not
+      # produced inline.
+      #
+      # `data` is one of:
+      #   - BeaconBlock           (when execution_payload_included=false)
+      #     i.e. { slot, proposer_index, parent_root, state_root, body }
+      #   - BlockContents          (when execution_payload_included=true)
+      #     i.e. { block, execution_payload_envelope, kzg_proofs, blobs }
+      #
+      # We use anyOf to accept either shape — that's exactly what
+      # spec-conformant clients return. A client that returns a third
+      # shape (e.g. flat block fields with no `body`) will fail both
+      # branches and surface as 🟡 with schema mismatches.
       type: object
-      required: [version, data, execution_payload_value]
+      required: [version, consensus_block_value, execution_payload_included, data]
       properties:
-        version: { type: string }
-        execution_payload_value: { type: string }
-        consensus_block_value:   { type: string }
+        version:                    { type: string }
+        consensus_block_value:      { type: string }
+        execution_payload_included: { type: boolean }
         data:
+          anyOf:
+            - $ref: "#/$defs/beaconBlock"
+            - $ref: "#/$defs/blockContents"
+      $defs:
+        beaconBlock:
           type: object
           required: [slot, proposer_index, parent_root, state_root, body]
           properties:
@@ -184,72 +200,104 @@ tasks:
             proposer_index: { type: string }
             parent_root:    { type: string }
             state_root:     { type: string }
-            body:
+            body:           { $ref: "#/$defs/beaconBlockBody" }
+        blockContents:
+          type: object
+          required: [block, execution_payload_envelope, kzg_proofs, blobs]
+          properties:
+            block:
+              type: object
+              required: [slot, proposer_index, parent_root, state_root, body]
+              properties:
+                slot:           { type: string }
+                proposer_index: { type: string }
+                parent_root:    { type: string }
+                state_root:     { type: string }
+                body:           { $ref: "#/$defs/beaconBlockBody" }
+            execution_payload_envelope:
               type: object
               required:
-                - randao_reveal
-                - eth1_data
-                - graffiti
-                - proposer_slashings
-                - attester_slashings
-                - attestations
-                - deposits
-                - voluntary_exits
-                - sync_aggregate
-                - bls_to_execution_changes
-                - signed_execution_payload_bid
-                - payload_attestations
+                - payload
+                - execution_requests
+                - builder_index
+                - beacon_block_root
+                - parent_beacon_block_root
+            kzg_proofs: { type: array }
+            blobs:      { type: array }
+        beaconBlockBody:
+          # GLOAS BeaconBlockBody (beacon-APIs types/gloas/block.yaml):
+          # randao_reveal, eth1_data, graffiti, proposer_slashings,
+          # attester_slashings, attestations, deposits, voluntary_exits,
+          # sync_aggregate, bls_to_execution_changes,
+          # signed_execution_payload_bid, payload_attestations.
+          # NOTE: field is `signed_execution_payload_bid` (NOT
+          # `execution_payload_bid`); blob_kzg_commitments + execution_requests
+          # are NOT body fields in gloas (they moved into the envelope).
+          type: object
+          required:
+            - randao_reveal
+            - eth1_data
+            - graffiti
+            - proposer_slashings
+            - attester_slashings
+            - attestations
+            - deposits
+            - voluntary_exits
+            - sync_aggregate
+            - bls_to_execution_changes
+            - signed_execution_payload_bid
+            - payload_attestations
+          properties:
+            randao_reveal:        { type: string }
+            graffiti:             { type: string }
+            proposer_slashings:   { type: array }
+            attester_slashings:   { type: array }
+            attestations:         { type: array }
+            deposits:             { type: array }
+            voluntary_exits:      { type: array }
+            bls_to_execution_changes: { type: array }
+            payload_attestations: { type: array }
+            eth1_data:
+              type: object
+              required: [deposit_root, deposit_count, block_hash]
+            sync_aggregate:
+              type: object
+              required: [sync_committee_bits, sync_committee_signature]
+            signed_execution_payload_bid:
+              type: object
+              required: [message, signature]
               properties:
-                randao_reveal:        { type: string }
-                graffiti:             { type: string }
-                proposer_slashings:   { type: array }
-                attester_slashings:   { type: array }
-                attestations:         { type: array }
-                deposits:             { type: array }
-                voluntary_exits:      { type: array }
-                bls_to_execution_changes: { type: array }
-                payload_attestations: { type: array }
-                eth1_data:
+                signature: { type: string }
+                message:
+                  # ExecutionPayloadBid spec required fields:
+                  # parent_block_hash, parent_block_root, block_hash,
+                  # prev_randao, fee_recipient, gas_limit, builder_index,
+                  # slot, value, execution_payment, blob_kzg_commitments
                   type: object
-                  required: [deposit_root, deposit_count, block_hash]
-                sync_aggregate:
-                  type: object
-                  required: [sync_committee_bits, sync_committee_signature]
-                signed_execution_payload_bid:
-                  type: object
-                  required: [message, signature]
+                  required:
+                    - parent_block_hash
+                    - parent_block_root
+                    - block_hash
+                    - prev_randao
+                    - fee_recipient
+                    - gas_limit
+                    - builder_index
+                    - slot
+                    - value
+                    - execution_payment
+                    - blob_kzg_commitments
                   properties:
-                    signature: { type: string }
-                    message:
-                      # ExecutionPayloadBid spec required fields:
-                      # parent_block_hash, parent_block_root, block_hash,
-                      # prev_randao, fee_recipient, gas_limit, builder_index,
-                      # slot, value, execution_payment, blob_kzg_commitments
-                      type: object
-                      required:
-                        - parent_block_hash
-                        - parent_block_root
-                        - block_hash
-                        - prev_randao
-                        - fee_recipient
-                        - gas_limit
-                        - builder_index
-                        - slot
-                        - value
-                        - execution_payment
-                        - blob_kzg_commitments
-                      properties:
-                        parent_block_hash:    { type: string }
-                        parent_block_root:    { type: string }
-                        block_hash:           { type: string }
-                        prev_randao:          { type: string }
-                        fee_recipient:        { type: string }
-                        gas_limit:            { type: string }
-                        builder_index:        { type: string }
-                        slot:                 { type: string }
-                        value:                { type: string }
-                        execution_payment:    { type: string }
-                        blob_kzg_commitments: { type: array }
+                    parent_block_hash:    { type: string }
+                    parent_block_root:    { type: string }
+                    block_hash:           { type: string }
+                    prev_randao:          { type: string }
+                    fee_recipient:        { type: string }
+                    gas_limit:            { type: string }
+                    builder_index:        { type: string }
+                    slot:                 { type: string }
+                    value:                { type: string }
+                    execution_payment:    { type: string }
+                    blob_kzg_commitments: { type: array }
     errorSchema:
       type: object
 
