@@ -1,8 +1,8 @@
 # Auto-generated playbook index
-# Generated: 2026-05-14T00:40:37Z
+# Generated: 2026-05-19T19:23:49Z
 # DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
 
-generated: 2026-05-14T00:40:37Z
+generated: 2026-05-19T19:23:49Z
 folders:
   - path: dev
     name: Development & Utilities
@@ -214,6 +214,29 @@ playbooks:
       - consensus
       - execution
     timeout: 12h
+  - file: dev/two-way-network-split.yaml
+    id: two-way-network-split
+    name: Two-Way Network Split Finality Test
+    description: |-
+      Splits a Kurtosis-launched devnet into two halves through the disruptoor
+      HTTP API, verifies that finality stops for two epochs, heals the split,
+      waits two more epochs, and verifies finality recovers.
+
+      The participant groups are computed dynamically from the assertoor client
+      pool: nodes 1..floor(N/2) form the left half, nodes floor(N/2)+1..N form
+      the right half. For odd N the right half gets the extra node. The playbook
+      requires at least `minClientCount` clients (default 2); choosing a topology
+      where one side retains a 2/3 finality majority (e.g. 3 nodes split 1/2) is
+      the operator's call. A disruptoor service is expected at `disruptoorUrl`
+      (default `http://disruptoor:7700`).
+    version: 1.0.0
+    tags:
+      - disruptoor
+      - kurtosis
+      - finality
+      - network-split
+      - consensus
+    timeout: 45m
   - file: dev/validator-lifecycle-test.yaml
     id: validator-lifecycle-test
     name: Validator Lifecycle Test (Un-finality Stress)
