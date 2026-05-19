@@ -19,11 +19,14 @@ config:
   disruptoorUrl: "http://disruptoor:7700"
   minClientCount: 2
   partitionClientTypes: ["execution", "beacon"]
-  slotsPerEpoch: 32
   splitObservationEpochs: 2
   recoveryEpochs: 2
   recoveredMaxUnfinalizedEpochs: 3
 tasks:
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+
 - name: sleep
   title: "Wait for disruptoor API to come up"
   config:
@@ -115,7 +118,7 @@ tasks:
   title: "Wait split observation epochs with the split active"
   timeout: 10m
   configVars:
-    minSlotNumber: "| (.tasks.split_start.outputs.currentSlot | tonumber) + ((.splitObservationEpochs | tonumber) * (.slotsPerEpoch | tonumber))"
+    minSlotNumber: "| (.tasks.split_start.outputs.currentSlot | tonumber) + ((.splitObservationEpochs | tonumber) * (.tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH | tonumber))"
 
 - name: check_consensus_finality
   title: "Check non-finality after split observation"
@@ -147,7 +150,7 @@ tasks:
   title: "Wait recovery epochs after clearing the split"
   timeout: 10m
   configVars:
-    minSlotNumber: "| (.tasks.recovery_start.outputs.currentSlot | tonumber) + ((.recoveryEpochs | tonumber) * (.slotsPerEpoch | tonumber))"
+    minSlotNumber: "| (.tasks.recovery_start.outputs.currentSlot | tonumber) + ((.recoveryEpochs | tonumber) * (.tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH | tonumber))"
 
 - name: check_consensus_finality
   title: "Check finality recovered"
