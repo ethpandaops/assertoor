@@ -162,6 +162,14 @@ tasks:
     errorStatuses:   [400, 404, 500, 501, 503]
     requestTimeout: "20s"
     responseSchema:
+      # GLOAS BeaconBlockBody (beacon-APIs types/gloas/block.yaml) —
+      # required: randao_reveal, eth1_data, graffiti, proposer_slashings,
+      # attester_slashings, attestations, deposits, voluntary_exits,
+      # sync_aggregate, bls_to_execution_changes,
+      # signed_execution_payload_bid, payload_attestations.
+      # NOTE the field is `signed_execution_payload_bid` (NOT
+      # `execution_payload_bid`); blob_kzg_commitments + execution_requests
+      # are NOT body fields in gloas (they moved into the envelope).
       type: object
       required: [version, data, execution_payload_value]
       properties:
@@ -188,10 +196,8 @@ tasks:
                 - deposits
                 - voluntary_exits
                 - sync_aggregate
-                - execution_payload_bid
                 - bls_to_execution_changes
-                - blob_kzg_commitments
-                - execution_requests
+                - signed_execution_payload_bid
                 - payload_attestations
               properties:
                 randao_reveal:        { type: string }
@@ -202,7 +208,6 @@ tasks:
                 deposits:             { type: array }
                 voluntary_exits:      { type: array }
                 bls_to_execution_changes: { type: array }
-                blob_kzg_commitments: { type: array }
                 payload_attestations: { type: array }
                 eth1_data:
                   type: object
@@ -210,26 +215,41 @@ tasks:
                 sync_aggregate:
                   type: object
                   required: [sync_committee_bits, sync_committee_signature]
-                execution_payload_bid:
+                signed_execution_payload_bid:
                   type: object
                   required: [message, signature]
                   properties:
                     signature: { type: string }
                     message:
+                      # ExecutionPayloadBid spec required fields:
+                      # parent_block_hash, parent_block_root, block_hash,
+                      # prev_randao, fee_recipient, gas_limit, builder_index,
+                      # slot, value, execution_payment, blob_kzg_commitments
                       type: object
                       required:
                         - parent_block_hash
                         - parent_block_root
                         - block_hash
+                        - prev_randao
                         - fee_recipient
                         - gas_limit
                         - builder_index
                         - slot
                         - value
-                        - blob_kzg_commitments_root
-                execution_requests:
-                  type: object
-                  required: [deposits, withdrawals, consolidations]
+                        - execution_payment
+                        - blob_kzg_commitments
+                      properties:
+                        parent_block_hash:    { type: string }
+                        parent_block_root:    { type: string }
+                        block_hash:           { type: string }
+                        prev_randao:          { type: string }
+                        fee_recipient:        { type: string }
+                        gas_limit:            { type: string }
+                        builder_index:        { type: string }
+                        slot:                 { type: string }
+                        value:                { type: string }
+                        execution_payment:    { type: string }
+                        blob_kzg_commitments: { type: array }
     errorSchema:
       type: object
 
@@ -276,6 +296,10 @@ tasks:
     errorStatuses:   [400, 404, 500, 501, 503]
     requestTimeout: "20s"
     responseSchema:
+      # SignedExecutionPayloadBid wrapped in {version, data}.
+      # ExecutionPayloadBid required: parent_block_hash, parent_block_root,
+      # block_hash, prev_randao, fee_recipient, gas_limit, builder_index,
+      # slot, value, execution_payment, blob_kzg_commitments.
       type: object
       required: [version, data]
       properties:
@@ -291,22 +315,26 @@ tasks:
                 - parent_block_hash
                 - parent_block_root
                 - block_hash
+                - prev_randao
                 - fee_recipient
                 - gas_limit
                 - builder_index
                 - slot
                 - value
-                - blob_kzg_commitments_root
+                - execution_payment
+                - blob_kzg_commitments
               properties:
-                parent_block_hash: { type: string }
-                parent_block_root: { type: string }
-                block_hash:        { type: string }
-                fee_recipient:     { type: string }
-                gas_limit:         { type: string }
-                builder_index:     { type: string }
-                slot:              { type: string }
-                value:             { type: string }
-                blob_kzg_commitments_root: { type: string }
+                parent_block_hash:    { type: string }
+                parent_block_root:    { type: string }
+                block_hash:           { type: string }
+                prev_randao:          { type: string }
+                fee_recipient:        { type: string }
+                gas_limit:            { type: string }
+                builder_index:        { type: string }
+                slot:                 { type: string }
+                value:                { type: string }
+                execution_payment:    { type: string }
+                blob_kzg_commitments: { type: array }
     errorSchema:
       type: object
 
@@ -349,10 +377,16 @@ tasks:
     errorStatuses:   [400, 404, 500, 503]
     requestTimeout: "20s"
     responseSchema:
+      # SignedExecutionPayloadEnvelope wrapped per spec —
+      # {version, execution_optimistic, finalized, data: {message, signature}}.
+      # ExecutionPayloadEnvelope required: payload, execution_requests,
+      # builder_index, beacon_block_root, parent_beacon_block_root.
       type: object
-      required: [version, data]
+      required: [version, execution_optimistic, finalized, data]
       properties:
-        version: { type: string }
+        version:              { type: string }
+        execution_optimistic: { type: boolean }
+        finalized:            { type: boolean }
         data:
           type: object
           required: [message, signature]
@@ -365,16 +399,13 @@ tasks:
                 - execution_requests
                 - builder_index
                 - beacon_block_root
-                - slot
-                - blob_kzg_commitments
-                - state_root
+                - parent_beacon_block_root
               properties:
-                builder_index:        { type: string }
-                beacon_block_root:    { type: string }
-                slot:                 { type: string }
-                state_root:           { type: string }
-                blob_kzg_commitments: { type: array }
+                builder_index:            { type: string }
+                beacon_block_root:        { type: string }
+                parent_beacon_block_root: { type: string }
                 payload:
+                  # ExecutionPayload (Deneb shape carried into gloas).
                   type: object
                   required:
                     - parent_hash
@@ -437,9 +468,7 @@ tasks:
                 - execution_requests
                 - builder_index
                 - beacon_block_root
-                - slot
-                - blob_kzg_commitments
-                - state_root
+                - parent_beacon_block_root
     errorSchema:
       type: object
 
@@ -495,16 +524,21 @@ tasks:
     errorStatuses:   [400, 404, 500, 503]
     requestTimeout: "20s"
     responseSchema:
+      # ProducePayloadAttestationDataResponse: {version, data}.
+      # PayloadAttestationData required:
+      # beacon_block_root, slot, payload_present, blob_data_available.
       type: object
-      required: [data]
+      required: [version, data]
       properties:
+        version: { type: string }
         data:
           type: object
-          required: [beacon_block_root, slot, payload_status]
+          required: [beacon_block_root, slot, payload_present, blob_data_available]
           properties:
-            beacon_block_root: { type: string }
-            slot:              { type: string }
-            payload_status:    { type: string }
+            beacon_block_root:   { type: string }
+            slot:                { type: string }
+            payload_present:     { type: boolean }
+            blob_data_available: { type: boolean }
     errorSchema:
       type: object
 
@@ -522,10 +556,12 @@ tasks:
       Eth-Consensus-Version: "gloas"
     body:
     - message:
-        beacon_block_root: "0x0000000000000000000000000000000000000000000000000000000000000000"
-        slot: "0"
         validator_index: "0"
-        payload_status: "0"
+        data:
+          beacon_block_root: "0x0000000000000000000000000000000000000000000000000000000000000000"
+          slot: "0"
+          payload_present: false
+          blob_data_available: false
       signature: "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
     expectStatuses:  [200, 202, 400, 404, 415, 500, 503]
     successStatuses: [200, 202]
@@ -549,9 +585,14 @@ tasks:
     errorStatuses:   [400, 404, 500, 503]
     requestTimeout: "20s"
     responseSchema:
+      # GetPoolPayloadAttestationsResponse: {version, data}.
+      # PayloadAttestation required: aggregation_bits, data, signature.
+      # PayloadAttestationData required: beacon_block_root, slot,
+      # payload_present, blob_data_available.
       type: object
-      required: [data]
+      required: [version, data]
       properties:
+        version: { type: string }
         data:
           type: array
           items:
@@ -562,11 +603,12 @@ tasks:
               signature:        { type: string }
               data:
                 type: object
-                required: [beacon_block_root, slot, payload_status]
+                required: [beacon_block_root, slot, payload_present, blob_data_available]
                 properties:
-                  beacon_block_root: { type: string }
-                  slot:              { type: string }
-                  payload_status:    { type: string }
+                  beacon_block_root:   { type: string }
+                  slot:                { type: string }
+                  payload_present:     { type: boolean }
+                  blob_data_available: { type: boolean }
     errorSchema:
       type: object
 
@@ -600,6 +642,8 @@ tasks:
           minEvents: 1
         overallTimeout: "60s"
         eventSchema:
+          # SignedExecutionPayloadBid wrapped as {version, data: {message, signature}}.
+          # Inner message: per ExecutionPayloadBid spec.
           type: object
           required: [version, data]
           properties:
@@ -607,6 +651,22 @@ tasks:
             data:
               type: object
               required: [message, signature]
+              properties:
+                signature: { type: string }
+                message:
+                  type: object
+                  required:
+                    - parent_block_hash
+                    - parent_block_root
+                    - block_hash
+                    - prev_randao
+                    - fee_recipient
+                    - gas_limit
+                    - builder_index
+                    - slot
+                    - value
+                    - execution_payment
+                    - blob_kzg_commitments
     - name: check_consensus_api
       id: row13_sse_execution_payload_available
       title: "13. SSE execution_payload_available"
@@ -620,11 +680,13 @@ tasks:
           minEvents: 1
         overallTimeout: "60s"
         eventSchema:
+          # Spec example: {"slot": "10", "block_root": "0x..."}.
+          # Note the field is `block_root` (not beacon_block_root).
           type: object
-          required: [slot, beacon_block_root]
+          required: [slot, block_root]
           properties:
-            slot:              { type: string }
-            beacon_block_root: { type: string }
+            slot:       { type: string }
+            block_root: { type: string }
     - name: check_consensus_api
       id: row14_sse_payload_attestation_message
       title: "14. SSE payload_attestation_message"
@@ -638,13 +700,27 @@ tasks:
           minEvents: 1
         overallTimeout: "60s"
         eventSchema:
+          # Spec example: wrapped as {version, data: {validator_index,
+          # data: {beacon_block_root, slot, payload_present,
+          # blob_data_available}, signature}}.
           type: object
-          required: [message, signature]
+          required: [version, data]
           properties:
-            signature: { type: string }
-            message:
+            version: { type: string }
+            data:
               type: object
-              required: [beacon_block_root, slot, payload_status, validator_index]
+              required: [validator_index, data, signature]
+              properties:
+                validator_index: { type: string }
+                signature:       { type: string }
+                data:
+                  type: object
+                  required: [beacon_block_root, slot, payload_present, blob_data_available]
+                  properties:
+                    beacon_block_root:   { type: string }
+                    slot:                { type: string }
+                    payload_present:     { type: boolean }
+                    blob_data_available: { type: boolean }
     - name: check_consensus_api
       id: row15_sse_execution_payload
       title: "15. SSE execution_payload"
@@ -658,13 +734,16 @@ tasks:
           minEvents: 1
         overallTimeout: "60s"
         eventSchema:
+          # Spec example: flat {slot, builder_index, block_hash,
+          # block_root, execution_optimistic}.
           type: object
-          required: [version, data]
+          required: [slot, builder_index, block_hash, block_root, execution_optimistic]
           properties:
-            version: { type: string }
-            data:
-              type: object
-              required: [message, signature]
+            slot:                 { type: string }
+            builder_index:        { type: string }
+            block_hash:           { type: string }
+            block_root:           { type: string }
+            execution_optimistic: { type: boolean }
     - name: check_consensus_api
       id: row16_sse_execution_payload_gossip
       title: "16. SSE execution_payload_gossip"
@@ -678,8 +757,17 @@ tasks:
           minEvents: 1
         overallTimeout: "60s"
         eventSchema:
+          # Spec example: flat {slot, builder_index, block_hash,
+          # block_root} (same as execution_payload but without
+          # execution_optimistic, since the payload hasn't been
+          # imported to fork-choice yet).
           type: object
-          required: [version, data]
+          required: [slot, builder_index, block_hash, block_root]
+          properties:
+            slot:          { type: string }
+            builder_index: { type: string }
+            block_hash:    { type: string }
+            block_root:    { type: string }
 
 ##
 ## ------------------------------------------------------------------

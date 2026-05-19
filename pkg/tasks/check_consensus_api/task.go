@@ -381,7 +381,15 @@ func (t *Task) resolvePath(ctx context.Context, allClients []*clients.PoolClient
 	}
 
 	if len(missing) == 0 {
-		return pathTpl, params, nil
+		// Everything was supplied via pathParams; still need to
+		// substitute, otherwise the request URL keeps the literal
+		// `{placeholder}` tokens.
+		finalPath = pathTpl
+		for k, v := range params {
+			finalPath = strings.ReplaceAll(finalPath, "{"+k+"}", v)
+		}
+
+		return finalPath, params, nil
 	}
 
 	// Need chain state. Use the first ready client we can find.
@@ -795,6 +803,19 @@ func classifyHTTPResult(
 	}
 
 	if containsInt(cfg.ErrorStatuses, r.HTTPStatus) {
+		// Empty or non-JSON body on an error status almost always means
+		// the route is not registered at all (frameworks return a bare
+		// 404 page from the global not-found handler). Treat that as
+		// "endpoint missing" rather than schema mismatch — the matrix
+		// signal is otherwise dominated by ambiguous 🟡 cells.
+		bodyTrim := bytes.TrimSpace(body)
+		if len(bodyTrim) == 0 {
+			r.Status = resultFail
+			r.Note = fmt.Sprintf("status %d with empty body — route likely missing", r.HTTPStatus)
+
+			return
+		}
+
 		if errorSchema == nil {
 			r.Status = resultPass
 			r.Note = fmt.Sprintf("status %d (no error schema)", r.HTTPStatus)
@@ -806,6 +827,17 @@ func classifyHTTPResult(
 		if len(errs) == 0 {
 			r.Status = resultPass
 			r.Note = fmt.Sprintf("well-formed error status %d", r.HTTPStatus)
+
+			return
+		}
+
+		// Body parsed but didn't match (or didn't parse as JSON). If
+		// it wasn't JSON at all that's a "route missing" signal too —
+		// most clients send a structured 4xx body on real endpoints.
+		var probe interface{}
+		if json.Unmarshal(body, &probe) != nil {
+			r.Status = resultFail
+			r.Note = fmt.Sprintf("status %d with non-JSON body — route likely missing", r.HTTPStatus)
 
 			return
 		}
