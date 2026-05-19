@@ -803,15 +803,34 @@ func classifyHTTPResult(
 	}
 
 	if containsInt(cfg.ErrorStatuses, r.HTTPStatus) {
-		// Empty or non-JSON body on an error status almost always means
-		// the route is not registered at all (frameworks return a bare
-		// 404 page from the global not-found handler). Treat that as
-		// "endpoint missing" rather than schema mismatch — the matrix
-		// signal is otherwise dominated by ambiguous 🟡 cells.
+		// Empty body on an error status almost always means the route
+		// is not registered at all (the framework's global not-found
+		// handler returns a bare 404). Treat that as ❌ rather than 🟡.
 		bodyTrim := bytes.TrimSpace(body)
 		if len(bodyTrim) == 0 {
 			r.Status = resultFail
 			r.Note = fmt.Sprintf("status %d with empty body — route likely missing", r.HTTPStatus)
+
+			return
+		}
+
+		// Non-JSON body — another "framework gave up" signal.
+		var probe interface{}
+		if jerr := json.Unmarshal(body, &probe); jerr != nil {
+			r.Status = resultFail
+			r.Note = fmt.Sprintf("status %d with non-JSON body — route likely missing", r.HTTPStatus)
+
+			return
+		}
+
+		// JSON body — check whether the `message` field looks like a
+		// generic "route not registered" reply ("NOT_FOUND",
+		// "Route POST:/… not found", "Unsupported endpoint version").
+		// Real domain handlers always mention the actual missing
+		// resource (block, envelope, validator, …) in their 404.
+		if msg, ok := extractErrorMessage(body); ok && isRouteMissingMessage(msg) {
+			r.Status = resultFail
+			r.Note = fmt.Sprintf("status %d %q — route likely missing", r.HTTPStatus, truncate(msg, 80))
 
 			return
 		}
@@ -831,17 +850,6 @@ func classifyHTTPResult(
 			return
 		}
 
-		// Body parsed but didn't match (or didn't parse as JSON). If
-		// it wasn't JSON at all that's a "route missing" signal too —
-		// most clients send a structured 4xx body on real endpoints.
-		var probe interface{}
-		if json.Unmarshal(body, &probe) != nil {
-			r.Status = resultFail
-			r.Note = fmt.Sprintf("status %d with non-JSON body — route likely missing", r.HTTPStatus)
-
-			return
-		}
-
 		r.Status = resultPartial
 		r.SchemaErrors = errs
 		r.Note = fmt.Sprintf("error status %d but body does not match ErrorMessage schema", r.HTTPStatus)
@@ -852,6 +860,72 @@ func classifyHTTPResult(
 	// Fell through expect list but not in success/error → treat as partial.
 	r.Status = resultPartial
 	r.Note = fmt.Sprintf("status %d not in success/error sets", r.HTTPStatus)
+}
+
+// extractErrorMessage pulls a `message` string out of a JSON error
+// body. Returns the message + true on success; false when the body
+// isn't a JSON object or has no string `message` field.
+func extractErrorMessage(body []byte) (string, bool) {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return "", false
+	}
+
+	v, ok := raw["message"]
+	if !ok {
+		return "", false
+	}
+
+	s, ok := v.(string)
+	if !ok {
+		return "", false
+	}
+
+	return s, true
+}
+
+// routeMissingPatterns lists case-insensitive substrings that strongly
+// indicate a framework's generic "route not registered" reply rather
+// than a domain-specific resource-not-found error. The patterns are
+// purposely narrow — domain handlers mentioning "block not found",
+// "envelope not found", etc. must NOT match.
+var routeMissingPatterns = []string{
+	"not_found",            // Lighthouse global 404 (`NOT_FOUND`)
+	"route not found",      // Nimbus / Lodestar style
+	"unsupported endpoint", // Lighthouse "Unsupported endpoint version"
+	"endpoint not found",   // generic
+	"unknown endpoint",     // generic
+	"unknown route",        // generic
+	"no matching route",    // generic
+	"method not allowed",   // 405 dressed up as 404
+	"no handler",           // generic
+}
+
+func isRouteMissingMessage(msg string) bool {
+	low := strings.ToLower(msg)
+
+	// Lodestar emits "Route POST:/eth/v1/foo not found" — accept any
+	// "Route … not found" form.
+	if strings.Contains(low, "route ") && strings.Contains(low, "not found") {
+		return true
+	}
+
+	for _, pat := range routeMissingPatterns {
+		if strings.Contains(low, pat) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// truncate clips s to at most n bytes for use in note strings.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+
+	return s[:n] + "…"
 }
 
 func clientTypeString(client *clients.PoolClient) string {
