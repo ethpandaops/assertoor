@@ -10,19 +10,27 @@ description: |
   [#588](https://github.com/ethereum/beacon-APIs/pull/588)) against every
   connected CL client and renders a compatibility matrix.
 
-  For each (endpoint × client) pair the result is:
+  Inputs are pulled from live chain state at the start of the run via two
+  small generic tasks — `get_consensus_block_header` for a canonical
+  recent slot/root pair, and `get_consensus_proposer_duties` for a real
+  future-slot proposer assignment plus a handful of live validator
+  indices. The GET endpoints below pull those values via `configVars`
+  so they answer with actual data instead of synthetic 404s.
 
-  - ✅ — endpoint exists, response body validates against a permissive
-    spec-derived schema (success body **or** any documented error body
-    counts; we only require that the body parses as a JSON object).
-  - 🟡 — endpoint exists but the success response body does not match
-    the spec schema, or an SSE topic was accepted but no event arrived
-    in the wait window. The note is captured as a footnote.
+  Each cell is classified as:
+
+  - ✅ — endpoint exists AND the success response body validates against
+    the spec-derived schema (every required field present, types match).
+    For error responses we only check that the body is a JSON object —
+    error shapes diverge legitimately across implementations.
+  - 🟡 — endpoint exists but the success body misses required spec
+    fields, or an SSE topic was accepted but no event arrived in the
+    wait window. The note is captured as a footnote.
   - ❌ — endpoint not implemented (route not found, connection error,
-    SSE subscription rejected, or unexpected 5xx outside the documented
-    error set).
+    SSE subscription rejected, or unexpected 5xx outside the
+    documented error set).
   - ⚪ — required fork not yet active on the client (skipped).
-version: 1.1.0
+version: 1.3.0
 tags: [api, compatibility, gloas, beacon-api]
 timeout: 30m
 
@@ -68,26 +76,41 @@ tasks:
       echo "::set-output-json warmupSlot $WARMUP_SLOT"
       echo "::set-output-json gloasEpoch $GFE"
 
-# Push the warmup another full epoch past the fork activation so that
-# subsequent rows can safely query "recent" state (`{recent_slot}` is
-# resolved as head - 4) without colliding with the fork boundary.
 - name: check_consensus_slot_range
   title: "Wait for GLOAS activation + warmup"
   timeout: 25m
   configVars:
     minSlotNumber: "tasks.gloas_target.outputs.warmupSlot"
 
+# Canonical recent slot/root pair. The envelope at this slot is
+# guaranteed to exist on every client (4 slots back, walking past any
+# missed slots).
+- name: get_consensus_block_header
+  id: recent
+  title: "Fetch a recent canonical block header (head - 4)"
+  config:
+    headOffset: 4
+    maxLookback: 8
+
+# A specific future-slot proposer for produceBlockV4, plus a handful
+# of real validator indices for endpoints that want a body of them.
+- name: get_consensus_proposer_duties
+  id: duties
+  title: "Fetch proposer duties for the next epoch"
+  config:
+    epochOffset: 1
+    maxDuties: 8
+
 ##
 ## ------------------------------------------------------------------
 ## HTTP endpoints (rows 1-11)
 ##
-## The errorSchema everywhere accepts ANY JSON object — implementations
-## diverge wildly on error-body shape (some return {code,message}, some
-## omit code, Lodestar wraps differently, etc.). Forcing the canonical
-## OpenAPI shape produced too many 🟡 false positives without telling
-## us anything about endpoint presence. The new contract is "if you
-## responded with a parseable JSON object on one of the documented
-## status codes, your route exists and that's good enough".
+## Inputs come from `tasks.recent` and `tasks.duties` wherever a real
+## value works better than a placeholder. Error schemas stay
+## permissive (any JSON object) because client error-body shapes
+## diverge in ways that don't affect endpoint compatibility. Success
+## schemas list every required field from the spec PRs, so a response
+## missing a GLOAS field gets a 🟡.
 ## ------------------------------------------------------------------
 ##
 
@@ -104,9 +127,6 @@ tasks:
     headers:
       Eth-Consensus-Version: "gloas"
     body:
-      # Deliberately empty/garbage Gloas-shaped body. The endpoint should
-      # parse it as a gloas SignedBeaconBlock and reject with a
-      # well-formed error message. That alone proves the endpoint exists.
       message:
         slot: "0"
         proposer_index: "0"
@@ -121,36 +141,95 @@ tasks:
     errorSchema:
       type: object
 
-# Row 2 -- GET /eth/v4/validator/blocks/{slot}
+# Row 2 -- GET /eth/v4/validator/blocks/{slot} (produceBlockV4)
 - name: check_consensus_api
   id: row02_produce_block_v4
   title: "2. GET /eth/v4/validator/blocks/{slot} (produceBlockV4)"
+  configVars:
+    pathParams: "{ slot: (tasks.duties.outputs.firstFutureSlot | tostring) }"
   config:
     rowId: "produce_block_v4"
     rowTitle: "GET /eth/v4/validator/blocks/{slot}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/580"
     method: "GET"
-    # Project from `recent_slot` (head-4) so all clients agree on the
-    # head we're projecting from. Adding 2 keeps the request in the
-    # future where the validator API is meant to operate.
-    path: "/eth/v4/validator/blocks/{recent_slot+2}"
+    path: "/eth/v4/validator/blocks/{slot}"
     queryParams:
       randao_reveal: "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
       graffiti: "0x000000000000000000000000000000000000000000000000000000000000000d"
       skip_randao_verification: "true"
-    # 500/501 indicate the route is registered but the handler is a
-    # stub / errors on the synthetic input — we still count that as
-    # "endpoint exists" because the route was recognised.
     expectStatuses:  [200, 202, 400, 404, 500, 501, 503]
     successStatuses: [200]
     errorStatuses:   [400, 404, 500, 501, 503]
     requestTimeout: "20s"
     responseSchema:
       type: object
-      required: [version, data]
+      required: [version, data, execution_payload_value]
       properties:
         version: { type: string }
-        data:    { type: object }
+        execution_payload_value: { type: string }
+        consensus_block_value:   { type: string }
+        data:
+          type: object
+          required: [slot, proposer_index, parent_root, state_root, body]
+          properties:
+            slot:           { type: string }
+            proposer_index: { type: string }
+            parent_root:    { type: string }
+            state_root:     { type: string }
+            body:
+              type: object
+              required:
+                - randao_reveal
+                - eth1_data
+                - graffiti
+                - proposer_slashings
+                - attester_slashings
+                - attestations
+                - deposits
+                - voluntary_exits
+                - sync_aggregate
+                - execution_payload_bid
+                - bls_to_execution_changes
+                - blob_kzg_commitments
+                - execution_requests
+                - payload_attestations
+              properties:
+                randao_reveal:        { type: string }
+                graffiti:             { type: string }
+                proposer_slashings:   { type: array }
+                attester_slashings:   { type: array }
+                attestations:         { type: array }
+                deposits:             { type: array }
+                voluntary_exits:      { type: array }
+                bls_to_execution_changes: { type: array }
+                blob_kzg_commitments: { type: array }
+                payload_attestations: { type: array }
+                eth1_data:
+                  type: object
+                  required: [deposit_root, deposit_count, block_hash]
+                sync_aggregate:
+                  type: object
+                  required: [sync_committee_bits, sync_committee_signature]
+                execution_payload_bid:
+                  type: object
+                  required: [message, signature]
+                  properties:
+                    signature: { type: string }
+                    message:
+                      type: object
+                      required:
+                        - parent_block_hash
+                        - parent_block_root
+                        - block_hash
+                        - fee_recipient
+                        - gas_limit
+                        - builder_index
+                        - slot
+                        - value
+                        - blob_kzg_commitments_root
+                execution_requests:
+                  type: object
+                  required: [deposits, withdrawals, consolidations]
     errorSchema:
       type: object
 
@@ -180,15 +259,18 @@ tasks:
 - name: check_consensus_api
   id: row04_get_bid
   title: "4. GET /eth/v1/validator/execution_payload_bid/{slot}/{builder_index}"
+  configVars:
+    pathParams: |
+      {
+        slot: (tasks.duties.outputs.firstFutureSlot | tostring),
+        builder_index: (tasks.duties.outputs.firstFutureValidatorIndex | tostring),
+      }
   config:
     rowId: "get_bid"
     rowTitle: "GET /eth/v1/validator/execution_payload_bid/{slot}/{builder_index}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
     method: "GET"
-    # The endpoint can legitimately respond "no bid available" on a
-    # synthetic builder_index — we just want to confirm the route is
-    # registered. 500/501 from a stub handler still counts.
-    path: "/eth/v1/validator/execution_payload_bid/{recent_slot+1}/0"
+    path: "/eth/v1/validator/execution_payload_bid/{slot}/{builder_index}"
     expectStatuses:  [200, 400, 404, 500, 501, 503]
     successStatuses: [200]
     errorStatuses:   [400, 404, 500, 501, 503]
@@ -198,7 +280,33 @@ tasks:
       required: [version, data]
       properties:
         version: { type: string }
-        data:    { type: object }
+        data:
+          type: object
+          required: [message, signature]
+          properties:
+            signature: { type: string }
+            message:
+              type: object
+              required:
+                - parent_block_hash
+                - parent_block_root
+                - block_hash
+                - fee_recipient
+                - gas_limit
+                - builder_index
+                - slot
+                - value
+                - blob_kzg_commitments_root
+              properties:
+                parent_block_hash: { type: string }
+                parent_block_root: { type: string }
+                block_hash:        { type: string }
+                fee_recipient:     { type: string }
+                gas_limit:         { type: string }
+                builder_index:     { type: string }
+                slot:              { type: string }
+                value:             { type: string }
+                blob_kzg_commitments_root: { type: string }
     errorSchema:
       type: object
 
@@ -228,21 +336,67 @@ tasks:
 - name: check_consensus_api
   id: row06_get_envelope_by_block
   title: "6. GET /eth/v1/beacon/execution_payload_envelope/{block_id}"
+  configVars:
+    pathParams: "{ block_id: tasks.recent.outputs.root }"
   config:
     rowId: "get_envelope_by_block"
     rowTitle: "GET /eth/v1/beacon/execution_payload_envelope/{block_id}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
     method: "GET"
-    path: "/eth/v1/beacon/execution_payload_envelope/head"
+    path: "/eth/v1/beacon/execution_payload_envelope/{block_id}"
     expectStatuses:  [200, 400, 404, 500, 503]
     successStatuses: [200]
     errorStatuses:   [400, 404, 500, 503]
     requestTimeout: "20s"
-    # Some implementations wrap with {version, data}; others return
-    # just {data} or the raw envelope. Accept any JSON object as long
-    # as the call succeeded — the route presence is what we're after.
     responseSchema:
       type: object
+      required: [version, data]
+      properties:
+        version: { type: string }
+        data:
+          type: object
+          required: [message, signature]
+          properties:
+            signature: { type: string }
+            message:
+              type: object
+              required:
+                - payload
+                - execution_requests
+                - builder_index
+                - beacon_block_root
+                - slot
+                - blob_kzg_commitments
+                - state_root
+              properties:
+                builder_index:        { type: string }
+                beacon_block_root:    { type: string }
+                slot:                 { type: string }
+                state_root:           { type: string }
+                blob_kzg_commitments: { type: array }
+                payload:
+                  type: object
+                  required:
+                    - parent_hash
+                    - fee_recipient
+                    - state_root
+                    - receipts_root
+                    - logs_bloom
+                    - prev_randao
+                    - block_number
+                    - gas_limit
+                    - gas_used
+                    - timestamp
+                    - extra_data
+                    - base_fee_per_gas
+                    - block_hash
+                    - transactions
+                    - withdrawals
+                    - blob_gas_used
+                    - excess_blob_gas
+                execution_requests:
+                  type: object
+                  required: [deposits, withdrawals, consolidations]
     errorSchema:
       type: object
 
@@ -250,24 +404,42 @@ tasks:
 - name: check_consensus_api
   id: row07_get_envelope_by_slot
   title: "7. GET /eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}"
+  configVars:
+    pathParams: |
+      {
+        slot: (tasks.recent.outputs.slot | tostring),
+        beacon_block_root: tasks.recent.outputs.root,
+      }
   config:
     rowId: "get_envelope_by_slot"
     rowTitle: "GET /eth/v1/validator/execution_payload_envelope/{slot}/{root}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/580"
     method: "GET"
-    # Critical fix: use the recent slot + the actual block root at
-    # that slot. The previous version used head-slot/head-root, but
-    # the envelope for the head block may not be produced yet on
-    # every client. {recent_slot} is head-4 with the matching root
-    # fetched from /eth/v1/beacon/headers, so each client should
-    # have a stable, canonical answer.
-    path: "/eth/v1/validator/execution_payload_envelope/{recent_slot}/{recent_block_root}"
+    path: "/eth/v1/validator/execution_payload_envelope/{slot}/{beacon_block_root}"
     expectStatuses:  [200, 400, 404, 500, 503]
     successStatuses: [200]
     errorStatuses:   [400, 404, 500, 503]
     requestTimeout: "20s"
     responseSchema:
       type: object
+      required: [version, data]
+      properties:
+        version: { type: string }
+        data:
+          type: object
+          required: [message, signature]
+          properties:
+            signature: { type: string }
+            message:
+              type: object
+              required:
+                - payload
+                - execution_requests
+                - builder_index
+                - beacon_block_root
+                - slot
+                - blob_kzg_commitments
+                - state_root
     errorSchema:
       type: object
 
@@ -275,15 +447,15 @@ tasks:
 - name: check_consensus_api
   id: row08_ptc_duties
   title: "8. POST /eth/v1/validator/duties/ptc/{epoch}"
+  configVars:
+    pathParams: "{ epoch: (tasks.duties.outputs.epoch | tostring) }"
+    body: "tasks.duties.outputs.validatorIndices | map(tostring)"
   config:
     rowId: "ptc_duties"
     rowTitle: "POST /eth/v1/validator/duties/ptc/{epoch}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552, https://github.com/ethereum/beacon-APIs/pull/592"
     method: "POST"
-    # `recent_epoch` is the epoch that contains `recent_slot` — already
-    # finalized'ish so duties are stable across clients.
-    path: "/eth/v1/validator/duties/ptc/{recent_epoch}"
-    body: ["0", "1", "2", "3", "4"]
+    path: "/eth/v1/validator/duties/ptc/{epoch}"
     expectStatuses:  [200, 400, 404, 500, 503]
     successStatuses: [200]
     errorStatuses:   [400, 404, 500, 503]
@@ -294,7 +466,15 @@ tasks:
       properties:
         dependent_root:       { type: string }
         execution_optimistic: { type: boolean }
-        data:                 { type: array }
+        data:
+          type: array
+          items:
+            type: object
+            required: [pubkey, validator_index, slot]
+            properties:
+              pubkey:          { type: string }
+              validator_index: { type: string }
+              slot:            { type: string }
     errorSchema:
       type: object
 
@@ -302,14 +482,14 @@ tasks:
 - name: check_consensus_api
   id: row09_payload_attestation_data
   title: "9. GET /eth/v1/validator/payload_attestation_data/{slot}"
+  configVars:
+    pathParams: "{ slot: (tasks.recent.outputs.slot | tostring) }"
   config:
     rowId: "payload_attestation_data"
     rowTitle: "GET /eth/v1/validator/payload_attestation_data/{slot}"
     referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
     method: "GET"
-    # PTC data is built for a previous slot. recent_slot (head-4) is
-    # safely past every client's current fork choice.
-    path: "/eth/v1/validator/payload_attestation_data/{recent_slot}"
+    path: "/eth/v1/validator/payload_attestation_data/{slot}"
     expectStatuses:  [200, 400, 404, 500, 503]
     successStatuses: [200]
     errorStatuses:   [400, 404, 500, 503]
@@ -318,7 +498,13 @@ tasks:
       type: object
       required: [data]
       properties:
-        data: { type: object }
+        data:
+          type: object
+          required: [beacon_block_root, slot, payload_status]
+          properties:
+            beacon_block_root: { type: string }
+            slot:              { type: string }
+            payload_status:    { type: string }
     errorSchema:
       type: object
 
@@ -366,92 +552,134 @@ tasks:
       type: object
       required: [data]
       properties:
-        data: { type: array }
+        data:
+          type: array
+          items:
+            type: object
+            required: [aggregation_bits, data, signature]
+            properties:
+              aggregation_bits: { type: string }
+              signature:        { type: string }
+              data:
+                type: object
+                required: [beacon_block_root, slot, payload_status]
+                properties:
+                  beacon_block_root: { type: string }
+                  slot:              { type: string }
+                  payload_status:    { type: string }
     errorSchema:
       type: object
 
 ##
 ## ------------------------------------------------------------------
-## SSE events (rows 12-16). Each subscribes for 48s — flat layout so
-## the matrix renderer can find them by id in the root tasks scope
-## (children of run_tasks_concurrent register in the wrapper's scope,
-## not the root).
+## SSE events (rows 12-16) — run concurrently to keep wallclock down
+## (5 × 48s sequential → ~48s parallel). newVariableScope:false makes
+## the children's ids land in the root tasks scope so the matrix
+## renderer below can still find them at `tasks.row1[2-6]_*`.
 ## ------------------------------------------------------------------
 ##
-- name: check_consensus_api
-  id: row12_sse_execution_payload_bid
-  title: "12. SSE execution_payload_bid"
+- name: run_tasks_concurrent
+  id: sse_group
+  title: "Run all SSE topic checks concurrently"
   config:
-    rowId: "sse_execution_payload_bid"
-    rowTitle: "SSE execution_payload_bid"
-    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552, https://github.com/ethereum/beacon-APIs/pull/587"
-    sse:
-      topic: "execution_payload_bid"
-      timeoutSeconds: 48
-      minEvents: 1
-    overallTimeout: "60s"
-    eventSchema:
-      type: object
-
-- name: check_consensus_api
-  id: row13_sse_execution_payload_available
-  title: "13. SSE execution_payload_available"
-  config:
-    rowId: "sse_execution_payload_available"
-    rowTitle: "SSE execution_payload_available"
-    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
-    sse:
-      topic: "execution_payload_available"
-      timeoutSeconds: 48
-      minEvents: 1
-    overallTimeout: "60s"
-    eventSchema:
-      type: object
-
-- name: check_consensus_api
-  id: row14_sse_payload_attestation_message
-  title: "14. SSE payload_attestation_message"
-  config:
-    rowId: "sse_payload_attestation_message"
-    rowTitle: "SSE payload_attestation_message"
-    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
-    sse:
-      topic: "payload_attestation_message"
-      timeoutSeconds: 48
-      minEvents: 1
-    overallTimeout: "60s"
-    eventSchema:
-      type: object
-
-- name: check_consensus_api
-  id: row15_sse_execution_payload
-  title: "15. SSE execution_payload"
-  config:
-    rowId: "sse_execution_payload"
-    rowTitle: "SSE execution_payload"
-    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
-    sse:
-      topic: "execution_payload"
-      timeoutSeconds: 48
-      minEvents: 1
-    overallTimeout: "60s"
-    eventSchema:
-      type: object
-
-- name: check_consensus_api
-  id: row16_sse_execution_payload_gossip
-  title: "16. SSE execution_payload_gossip"
-  config:
-    rowId: "sse_execution_payload_gossip"
-    rowTitle: "SSE execution_payload_gossip"
-    referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
-    sse:
-      topic: "execution_payload_gossip"
-      timeoutSeconds: 48
-      minEvents: 1
-    overallTimeout: "60s"
-    eventSchema:
-      type: object
+    newVariableScope: false
+    failureThreshold: 0
+    stopOnThreshold: false
+    ignoreResult: true
+    tasks:
+    - name: check_consensus_api
+      id: row12_sse_execution_payload_bid
+      title: "12. SSE execution_payload_bid"
+      config:
+        rowId: "sse_execution_payload_bid"
+        rowTitle: "SSE execution_payload_bid"
+        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552, https://github.com/ethereum/beacon-APIs/pull/587"
+        sse:
+          topic: "execution_payload_bid"
+          timeoutSeconds: 48
+          minEvents: 1
+        overallTimeout: "60s"
+        eventSchema:
+          type: object
+          required: [version, data]
+          properties:
+            version: { type: string }
+            data:
+              type: object
+              required: [message, signature]
+    - name: check_consensus_api
+      id: row13_sse_execution_payload_available
+      title: "13. SSE execution_payload_available"
+      config:
+        rowId: "sse_execution_payload_available"
+        rowTitle: "SSE execution_payload_available"
+        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+        sse:
+          topic: "execution_payload_available"
+          timeoutSeconds: 48
+          minEvents: 1
+        overallTimeout: "60s"
+        eventSchema:
+          type: object
+          required: [slot, beacon_block_root]
+          properties:
+            slot:              { type: string }
+            beacon_block_root: { type: string }
+    - name: check_consensus_api
+      id: row14_sse_payload_attestation_message
+      title: "14. SSE payload_attestation_message"
+      config:
+        rowId: "sse_payload_attestation_message"
+        rowTitle: "SSE payload_attestation_message"
+        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/552"
+        sse:
+          topic: "payload_attestation_message"
+          timeoutSeconds: 48
+          minEvents: 1
+        overallTimeout: "60s"
+        eventSchema:
+          type: object
+          required: [message, signature]
+          properties:
+            signature: { type: string }
+            message:
+              type: object
+              required: [beacon_block_root, slot, payload_status, validator_index]
+    - name: check_consensus_api
+      id: row15_sse_execution_payload
+      title: "15. SSE execution_payload"
+      config:
+        rowId: "sse_execution_payload"
+        rowTitle: "SSE execution_payload"
+        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
+        sse:
+          topic: "execution_payload"
+          timeoutSeconds: 48
+          minEvents: 1
+        overallTimeout: "60s"
+        eventSchema:
+          type: object
+          required: [version, data]
+          properties:
+            version: { type: string }
+            data:
+              type: object
+              required: [message, signature]
+    - name: check_consensus_api
+      id: row16_sse_execution_payload_gossip
+      title: "16. SSE execution_payload_gossip"
+      config:
+        rowId: "sse_execution_payload_gossip"
+        rowTitle: "SSE execution_payload_gossip"
+        referenceUrl: "https://github.com/ethereum/beacon-APIs/pull/588"
+        sse:
+          topic: "execution_payload_gossip"
+          timeoutSeconds: 48
+          minEvents: 1
+        overallTimeout: "60s"
+        eventSchema:
+          type: object
+          required: [version, data]
 
 ##
 ## ------------------------------------------------------------------
@@ -469,8 +697,7 @@ tasks:
     envVars:
       # One env var per row. Each query is a simple path expression so it
       # never enumerates the scope wholesale — that avoids gojq panicking
-      # on time.Time values nested elsewhere in the var tree (e.g. inside
-      # get_consensus_specs's spec map).
+      # on time.Time values nested elsewhere in the var tree.
       ROW_01: "tasks.row01_publish_block.outputs"
       ROW_02: "tasks.row02_produce_block_v4.outputs"
       ROW_03: "tasks.row03_publish_bid.outputs"
