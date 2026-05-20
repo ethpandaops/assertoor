@@ -144,6 +144,9 @@ tasks:
   title: "Poll for finality recovery (succeeds as soon as unfinalized epochs drop)"
   timeout: 25m
   configVars:
+    # Require a fresh finalized checkpoint after the split. maxUnfinalizedEpochs
+    # alone can pass on stale pre-split finality when the current epoch is close.
+    minFinalizedEpochs: "| (.tasks.initial_finality.outputs.finalizedEpoch | tonumber) + 1"
     maxUnfinalizedEpochs: "recoveredMaxUnfinalizedEpochs"
 
 cleanupTasks:
