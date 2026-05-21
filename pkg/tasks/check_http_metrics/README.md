@@ -42,10 +42,7 @@ The `check_http_metrics` task fetches metrics from an HTTP Prometheus endpoint a
   Behavior when a COUNTER metric's value drops below baseline (indicating restart): `fail`, `rebaseline`, or `ignore`. Only applies to COUNTER type metrics. Default: `fail`.
 
 - **`assertions`**:\
-  List of metric assertions. At least one required. Example:
-  ```yaml
-  - { "name": "counter_increased", "metric": "my_counter", "labels": { "env": "prod" }, "mode": "delta", "operator": "gt", "value": 0 }
-  ```
+  List of metric assertions. At least one required.
 
 #### Assertion Configuration
 
@@ -57,6 +54,41 @@ The `check_http_metrics` task fetches metrics from an HTTP Prometheus endpoint a
 - **`value`**: Expected numeric value. Required.
 - **`missingMetric`**: Per-assertion override for global `missingMetric`.
 - **`missingSeries`**: Per-assertion override for global `missingSeries`.
+
+#### Delta Mode
+
+In `delta` mode, the task tracks changes over time:
+1. First scrape: records the current value as baseline (waits, does not evaluate)
+2. Subsequent scrapes: computes `delta = current - baseline` and evaluates
+
+Negative deltas are valid for GAUGE and UNTYPED metrics. For COUNTER metrics, a decrease triggers `resetBehavior`.
+
+#### Examples
+
+```yaml
+assertions:
+  # Check counter increased by at least 1
+  - name: counter_increased
+    metric: my_counter
+    labels:
+      env: prod
+    mode: delta
+    operator: gte
+    value: 1
+
+  # Check gauge decreased (negative delta)
+  - name: gauge_dropped
+    metric: my_gauge
+    mode: delta
+    operator: lte
+    value: -1
+
+  # Check current value is above threshold
+  - name: value_above_threshold
+    metric: my_metric
+    operator: gt
+    value: 100
+```
 
 #### Metric Type Handling
 
