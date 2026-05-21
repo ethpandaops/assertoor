@@ -20,6 +20,9 @@ import (
 
 const outputTypeObject = "object"
 
+// Compile-time interface compliance check.
+var _ types.Task = (*Task)(nil)
+
 var (
 	TaskName       = "check_http_metrics"
 	TaskDescriptor = &types.TaskDescriptor{
@@ -267,25 +270,35 @@ func (t *Task) setOutputs(out *checkOutputs) {
 		t.ctx.Outputs.SetVar("values", map[string]float64{})
 		t.ctx.Outputs.SetVar("deltas", map[string]float64{})
 	} else {
-		if data, err := vars.GeneralizeData(out.passedAssertions); err == nil {
+		if data, err := vars.GeneralizeData(out.passedAssertions); err != nil {
+			t.logger.Warnf("failed to generalize passedAssertions: %v", err)
+		} else {
 			t.ctx.Outputs.SetVar("passedAssertions", data)
 		}
 
-		if data, err := vars.GeneralizeData(out.failedAssertions); err == nil {
+		if data, err := vars.GeneralizeData(out.failedAssertions); err != nil {
+			t.logger.Warnf("failed to generalize failedAssertions: %v", err)
+		} else {
 			t.ctx.Outputs.SetVar("failedAssertions", data)
 		}
 
-		if data, err := vars.GeneralizeData(out.values); err == nil {
+		if data, err := vars.GeneralizeData(out.values); err != nil {
+			t.logger.Warnf("failed to generalize values: %v", err)
+		} else {
 			t.ctx.Outputs.SetVar("values", data)
 		}
 
-		if data, err := vars.GeneralizeData(out.deltas); err == nil {
+		if data, err := vars.GeneralizeData(out.deltas); err != nil {
+			t.logger.Warnf("failed to generalize deltas: %v", err)
+		} else {
 			t.ctx.Outputs.SetVar("deltas", data)
 		}
 	}
 
 	// Baselines
-	if data, err := vars.GeneralizeData(t.baselines); err == nil {
+	if data, err := vars.GeneralizeData(t.baselines); err != nil {
+		t.logger.Warnf("failed to generalize baselines: %v", err)
+	} else {
 		t.ctx.Outputs.SetVar("baselines", data)
 	}
 

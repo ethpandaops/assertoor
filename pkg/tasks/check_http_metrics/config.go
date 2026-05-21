@@ -17,10 +17,10 @@ const (
 	MissingBehaviorWait MissingBehavior = "wait"
 	MissingBehaviorFail MissingBehavior = "fail"
 	MissingBehaviorPass MissingBehavior = "pass"
-
-	// DefaultMaxResponseSize is the default maximum response body size for metrics scraping.
-	DefaultMaxResponseSize = "10MB"
 )
+
+// DefaultMaxResponseSize is the default maximum response body size for metrics scraping.
+const DefaultMaxResponseSize = "10MB"
 
 // ResetBehavior controls what happens when a counter value drops below its baseline,
 // which typically indicates a service restart or counter reset.
@@ -54,11 +54,12 @@ const (
 )
 
 // AssertionConfig defines a single metric assertion to evaluate.
-// Labels must match exactly one time series; matching zero or multiple series is an error.
+// Labels are a subset selector that must match exactly one time series;
+// matching zero or multiple series is an error.
 type AssertionConfig struct {
 	Name          string            `yaml:"name" json:"name" desc:"Unique human-readable assertion name."`
 	Metric        string            `yaml:"metric" json:"metric" desc:"Prometheus metric name."`
-	Labels        map[string]string `yaml:"labels" json:"labels" desc:"Exact label match for the time series."`
+	Labels        map[string]string `yaml:"labels" json:"labels" desc:"Label selector; all specified labels must match and select exactly one time series."`
 	Mode          AssertionMode     `yaml:"mode" json:"mode" desc:"Evaluation mode: 'value' (current value) or 'delta' (change since baseline)."`
 	Operator      Operator          `yaml:"operator" json:"operator" desc:"Comparison operator: eq, neq, gt, gte, lt, lte."`
 	Value         float64           `yaml:"value" json:"value" desc:"Expected value for comparison."`
