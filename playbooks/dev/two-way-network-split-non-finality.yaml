@@ -1,27 +1,28 @@
-id: two-way-network-split
-name: "Two-Way Network Split Finality Test"
+id: two-way-network-split-non-finality
+name: "Two-Way Network Split Non-Finality Test"
 description: |
   Splits a Kurtosis-launched devnet into two halves through the disruptoor
-  HTTP API, verifies that finality stops for two epochs, heals the split,
-  then polls for finality recovery for up to recoveryEpochs (default 3).
+  HTTP API, keeps the split active for an epoch-based observation window
+  (default/minimum 2 epochs), verifies finality lag increased, heals the split,
+  then polls for fresh finality.
 
   The participant groups are computed dynamically from the assertoor client
   pool: nodes 1..floor(N/2) form the left half, nodes floor(N/2)+1..N form
   the right half. For odd N the right half gets the extra node. The playbook
-  requires at least `minClientCount` clients (default 2); choosing a topology
-  where one side retains a 2/3 finality majority (e.g. 3 nodes split 1/2) is
-  the operator's call. A disruptoor service is expected at `disruptoorUrl`
+  requires at least `minimumClientCount` clients (default 2); choosing a
+  topology where one side retains a 2/3 finality majority (e.g. 3 nodes split
+  1/2) is the operator's call. A disruptoor service is expected at `disruptoorApiUrl`
   (default `http://disruptoor:7700`).
 version: 1.0.0
-tags: [disruptoor, kurtosis, finality, network-split, consensus]
+tags: [disruptoor, kurtosis, finality, network-split, non-finality, consensus]
 timeout: 120m
 config:
-  disruptoorUrl: "http://disruptoor:7700"
-  minClientCount: 2
-  partitionClientTypes: ["execution", "beacon"]
-  splitObservationEpochs: 2
-  recoveryEpochs: 3
-  recoveredMaxUnfinalizedEpochs: 6
+  disruptoorApiUrl: "http://disruptoor:7700" # Disruptoor HTTP API used to apply and clear the partition.
+  minimumClientCount: 2 # Minimum number of healthy clients required before starting the split.
+  partitionedClientTypes: ["execution", "beacon"] # Client roles included in the partition groups.
+  splitDurationEpochs: 2 # Epochs to keep the split active; values below 2 are treated as 2.
+  minFinalizedEpochIncreaseAfterRecovery: 1 # Required finalized epoch increase after healing to prove fresh finality.
+  maxUnfinalizedEpochsAfterRecovery: 6 # Maximum finality lag allowed after healing.
 tasks:
 - name: get_consensus_specs
   id: get_specs
@@ -37,7 +38,7 @@ tasks:
   timeout: 1m
   config:
     envVars:
-      DISRUPTOOR_URL: disruptoorUrl
+      DISRUPTOOR_URL: disruptoorApiUrl
     command: |
       set -euo pipefail
       disruptoor_url=$(echo "$DISRUPTOOR_URL" | jq -r .)
@@ -48,7 +49,7 @@ tasks:
   title: "Wait for all devnet clients to be healthy"
   timeout: 20m
   configVars:
-    minClientCount: "minClientCount"
+    minClientCount: "minimumClientCount"
   config:
     maxUnhealthyCount: 0
 
@@ -71,10 +72,10 @@ tasks:
   timeout: 1m
   config:
     envVars:
-      DISRUPTOOR_URL: disruptoorUrl
+      DISRUPTOOR_URL: disruptoorApiUrl
       SPLIT_LEFT_PARTICIPANTS: "| [range(1; ((.tasks.client_check.outputs.totalCount / 2) | floor) + 1)]"
       SPLIT_RIGHT_PARTICIPANTS: "| [range(((.tasks.client_check.outputs.totalCount / 2) | floor) + 1; .tasks.client_check.outputs.totalCount + 1)]"
-      PARTITION_CLIENT_TYPES: partitionClientTypes
+      PARTITION_CLIENT_TYPES: partitionedClientTypes
     command: |
       set -euo pipefail
       disruptoor_url=$(echo "$DISRUPTOOR_URL" | jq -r .)
@@ -118,13 +119,13 @@ tasks:
   title: "Wait split observation epochs with the split active"
   timeout: 15m
   configVars:
-    minSlotNumber: "| (.tasks.split_start.outputs.currentSlot | tonumber) + ((.splitObservationEpochs | tonumber) * (.tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH | tonumber))"
+    minSlotNumber: "| (.tasks.split_start.outputs.currentSlot | tonumber) + (((.splitDurationEpochs | tonumber) | if . < 2 then 2 else . end) * (.tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH | tonumber))"
 
 - name: check_consensus_finality
   title: "Check non-finality after split observation"
   timeout: 1m
   configVars:
-    minUnfinalizedEpochs: "| (.tasks.initial_finality.outputs.unfinalizedEpochs | tonumber) + (.splitObservationEpochs | tonumber)"
+    minUnfinalizedEpochs: "| (.tasks.initial_finality.outputs.unfinalizedEpochs | tonumber) + ((.splitDurationEpochs | tonumber) | if . < 2 then 2 else . end)"
   config:
     failOnCheckMiss: true
 
@@ -133,7 +134,7 @@ tasks:
   timeout: 1m
   config:
     envVars:
-      DISRUPTOOR_URL: disruptoorUrl
+      DISRUPTOOR_URL: disruptoorApiUrl
     command: |
       set -euo pipefail
       disruptoor_url=$(echo "$DISRUPTOOR_URL" | jq -r .)
@@ -146,8 +147,8 @@ tasks:
   configVars:
     # Require a fresh finalized checkpoint after the split. maxUnfinalizedEpochs
     # alone can pass on stale pre-split finality when the current epoch is close.
-    minFinalizedEpochs: "| (.tasks.initial_finality.outputs.finalizedEpoch | tonumber) + 1"
-    maxUnfinalizedEpochs: "recoveredMaxUnfinalizedEpochs"
+    minFinalizedEpochs: "| (.tasks.initial_finality.outputs.finalizedEpoch | tonumber) + (.minFinalizedEpochIncreaseAfterRecovery | tonumber)"
+    maxUnfinalizedEpochs: "maxUnfinalizedEpochsAfterRecovery"
 
 cleanupTasks:
 - name: run_shell
@@ -155,7 +156,7 @@ cleanupTasks:
   timeout: 1m
   config:
     envVars:
-      DISRUPTOOR_URL: disruptoorUrl
+      DISRUPTOOR_URL: disruptoorApiUrl
     command: |
       set -euo pipefail
       disruptoor_url=$(echo "$DISRUPTOOR_URL" | jq -r .)

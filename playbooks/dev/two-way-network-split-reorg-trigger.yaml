@@ -1,0 +1,152 @@
+id: two-way-network-split-reorg-trigger
+name: "Two-Way Network Split Reorg Trigger"
+description: |
+  Splits a Kurtosis-launched devnet into two halves through the disruptoor
+  HTTP API, keeps the split active for a configurable observation window
+  (default 64 slots), heals the split, then polls for fresh finality.
+
+  The participant groups are computed dynamically from the assertoor client
+  pool: nodes 1..floor(N/2) form the left half, nodes floor(N/2)+1..N form
+  the right half. For odd N the right half gets the extra node. The playbook
+  requires at least `minimumClientCount` clients (default 2); choosing a
+  topology where one side retains a 2/3 finality majority (e.g. 3 nodes split
+  1/2) is the operator's call. A disruptoor service is expected at `disruptoorApiUrl`
+  (default `http://disruptoor:7700`).
+version: 1.0.0
+tags: [disruptoor, kurtosis, finality, network-split, reorg, consensus]
+timeout: 120m
+config:
+  disruptoorApiUrl: "http://disruptoor:7700" # Disruptoor HTTP API used to apply and clear the partition.
+  minimumClientCount: 2 # Minimum number of healthy clients required before starting the split.
+  partitionedClientTypes: ["execution", "beacon"] # Client roles included in the partition groups.
+  splitDurationSlots: 64 # Number of slots to keep the network split active before healing.
+  minFinalizedEpochIncreaseAfterRecovery: 1 # Required finalized epoch increase after healing to prove fresh finality.
+  maxUnfinalizedEpochsAfterRecovery: 6 # Maximum finality lag allowed after healing.
+tasks:
+- name: sleep
+  title: "Wait for disruptoor API to come up"
+  config:
+    duration: 10s
+
+- name: run_shell
+  title: "Check disruptoor API health"
+  timeout: 1m
+  config:
+    envVars:
+      DISRUPTOOR_URL: disruptoorApiUrl
+    command: |
+      set -euo pipefail
+      disruptoor_url=$(echo "$DISRUPTOOR_URL" | jq -r .)
+      curl -fsS "${disruptoor_url}/v1/healthz" >/dev/null
+
+- name: check_clients_are_healthy
+  id: client_check
+  title: "Wait for all devnet clients to be healthy"
+  timeout: 20m
+  configVars:
+    minClientCount: "minimumClientCount"
+  config:
+    maxUnhealthyCount: 0
+
+- name: check_consensus_finality
+  id: initial_finality
+  title: "Wait for initial finality"
+  timeout: 40m
+  config:
+    minFinalizedEpochs: 2
+    maxUnfinalizedEpochs: 3
+
+- name: check_consensus_slot_range
+  id: split_start
+  title: "Capture split start slot"
+  timeout: 1m
+  config: {}
+
+- name: run_shell
+  title: "Split devnet into two halves"
+  timeout: 1m
+  config:
+    envVars:
+      DISRUPTOOR_URL: disruptoorApiUrl
+      SPLIT_LEFT_PARTICIPANTS: "| [range(1; ((.tasks.client_check.outputs.totalCount / 2) | floor) + 1)]"
+      SPLIT_RIGHT_PARTICIPANTS: "| [range(((.tasks.client_check.outputs.totalCount / 2) | floor) + 1; .tasks.client_check.outputs.totalCount + 1)]"
+      PARTITION_CLIENT_TYPES: partitionedClientTypes
+    command: |
+      set -euo pipefail
+      disruptoor_url=$(echo "$DISRUPTOOR_URL" | jq -r .)
+      left_participants=$(echo "$SPLIT_LEFT_PARTICIPANTS" | jq -c .)
+      right_participants=$(echo "$SPLIT_RIGHT_PARTICIPANTS" | jq -c .)
+      client_types=$(echo "$PARTITION_CLIENT_TYPES" | jq -c .)
+      left_count=$(echo "$left_participants" | jq 'length')
+      right_count=$(echo "$right_participants" | jq 'length')
+      echo "Splitting ${left_count} left (${left_participants}) vs ${right_count} right (${right_participants})"
+      if [ "$left_count" -lt 1 ] || [ "$right_count" -lt 1 ]; then
+        echo "Refusing to split: each side must have at least one node" >&2
+        exit 1
+      fi
+      state_file=$(mktemp)
+      trap 'rm -f "$state_file"' EXIT
+
+      jq -n \
+        --argjson left "$left_participants" \
+        --argjson right "$right_participants" \
+        --argjson clientTypes "$client_types" \
+        '{
+          partitions: [
+            {
+              name: "assertoor-two-half-split",
+              groups: [
+                {"node-index": $left, "client-type": $clientTypes},
+                {"node-index": $right, "client-type": $clientTypes}
+              ],
+              scope: ["el_p2p", "cl_p2p"],
+              symmetric: true
+            }
+          ]
+        }' >"$state_file"
+
+      curl -fsS -X PUT "${disruptoor_url}/v1/state" \
+        -H "Content-Type: application/json" \
+        --data @"$state_file"
+      curl -fsS "${disruptoor_url}/v1/state" | jq -e '.partitions | length == 1' >/dev/null
+
+- name: check_consensus_slot_range
+  title: "Wait split observation duration with the split active"
+  timeout: 15m
+  configVars:
+    minSlotNumber: "| (.tasks.split_start.outputs.currentSlot | tonumber) + (.splitDurationSlots | tonumber)"
+
+- name: run_shell
+  title: "Clear disruptoor network split"
+  timeout: 1m
+  config:
+    envVars:
+      DISRUPTOOR_URL: disruptoorApiUrl
+    command: |
+      set -euo pipefail
+      disruptoor_url=$(echo "$DISRUPTOOR_URL" | jq -r .)
+      curl -fsS -X POST "${disruptoor_url}/v1/state/clear"
+      curl -fsS "${disruptoor_url}/v1/state" | jq -e '(.partitions | length) == 0 and (.shaping | length) == 0' >/dev/null
+
+- name: check_consensus_finality
+  title: "Poll for finality recovery (succeeds as soon as unfinalized epochs drop)"
+  timeout: 25m
+  configVars:
+    # Require a fresh finalized checkpoint after the split. maxUnfinalizedEpochs
+    # alone can pass on stale pre-split finality when the current epoch is close.
+    minFinalizedEpochs: "| (.tasks.initial_finality.outputs.finalizedEpoch | tonumber) + (.minFinalizedEpochIncreaseAfterRecovery | tonumber)"
+    maxUnfinalizedEpochs: "maxUnfinalizedEpochsAfterRecovery"
+
+cleanupTasks:
+- name: run_shell
+  title: "Clear disruptoor state"
+  timeout: 1m
+  config:
+    envVars:
+      DISRUPTOOR_URL: disruptoorApiUrl
+    command: |
+      set -euo pipefail
+      disruptoor_url=$(echo "$DISRUPTOOR_URL" | jq -r .)
+      if ! curl -fsS -X POST "${disruptoor_url}/v1/state/clear"; then
+        echo "WARNING: failed to clear disruptoor state during cleanup; devnet may still be partitioned" >&2
+      fi
