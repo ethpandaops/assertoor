@@ -115,23 +115,25 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("requestTimeout must be positive")
 	}
 
-	// Parse max response size
-	if c.MaxResponseSize != "" {
-		size, err := humanize.ParseBytes(c.MaxResponseSize)
-		if err != nil {
-			return fmt.Errorf("invalid maxResponseSize %q: %w", c.MaxResponseSize, err)
-		}
-
-		if size == 0 {
-			return fmt.Errorf("maxResponseSize must be positive")
-		}
-
-		if size > math.MaxInt64 {
-			return fmt.Errorf("maxResponseSize %q exceeds maximum allowed value", c.MaxResponseSize)
-		}
-
-		c.maxResponseSizeBytes = int64(size)
+	// Set default and parse max response size
+	if c.MaxResponseSize == "" {
+		c.MaxResponseSize = DefaultMaxResponseSize
 	}
+
+	size, err := humanize.ParseBytes(c.MaxResponseSize)
+	if err != nil {
+		return fmt.Errorf("invalid maxResponseSize %q: %w", c.MaxResponseSize, err)
+	}
+
+	if size == 0 {
+		return fmt.Errorf("maxResponseSize must be positive")
+	}
+
+	if size > math.MaxInt64 {
+		return fmt.Errorf("maxResponseSize %q exceeds maximum allowed value", c.MaxResponseSize)
+	}
+
+	c.maxResponseSizeBytes = int64(size)
 
 	// Validate assertions and check for duplicate names
 	seenNames := make(map[string]bool, len(c.Assertions))
@@ -189,10 +191,6 @@ func (c *Config) Validate() error {
 }
 
 func (c *Config) GetMaxResponseSizeBytes() int64 {
-	if c.maxResponseSizeBytes == 0 {
-		return 10 * 1024 * 1024 // 10MB default
-	}
-
 	return c.maxResponseSizeBytes
 }
 
