@@ -2,6 +2,7 @@ package checkhttpmetrics
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,7 @@ const (
 	testLabelBar           = "bar"
 	testLabelEnv           = "env"
 	testLabelRegion        = "region"
+	testLabelHost          = "host"
 	testValueProd          = "prod"
 	testAssertionName      = "test"
 	testAssertionName2     = "test_assertion"
@@ -374,31 +376,46 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestGetMaxResponseSizeBytes(t *testing.T) {
-	tests := []struct {
-		name string
-		cfg  Config
-		want int64
-	}{
-		{
-			name: "default when not set",
-			cfg:  Config{},
-			want: 10 * 1024 * 1024,
-		},
-		{
-			name: "parsed value",
-			cfg:  Config{MaxResponseSize: "5MB", maxResponseSizeBytes: 5 * 1024 * 1024},
-			want: 5 * 1024 * 1024,
-		},
-	}
+	// Test that Validate() sets the default when MaxResponseSize is empty
+	t.Run("default set by Validate when empty", func(t *testing.T) {
+		cfg := Config{
+			URL:            "http://example.com",
+			PollInterval:   helper.Duration{Duration: time.Second},
+			RequestTimeout: helper.Duration{Duration: time.Second},
+			Assertions:     []AssertionConfig{{Name: testAssertionName, Metric: "m", Operator: OperatorEq}},
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("Validate() failed: %v", err)
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.cfg.GetMaxResponseSizeBytes()
-			if got != tt.want {
-				t.Errorf("GetMaxResponseSizeBytes() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+		got := cfg.GetMaxResponseSizeBytes()
+		want := int64(10 * 1000 * 1000) // 10MB = 10,000,000 bytes (decimal)
+
+		if got != want {
+			t.Errorf("GetMaxResponseSizeBytes() = %v, want %v", got, want)
+		}
+	})
+
+	// Test that Validate() parses custom MaxResponseSize
+	t.Run("custom value parsed by Validate", func(t *testing.T) {
+		cfg := Config{
+			URL:             "http://example.com",
+			MaxResponseSize: "5MB",
+			PollInterval:    helper.Duration{Duration: time.Second},
+			RequestTimeout:  helper.Duration{Duration: time.Second},
+			Assertions:      []AssertionConfig{{Name: testAssertionName, Metric: "m", Operator: OperatorEq}},
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("Validate() failed: %v", err)
+		}
+
+		got := cfg.GetMaxResponseSizeBytes()
+		want := int64(5 * 1000 * 1000) // 5MB = 5,000,000 bytes (decimal)
+
+		if got != want {
+			t.Errorf("GetMaxResponseSizeBytes() = %v, want %v", got, want)
+		}
+	})
 }
 
 func TestValidateMissingBehavior(t *testing.T) {
@@ -465,6 +482,12 @@ func newTestTask(cfg *Config) *Task {
 	c := Config{}
 	if cfg != nil {
 		c = *cfg
+	}
+
+	// Ensure maxResponseSizeBytes has a default for tests that don't call Validate
+	// Use decimal value (10MB = 10,000,000) consistent with humanize.ParseBytes
+	if c.maxResponseSizeBytes == 0 {
+		c.maxResponseSizeBytes = 10 * 1000 * 1000
 	}
 
 	return &Task{
@@ -1306,6 +1329,12 @@ func newTestTaskWithContext(cfg *Config) (*Task, types.Variables, *types.TaskRes
 		config = *cfg
 	}
 
+	// Ensure maxResponseSizeBytes has a default for tests that don't call Validate
+	// Use decimal value (10MB = 10,000,000) consistent with humanize.ParseBytes
+	if config.maxResponseSizeBytes == 0 {
+		config.maxResponseSizeBytes = 10 * 1000 * 1000
+	}
+
 	task := &Task{
 		ctx:       ctx,
 		config:    config,
@@ -1600,5 +1629,303 @@ func TestRunCheck_ContinueOnPass(t *testing.T) {
 
 	if *result != types.TaskResultSuccess {
 		t.Errorf("result = %v, want TaskResultSuccess", *result)
+	}
+}
+
+// =============================================================================
+// Full-Cycle Integration Tests
+// =============================================================================
+// These tests verify the complete flow from DefaultConfig() through Validate()
+// to execution, mirroring how the task is used in production.
+
+func TestIntegration_ValueMode(t *testing.T) {
+	// Setup mock metrics server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP http_requests_total Total HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",status="200"} 150
+http_requests_total{method="POST",status="200"} 50
+`))
+	}))
+	defer server.Close()
+
+	// Start from DefaultConfig (like production)
+	cfg := DefaultConfig()
+	cfg.URL = server.URL
+	cfg.Assertions = []AssertionConfig{
+		{
+			Name:     "get_requests_above_100",
+			Metric:   "http_requests_total",
+			Labels:   map[string]string{"method": "GET", "status": "200"},
+			Mode:     AssertionModeValue,
+			Operator: OperatorGt,
+			Value:    100,
+		},
+	}
+
+	// Validate (like production)
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() failed: %v", err)
+	}
+
+	// Verify maxResponseSizeBytes was set by Validate
+	if cfg.GetMaxResponseSizeBytes() == 0 {
+		t.Fatal("maxResponseSizeBytes should be set after Validate()")
+	}
+
+	// Create task with context (like production)
+	logger := logrus.New()
+	logger.SetLevel(logrus.PanicLevel)
+
+	outputs := vars.NewVariables(nil)
+
+	var lastResult types.TaskResult
+
+	ctx := &types.TaskContext{
+		Outputs:        outputs,
+		SetResult:      func(r types.TaskResult) { lastResult = r },
+		ReportProgress: func(_ float64, _ string) {},
+	}
+
+	task := &Task{
+		ctx:        ctx,
+		config:     cfg,
+		logger:     logger,
+		baselines:  make(map[string]float64),
+		httpClient: &http.Client{Timeout: cfg.RequestTimeout.Duration},
+	}
+
+	// Run check
+	done, err := task.runCheck(context.Background())
+	if err != nil {
+		t.Fatalf("runCheck() error: %v", err)
+	}
+
+	if !done {
+		t.Error("expected done=true when assertion passes")
+	}
+
+	if lastResult != types.TaskResultSuccess {
+		t.Errorf("result = %v, want TaskResultSuccess", lastResult)
+	}
+
+	// Verify outputs
+	passed := outputs.GetVar("passedAssertions")
+	if passed == nil {
+		t.Fatal("passedAssertions output not set")
+	}
+
+	passedList, ok := passed.([]any)
+	if !ok {
+		t.Fatalf("passedAssertions type = %T, want []any", passed)
+	}
+
+	if len(passedList) != 1 || passedList[0] != "get_requests_above_100" {
+		t.Errorf("passedAssertions = %v, want [get_requests_above_100]", passedList)
+	}
+}
+
+func TestIntegration_DeltaMode(t *testing.T) {
+	requestCount := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+
+		// First scrape: baseline of 100
+		// Second scrape: value of 150 (delta = 50)
+		value := 100
+		if requestCount > 1 {
+			value = 150
+		}
+
+		_, _ = fmt.Fprintf(w, `
+# HELP requests_total Total requests
+# TYPE requests_total counter
+requests_total %d
+`, value)
+	}))
+	defer server.Close()
+
+	cfg := DefaultConfig()
+	cfg.URL = server.URL
+	cfg.Assertions = []AssertionConfig{
+		{
+			Name:     "delta_above_40",
+			Metric:   "requests_total",
+			Mode:     AssertionModeDelta,
+			Operator: OperatorGt,
+			Value:    40,
+		},
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() failed: %v", err)
+	}
+
+	logger := logrus.New()
+	logger.SetLevel(logrus.PanicLevel)
+
+	outputs := vars.NewVariables(nil)
+
+	var lastResult types.TaskResult
+
+	ctx := &types.TaskContext{
+		Outputs:        outputs,
+		SetResult:      func(r types.TaskResult) { lastResult = r },
+		ReportProgress: func(_ float64, _ string) {},
+	}
+
+	task := &Task{
+		ctx:        ctx,
+		config:     cfg,
+		logger:     logger,
+		baselines:  make(map[string]float64),
+		httpClient: &http.Client{Timeout: cfg.RequestTimeout.Duration},
+	}
+
+	// First scrape - records baseline, doesn't complete
+	done, err := task.runCheck(context.Background())
+	if err != nil {
+		t.Fatalf("first runCheck() error: %v", err)
+	}
+
+	if done {
+		t.Error("expected done=false on first scrape (baseline recording)")
+	}
+
+	// Second scrape - evaluates delta
+	done, err = task.runCheck(context.Background())
+	if err != nil {
+		t.Fatalf("second runCheck() error: %v", err)
+	}
+
+	if !done {
+		t.Error("expected done=true on second scrape")
+	}
+
+	if lastResult != types.TaskResultSuccess {
+		t.Errorf("result = %v, want TaskResultSuccess", lastResult)
+	}
+
+	// Verify delta output
+	deltas := outputs.GetVar("deltas")
+	if deltas == nil {
+		t.Fatal("deltas output not set")
+	}
+
+	deltasMap, ok := deltas.(map[string]any)
+	if !ok {
+		t.Fatalf("deltas type = %T, want map[string]any", deltas)
+	}
+
+	if delta, exists := deltasMap["delta_above_40"]; !exists || delta != 50.0 {
+		t.Errorf("deltas[delta_above_40] = %v, want 50.0", deltasMap["delta_above_40"])
+	}
+}
+
+func TestIntegration_MultipleAssertions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP cpu_usage CPU usage percentage
+# TYPE cpu_usage gauge
+cpu_usage{host="server1"} 45.5
+cpu_usage{host="server2"} 78.2
+# HELP memory_usage Memory usage percentage
+# TYPE memory_usage gauge
+memory_usage{host="server1"} 60.0
+`))
+	}))
+	defer server.Close()
+
+	cfg := DefaultConfig()
+	cfg.URL = server.URL
+	cfg.Assertions = []AssertionConfig{
+		{
+			Name:     "server1_cpu_ok",
+			Metric:   "cpu_usage",
+			Labels:   map[string]string{testLabelHost: "server1"},
+			Mode:     AssertionModeValue,
+			Operator: OperatorLt,
+			Value:    50,
+		},
+		{
+			Name:     "server1_memory_ok",
+			Metric:   "memory_usage",
+			Labels:   map[string]string{testLabelHost: "server1"},
+			Mode:     AssertionModeValue,
+			Operator: OperatorLte,
+			Value:    60,
+		},
+		{
+			Name:     "server2_cpu_high",
+			Metric:   "cpu_usage",
+			Labels:   map[string]string{testLabelHost: "server2"},
+			Mode:     AssertionModeValue,
+			Operator: OperatorGt,
+			Value:    70,
+		},
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() failed: %v", err)
+	}
+
+	logger := logrus.New()
+	logger.SetLevel(logrus.PanicLevel)
+
+	outputs := vars.NewVariables(nil)
+
+	var lastResult types.TaskResult
+
+	ctx := &types.TaskContext{
+		Outputs:        outputs,
+		SetResult:      func(r types.TaskResult) { lastResult = r },
+		ReportProgress: func(_ float64, _ string) {},
+	}
+
+	task := &Task{
+		ctx:        ctx,
+		config:     cfg,
+		logger:     logger,
+		baselines:  make(map[string]float64),
+		httpClient: &http.Client{Timeout: cfg.RequestTimeout.Duration},
+	}
+
+	done, err := task.runCheck(context.Background())
+	if err != nil {
+		t.Fatalf("runCheck() error: %v", err)
+	}
+
+	if !done {
+		t.Error("expected done=true when all assertions pass")
+	}
+
+	if lastResult != types.TaskResultSuccess {
+		t.Errorf("result = %v, want TaskResultSuccess", lastResult)
+	}
+
+	// Verify all three passed
+	passed := outputs.GetVar("passedAssertions")
+	passedList, ok := passed.([]any)
+
+	if !ok {
+		t.Fatalf("passedAssertions type = %T, want []any", passed)
+	}
+
+	if len(passedList) != 3 {
+		t.Errorf("passedAssertions count = %d, want 3", len(passedList))
+	}
+
+	// Verify values output
+	values := outputs.GetVar("values")
+	valuesMap, ok := values.(map[string]any)
+
+	if !ok {
+		t.Fatalf("values type = %T, want map[string]any", values)
+	}
+
+	if v := valuesMap["server1_cpu_ok"]; v != 45.5 {
+		t.Errorf("values[server1_cpu_ok] = %v, want 45.5", v)
 	}
 }
