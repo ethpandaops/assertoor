@@ -19,6 +19,7 @@ import (
 	checkethcall "github.com/ethpandaops/assertoor/pkg/tasks/check_eth_call"
 	checkethconfig "github.com/ethpandaops/assertoor/pkg/tasks/check_eth_config"
 	checkexecutionsyncstatus "github.com/ethpandaops/assertoor/pkg/tasks/check_execution_sync_status"
+	checkhttpjson "github.com/ethpandaops/assertoor/pkg/tasks/check_http_json"
 	generateattestations "github.com/ethpandaops/assertoor/pkg/tasks/generate_attestations"
 	generatebatchdeposits "github.com/ethpandaops/assertoor/pkg/tasks/generate_batch_deposits"
 	generateblobtransactions "github.com/ethpandaops/assertoor/pkg/tasks/generate_blob_transactions"
@@ -71,6 +72,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	checkexecutionblock.TaskDescriptor,
 	checkethcall.TaskDescriptor,
 	checkethconfig.TaskDescriptor,
+	checkhttpjson.TaskDescriptor,
 	checkexecutionsyncstatus.TaskDescriptor,
 	generateattestations.TaskDescriptor,
 	generatebatchdeposits.TaskDescriptor,
