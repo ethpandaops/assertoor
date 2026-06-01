@@ -70,7 +70,7 @@ type AssertionConfig struct {
 // Config holds the task configuration for scraping a Prometheus metrics endpoint
 // and evaluating assertions against the scraped values.
 type Config struct {
-	URL             string            `yaml:"url" json:"url" desc:"HTTP URL of the Prometheus metrics endpoint."`
+	URL             string            `yaml:"url" json:"url" require:"A" desc:"HTTP URL of the Prometheus metrics endpoint."`
 	Headers         map[string]string `yaml:"headers" json:"headers" desc:"Optional HTTP request headers."`
 	PollInterval    helper.Duration   `yaml:"pollInterval" json:"pollInterval" desc:"Interval between metric scrapes."`
 	RequestTimeout  helper.Duration   `yaml:"requestTimeout" json:"requestTimeout" desc:"Timeout for a single HTTP request."`
@@ -80,7 +80,7 @@ type Config struct {
 	MissingMetric   MissingBehavior   `yaml:"missingMetric" json:"missingMetric" desc:"Behavior when metric doesn't exist: wait, fail, pass."`
 	MissingSeries   MissingBehavior   `yaml:"missingSeries" json:"missingSeries" desc:"Behavior when no series matches labels: wait, fail, pass."`
 	ResetBehavior   ResetBehavior     `yaml:"resetBehavior" json:"resetBehavior" desc:"Behavior on counter reset in delta mode: fail, rebaseline, ignore."`
-	Assertions      []AssertionConfig `yaml:"assertions" json:"assertions" desc:"List of metric assertions to evaluate."`
+	Assertions      []AssertionConfig `yaml:"assertions" json:"assertions" require:"B" desc:"List of metric assertions to evaluate."`
 
 	// Parsed values (not from YAML)
 	maxResponseSizeBytes int64
