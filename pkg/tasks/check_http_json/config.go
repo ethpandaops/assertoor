@@ -62,7 +62,7 @@ type AssertionConfig struct {
 // Config holds the task configuration for fetching JSON from an HTTP endpoint
 // and evaluating assertions against the response.
 type Config struct {
-	URL             string            `yaml:"url" json:"url" desc:"HTTP URL of the JSON endpoint."`
+	URL             string            `yaml:"url" json:"url" require:"A" desc:"HTTP URL of the JSON endpoint."`
 	Method          string            `yaml:"method" json:"method" desc:"HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD)."`
 	Headers         map[string]string `yaml:"headers" json:"headers" desc:"Optional HTTP request headers."`
 	Body            any               `yaml:"body" json:"body,omitempty" desc:"Request body (YAML/JSON value, JSON-encoded before sending)."`
