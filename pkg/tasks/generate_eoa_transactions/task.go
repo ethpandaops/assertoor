@@ -173,7 +173,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		pendingWaitGroup.Add(1)
 
-		err := t.generateTransaction(ctx, txIndex, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt, err error) {
+		handedOff, err := t.generateTransaction(ctx, txIndex, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt, err error) {
 			if pendingChan != nil {
 				<-pendingChan
 			}
@@ -202,8 +202,15 @@ func (t *Task) Execute(ctx context.Context) error {
 		if err != nil {
 			t.logger.Errorf("error generating transaction: %v", err.Error())
 
-			// Note: onComplete callback is still called by spamoor even on error,
-			// so we don't drain pendingChan or call pendingWaitGroup.Done() here
+			if !handedOff {
+				// The tx was never handed to spamoor, so its OnComplete callback
+				// will never fire; release the pending slot and waitgroup entry here.
+				if pendingChan != nil {
+					<-pendingChan
+				}
+
+				pendingWaitGroup.Done()
+			}
 		} else {
 			perBlockCount++
 			totalCount++
@@ -257,7 +264,11 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, completeFn spamoor.TxCompleteFn) error {
+// generateTransaction builds and submits a single transaction.
+// The returned bool reports whether the tx was handed off to spamoor: when true,
+// spamoor owns the OnComplete callback (even if an error is also returned); when
+// false, the tx never reached submission and the caller must release its pending slot.
+func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, completeFn spamoor.TxCompleteFn) (bool, error) {
 	txWallet := t.wallet
 	if t.wallet == nil {
 		txWallet = t.walletPool.GetWallet(spamoor.SelectWalletRoundRobin, 0)
@@ -301,12 +312,16 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		clients = clientPool.GetExecutionPool().AwaitReadyEndpoints(ctx, true)
 		if len(clients) == 0 {
-			return ctx.Err()
+			if err := ctx.Err(); err != nil {
+				return false, err
+			}
+
+			return false, fmt.Errorf("no ready execution clients available")
 		}
 	} else {
 		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(poolClients) == 0 {
-			return fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+			return false, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
 
 		clients = make([]*execution.Client, len(poolClients))
@@ -328,7 +343,7 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 			Data:      txData,
 		})
 		if buildErr != nil {
-			return fmt.Errorf("cannot build legacy tx data: %w", buildErr)
+			return false, fmt.Errorf("cannot build legacy tx data: %w", buildErr)
 		}
 
 		tx, err = txWallet.BuildLegacyTx(legacyTx)
@@ -342,14 +357,14 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 			Data:      txData,
 		})
 		if buildErr != nil {
-			return fmt.Errorf("cannot build dynamic fee tx data: %w", buildErr)
+			return false, fmt.Errorf("cannot build dynamic fee tx data: %w", buildErr)
 		}
 
 		tx, err = txWallet.BuildDynamicFeeTx(dynFeeTx)
 	}
 
 	if err != nil {
-		return fmt.Errorf("cannot build transaction: %w", err)
+		return false, fmt.Errorf("cannot build transaction: %w", err)
 	}
 
 	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
@@ -390,8 +405,8 @@ func (t *Task) generateTransaction(ctx context.Context, transactionIdx uint64, c
 	})
 	if err != nil {
 		txWallet.MarkSkippedNonce(tx.Nonce())
-		return err
+		return true, err
 	}
 
-	return nil
+	return true, nil
 }
