@@ -1,8 +1,8 @@
 # Auto-generated playbook index
-# Generated: 2026-05-19T21:36:30Z
+# Generated: 2026-05-21T07:03:46Z
 # DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
 
-generated: 2026-05-19T21:36:30Z
+generated: 2026-05-21T07:03:46Z
 folders:
   - path: api-compatibility
     name: API Compatibility
@@ -237,20 +237,21 @@ playbooks:
       - consensus
       - execution
     timeout: 12h
-  - file: dev/two-way-network-split.yaml
-    id: two-way-network-split
-    name: Two-Way Network Split Finality Test
+  - file: dev/two-way-network-split-non-finality.yaml
+    id: two-way-network-split-non-finality
+    name: Two-Way Network Split Non-Finality Test
     description: |-
       Splits a Kurtosis-launched devnet into two halves through the disruptoor
-      HTTP API, verifies that finality stops for two epochs, heals the split,
-      waits two more epochs, and verifies finality recovers.
+      HTTP API, keeps the split active for an epoch-based observation window
+      (default/minimum 2 epochs), verifies finality lag increased, heals the split,
+      then polls for fresh finality.
 
       The participant groups are computed dynamically from the assertoor client
       pool: nodes 1..floor(N/2) form the left half, nodes floor(N/2)+1..N form
       the right half. For odd N the right half gets the extra node. The playbook
-      requires at least `minClientCount` clients (default 2); choosing a topology
-      where one side retains a 2/3 finality majority (e.g. 3 nodes split 1/2) is
-      the operator's call. A disruptoor service is expected at `disruptoorUrl`
+      requires at least `minimumClientCount` clients (default 2); choosing a
+      topology where one side retains a 2/3 finality majority (e.g. 3 nodes split
+      1/2) is the operator's call. A disruptoor service is expected at `disruptoorApiUrl`
       (default `http://disruptoor:7700`).
     version: 1.0.0
     tags:
@@ -258,8 +259,33 @@ playbooks:
       - kurtosis
       - finality
       - network-split
+      - non-finality
       - consensus
-    timeout: 45m
+    timeout: 120m
+  - file: dev/two-way-network-split-reorg-trigger.yaml
+    id: two-way-network-split-reorg-trigger
+    name: Two-Way Network Split Reorg Trigger
+    description: |-
+      Splits a Kurtosis-launched devnet into two halves through the disruptoor
+      HTTP API, keeps the split active for a configurable observation window
+      (default 64 slots), heals the split, then polls for fresh finality.
+
+      The participant groups are computed dynamically from the assertoor client
+      pool: nodes 1..floor(N/2) form the left half, nodes floor(N/2)+1..N form
+      the right half. For odd N the right half gets the extra node. The playbook
+      requires at least `minimumClientCount` clients (default 2); choosing a
+      topology where one side retains a 2/3 finality majority (e.g. 3 nodes split
+      1/2) is the operator's call. A disruptoor service is expected at `disruptoorApiUrl`
+      (default `http://disruptoor:7700`).
+    version: 1.0.0
+    tags:
+      - disruptoor
+      - kurtosis
+      - finality
+      - network-split
+      - reorg
+      - consensus
+    timeout: 120m
   - file: dev/validator-lifecycle-test.yaml
     id: validator-lifecycle-test
     name: Validator Lifecycle Test (Un-finality Stress)
