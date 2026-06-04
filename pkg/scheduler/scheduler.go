@@ -164,6 +164,22 @@ func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.TaskI
 	return task.index, nil
 }
 
+// PrependCleanupTask registers a cleanup task to run before any
+// previously-registered cleanup tasks. Used by dynamic registration from
+// inside a running task so cleanup happens in reverse order of setup
+// (LIFO), regardless of how the static cleanup section in the YAML is
+// ordered.
+func (ts *TaskScheduler) PrependCleanupTask(options *types.TaskOptions) (types.TaskIndex, error) {
+	task, err := ts.newTaskState(options, nil, nil, true)
+	if err != nil {
+		return 0, err
+	}
+
+	ts.rootCleanupTasks = append([]types.TaskIndex{task.index}, ts.rootCleanupTasks...)
+
+	return task.index, nil
+}
+
 func (ts *TaskScheduler) RunTasks(testRunCtx context.Context, timeout time.Duration) error {
 	var cleanupCtx, tasksCtx context.Context
 

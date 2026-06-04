@@ -89,6 +89,7 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 
 			return task.index, nil
 		},
+		AddCleanupTask: ts.PrependCleanupTask,
 		SetResult: func(result types.TaskResult) {
 			taskState.setTaskResult(result, true)
 		},

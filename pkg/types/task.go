@@ -96,6 +96,7 @@ type TaskContext struct {
 	Outputs        Variables
 	Logger         *logger.LogScope
 	NewTask        func(options *TaskOptions, variables Variables) (TaskIndex, error)
+	AddCleanupTask func(options *TaskOptions) (TaskIndex, error)
 	SetResult      func(result TaskResult)
 	ReportProgress func(percent float64, message string)
 	EmitEvent      func(eventType string, data any)
