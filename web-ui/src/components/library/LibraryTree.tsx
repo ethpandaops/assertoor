@@ -1,5 +1,5 @@
 import type { LibraryEntry } from '../../types/api';
-import { countPlaybooks, type TreeNode } from './libraryTree';
+import { countPlaybooks, type TreeNode } from './libraryTreeUtils';
 
 interface LibraryTreeProps {
   // The (already filtered) root node. Direct playbooks at root are

@@ -9,8 +9,8 @@ import { githubLight, githubDark } from '@uiw/codemirror-theme-github';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import Modal from '../common/Modal';
 import type { LibraryEntry } from '../../types/api';
-import type { TreeNode } from './libraryTree';
-import { countPlaybooks } from './libraryTree';
+import type { TreeNode } from './libraryTreeUtils';
+import { countPlaybooks } from './libraryTreeUtils';
 
 export type LibrarySelection =
   | { kind: 'playbook'; playbook: LibraryEntry }

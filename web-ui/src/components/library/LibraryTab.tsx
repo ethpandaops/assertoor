@@ -17,7 +17,7 @@ import {
   type LibraryFilter,
   type SearchScope,
   type TreeNode,
-} from './libraryTree';
+} from './libraryTreeUtils';
 import LibraryTree from './LibraryTree';
 import LibraryDetails, { type LibrarySelection } from './LibraryDetails';
 

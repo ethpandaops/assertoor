@@ -2,12 +2,9 @@
 name: Reusable check workflow
 on:
   workflow_call:
-    inputs:
-      ref:
-        description: 'The branch, tag or SHA to check'
-        default: ''
-        required: false
-        type: string
+
+permissions:
+  contents: read
 
 # shared check jobs
 jobs:
@@ -16,8 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      with:
-        ref: ${{ inputs.ref }}
 
     # setup global dependencies
     - name: Set up go
@@ -86,8 +81,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      with:
-        ref: ${{ inputs.ref }}
 
     - name: Set up Node.js
       uses: actions/setup-node@v6
