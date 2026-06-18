@@ -1,0 +1,277 @@
+id: prefork-queue-fill-public
+name: "GLOAS: Fill pending queues before fork activation (public devnet)"
+description: |
+  Public-devnet variant of `prefork-queue-fill` that needs NO special genesis
+  mnemonic - it deposits all of its own validators and builders.
+
+  Compressed to fit a short pre-fork window (`leadEpochs`) before GLOAS activation:
+
+  1. Wait until `leadEpochs` epochs before GLOAS activation.
+  2. Deposit a set of validators with a mixed credential set
+     (0x02 first so keys 0..N are compounding, then 0x01, then 0x00) from a
+     fresh mnemonic.
+  3. Deposit builders (0x03 credentials), batched - submitted AFTER the
+     regular deposits so they sit at the END of the pending-deposit queue.
+  4. Wait until `withdrawalLeadSlots` (10) slots before activation.
+  5. Submit 100 EL-triggered partial withdrawal requests (1 gwei each) for
+     keys 0-4, 20 per key.
+
+  IMPORTANT - intentionally invalid requests:
+  Freshly-deposited validators do NOT activate within such a short pre-fork
+  window (MAX_SEED_LOOKAHEAD is a fixed 4 epochs, plus finality lag). The 100
+  withdrawal requests are therefore expected to be skipped by the consensus
+  layer (their source validators are not active yet). They still fill the
+  execution-layer 7002 request queue and exercise the request path, which is
+  the point of this variant. Consolidations are intentionally omitted.
+
+  Goal: at GLOAS activation the pending-deposit queue (regular validators +
+  builders) and the EL withdrawal-request queue are non-empty.
+version: 1.0.0
+tags: [gloas, deposit, builder, withdrawal, el-triggered, queue, public-devnet]
+timeout: 1h
+config:
+  # Funding wallet (must hold enough to fund the child wallets below).
+  walletPrivkey: ""
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
+
+  # New validator deposits (mixed credentials), from a fresh mnemonic.
+  # Batches are deposited 0x02 -> 0x01 -> 0x00, so keys 0..newValidatorDepCount02-1
+  # are compounding (0x02). Keep newValidatorDepCount02 >= withdrawalKeyCount so
+  # the withdrawal-request keys (0..withdrawalKeyCount-1) carry 0x02 credentials.
+  newValidatorDepCount02: 20   # 0x02 compounding (keys 0..19)
+  newValidatorDepCount01: 20   # 0x01 eth1        (keys 20..39)
+  newValidatorDepCount00: 20   # 0x00 BLS         (keys 40..59)
+  validatorDepositAmount: 32   # ETH per new validator
+
+  # Builder deposits (0x03 credentials), batched, queued last.
+  builderCount: 500
+  builderDepositAmount: 1      # ETH per builder
+  builderBatchSize: 100
+
+  # EL-triggered withdrawal requests.
+  withdrawalKeyCount: 5        # keys 0..withdrawalKeyCount-1
+  withdrawalRounds: 20         # requests per key (20 -> 100 total)
+  withdrawalAmount: 1          # gwei per partial withdrawal
+
+  # Timing (relative to GLOAS activation slot), driven by chain specs.
+  leadEpochs: 2                # start filling this many epochs before activation
+  withdrawalLeadSlots: 10      # submit withdrawals this many slots before activation
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+##
+## Preparation: gather specs, derive timing, prepare wallets & keys
+##
+
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+
+- name: check_consensus_slot_range
+  id: current_slot
+  title: "Get current slot"
+
+- name: run_shell
+  id: calc_timing
+  title: "Calculate fork-relative timing slots"
+  config:
+    envVars:
+      GLOAS_FORK_EPOCH: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
+      SLOTS_PER_EPOCH: "tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH"
+      CURRENT_SLOT: "tasks.current_slot.outputs.currentSlot"
+      LEAD_EPOCHS: "leadEpochs"
+      WITHDRAWAL_LEAD_SLOTS: "withdrawalLeadSlots"
+    command: |
+      set -e
+      GLOAS_FORK_EPOCH=$(echo "$GLOAS_FORK_EPOCH" | jq -r .)
+      SLOTS_PER_EPOCH=$(echo "$SLOTS_PER_EPOCH" | jq -r .)
+      CURRENT_SLOT=$(echo "$CURRENT_SLOT" | jq -r .)
+      LEAD_EPOCHS=$(echo "$LEAD_EPOCHS" | jq -r .)
+      WITHDRAWAL_LEAD_SLOTS=$(echo "$WITHDRAWAL_LEAD_SLOTS" | jq -r .)
+
+      ACTIVATION_SLOT=$((GLOAS_FORK_EPOCH * SLOTS_PER_EPOCH))
+      START_SLOT=$((ACTIVATION_SLOT - LEAD_EPOCHS * SLOTS_PER_EPOCH))
+      WITHDRAWAL_SLOT=$((ACTIVATION_SLOT - WITHDRAWAL_LEAD_SLOTS))
+
+      echo "Current slot:        $CURRENT_SLOT"
+      echo "GLOAS activation:    epoch $GLOAS_FORK_EPOCH (slot $ACTIVATION_SLOT)"
+      echo "Queue-fill start:    slot $START_SLOT ($LEAD_EPOCHS epochs before activation)"
+      echo "Withdrawal start:    slot $WITHDRAWAL_SLOT ($WITHDRAWAL_LEAD_SLOTS slots before activation)"
+
+      if [ "$CURRENT_SLOT" -ge "$ACTIVATION_SLOT" ]; then
+        echo "WARNING: GLOAS has already activated (current slot >= activation slot)."
+        echo "         The queues will be filled post-activation; the pre-fork premise no longer holds."
+      elif [ "$CURRENT_SLOT" -ge "$START_SLOT" ]; then
+        echo "WARNING: already inside the queue-fill window (current slot >= start slot)."
+        echo "         Filling starts immediately with reduced lead time."
+      fi
+
+      echo "::set-output-json activationSlot $ACTIVATION_SLOT"
+      echo "::set-output-json startSlot $START_SLOT"
+      echo "::set-output-json withdrawalSlot $WITHDRAWAL_SLOT"
+
+# fresh mnemonics for the two deposit sets (no genesis mnemonic dependency)
+- name: get_random_mnemonic
+  id: val_mnemonic
+  title: "Generate fresh mnemonic for new validators"
+- name: get_random_mnemonic
+  id: builder_mnemonic
+  title: "Generate fresh mnemonic for builders"
+
+# wallet that funds the validator deposits, holds the 0x01/0x02 withdrawal
+# address, and sends the withdrawal requests
+- name: generate_child_wallet
+  id: deposit_wallet
+  title: "Generate wallet funding the validator deposits (+ withdrawal sender)"
+  config:
+    walletSeed: "gloas-prefork-public-deposits"
+  configVars:
+    privateKey: "walletPrivkey"
+    prefundMinBalance: "| ((.newValidatorDepCount00 + .newValidatorDepCount01 + .newValidatorDepCount02) * .validatorDepositAmount + 50) * 1000000000000000000"
+
+# wallet that funds the builder deposits + holds the 0x03 address
+- name: generate_child_wallet
+  id: builder_wallet
+  title: "Generate wallet funding the builder deposits"
+  config:
+    walletSeed: "gloas-prefork-public-builders"
+  configVars:
+    privateKey: "walletPrivkey"
+    prefundMinBalance: "| (.builderCount * .builderDepositAmount + 100) * 1000000000000000000"
+
+##
+## Gate: wait until `leadEpochs` epochs before GLOAS activation
+##
+
+- name: check_consensus_slot_range
+  title: "Wait until ${leadEpochs} epochs before GLOAS activation (slot ${{ tasks.calc_timing.outputs.startSlot }})"
+  timeout: 2h
+  configVars:
+    minSlotNumber: "tasks.calc_timing.outputs.startSlot"
+
+##
+## Deposit the new validators with mixed credentials.
+##  Batches run in order 0x02 -> 0x01 -> 0x00 so keys 0..newValidatorDepCount02-1
+##  are compounding (covers the withdrawal-request keys).
+##
+
+- name: run_tasks
+  title: "Deposit new validators (0x02, then 0x01, then 0x00 credentials)"
+  config:
+    tasks:
+    # 0x02 compounding credentials (keys 0..newValidatorDepCount02-1)
+    - name: generate_deposits
+      title: "Deposit ${newValidatorDepCount02} validators with 0x02 credentials"
+      config:
+        startIndex: 0
+        awaitReceipt: true
+        failOnReject: true
+      configVars:
+        limitTotal: "newValidatorDepCount02"
+        indexCount: "newValidatorDepCount02"
+        depositAmount: "validatorDepositAmount"
+        walletPrivkey: "tasks.deposit_wallet.outputs.childWallet.privkey"
+        mnemonic: "tasks.val_mnemonic.outputs.mnemonic"
+        depositContract: "depositContract"
+        withdrawalCredentials: '| "0x02" + ("00" * 11) + (.tasks.deposit_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+
+    # 0x01 eth1 credentials
+    - name: generate_deposits
+      title: "Deposit ${newValidatorDepCount01} validators with 0x01 credentials"
+      config:
+        awaitReceipt: true
+        failOnReject: true
+      configVars:
+        limitTotal: "newValidatorDepCount01"
+        indexCount: "newValidatorDepCount01"
+        startIndex: "newValidatorDepCount02"
+        depositAmount: "validatorDepositAmount"
+        walletPrivkey: "tasks.deposit_wallet.outputs.childWallet.privkey"
+        mnemonic: "tasks.val_mnemonic.outputs.mnemonic"
+        depositContract: "depositContract"
+        withdrawalCredentials: '| "0x01" + ("00" * 11) + (.tasks.deposit_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+
+    # 0x00 BLS credentials (default - derived from the validator BLS key)
+    - name: generate_deposits
+      title: "Deposit ${newValidatorDepCount00} validators with 0x00 credentials"
+      config:
+        awaitReceipt: true
+        failOnReject: true
+      configVars:
+        limitTotal: "newValidatorDepCount00"
+        indexCount: "newValidatorDepCount00"
+        startIndex: "| .newValidatorDepCount02 + .newValidatorDepCount01"
+        depositAmount: "validatorDepositAmount"
+        walletPrivkey: "tasks.deposit_wallet.outputs.childWallet.privkey"
+        mnemonic: "tasks.val_mnemonic.outputs.mnemonic"
+        depositContract: "depositContract"
+
+##
+## Builder deposits (0x03) - queued LAST.
+##  Submitted only after the regular validator deposits have execution-layer
+##  receipts, so their deposit requests land in later EL blocks and sit at the
+##  END of the pending-deposit queue.
+##
+
+- name: generate_batch_deposits
+  title: "Deposit ${builderCount} builders (0x03) in batches of ${builderBatchSize} (queued last)"
+  timeout: 30m
+  config:
+    awaitReceipt: true
+    failOnReject: true
+  configVars:
+    limitTotal: "builderCount"
+    indexCount: "builderCount"
+    batchSize: "builderBatchSize"
+    depositAmount: "builderDepositAmount"
+    walletPrivkey: "tasks.builder_wallet.outputs.childWallet.privkey"
+    mnemonic: "tasks.builder_mnemonic.outputs.mnemonic"
+    depositContract: "depositContract"
+    # 0x03 builder credentials: version byte + 11 zero bytes + 20-byte address
+    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.builder_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+
+##
+## Gate: wait until `withdrawalLeadSlots` slots before GLOAS activation
+##
+
+- name: check_consensus_slot_range
+  title: "Wait until ${withdrawalLeadSlots} slots before GLOAS activation (slot ${{ tasks.calc_timing.outputs.withdrawalSlot }})"
+  timeout: 1h
+  configVars:
+    minSlotNumber: "tasks.calc_timing.outputs.withdrawalSlot"
+
+##
+## Submit 100 EL-triggered partial withdrawal requests (1 gwei each).
+##  Keys 0..withdrawalKeyCount-1, withdrawalRounds requests per key. The index
+##  loop does not cycle, so we run `withdrawalRounds` concurrent rounds.
+##  These are expected to be skipped by the CL (source validators are not active
+##  yet) but still fill the EL 7002 request queue. failOnReject is off because
+##  the requests are intentionally not valid consensus-layer operations.
+##
+
+- name: run_task_matrix
+  title: "Submit ${withdrawalRounds}x ${withdrawalKeyCount} EL-triggered partial withdrawals (1 gwei each)"
+  timeout: 30m
+  configVars:
+    matrixValues: "| [range(0; .withdrawalRounds)]"
+  config:
+    runConcurrent: true
+    matrixVar: "round"
+    task:
+      name: generate_withdrawal_requests
+      title: "Withdrawal round ${round}: ${withdrawalKeyCount} requests (keys 0-${withdrawalKeyCount})"
+      config:
+        sourceStartIndex: 0
+        awaitReceipt: true
+      configVars:
+        # limitTotal is required by the task; with sourceIndexCount it bounds the round to keys 0..withdrawalKeyCount-1
+        limitTotal: "withdrawalKeyCount"
+        sourceIndexCount: "withdrawalKeyCount"
+        withdrawAmount: "withdrawalAmount"
+        sourceMnemonic: "tasks.val_mnemonic.outputs.mnemonic"
+        walletPrivkey: "tasks.deposit_wallet.outputs.childWallet.privkey"

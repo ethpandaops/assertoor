@@ -1,0 +1,47 @@
+id: exit-builders
+name: "GLOAS: Exit builders deposited by prefork-queue-fill-public"
+description: |
+  Small test that exits the builders created by `prefork-queue-fill-public`.
+
+  The queue-fill run deposits `builderCount` builders (0x03 credentials) from a
+  fresh random mnemonic (its `builder_mnemonic` task output). Once GLOAS has
+  activated and those deposits have been processed, the builders are part of the
+  builder set and can be exited via voluntary builder exits.
+
+  Mnemonic: copy the random `builderMnemonic` from the queue-fill run's
+  `builder_mnemonic` task output. builderStartIndex / builderCount must cover the
+  same key range that was deposited (defaults match the queue-fill defaults).
+
+  builderExit=true uses the BUILDER_INDEX_FLAG in the voluntary-exit message and
+  looks the pubkey up in the builder set cache. sendToAllClients is on because
+  not every CL client supports builder exits - the exit succeeds if at least one
+  client accepts it. awaitInclusion is on so the test only passes once the exits
+  are actually included in blocks.
+version: 1.0.0
+tags: [gloas, builder, exit, voluntary-exit]
+timeout: 30m
+config:
+  # Mnemonic of the deposited builders (from the queue-fill run's builder_mnemonic).
+  builderMnemonic: ""
+  builderStartIndex: 0
+  builderCount: 500
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: generate_exits
+  title: "Exit ${builderCount} builders (from index ${builderStartIndex})"
+  timeout: 25m
+  config:
+    builderExit: true
+    sendToAllClients: true
+    awaitInclusion: true
+  configVars:
+    limitTotal: "builderCount"
+    indexCount: "builderCount"
+    startIndex: "builderStartIndex"
+    mnemonic: "builderMnemonic"
