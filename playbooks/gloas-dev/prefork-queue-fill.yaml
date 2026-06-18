@@ -19,8 +19,8 @@ description: |
      0x01 -> 0x02 (compounding) credentials.
   5. Submit 100 consolidation requests (sources 50-149) targeting the now
      0x02 keys 0-49 (2 sources per target).
-  6. Deposit 1000 builders (0x03 credentials) from a second fresh mnemonic,
-     batched 100-per-tx for speed.
+  6. Deposit 1000 builders (EIP-8282) from a second fresh mnemonic, via the
+     builder deposit system contract (raw-calldata requests, in-flight capped).
   7. Wait until 10 slots before GLOAS activation.
   8. Submit 200 EL-triggered partial withdrawal requests (1 gwei each) for
      the supplied mnemonic keys 0-49, 4 requests per key.
@@ -59,10 +59,11 @@ config:
   newValidatorDepCount02: 33   # 0x02 compounding credentials
   validatorDepositAmount: 32   # ETH per new validator
 
-  # Builder deposits (0x03 credentials), batched.
+  # Builder deposits (EIP-8282), queued last.
   builderCount: 1000
   builderDepositAmount: 1      # ETH per builder
-  builderBatchSize: 100
+  builderPending: 200          # in-flight concurrency cap for builder deposit txs
+  builderDepositContract: "0x0000884d2AA32eAa155F59A2f24eFa73D9008282"
 
   # EL-triggered withdrawal requests (step 8).
   withdrawalKeyCount: 50       # keys 0..withdrawalKeyCount-1
@@ -337,8 +338,8 @@ tasks:
 ##  land in later blocks and sit at the END of the pending-deposit queue.
 ##
 
-- name: generate_batch_deposits
-  title: "Deposit ${builderCount} builders (0x03) in batches of ${builderBatchSize} (queued last)"
+- name: generate_builder_deposits
+  title: "Deposit ${builderCount} builders (EIP-8282) (queued last)"
   timeout: 45m
   config:
     awaitReceipt: true
@@ -346,13 +347,13 @@ tasks:
   configVars:
     limitTotal: "builderCount"
     indexCount: "builderCount"
-    batchSize: "builderBatchSize"
+    # in-flight concurrency cap (builder deposits are one tx each, no batch contract)
+    limitPending: "builderPending"
     depositAmount: "builderDepositAmount"
     walletPrivkey: "tasks.builder_wallet.outputs.childWallet.privkey"
     mnemonic: "tasks.builder_mnemonic.outputs.mnemonic"
-    depositContract: "depositContract"
-    # 0x03 builder credentials: version byte + 11 zero bytes + 20-byte address
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.builder_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+    # builder deposit system contract (EIP-8282); 0x03 creds derived from builder wallet
+    builderDepositContract: "builderDepositContract"
 
 ##
 ## Gate: wait until `withdrawalLeadSlots` slots before GLOAS activation

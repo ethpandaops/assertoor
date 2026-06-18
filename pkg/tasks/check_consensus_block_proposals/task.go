@@ -15,7 +15,6 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/vars"
 	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/ethpandaops/go-eth2-client/spec/capella"
-	"github.com/ethpandaops/go-eth2-client/spec/electra"
 	"github.com/ethpandaops/go-eth2-client/spec/gloas"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/juliangruber/go-intersect"
@@ -228,7 +227,11 @@ func (t *Task) needsPayload() bool {
 		t.config.MinWithdrawalRequestCount > 0 ||
 		len(t.config.ExpectWithdrawalRequests) > 0 ||
 		t.config.MinConsolidationRequestCount > 0 ||
-		len(t.config.ExpectConsolidationRequests) > 0
+		len(t.config.ExpectConsolidationRequests) > 0 ||
+		t.config.MinBuilderDepositRequestCount > 0 ||
+		len(t.config.ExpectBuilderDepositRequests) > 0 ||
+		t.config.MinBuilderExitRequestCount > 0 ||
+		len(t.config.ExpectBuilderExitRequests) > 0
 }
 
 // getPayloadTimeout returns the configured payload timeout or the default of 12 seconds.
@@ -339,6 +342,16 @@ func (t *Task) checkBlock(ctx context.Context, block *consensus.Block) bool {
 
 	// check consolidation request count
 	if (t.config.MinConsolidationRequestCount > 0 || len(t.config.ExpectConsolidationRequests) > 0) && !t.checkBlockConsolidationRequests(block, blockData, payload) {
+		return false
+	}
+
+	// check builder deposit request count (EIP-8282)
+	if (t.config.MinBuilderDepositRequestCount > 0 || len(t.config.ExpectBuilderDepositRequests) > 0) && !t.checkBlockBuilderDepositRequests(block, blockData, payload) {
+		return false
+	}
+
+	// check builder exit request count (EIP-8282)
+	if (t.config.MinBuilderExitRequestCount > 0 || len(t.config.ExpectBuilderExitRequests) > 0) && !t.checkBlockBuilderExitRequests(block, blockData, payload) {
 		return false
 	}
 
@@ -800,23 +813,9 @@ func (t *Task) checkBlockBlobs(block *consensus.Block, blockData *spec.Versioned
 }
 
 func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
-	var executionRequests *electra.ExecutionRequests
-
-	if blockData.Version >= spec.DataVersionGloas {
-		if payload == nil || payload.Message == nil || payload.Message.ExecutionRequests == nil {
-			t.logger.Warnf("could not get execution requests for gloas block %v [0x%x]: no payload", block.Slot, block.Root)
-			return false
-		}
-
-		executionRequests = payload.Message.ExecutionRequests
-	} else {
-		var err error
-
-		executionRequests, err = blockData.ExecutionRequests()
-		if err != nil {
-			t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
-			return false
-		}
+	executionRequests, ok := t.getExecutionRequests(block, blockData, payload)
+	if !ok {
+		return false
 	}
 
 	depositRequests := executionRequests.Deposits
@@ -863,23 +862,9 @@ func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec
 }
 
 func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
-	var executionRequests *electra.ExecutionRequests
-
-	if blockData.Version >= spec.DataVersionGloas {
-		if payload == nil || payload.Message == nil || payload.Message.ExecutionRequests == nil {
-			t.logger.Warnf("could not get execution requests for gloas block %v [0x%x]: no payload", block.Slot, block.Root)
-			return false
-		}
-
-		executionRequests = payload.Message.ExecutionRequests
-	} else {
-		var err error
-
-		executionRequests, err = blockData.ExecutionRequests()
-		if err != nil {
-			t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
-			return false
-		}
+	executionRequests, ok := t.getExecutionRequests(block, blockData, payload)
+	if !ok {
+		return false
 	}
 
 	withdrawalRequests := executionRequests.Withdrawals
@@ -930,23 +915,9 @@ func (t *Task) checkBlockWithdrawalRequests(block *consensus.Block, blockData *s
 }
 
 func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
-	var executionRequests *electra.ExecutionRequests
-
-	if blockData.Version >= spec.DataVersionGloas {
-		if payload == nil || payload.Message == nil || payload.Message.ExecutionRequests == nil {
-			t.logger.Warnf("could not get execution requests for gloas block %v [0x%x]: no payload", block.Slot, block.Root)
-			return false
-		}
-
-		executionRequests = payload.Message.ExecutionRequests
-	} else {
-		var err error
-
-		executionRequests, err = blockData.ExecutionRequests()
-		if err != nil {
-			t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
-			return false
-		}
+	executionRequests, ok := t.getExecutionRequests(block, blockData, payload)
+	if !ok {
+		return false
 	}
 
 	consolidationRequests := executionRequests.Consolidations
@@ -993,6 +964,133 @@ func (t *Task) checkBlockConsolidationRequests(block *consensus.Block, blockData
 				t.logger.Infof("check failed for block %v [0x%x]: expected consolidation request not found (address: %v, pubkey: %v)", block.Slot, block.Root, expectedConsolidationRequest.SourceAddress, expectedConsolidationRequest.SourcePubkey)
 				return false
 			}
+		}
+	}
+
+	return true
+}
+
+// getExecutionRequests returns the EIP-7685 execution requests for a block in a
+// version-agnostic way. For Gloas+ blocks the requests live in the separate
+// execution payload envelope; for Electra/Fulu they are part of the beacon block
+// body. The result is normalized to a gloas.ExecutionRequests so callers can access
+// all request types (including builder deposits/exits) uniformly.
+func (t *Task) getExecutionRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) (*gloas.ExecutionRequests, bool) {
+	if blockData.Version >= spec.DataVersionGloas {
+		if payload == nil || payload.Message == nil || payload.Message.ExecutionRequests == nil {
+			t.logger.Warnf("could not get execution requests for gloas block %v [0x%x]: no payload", block.Slot, block.Root)
+			return nil, false
+		}
+
+		return payload.Message.ExecutionRequests, true
+	}
+
+	versioned, err := blockData.ExecutionRequests()
+	if err != nil {
+		t.logger.Warnf("could not get execution requests for block %v [0x%x]: %v", block.Slot, block.Root, err)
+		return nil, false
+	}
+
+	deposits, _ := versioned.Deposits()
+	withdrawals, _ := versioned.Withdrawals()
+	consolidations, _ := versioned.Consolidations()
+
+	return &gloas.ExecutionRequests{
+		Deposits:       deposits,
+		Withdrawals:    withdrawals,
+		Consolidations: consolidations,
+	}, true
+}
+
+//nolint:dupl // structurally similar to checkBlockDepositRequests but operates on builder deposits
+func (t *Task) checkBlockBuilderDepositRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
+	executionRequests, ok := t.getExecutionRequests(block, blockData, payload)
+	if !ok {
+		return false
+	}
+
+	builderDepositRequests := executionRequests.BuilderDeposits
+	if len(builderDepositRequests) < t.config.MinBuilderDepositRequestCount {
+		t.logger.Infof("check failed for block %v [0x%x]: not enough builder deposit requests (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinBuilderDepositRequestCount, len(builderDepositRequests))
+		return false
+	}
+
+	for _, expectedRequest := range t.config.ExpectBuilderDepositRequests {
+		found := false
+
+		var expectedWithdrawalCreds []byte
+
+		if expectedRequest.WithdrawalCredentials != "" {
+			expectedWithdrawalCreds = common.FromHex(expectedRequest.WithdrawalCredentials)
+		}
+
+	requestLoop:
+		for _, builderDepositRequest := range builderDepositRequests {
+			if expectedRequest.PublicKey == "" || builderDepositRequest.Pubkey.String() == expectedRequest.PublicKey {
+				depositAmount := big.NewInt(0).SetUint64(uint64(builderDepositRequest.Amount))
+
+				switch {
+				case expectedRequest.WithdrawalCredentials != "" && !bytes.Equal(expectedWithdrawalCreds, builderDepositRequest.WithdrawalCredentials):
+					t.logger.Warnf("check failed: builder deposit request found, but withdrawal credentials do not match (have: 0x%x, want: 0x%x)", builderDepositRequest.WithdrawalCredentials, expectedWithdrawalCreds)
+				case expectedRequest.Amount != nil && expectedRequest.Amount.Cmp(big.NewInt(0)) > 0 && expectedRequest.Amount.Cmp(depositAmount) != 0:
+					t.logger.Warnf("check failed: builder deposit request found, but amount does not match (have: %v, want: %v)", depositAmount, expectedRequest.Amount.String())
+				default:
+					found = true
+					break requestLoop
+				}
+			}
+		}
+
+		if !found {
+			t.logger.Infof("check failed for block %v [0x%x]: expected builder deposit request not found (pubkey: %v)", block.Slot, block.Root, expectedRequest.PublicKey)
+			return false
+		}
+	}
+
+	return true
+}
+
+func (t *Task) checkBlockBuilderExitRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
+	executionRequests, ok := t.getExecutionRequests(block, blockData, payload)
+	if !ok {
+		return false
+	}
+
+	builderExitRequests := executionRequests.BuilderExits
+	if len(builderExitRequests) < t.config.MinBuilderExitRequestCount {
+		t.logger.Infof("check failed for block %v [0x%x]: not enough builder exit requests (want: >= %v, have: %v)", block.Slot, block.Root, t.config.MinBuilderExitRequestCount, len(builderExitRequests))
+		return false
+	}
+
+	for _, expectedRequest := range t.config.ExpectBuilderExitRequests {
+		found := false
+
+		var expectedAddress, expectedPubKey []byte
+
+		if expectedRequest.SourceAddress != "" {
+			expectedAddress = common.FromHex(expectedRequest.SourceAddress)
+		}
+
+		if expectedRequest.BuilderPubkey != "" {
+			expectedPubKey = common.FromHex(expectedRequest.BuilderPubkey)
+		}
+
+	requestLoop:
+		for _, builderExitRequest := range builderExitRequests {
+			if expectedRequest.BuilderPubkey == "" || bytes.Equal(builderExitRequest.Pubkey[:], expectedPubKey) {
+				switch {
+				case expectedRequest.SourceAddress != "" && !bytes.Equal(expectedAddress, builderExitRequest.SourceAddress[:]):
+					t.logger.Warnf("check failed: builder exit request found, but source address does not match (have: 0x%x, want: 0x%x)", builderExitRequest.SourceAddress, expectedAddress)
+				default:
+					found = true
+					break requestLoop
+				}
+			}
+		}
+
+		if !found {
+			t.logger.Infof("check failed for block %v [0x%x]: expected builder exit request not found (address: %v, pubkey: %v)", block.Slot, block.Root, expectedRequest.SourceAddress, expectedRequest.BuilderPubkey)
+			return false
 		}
 	}
 

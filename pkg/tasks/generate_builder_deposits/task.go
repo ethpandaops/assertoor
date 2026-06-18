@@ -1,10 +1,11 @@
-package generatedeposits
+package generatebuilderdeposits
 
 import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
 	cryptorand "crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,57 +14,59 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
 	"github.com/ethpandaops/assertoor/pkg/clients/execution"
 	"github.com/ethpandaops/assertoor/pkg/types"
-	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/ethpandaops/spamoor/spamoor"
 	"github.com/ethpandaops/spamoor/txbuilder"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/holiman/uint256"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
-	"github.com/protolambda/zrnt/eth2/util/hashing"
 	"github.com/protolambda/ztyp/tree"
 	"github.com/sirupsen/logrus"
 	"github.com/tyler-smith/go-bip39"
 	e2types "github.com/wealdtech/go-eth2-types/v2"
 	util "github.com/wealdtech/go-eth2-util"
-
-	depositcontract "github.com/ethpandaops/assertoor/pkg/tasks/generate_deposits/deposit_contract"
 )
 
+// domainBuilderDeposit is DOMAIN_BUILDER_DEPOSIT (Gloas/EIP-8282): a dedicated
+// domain type (0x0E000000) that separates builder-deposit proofs-of-possession
+// from regular validator deposits.
+var domainBuilderDeposit = common.BLSDomainType{0x0E, 0x00, 0x00, 0x00}
+
+const outputTypeArray = "array"
+
 var (
-	TaskName       = "generate_deposits"
+	TaskName       = "generate_builder_deposits"
 	TaskDescriptor = &types.TaskDescriptor{
 		Name:        TaskName,
-		Description: "Generates deposits and sends them to the network",
+		Description: "Generates builder deposits (EIP-8282) and sends them to the network",
 		Category:    "validator",
 		Config:      DefaultConfig(),
 		Outputs: []types.TaskOutputDefinition{
 			{
-				Name:        "validatorPubkeys",
-				Type:        "array",
-				Description: "Array of validator public keys for the deposits.",
+				Name:        "builderPubkeys",
+				Type:        outputTypeArray,
+				Description: "Array of builder public keys for the deposits.",
 			},
 			{
 				Name:        "depositTransactions",
-				Type:        "array",
-				Description: "Array of deposit transaction hashes.",
+				Type:        outputTypeArray,
+				Description: "Array of builder deposit transaction hashes.",
 			},
 			{
 				Name:        "depositReceipts",
-				Type:        "array",
-				Description: "Array of deposit transaction receipts.",
+				Type:        outputTypeArray,
+				Description: "Array of builder deposit transaction receipts.",
 			},
 			{
 				Name:        "includedDeposits",
 				Type:        "number",
-				Description: "Number of deposits included on beacon chain (when awaitInclusion is enabled).",
+				Description: "Number of builder deposits included on beacon chain (when awaitInclusion is enabled).",
 			},
 		},
 		NewTask: NewTask,
@@ -75,7 +78,7 @@ type Task struct {
 	options             *types.TaskOptions
 	config              Config
 	logger              logrus.FieldLogger
-	valkeySeed          []byte
+	builderKeySeed      []byte
 	nextIndex           uint64
 	lastIndex           uint64
 	walletPrivKey       *ecdsa.PrivateKey
@@ -120,12 +123,12 @@ func (t *Task) LoadConfig() error {
 	}
 
 	if config.Mnemonic != "" {
-		t.valkeySeed, err = t.mnemonicToSeed(config.Mnemonic)
+		t.builderKeySeed, err = t.mnemonicToSeed(config.Mnemonic)
 		if err != nil {
 			return err
 		}
 
-		t.logger.Infof("validator key seed: 0x%x", t.valkeySeed)
+		t.logger.Infof("builder key seed: 0x%x", t.builderKeySeed)
 	}
 
 	t.walletPrivKey, err = crypto.HexToECDSA(config.WalletPrivkey)
@@ -134,7 +137,7 @@ func (t *Task) LoadConfig() error {
 	}
 
 	t.config = config
-	t.depositContractAddr = ethcommon.HexToAddress(config.DepositContract)
+	t.depositContractAddr = ethcommon.HexToAddress(config.BuilderDepositContract)
 
 	return nil
 }
@@ -155,8 +158,9 @@ func (t *Task) Execute(ctx context.Context) error {
 		defer subscription.Unsubscribe()
 	}
 
-	// Subscribe early so we don't miss the block containing the deposit.
-	// With EIP-6110, deposits are included in the same beacon block as the EL transaction.
+	// Subscribe early so we don't miss the block containing the builder deposit.
+	// As with EIP-6110 deposits, the request is surfaced in the same beacon block
+	// as the EL transaction is dequeued.
 	var inclusionSubscription *consensus.Subscription[*consensus.Block]
 	if t.config.AwaitInclusion {
 		inclusionSubscription = t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBlockCache().SubscribeBlockEvent(10)
@@ -174,7 +178,6 @@ func (t *Task) Execute(ctx context.Context) error {
 	perSlotCount := 0
 	totalCount := 0
 
-	// Calculate target count for progress reporting
 	targetCount := 0
 	if t.config.LimitTotal > 0 {
 		targetCount = t.config.LimitTotal
@@ -182,10 +185,10 @@ func (t *Task) Execute(ctx context.Context) error {
 		targetCount = int(t.lastIndex - t.nextIndex) //nolint:gosec // G115: difference is bounded by config values
 	}
 
-	t.ctx.ReportProgress(0, "Starting deposit generation")
+	t.ctx.ReportProgress(0, "Starting builder deposit generation")
 
 	depositTransactions := []string{}
-	validatorPubkeys := []string{}
+	builderPubkeys := []string{}
 	depositReceipts := map[string]*ethtypes.Receipt{}
 	depositReceiptsMtx := sync.Mutex{}
 
@@ -203,7 +206,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 		pendingWg.Add(1)
 
-		pubkey, tx, err := t.generateDeposit(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt, err error) {
+		pubkey, tx, err := t.generateBuilderDeposit(ctx, accountIdx, func(tx *ethtypes.Transaction, receipt *ethtypes.Receipt, err error) {
 			if pendingChan != nil {
 				<-pendingChan
 			}
@@ -216,32 +219,31 @@ func (t *Task) Execute(ctx context.Context) error {
 
 			switch {
 			case receipt != nil:
-				t.logger.Infof("deposit %v confirmed in block %v (nonce: %v, status: %v)", tx.Hash().Hex(), receipt.BlockNumber, tx.Nonce(), receipt.Status)
+				t.logger.Infof("builder deposit %v confirmed in block %v (nonce: %v, status: %v)", tx.Hash().Hex(), receipt.BlockNumber, tx.Nonce(), receipt.Status)
 			case err != nil:
-				t.logger.Errorf("error awaiting deposit transaction receipt: %v", err.Error())
+				t.logger.Errorf("error awaiting builder deposit transaction receipt: %v", err.Error())
 			default:
-				t.logger.Warnf("no receipt for deposit transaction: %v", tx.Hash().Hex())
+				t.logger.Warnf("no receipt for builder deposit transaction: %v", tx.Hash().Hex())
 			}
 
 			pendingWg.Done()
 		})
 		if err != nil {
-			t.logger.Errorf("error generating deposit: %v", err.Error())
+			t.logger.Errorf("error generating builder deposit: %v", err.Error())
 			// Note: onComplete callback is still called by spamoor even on error,
 			// so we don't call pendingWg.Done() here
 		} else {
 			perSlotCount++
 			totalCount++
 
-			validatorPubkeys = append(validatorPubkeys, pubkey.String())
+			builderPubkeys = append(builderPubkeys, pubkey)
 			depositTransactions = append(depositTransactions, tx.Hash().Hex())
 
-			// Report progress
 			if targetCount > 0 {
 				progress := float64(totalCount) / float64(targetCount) * 100
-				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d deposits", totalCount, targetCount))
+				t.ctx.ReportProgress(progress, fmt.Sprintf("Generated %d/%d builder deposits", totalCount, targetCount))
 			} else {
-				t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d deposits", totalCount))
+				t.ctx.ReportProgress(0, fmt.Sprintf("Generated %d builder deposits", totalCount))
 			}
 		}
 
@@ -271,16 +273,7 @@ func (t *Task) Execute(ctx context.Context) error {
 		pendingWg.Wait()
 	}
 
-	if t.config.ValidatorPubkeysResultVar != "" {
-		t.ctx.Vars.SetVar(t.config.ValidatorPubkeysResultVar, validatorPubkeys)
-	}
-
-	t.ctx.Outputs.SetVar("validatorPubkeys", validatorPubkeys)
-
-	if t.config.DepositTransactionsResultVar != "" {
-		t.ctx.Vars.SetVar(t.config.DepositTransactionsResultVar, depositTransactions)
-	}
-
+	t.ctx.Outputs.SetVar("builderPubkeys", builderPubkeys)
 	t.ctx.Outputs.SetVar("depositTransactions", depositTransactions)
 
 	receiptList := []interface{}{}
@@ -289,15 +282,12 @@ func (t *Task) Execute(ctx context.Context) error {
 		var receiptMap map[string]interface{}
 
 		receipt := depositReceipts[txhash]
-		if receipt == nil {
-			receiptMap = nil
-		} else {
+		if receipt != nil {
 			receiptJSON, err := json.Marshal(receipt)
 			if err == nil {
 				receiptMap = map[string]interface{}{}
 
-				err = json.Unmarshal(receiptJSON, &receiptMap)
-				if err != nil {
+				if err = json.Unmarshal(receiptJSON, &receiptMap); err != nil {
 					t.logger.Errorf("could not unmarshal transaction receipt for result var: %v", err)
 
 					receiptMap = nil
@@ -310,25 +300,21 @@ func (t *Task) Execute(ctx context.Context) error {
 		receiptList = append(receiptList, receiptMap)
 	}
 
-	if t.config.DepositReceiptsResultVar != "" {
-		t.ctx.Vars.SetVar(t.config.DepositReceiptsResultVar, receiptList)
-	}
-
 	t.ctx.Outputs.SetVar("depositReceipts", receiptList)
 
-	t.ctx.ReportProgress(100, fmt.Sprintf("Completed generating %d deposits", totalCount))
+	t.ctx.ReportProgress(100, fmt.Sprintf("Completed generating %d builder deposits", totalCount))
 
 	if t.config.FailOnReject {
 		for _, txhash := range depositTransactions {
 			if depositReceipts[txhash] == nil {
-				t.logger.Errorf("no receipt for deposit transaction: %v", txhash)
+				t.logger.Errorf("no receipt for builder deposit transaction: %v", txhash)
 				t.ctx.SetResult(types.TaskResultFailure)
 
 				break
 			}
 
 			if depositReceipts[txhash].Status == 0 {
-				t.logger.Errorf("deposit transaction failed: %v", txhash)
+				t.logger.Errorf("builder deposit transaction failed: %v", txhash)
 				t.ctx.SetResult(types.TaskResultFailure)
 
 				break
@@ -336,9 +322,8 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	// Await inclusion in beacon blocks if configured
-	if t.config.AwaitInclusion && len(validatorPubkeys) > 0 {
-		err := t.awaitInclusion(ctx, inclusionSubscription, validatorPubkeys, totalCount)
+	if t.config.AwaitInclusion && len(builderPubkeys) > 0 {
+		err := t.awaitInclusion(ctx, inclusionSubscription, builderPubkeys, totalCount)
 		if err != nil {
 			return err
 		}
@@ -347,18 +332,17 @@ func (t *Task) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *Task) awaitInclusion(ctx context.Context, blockSubscription *consensus.Subscription[*consensus.Block], validatorPubkeys []string, totalCount int) error {
-	// Create a map of pending pubkeys for faster lookup
-	pendingPubkeys := make(map[string]bool, len(validatorPubkeys))
-	for _, pubkey := range validatorPubkeys {
+func (t *Task) awaitInclusion(ctx context.Context, blockSubscription *consensus.Subscription[*consensus.Block], builderPubkeys []string, totalCount int) error {
+	pendingPubkeys := make(map[string]bool, len(builderPubkeys))
+	for _, pubkey := range builderPubkeys {
 		pendingPubkeys[pubkey] = true
 	}
 
 	includedCount := 0
 	t.ctx.Outputs.SetVar("includedDeposits", includedCount)
 
-	t.logger.Infof("waiting for %d deposits to be included in beacon blocks", len(pendingPubkeys))
-	t.ctx.ReportProgress(50, fmt.Sprintf("Awaiting inclusion: 0/%d deposits included", len(pendingPubkeys)))
+	t.logger.Infof("waiting for %d builder deposits to be included in beacon blocks", len(pendingPubkeys))
+	t.ctx.ReportProgress(50, fmt.Sprintf("Awaiting inclusion: 0/%d builder deposits included", len(pendingPubkeys)))
 
 	for len(pendingPubkeys) > 0 {
 		select {
@@ -370,50 +354,17 @@ func (t *Task) awaitInclusion(ctx context.Context, blockSubscription *consensus.
 				continue
 			}
 
-			// Check old-style deposits (pre-Electra)
-			deposits, err := blockData.Deposits()
-			if err == nil {
-				for _, deposit := range deposits {
-					pubkeyStr := deposit.Data.PublicKey.String()
-					if pendingPubkeys[pubkeyStr] {
-						delete(pendingPubkeys, pubkeyStr)
-
-						includedCount++
-					}
-				}
-			}
-
-			// Check EIP-6110 deposit requests from execution requests
+			// Builder deposit requests only exist on Gloas+ and live in the
+			// separate execution payload envelope.
 			if blockData.Version >= spec.DataVersionGloas {
-				// GLOAS: execution requests are in the separate payload envelope
 				payload := block.AwaitPayload(ctx, 2*time.Second)
+				if payload != nil && payload.Gloas != nil && payload.Gloas.Message.ExecutionRequests != nil {
+					for _, depositReq := range payload.Gloas.Message.ExecutionRequests.BuilderDeposits {
+						pubkeyStr := depositReq.Pubkey.String()
+						if pendingPubkeys[pubkeyStr] {
+							delete(pendingPubkeys, pubkeyStr)
 
-				if payload != nil {
-					payloadData := payload.Gloas
-					if payloadData != nil && payloadData.Message.ExecutionRequests != nil {
-						for _, depositReq := range payloadData.Message.ExecutionRequests.Deposits {
-							pubkeyStr := depositReq.Pubkey.String()
-							if pendingPubkeys[pubkeyStr] {
-								delete(pendingPubkeys, pubkeyStr)
-
-								includedCount++
-							}
-						}
-					}
-				}
-			} else {
-				// Electra: execution requests are in the beacon block body
-				execRequests, err := blockData.ExecutionRequests()
-				if err == nil && execRequests != nil {
-					deposits, err := execRequests.Deposits()
-					if err == nil {
-						for _, depositReq := range deposits {
-							pubkeyStr := depositReq.Pubkey.String()
-							if pendingPubkeys[pubkeyStr] {
-								delete(pendingPubkeys, pubkeyStr)
-
-								includedCount++
-							}
+							includedCount++
 						}
 					}
 				}
@@ -424,92 +375,73 @@ func (t *Task) awaitInclusion(ctx context.Context, blockSubscription *consensus.
 			if includedCount > 0 {
 				inclusionProgress := float64(includedCount) / float64(totalCount) * 50
 				t.ctx.ReportProgress(50+inclusionProgress,
-					fmt.Sprintf("Awaiting inclusion: %d/%d deposits included", includedCount, totalCount))
+					fmt.Sprintf("Awaiting inclusion: %d/%d builder deposits included", includedCount, totalCount))
 
-				t.logger.Infof("deposits included in block %d (%d/%d)",
-					block.Slot, includedCount, totalCount)
+				t.logger.Infof("builder deposits included in block %d (%d/%d)", block.Slot, includedCount, totalCount)
 			}
 		}
 	}
 
 	t.ctx.SetResult(types.TaskResultSuccess)
-	t.ctx.ReportProgress(100, fmt.Sprintf("All %d deposits included on beacon chain", totalCount))
+	t.ctx.ReportProgress(100, fmt.Sprintf("All %d builder deposits included on beacon chain", totalCount))
 
 	return nil
 }
 
-func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onComplete spamoor.TxCompleteFn) (*common.BLSPubkey, *ethtypes.Transaction, error) {
+func (t *Task) generateBuilderDeposit(ctx context.Context, accountIdx uint64, onComplete spamoor.TxCompleteFn) (string, *ethtypes.Transaction, error) {
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
-	validatorSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet()
+	builderSet := clientPool.GetConsensusPool().GetBuilderSet()
 
-	var validatorPubkey []byte
+	var builderPubkey []byte
 
-	var validatorPrivkey *e2types.BLSPrivateKey
+	var builderPrivkey *e2types.BLSPrivateKey
 
-	if t.valkeySeed != nil {
-		validatorKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
+	if t.builderKeySeed != nil {
+		builderKeyPath := fmt.Sprintf("m/12381/3600/%d/0/0", accountIdx)
 
-		validatorPriv, err := util.PrivateKeyFromSeedAndPath(t.valkeySeed, validatorKeyPath)
+		builderPriv, err := util.PrivateKeyFromSeedAndPath(t.builderKeySeed, builderKeyPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed generating validator key %v: %w", validatorKeyPath, err)
+			return "", nil, fmt.Errorf("failed generating builder key %v: %w", builderKeyPath, err)
 		}
 
-		validatorPrivkey = validatorPriv
+		builderPrivkey = builderPriv
+		builderPubkey = builderPrivkey.PublicKey().Marshal()
 
-		validatorPubkey = validatorPrivkey.PublicKey().Marshal()
-		t.logger.Debugf("generated validator pubkey %v: 0x%x", validatorKeyPath, validatorPubkey)
+		t.logger.Debugf("generated builder pubkey %v: 0x%x", builderKeyPath, builderPubkey)
 	} else {
-		validatorPubkey = ethcommon.FromHex(t.config.PublicKey)
+		builderPubkey = ethcommon.FromHex(t.config.PublicKey)
 	}
 
-	var validator *v1.Validator
+	var existingBuilder *consensus.BuilderInfo
 
-	for _, val := range validatorSet {
-		if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
-			validator = val
+	for i := range builderSet {
+		if bytes.Equal(builderSet[i].Builder.PublicKey[:], builderPubkey) {
+			existingBuilder = builderSet[i]
 			break
 		}
 	}
 
-	if t.valkeySeed != nil && validator != nil {
-		t.logger.Warnf("validator already exists on chain (index: %v)", validator.Index)
-	} else if t.valkeySeed == nil && validator == nil {
-		t.logger.Warnf("validator not found on chain for topup deposit")
+	if t.builderKeySeed != nil && existingBuilder != nil {
+		t.logger.Warnf("builder already exists on chain (index: %v)", existingBuilder.Index)
+	} else if t.builderKeySeed == nil && existingBuilder == nil {
+		t.logger.Warnf("builder not found on chain for top-up deposit")
 	}
 
 	var pub common.BLSPubkey
 
-	var withdrCreds []byte
+	copy(pub[:], builderPubkey)
 
-	copy(pub[:], validatorPubkey)
-
-	switch {
-	case t.config.WithdrawalCredentials != "":
-		withdrCreds = ethcommon.FromHex(t.config.WithdrawalCredentials)
-	case t.config.TopUpDeposit:
-		withdrCreds = ethcommon.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000")
-	default:
-		withdrAccPath := fmt.Sprintf("m/12381/3600/%d/0", accountIdx)
-
-		withdrPrivkey, err2 := util.PrivateKeyFromSeedAndPath(t.valkeySeed, withdrAccPath)
-		if err2 != nil {
-			return nil, nil, fmt.Errorf("failed generating key %v: %w", withdrAccPath, err2)
-		}
-
-		withdrPubKey := withdrPrivkey.PublicKey().Marshal()
-		t.logger.Debugf("generated withdrawal pubkey %v: 0x%x", withdrAccPath, withdrPubKey)
-
-		withdrKeyHash := hashing.Hash(withdrPubKey)
-		withdrCreds = withdrKeyHash[:]
-		withdrCreds[0] = common.BLS_WITHDRAWAL_PREFIX
+	withdrCreds, err := t.builderWithdrawalCredentials()
+	if err != nil {
+		return "", nil, err
 	}
 
-	// Convert deposit amount from ETH to Gwei using big.Int to avoid overflow
+	// Convert deposit amount from ETH to Gwei using big.Int to avoid overflow.
 	depositAmountGwei := new(big.Int).SetUint64(t.config.DepositAmount)
 	depositAmountGwei.Mul(depositAmountGwei, big.NewInt(1000000000))
 
 	if !depositAmountGwei.IsUint64() {
-		return nil, nil, fmt.Errorf("deposit amount too large: %v ETH", t.config.DepositAmount)
+		return "", nil, fmt.Errorf("deposit amount too large: %v ETH", t.config.DepositAmount)
 	}
 
 	depositData := common.DepositData{
@@ -519,36 +451,39 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onComplet
 		Signature:             common.BLSSignature{},
 	}
 
-	if err := t.signDepositData(&depositData, validatorPrivkey); err != nil {
-		return nil, nil, err
+	if signErr := t.signDepositData(&depositData, builderPrivkey); signErr != nil {
+		return "", nil, signErr
 	}
 
-	dataRoot := depositData.HashTreeRoot(tree.GetHashFn())
+	// Build the raw 184-byte builder deposit calldata (EIP-8282, no function selector):
+	// 0-48:   pubkey
+	// 48-80:  withdrawal credentials
+	// 80-88:  amount (8 bytes, big-endian gwei)
+	// 88-184: signature
+	txData := make([]byte, 184)
+	copy(txData[0:48], depositData.Pubkey[:])
+	copy(txData[48:80], depositData.WithdrawalCredentials[:])
+	binary.BigEndian.PutUint64(txData[80:88], uint64(depositData.Amount))
+	copy(txData[88:184], depositData.Signature[:])
 
-	// generate deposit transaction
-
+	// select clients
 	var clients []*execution.Client
 
 	if t.config.ClientPattern == "" && t.config.ExcludeClientPattern == "" {
 		clients = clientPool.GetExecutionPool().AwaitReadyEndpoints(ctx, true)
 		if len(clients) == 0 {
-			return nil, nil, ctx.Err()
+			return "", nil, ctx.Err()
 		}
 	} else {
 		poolClients := clientPool.GetClientsByNamePatterns(t.config.ClientPattern, t.config.ExcludeClientPattern)
 		if len(poolClients) == 0 {
-			return nil, nil, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
+			return "", nil, fmt.Errorf("no client found with pattern %v", t.config.ClientPattern)
 		}
 
 		clients = make([]*execution.Client, len(poolClients))
 		for i, c := range poolClients {
 			clients[i] = c.ExecutionClient
 		}
-	}
-
-	depositContract, err := depositcontract.NewDepositContract(t.depositContractAddr, clients[0].GetRPCClient().GetEthClient())
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create bound instance of DepositContract: %w", err)
 	}
 
 	walletMgr := t.ctx.Scheduler.GetServices().WalletManager()
@@ -560,26 +495,35 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onComplet
 
 	txWallet, err := walletMgr.GetWalletByPrivkey(t.ctx.Scheduler.GetTestRunCtx(), t.walletPrivKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot initialize wallet: %w", err)
+		return "", nil, fmt.Errorf("cannot initialize wallet: %w", err)
 	}
 
 	t.logger.Infof("wallet: %v [nonce: %v]  %v ETH", txWallet.GetAddress().Hex(), txWallet.GetNonce(), txWallet.GetReadableBalance(18, 0, 4, false, false))
 
-	amount := big.NewInt(0).SetUint64(uint64(depositData.Amount))
-	amount.Mul(amount, big.NewInt(1000000000))
+	// The contract requires msg.value - fee >= amount * 1 gwei, so send the deposit
+	// amount (in wei) plus a small buffer to cover the request fee.
+	amountWei := new(big.Int).Mul(depositAmountGwei, big.NewInt(1000000000))
 
-	txMeta := &txbuilder.TxMetadata{
-		GasFeeCap: uint256.MustFromBig(big.NewInt(t.config.DepositTxFeeCap)),
-		GasTipCap: uint256.MustFromBig(big.NewInt(t.config.DepositTxTipCap)),
-		Gas:       400000,
-		Value:     uint256.MustFromBig(amount),
+	txValue := new(big.Int).Set(amountWei)
+	if t.config.TxFeeBuffer != nil {
+		txValue.Add(txValue, t.config.TxFeeBuffer)
 	}
 
-	tx, err := txWallet.BuildBoundTx(ctx, txMeta, func(opts *bind.TransactOpts) (*ethtypes.Transaction, error) {
-		return depositContract.Deposit(opts, depositData.Pubkey[:], depositData.WithdrawalCredentials[:], depositData.Signature[:], dataRoot)
+	dynFeeTx, err := txbuilder.DynFeeTx(&txbuilder.TxMetadata{
+		GasTipCap: uint256.MustFromBig(t.config.TxTipCap),
+		GasFeeCap: uint256.MustFromBig(t.config.TxFeeCap),
+		Gas:       t.config.TxGasLimit,
+		To:        &t.depositContractAddr,
+		Value:     uint256.MustFromBig(txValue),
+		Data:      txData,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot build deposit transaction: %w", err)
+		return "", nil, fmt.Errorf("cannot build builder deposit tx data: %w", err)
+	}
+
+	tx, err := txWallet.BuildDynamicFeeTx(dynFeeTx)
+	if err != nil {
+		return "", nil, fmt.Errorf("cannot build builder deposit transaction: %w", err)
 	}
 
 	err = walletMgr.GetTxPool().SendTransaction(ctx, txWallet, tx, &spamoor.SendTransactionOptions{
@@ -600,18 +544,50 @@ func (t *Task) generateDeposit(ctx context.Context, accountIdx uint64, onComplet
 				logEntry = logEntry.WithField("rebroadcast", rebroadcast)
 			}
 
-			logEntry.Infof("submitted deposit transaction (account idx: %v, nonce: %v, attempt: %v)", accountIdx, tx.Nonce(), retry)
+			logEntry.Infof("submitted builder deposit transaction (account idx: %v, nonce: %v, attempt: %v)", accountIdx, tx.Nonce(), retry)
 		},
 	})
 	if err != nil {
 		txWallet.MarkSkippedNonce(tx.Nonce())
-		return nil, nil, fmt.Errorf("failed sending deposit transaction: %w", err)
+		return "", nil, fmt.Errorf("failed sending builder deposit transaction: %w", err)
 	}
 
-	return &pub, tx, nil
+	return pub.String(), tx, nil
 }
 
-func (t *Task) signDepositData(depositData *common.DepositData, validatorPrivkey *e2types.BLSPrivateKey) error {
+// builderWithdrawalCredentials returns the 32-byte withdrawal credentials for the
+// builder deposit. Builder deposits require 0x03-prefixed credentials.
+func (t *Task) builderWithdrawalCredentials() ([]byte, error) {
+	if t.config.TopUpDeposit {
+		// Credentials are ignored by the consensus layer for top-ups.
+		return ethcommon.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000"), nil
+	}
+
+	if t.config.WithdrawalCredentials != "" {
+		creds := ethcommon.FromHex(t.config.WithdrawalCredentials)
+		if len(creds) != 32 {
+			return nil, fmt.Errorf("withdrawalCredentials must be 32 bytes, got %d", len(creds))
+		}
+
+		return creds, nil
+	}
+
+	// Derive 0x03 credentials from the builder address, or the funding wallet address.
+	var addr ethcommon.Address
+	if t.config.BuilderAddress != "" {
+		addr = ethcommon.HexToAddress(t.config.BuilderAddress)
+	} else {
+		addr = crypto.PubkeyToAddress(t.walletPrivKey.PublicKey)
+	}
+
+	creds := make([]byte, 32)
+	creds[0] = 0x03
+	copy(creds[12:], addr[:])
+
+	return creds, nil
+}
+
+func (t *Task) signDepositData(depositData *common.DepositData, builderPrivkey *e2types.BLSPrivateKey) error {
 	if t.config.TopUpDeposit {
 		return nil
 	}
@@ -626,7 +602,7 @@ func (t *Task) signDepositData(depositData *common.DepositData, validatorPrivkey
 			return fmt.Errorf("failed to generate random invalid signature: %w", err)
 		}
 
-		t.logger.Debugf("generated deposit with invalid (random) signature for pubkey 0x%x", depositData.Pubkey)
+		t.logger.Debugf("generated builder deposit with invalid (random) signature for pubkey 0x%x", depositData.Pubkey)
 
 		return nil
 	}
@@ -634,13 +610,13 @@ func (t *Task) signDepositData(depositData *common.DepositData, validatorPrivkey
 	msgRoot := depositData.ToMessage().HashTreeRoot(tree.GetHashFn())
 
 	var secKey hbls.SecretKey
-	if err := secKey.Deserialize(validatorPrivkey.Marshal()); err != nil {
-		return fmt.Errorf("cannot convert validator priv key")
+	if err := secKey.Deserialize(builderPrivkey.Marshal()); err != nil {
+		return fmt.Errorf("cannot convert builder priv key")
 	}
 
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
 	genesis := clientPool.GetConsensusPool().GetBlockCache().GetGenesis()
-	dom := common.ComputeDomain(common.DOMAIN_DEPOSIT, common.Version(genesis.GenesisForkVersion), common.Root{})
+	dom := common.ComputeDomain(domainBuilderDeposit, common.Version(genesis.GenesisForkVersion), common.Root{})
 	msg := common.ComputeSigningRoot(msgRoot, dom)
 	sig := secKey.SignHash(msg[:])
 	copy(depositData.Signature[:], sig.Serialize())

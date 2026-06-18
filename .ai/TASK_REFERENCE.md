@@ -237,6 +237,8 @@ Monitors consensus blocks for ones matching specific criteria. Waits until enoug
 | `minDepositRequestCount` | int | 0 | Min deposit requests (EIP-6110) |
 | `minWithdrawalRequestCount` | int | 0 | Min withdrawal requests (EIP-7002) |
 | `minConsolidationRequestCount` | int | 0 | Min consolidation requests (EIP-7251) |
+| `minBuilderDepositRequestCount` | int | 0 | Min builder deposit requests (EIP-8282) |
+| `minBuilderExitRequestCount` | int | 0 | Min builder exit requests (EIP-8282) |
 | `expectDeposits` | array[string] | [] | Expected validator pubkeys with deposits |
 | `expectExits` | array[string] | [] | Expected validator pubkeys with exits |
 | `expectSlashings` | array | [] | Expected slashings [{publicKey, slashingType}] |
@@ -245,6 +247,8 @@ Monitors consensus blocks for ones matching specific criteria. Waits until enoug
 | `expectDepositRequests` | array | [] | Expected deposit requests [{publicKey, withdrawalCredentials, amount}] |
 | `expectWithdrawalRequests` | array | [] | Expected withdrawal requests [{sourceAddress, validatorPubkey, amount}] |
 | `expectConsolidationRequests` | array | [] | Expected consolidations [{sourceAddress, sourcePubkey, targetPubkey}] |
+| `expectBuilderDepositRequests` | array | [] | Expected builder deposits [{publicKey, withdrawalCredentials, amount}] (EIP-8282) |
+| `expectBuilderExitRequests` | array | [] | Expected builder exits [{sourceAddress, builderPubkey}] (EIP-8282) |
 
 **Outputs:**
 | Variable | Type | Description |
@@ -711,7 +715,6 @@ Generates voluntary validator exits.
 | `mnemonic` | string | required | Validator key mnemonic |
 | `startIndex` | int | 0 | Start index in mnemonic |
 | `indexCount` | int | required | Number of validator keys |
-| `builderExit` | bool | false | Generate builder exits instead of validator exits (uses BUILDER_INDEX_FLAG) |
 | `sendToAllClients` | bool | false | Submit exit to all ready CL clients in parallel (succeeds if any accepts) |
 | `exitEpoch` | int64 | -1 | Exit epoch (-1 = current) |
 | `clientPattern` | string | "" | Client selection regex |
@@ -827,6 +830,80 @@ Generates validator consolidation requests (EIP-7251).
 | `walletPrivkey` | string | "" | Wallet private key |
 | `consolidationContract` | string | 0x00...7251 | Contract address |
 | `txAmount` | *big.Int | 0.5 ETH | ETH to send |
+| `txFeeCap` | *big.Int | 100 Gwei | Fee cap |
+| `txTipCap` | *big.Int | 1 Gwei | Tip cap |
+| `txGasLimit` | uint64 | 200000 | Gas limit |
+| `clientPattern` | string | "" | Client selection regex |
+| `excludeClientPattern` | string | "" | Client exclusion regex |
+| `awaitReceipt` | bool | false | Wait for receipts |
+| `failOnReject` | bool | false | Fail on rejection |
+
+**Outputs:**
+| Variable | Type | Description |
+|----------|------|-------------|
+| `transactionHashes` | array | Transaction hashes |
+| `transactionReceipts` | array | Transaction receipts |
+
+---
+
+### generate_builder_deposits
+
+Generates builder deposits (EIP-8282, GLOAS). Submitted as raw calldata (no `deposit()` selector) to the builder deposit system contract: `pubkey || withdrawal_credentials || amount || signature`. The BLS proof-of-possession is signed under `DOMAIN_BUILDER_DEPOSIT` (`0x0E000000`).
+
+**Config:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limitPerSlot` | int | required | Max deposits per slot |
+| `limitTotal` | int | required | Total deposit limit |
+| `limitPending` | int | 0 | Max in-flight deposit txs |
+| `mnemonic` | string | required | Builder BLS key mnemonic |
+| `startIndex` | int | 0 | Start index in mnemonic |
+| `indexCount` | int | required | Number of builder keys |
+| `publicKey` | string | "" | Existing builder pubkey (top-up only) |
+| `walletPrivkey` | string | required | Funding wallet private key |
+| `builderDepositContract` | string | 0x0000884d...8282 | Builder deposit contract address |
+| `depositAmount` | uint64 | 1 | ETH per builder (min 1 ETH) |
+| `withdrawalCredentials` | string | "" | 0x03 credentials (derived from builderAddress/wallet if empty) |
+| `builderAddress` | string | "" | Execution address for 0x03 creds (defaults to funding wallet) |
+| `topUpDeposit` | bool | false | Top up existing builder (creds/sig ignored by CL) |
+| `txFeeCap` | *big.Int | 100 Gwei | Fee cap |
+| `txTipCap` | *big.Int | 1 Gwei | Tip cap |
+| `txGasLimit` | uint64 | 400000 | Gas limit |
+| `txFeeBuffer` | *big.Int | 0.001 ETH | Extra value (wei) added on top of amount to cover the request fee |
+| `clientPattern` | string | "" | Client selection regex |
+| `excludeClientPattern` | string | "" | Client exclusion regex |
+| `awaitReceipt` | bool | false | Wait for receipts |
+| `failOnReject` | bool | false | Fail on rejection |
+| `awaitInclusion` | bool | false | Wait for builder deposit requests in beacon blocks |
+| `invalidSigPercent` | int | 0 | Percentage of deposits with corrupted signatures |
+
+**Outputs:**
+| Variable | Type | Description |
+|----------|------|-------------|
+| `builderPubkeys` | array | Builder public keys |
+| `depositTransactions` | array | Deposit transaction hashes |
+| `depositReceipts` | array | Deposit transaction receipts |
+| `includedDeposits` | number | Builder deposits included on-chain (with awaitInclusion) |
+
+---
+
+### generate_builder_exits
+
+Generates builder exit requests (EIP-8282, GLOAS). Builder exits are no longer voluntary exits — they are submitted as raw calldata (the 48-byte builder pubkey) to the builder exit system contract. The transaction **must be sent from the builder's execution address** (the address in its 0x03 withdrawal credentials), which is the only address authorized to exit it.
+
+**Config:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limitPerSlot` | int | required | Max exits per slot |
+| `limitTotal` | int | required | Total exit limit |
+| `limitPending` | int | 0 | Max in-flight exit txs |
+| `sourcePubkey` | string | "" | Single builder pubkey to exit |
+| `sourceMnemonic` | string | required | Builder key mnemonic |
+| `sourceStartIndex` | int | 0 | Start index in mnemonic |
+| `sourceIndexCount` | int | 0 | Number of builders |
+| `walletPrivkey` | string | required | Builder execution-address private key |
+| `builderExitContract` | string | 0x000014574A...8282 | Builder exit contract address |
+| `txAmount` | *big.Int | 0.001 ETH | ETH (wei) to send to cover the request fee |
 | `txFeeCap` | *big.Int | 100 Gwei | Fee cap |
 | `txTipCap` | *big.Int | 1 Gwei | Tip cap |
 | `txGasLimit` | uint64 | 200000 | Gas limit |

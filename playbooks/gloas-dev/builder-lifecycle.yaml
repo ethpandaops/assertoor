@@ -1,29 +1,35 @@
 id: builder-lifecycle
 name: "GLOAS: Builder Lifecycle Test"
 description: |
-  End-to-end lifecycle for GLOAS builders (validators with 0x03
-  withdrawal credentials). Walks 10 builder keys through:
+  End-to-end lifecycle for GLOAS builders (EIP-8282). Walks 10 builder
+  keys through:
 
   1. Deposit 6 builders across the GLOAS activation boundary (3 before,
-     3 after).
+     3 after) via the builder deposit system contract.
   2. Wait for all 6 to become active.
-  3. Exit them with alternating voluntary / EL-triggered exits, 10 slots
-     apart, ensuring exits span at least 2 epochs.
+  3. Exit them via builder exit requests (EIP-8282), 10 slots apart,
+     ensuring exits span at least 2 epochs.
   4. Wait for builders 0–2 to be fully withdrawn (balance == 0).
   5. Deposit 4 new builders (keys 6–9) and verify **builder index reuse**:
      keys 6/7/8 get the now-empty indices 0/1/2; key 9 gets a new index.
-  6. Send no-op partial withdrawal & consolidation requests against
-     active builders (should have no effect).
-  7. EL-triggered exit all newly-deposited builders.
+  6. Send no-op validator withdrawal & consolidation requests against
+     active builders (should have no effect — builder/validator flows are
+     fully separated as of EIP-8282).
+  7. Builder-exit all newly-deposited builders.
+
+  Builder deposits and exits use the dedicated EIP-8282 system contracts
+  (raw calldata, no deposit() selector); both the 0x03 withdrawal
+  credentials and the exit sender are the funding wallet address.
 
   Verifies the GLOAS builder pool tracks deposits / exits / index reuse
   correctly across epoch boundaries.
 version: 1.0.0
-tags: [gloas, builder, lifecycle, deposit, exit, withdrawal, el-triggered, voluntary]
+tags: [gloas, builder, lifecycle, deposit, exit, eip-8282]
 timeout: 24h
 config:
   walletPrivkey: ''
-  depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
+  builderDepositContract: '0x0000884d2AA32eAa155F59A2f24eFa73D9008282'
+  builderExitContract: '0x000014574A74c805590AFF9499fc7A690f008282'
   depositAmount: 5
 
 tasks:
@@ -118,9 +124,9 @@ tasks:
   configVars:
     minSlotNumber: "tasks.calc_slots.outputs.deposit1Slot"
 
-- name: generate_deposits
+- name: generate_builder_deposits
   id: deposit_batch1
-  title: "Deposit builders 0-2 with 0x03 credentials"
+  title: "Deposit builders 0-2 (EIP-8282)"
   config:
     limitTotal: 3
     limitPerSlot: 3
@@ -131,9 +137,8 @@ tasks:
   configVars:
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
     mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    depositContract: "depositContract"
+    builderDepositContract: "builderDepositContract"
     depositAmount: "depositAmount"
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
 # Verify batch 1 deposit receipts
 - name: run_shell
@@ -158,9 +163,9 @@ tasks:
   configVars:
     minSlotNumber: "tasks.calc_slots.outputs.deposit2Slot"
 
-- name: generate_deposits
+- name: generate_builder_deposits
   id: deposit_batch2
-  title: "Deposit builders 3-5 with 0x03 credentials"
+  title: "Deposit builders 3-5 (EIP-8282)"
   config:
     limitTotal: 3
     limitPerSlot: 3
@@ -171,9 +176,8 @@ tasks:
   configVars:
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
     mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    depositContract: "depositContract"
+    builderDepositContract: "builderDepositContract"
     depositAmount: "depositAmount"
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
 # Verify batch 2 deposit receipts
 - name: run_shell
@@ -219,7 +223,7 @@ tasks:
         builderPubKey: "builderPubkey"
 
 ##
-## PHASE 3: Exit builders with alternating voluntary / EL-triggered exits, 10 slots apart
+## PHASE 3: Exit builders via builder exit requests (EIP-8282), 10 slots apart
 ##         Ensure exits span at least 2 epochs
 ##
 
@@ -228,38 +232,18 @@ tasks:
   id: exit_start
   title: "Record epoch at start of exits"
 
-# Builder 0: voluntary exit (fallback to EL)
-- name: run_tasks
-  title: "Exit builder 0 (voluntary, EL fallback)"
+# Builder 0: builder exit request (EIP-8282)
+- name: generate_builder_exits
+  title: "Exit builder 0 (EIP-8282)"
   config:
-    continueOnFailure: true
-    tasks:
-    - name: generate_exits
-      id: vol_exit_0
-      title: "Try voluntary exit for builder 0"
-      timeout: 2m
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        indexCount: 1
-        startIndex: 0
-        builderExit: true
-        sendToAllClients: true
-        awaitInclusion: true
-      configVars:
-        mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    - name: generate_withdrawal_requests
-      title: "Fallback: EL-triggered exit for builder 0"
-      if: "| .tasks.vol_exit_0.result != 1"
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        withdrawAmount: 0
-        awaitReceipt: true
-        failOnReject: true
-      configVars:
-        sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[0]"
-        walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    limitTotal: 1
+    limitPerSlot: 1
+    awaitReceipt: true
+    failOnReject: true
+  configVars:
+    sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[0]"
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    builderExitContract: "builderExitContract"
 
 # Wait 10 slots
 - name: check_consensus_slot_range
@@ -271,18 +255,18 @@ tasks:
   configVars:
     minSlotNumber: "| (.tasks.post_exit0.outputs.currentSlot | tonumber) + 10"
 
-# Builder 1: EL-triggered exit
-- name: generate_withdrawal_requests
-  title: "Exit builder 1 via EL-triggered exit"
+# Builder 1: builder exit request (EIP-8282)
+- name: generate_builder_exits
+  title: "Exit builder 1 (EIP-8282)"
   config:
     limitTotal: 1
     limitPerSlot: 1
-    withdrawAmount: 0
     awaitReceipt: true
     failOnReject: true
   configVars:
     sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[1]"
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    builderExitContract: "builderExitContract"
 
 # Wait 10 slots
 - name: check_consensus_slot_range
@@ -294,38 +278,18 @@ tasks:
   configVars:
     minSlotNumber: "| (.tasks.post_exit1.outputs.currentSlot | tonumber) + 10"
 
-# Builder 2: voluntary exit (fallback to EL)
-- name: run_tasks
-  title: "Exit builder 2 (voluntary, EL fallback)"
+# Builder 2: builder exit request (EIP-8282)
+- name: generate_builder_exits
+  title: "Exit builder 2 (EIP-8282)"
   config:
-    continueOnFailure: true
-    tasks:
-    - name: generate_exits
-      id: vol_exit_2
-      title: "Try voluntary exit for builder 2"
-      timeout: 1m
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        indexCount: 1
-        startIndex: 2
-        builderExit: true
-        sendToAllClients: true
-        awaitInclusion: true
-      configVars:
-        mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    - name: generate_withdrawal_requests
-      title: "Fallback: EL-triggered exit for builder 2"
-      if: "| .tasks.vol_exit_2.result != 1"
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        withdrawAmount: 0
-        awaitReceipt: true
-        failOnReject: true
-      configVars:
-        sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[2]"
-        walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    limitTotal: 1
+    limitPerSlot: 1
+    awaitReceipt: true
+    failOnReject: true
+  configVars:
+    sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[2]"
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    builderExitContract: "builderExitContract"
 
 # After first 3 exits: ensure we cross an epoch boundary before continuing
 - name: check_consensus_slot_range
@@ -334,64 +298,44 @@ tasks:
   configVars:
     minEpochNumber: "| (.tasks.exit_start.outputs.currentEpoch | tonumber) + 1"
 
-# Builder 3: EL-triggered exit
-- name: generate_withdrawal_requests
-  title: "Exit builder 3 via EL-triggered exit"
+# Builder 3: builder exit request (EIP-8282)
+- name: generate_builder_exits
+  title: "Exit builder 3 (EIP-8282)"
   config:
     limitTotal: 1
     limitPerSlot: 1
-    withdrawAmount: 0
     awaitReceipt: true
     failOnReject: true
   configVars:
     sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[3]"
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    builderExitContract: "builderExitContract"
 
-# Builder 4: voluntary exit (fallback to EL)
-- name: run_tasks
-  title: "Exit builder 4 (voluntary, EL fallback)"
-  config:
-    continueOnFailure: true
-    tasks:
-    - name: generate_exits
-      id: vol_exit_4
-      title: "Try voluntary exit for builder 4"
-      timeout: 1m
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        indexCount: 1
-        startIndex: 4
-        builderExit: true
-        sendToAllClients: true
-        awaitInclusion: true
-      configVars:
-        mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    - name: generate_withdrawal_requests
-      title: "Fallback: EL-triggered exit for builder 4"
-      if: "| .tasks.vol_exit_4.result != 1"
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        withdrawAmount: 0
-        awaitReceipt: true
-        failOnReject: true
-      configVars:
-        sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[4]"
-        walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-
-# Builder 5: EL-triggered exit
-- name: generate_withdrawal_requests
-  title: "Exit builder 5 via EL-triggered exit"
+# Builder 4: builder exit request (EIP-8282)
+- name: generate_builder_exits
+  title: "Exit builder 4 (EIP-8282)"
   config:
     limitTotal: 1
     limitPerSlot: 1
-    withdrawAmount: 0
+    awaitReceipt: true
+    failOnReject: true
+  configVars:
+    sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[4]"
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    builderExitContract: "builderExitContract"
+
+# Builder 5: builder exit request (EIP-8282)
+- name: generate_builder_exits
+  title: "Exit builder 5 (EIP-8282)"
+  config:
+    limitTotal: 1
+    limitPerSlot: 1
     awaitReceipt: true
     failOnReject: true
   configVars:
     sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[5]"
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    builderExitContract: "builderExitContract"
 
 ##
 ## PHASE 4: Wait for builders 0-2 to be fully withdrawn (balance == 0)
@@ -427,9 +371,9 @@ tasks:
 ##         Expected: key 6->idx 0, key 7->idx 1, key 8->idx 2, key 9->idx 6
 ##
 
-- name: generate_deposits
+- name: generate_builder_deposits
   id: deposit_batch3
-  title: "Deposit builders 6-9 with 0x03 credentials"
+  title: "Deposit builders 6-9 (EIP-8282)"
   config:
     limitTotal: 4
     limitPerSlot: 4
@@ -440,9 +384,8 @@ tasks:
   configVars:
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
     mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    depositContract: "depositContract"
+    builderDepositContract: "builderDepositContract"
     depositAmount: "depositAmount"
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
 # Verify batch 3 deposit receipts
 - name: run_shell
@@ -588,22 +531,22 @@ tasks:
   configVars:
     minEpochNumber: "| (.tasks.pre_final_exits.outputs.currentEpoch | tonumber) + 1"
 
-# Exit all 4 new builders via EL-triggered exits
+# Exit all 4 new builders via builder exit requests (EIP-8282)
 - name: run_task_matrix
-  title: "Exit builders 6-9 via EL-triggered exit"
+  title: "Exit builders 6-9 (EIP-8282)"
   configVars:
     matrixValues: "tasks.builder_pubkeys.outputs.pubkeys[6:10]"
   config:
     matrixVar: "builderPubkey"
     task:
-      name: generate_withdrawal_requests
-      title: "EL-triggered exit for ${builderPubkey}"
+      name: generate_builder_exits
+      title: "Builder exit for ${builderPubkey}"
       config:
         limitTotal: 1
         limitPerSlot: 1
-        withdrawAmount: 0
         awaitReceipt: true
         failOnReject: true
       configVars:
         sourcePubkey: "builderPubkey"
         walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+        builderExitContract: "builderExitContract"

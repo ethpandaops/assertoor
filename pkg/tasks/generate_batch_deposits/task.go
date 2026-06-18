@@ -829,7 +829,12 @@ func (t *Task) scanBlockForDeposits(ctx context.Context, block *consensus.Block,
 		return
 	}
 
-	for _, depositReq := range execRequests.Deposits {
+	deposits, err := execRequests.Deposits()
+	if err != nil {
+		return
+	}
+
+	for _, depositReq := range deposits {
 		pubkeyStr := depositReq.Pubkey.String()
 		if pending[pubkeyStr] {
 			delete(pending, pubkeyStr)
