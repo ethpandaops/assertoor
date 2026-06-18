@@ -79,8 +79,8 @@ github.com/ethereum/go-ethereum v1.17.3 h1:Ev/sQHH+UdKZHWjuVzhu2pxhi/sXaPZl23Q+Q
 github.com/ethereum/go-ethereum v1.17.3/go.mod h1:f2EhRwqewIZkGoQekywI2Y2RZAMTSavLNkD9qItFy1A=
 github.com/ethpandaops/ethwallclock v0.4.0 h1:+sgnhf4pk6hLPukP076VxkiLloE4L0Yk1yat+ZyHh1g=
 github.com/ethpandaops/ethwallclock v0.4.0/go.mod h1:y0Cu+mhGLlem19vnAV2x0hpFS5KZ7oOi2SWYayv9l24=
-github.com/ethpandaops/go-eth2-client v0.1.4-0.20260618143220-d4d071326327 h1:MQY7NmRieJbknjitZ9VlFO7Uw7B3s0WVMGLboBJv76w=
-github.com/ethpandaops/go-eth2-client v0.1.4-0.20260618143220-d4d071326327/go.mod h1:U3KdR8QSq8vqs9LWSGAF4ETHJpcB62E1DFf0gVMgWv0=
+github.com/ethpandaops/go-eth2-client v0.1.4-0.20260618225213-e8d135e8cdc1 h1:kQC/fTbBdZ8uZxFd779/EezbpWb6KMd+wPIlXjUMoDo=
+github.com/ethpandaops/go-eth2-client v0.1.4-0.20260618225213-e8d135e8cdc1/go.mod h1:U3KdR8QSq8vqs9LWSGAF4ETHJpcB62E1DFf0gVMgWv0=
 github.com/ethpandaops/service-authenticatoor v0.0.1 h1:yZ0gKYf+kkj92piqqYprpF6HkhEIhCNmzDrsYth92KI=
 github.com/ethpandaops/service-authenticatoor v0.0.1/go.mod h1:+C6sQMBxY2E3u6BITSZakQrGRovNnB1CamuQh/RIaXI=
 github.com/ethpandaops/spamoor v1.2.1 h1:ndCCKVehEB9t8O7/wnpZfqQ846uiknX1IQ10Di/2vAE=
