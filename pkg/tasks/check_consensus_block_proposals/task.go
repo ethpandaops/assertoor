@@ -812,6 +812,7 @@ func (t *Task) checkBlockBlobs(block *consensus.Block, blockData *spec.Versioned
 	return true
 }
 
+//nolint:dupl // structurally similar to checkBlockBuilderDepositRequests but operates on validator deposits
 func (t *Task) checkBlockDepositRequests(block *consensus.Block, blockData *spec.VersionedSignedBeaconBlock, payload *gloas.SignedExecutionPayloadEnvelope) bool {
 	executionRequests, ok := t.getExecutionRequests(block, blockData, payload)
 	if !ok {
