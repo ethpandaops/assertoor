@@ -77,7 +77,8 @@ tasks:
       ACTIVATION_SLOT=$((GLOAS_FORK_EPOCH * SLOTS_PER_EPOCH))
       # Pre-fork deposits land a few slots before activation so they reach the fork
       # still pending and get onboarded as builders.
-      PREFORK_SLOT=$((ACTIVATION_SLOT - 4))
+      PREFORK_SLOT_COUNT=$((SLOTS_PER_EPOCH / 3))
+      PREFORK_SLOT=$((ACTIVATION_SLOT - PREFORK_SLOT_COUNT))
 
       if [ "$CURRENT_SLOT" -lt "$PREFORK_SLOT" ]; then
         # Started before the fork: exercise both onboarding paths.
