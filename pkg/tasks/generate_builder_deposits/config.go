@@ -37,8 +37,8 @@ func DefaultConfig() Config {
 		DepositAmount:          1,                        // 1 ETH (BUILDER_MIN_DEPOSIT)
 		TxFeeCap:               big.NewInt(100000000000), // 100 gwei
 		TxTipCap:               big.NewInt(1000000000),   // 1 gwei
-		TxGasLimit:             400000,
-		TxFeeBuffer:            big.NewInt(1000000000000000), // 0.001 ETH
+		TxGasLimit:             2000000,
+		TxFeeBuffer:            big.NewInt(100000000000000000), // 0.1 ETH
 	}
 }
 

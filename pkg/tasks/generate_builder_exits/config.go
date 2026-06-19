@@ -28,10 +28,10 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		BuilderExitContract: "0x000014574A74c805590AFF9499fc7A690f008282",
-		TxAmount:            big.NewInt(1000000000000000), // 0.001 ETH
-		TxFeeCap:            big.NewInt(100000000000),     // 100 Gwei
-		TxTipCap:            big.NewInt(1000000000),       // 1 Gwei
-		TxGasLimit:          200000,
+		TxAmount:            big.NewInt(100000000000000000), // 0.1 ETH
+		TxFeeCap:            big.NewInt(100000000000),       // 100 Gwei
+		TxTipCap:            big.NewInt(1000000000),         // 1 Gwei
+		TxGasLimit:          1000000,
 	}
 }
 
