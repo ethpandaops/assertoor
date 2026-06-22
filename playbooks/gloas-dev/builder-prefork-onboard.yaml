@@ -155,10 +155,12 @@ tasks:
     task:
       name: check_consensus_builder_status
       title: "Verify ${builderPubkey} was onboarded as a builder"
-      config:
-        # withdrawable_epoch == FAR_FUTURE; a missing pubkey is a check miss.
-        expectActive: true
-        failOnCheckMiss: true
+      # Existence-only check. Do NOT use expectActive here: a deposit onboarded
+      # AT the fork has deposit_epoch == GLOAS_FORK_EPOCH, which cannot be
+      # finalized yet, and expectActive requires deposit_epoch < finalized_epoch.
+      # Poll (no failOnCheckMiss) so we wait for the builder to appear in the
+      # builder set instead of failing on a single too-early read.
+      timeout: 10m
       configVars:
         builderPubKey: "builderPubkey"
 
@@ -183,8 +185,11 @@ tasks:
     task:
       name: check_consensus_builder_status
       title: "Verify builder ${builderPubkey} is active"
+      # Poll until the builder is active (deposit finalized + withdrawable_epoch
+      # == FAR_FUTURE) rather than asserting once: finalization timing varies, so
+      # let it converge within the timeout instead of failing on an early read.
+      timeout: 20m
       config:
         expectActive: true
-        failOnCheckMiss: true
       configVars:
         builderPubKey: "builderPubkey"
