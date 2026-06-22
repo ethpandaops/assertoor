@@ -8,10 +8,11 @@ description: |
   validator deposit that is still sitting in the pending-deposit queue when the
   fork happens:
 
-  1. A few slots BEFORE GLOAS activates, deposit `builderCount` keys via the
-     STANDARD validator deposit contract, using 0x03 (builder) withdrawal
-     credentials. The deposit signatures are verified under the regular
-     DOMAIN_DEPOSIT, so the ordinary `generate_deposits` task is used unchanged.
+  1. As soon as the test starts (and as long as GLOAS has not activated yet),
+     deposit `builderCount` keys via the STANDARD validator deposit contract,
+     using 0x03 (builder) withdrawal credentials. The deposit signatures are
+     verified under the regular DOMAIN_DEPOSIT, so the ordinary
+     `generate_deposits` task is used unchanged.
   2. Because these deposits reach the fork still pending (unprocessed), the GLOAS
      fork transition dequeues them and converts them into builders via
      `onboard_builders_from_pending_deposits`.
@@ -19,9 +20,9 @@ description: |
      builder in the beacon state (i.e. it was dequeued/onboarded at the fork).
   4. Verify the onboarded builders go active.
 
-  This test REQUIRES being started before GLOAS activation. If the pre-fork
-  deposit window has already passed, the test fails fast (the path under test is
-  no longer reachable) rather than silently passing.
+  This test REQUIRES being started before GLOAS activation. If GLOAS has already
+  activated, the test fails fast (the path under test is no longer reachable)
+  rather than silently passing.
 version: 1.0.0
 tags: [gloas, builder, deposit, onboarding, prefork, eip-8282]
 timeout: 1h
@@ -50,7 +51,7 @@ tasks:
 
 - name: run_shell
   id: calc_slots
-  title: "Calculate pre-fork deposit timing (and require pre-fork start)"
+  title: "Check GLOAS hasn't activated yet and calculate verify timing"
   config:
     envVars:
       GLOAS_FORK_EPOCH: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
@@ -63,17 +64,16 @@ tasks:
       CURRENT_SLOT=$(echo "$CURRENT_SLOT" | jq -r .)
 
       ACTIVATION_SLOT=$((GLOAS_FORK_EPOCH * SLOTS_PER_EPOCH))
-      # Pre-fork deposits must land a few slots before activation so they reach
-      # the fork still pending and get onboarded as builders at the transition.
-      PREFORK_SLOT_COUNT=$((SLOTS_PER_EPOCH / 3))
-      PREFORK_SLOT=$((ACTIVATION_SLOT - PREFORK_SLOT_COUNT))
 
-      if [ "$CURRENT_SLOT" -ge "$PREFORK_SLOT" ]; then
-        echo "ERROR: pre-fork deposit window has already passed."
-        echo "  current slot:        $CURRENT_SLOT"
-        echo "  pre-fork window ends: slot $PREFORK_SLOT (GLOAS epoch $GLOAS_FORK_EPOCH)"
-        echo "This test must be started before GLOAS activation; the 0x03 -> builder"
-        echo "pre-fork dequeue path is no longer reachable. Failing."
+      # The deposit fires immediately after this task. It only needs to be
+      # included on-chain (still pending) before the fork, so the only hard
+      # requirement is that GLOAS has not activated yet.
+      if [ "$CURRENT_SLOT" -ge "$ACTIVATION_SLOT" ]; then
+        echo "ERROR: GLOAS has already activated."
+        echo "  current slot:     $CURRENT_SLOT"
+        echo "  GLOAS activation: slot $ACTIVATION_SLOT (epoch $GLOAS_FORK_EPOCH)"
+        echo "A pre-fork pending deposit can no longer be created, so the"
+        echo "0x03 -> builder onboarding path is unreachable. Failing."
         exit 1
       fi
 
@@ -83,11 +83,9 @@ tasks:
 
       echo "Current slot:      $CURRENT_SLOT"
       echo "GLOAS activation:  epoch $GLOAS_FORK_EPOCH (slot $ACTIVATION_SLOT)"
-      echo "Pre-fork deposits: slot $PREFORK_SLOT"
       echo "Onboard check:     slot $ONBOARD_SLOT"
       echo "Active wait epoch: $ACTIVE_EPOCH"
 
-      echo "::set-output-json preforkSlot $PREFORK_SLOT"
       echo "::set-output-json onboardSlot $ONBOARD_SLOT"
       echo "::set-output-json activeEpoch $ACTIVE_EPOCH"
 
@@ -114,15 +112,9 @@ tasks:
 
 ##
 ## PHASE 1: PRE-FORK deposit via the STANDARD validator deposit contract
-##  Deposit builderCount keys with 0x03 credentials a few slots before GLOAS,
-##  so they are still pending at the fork.
+##  Deposit builderCount keys with 0x03 credentials immediately (GLOAS has not
+##  activated yet, per calc_slots), so they are still pending at the fork.
 ##
-
-- name: check_consensus_slot_range
-  title: "Wait for pre-fork deposit slot (${{ tasks.calc_slots.outputs.preforkSlot }})"
-  timeout: 1h
-  configVars:
-    minSlotNumber: "tasks.calc_slots.outputs.preforkSlot"
 
 - name: generate_deposits
   id: prefork_deposits
