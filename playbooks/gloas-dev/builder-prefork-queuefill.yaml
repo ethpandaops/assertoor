@@ -1,0 +1,240 @@
+id: builder-prefork-queuefill
+name: "GLOAS: Pre-fork builder active AT the fork (queue-fill trick)"
+description: |
+  Tests whether a builder can be ACTIVE in the very first gloas epoch (epoch F,
+  slot 0) instead of the usual F+1/F+2 floor, using the deposit-queue-position
+  trick.
+
+  Why F slot-0 is normally impossible (per gloas spec v1.7.0-alpha.11):
+    - is_active_builder requires `builder.deposit_epoch < finalized_checkpoint.epoch`.
+    - onboard_builders_from_pending_deposits only onboards deposits that are still
+      in state.pending_deposits at the fork boundary.
+    - process_pending_deposits drains only FINALIZED deposits, in order, capped at
+      MAX_PENDING_DEPOSITS_PER_EPOCH (= 16) per epoch.
+  So to be active at slot 0 of epoch F, the builder's deposit must be BOTH
+  finalized (deposit_epoch <= F-3) AND still in the pending queue at the fork. A
+  finalized deposit on an empty queue gets drained into the validator registry, so
+  the only way to keep it pending is to put >= 16 finalized deposits AHEAD of it so
+  the per-epoch drain (16) can't reach it at the F-1 -> F boundary.
+
+  Construction:
+    1. In epoch F-3, deposit `junkCount` (>= 16) regular 0x01 deposits of 1 ETH as
+       a "wall" at the front of the pending-deposit queue.
+    2. Right after (later slot, same epoch F-3), deposit the 0x03 builder deposit,
+       so it sits BEHIND the wall, at queue index >= junkCount.
+    3. At the F-1 -> F boundary, process_pending_deposits finalizes everything,
+       drains the first 16 (wall), hits the count cap, and stops BEFORE the builder
+       deposit. upgrade_to_gloas then onboards the still-pending builder deposit
+       with deposit_epoch = F-3.
+    4. In epoch F, finalized ~ F-2 > F-3 = deposit_epoch, so is_active_builder is
+       already true -> the builder can bid for a payload in the first gloas epoch.
+
+  PASS  => the queue-fill trick works: builder active in epoch F.
+  FAIL on the active check => trick did not achieve slot-0 activation (logs show
+       deposit_epoch vs finalized_epoch; usually means it slipped to F+1).
+  FAIL on the onboard check => builder deposit was drained into a validator
+       (wall too small / mistimed) and is now a stuck 0x03 validator.
+
+  Requires being started before epoch F-3 and GLOAS_FORK_EPOCH >= 3.
+version: 1.0.0
+tags: [gloas, builder, deposit, onboarding, prefork, queue, eip-8282]
+timeout: 1h
+config:
+  walletPrivkey: ''
+  # Regular validator deposit contract (pre-fork onboarding path).
+  depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
+  builderCount: 1
+  # Wall size. Must exceed MAX_PENDING_DEPOSITS_PER_EPOCH (16) so the boundary
+  # drain can't reach the builder deposit. 20 gives margin.
+  junkCount: 20
+  builderDepositAmount: 5
+  junkDepositAmount: 1
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+
+- name: check_consensus_slot_range
+  id: current_slot
+  title: "Get current slot"
+
+- name: run_shell
+  id: calc_slots
+  title: "Calculate F-3 deposit window for queue-fill"
+  config:
+    envVars:
+      GLOAS_FORK_EPOCH: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
+      SLOTS_PER_EPOCH: "tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH"
+      CURRENT_SLOT: "tasks.current_slot.outputs.currentSlot"
+    command: |
+      set -e
+      GLOAS_FORK_EPOCH=$(echo "$GLOAS_FORK_EPOCH" | jq -r .)
+      SLOTS_PER_EPOCH=$(echo "$SLOTS_PER_EPOCH" | jq -r .)
+      CURRENT_SLOT=$(echo "$CURRENT_SLOT" | jq -r .)
+
+      if [ "$GLOAS_FORK_EPOCH" -lt 3 ]; then
+        echo "ERROR: need GLOAS_FORK_EPOCH >= 3 to deposit at epoch F-3 (got $GLOAS_FORK_EPOCH)."
+        exit 1
+      fi
+
+      ACTIVATION_SLOT=$((GLOAS_FORK_EPOCH * SLOTS_PER_EPOCH))
+
+      # Deposit in epoch F-3 so deposit_epoch = F-3 < finalized@fork (~F-2), the
+      # condition is_active_builder needs. Land a slot into F-3 (not the very
+      # first slot) so it isn't finalized at the F-2 boundary prematurely.
+      STUFF_EPOCH=$((GLOAS_FORK_EPOCH - 3))
+      STUFF_SLOT=$((STUFF_EPOCH * SLOTS_PER_EPOCH + 1))
+
+      # All deposits must land while still in epoch F-3; keep ~2 slots headroom.
+      LATEST_DEPOSIT_SLOT=$(((GLOAS_FORK_EPOCH - 2) * SLOTS_PER_EPOCH - 2))
+      if [ "$CURRENT_SLOT" -ge "$LATEST_DEPOSIT_SLOT" ]; then
+        echo "ERROR: too late for the F-3 queue-fill window."
+        echo "  current slot:        $CURRENT_SLOT"
+        echo "  latest deposit slot: $LATEST_DEPOSIT_SLOT (epoch F-3)"
+        echo "  GLOAS activation:    slot $ACTIVATION_SLOT (epoch $GLOAS_FORK_EPOCH)"
+        exit 1
+      fi
+
+      # A couple slots into epoch F: builder should already be active here.
+      FORK_CHECK_SLOT=$((ACTIVATION_SLOT + 2))
+
+      echo "Current slot:        $CURRENT_SLOT"
+      echo "GLOAS activation:    epoch $GLOAS_FORK_EPOCH (slot $ACTIVATION_SLOT)"
+      echo "Queue-fill deposits: slot $STUFF_SLOT (epoch $STUFF_EPOCH = F-3)"
+      echo "Active-at-fork check: slot $FORK_CHECK_SLOT (epoch $GLOAS_FORK_EPOCH = F)"
+
+      echo "::set-output-json stuffSlot $STUFF_SLOT"
+      echo "::set-output-json forkCheckSlot $FORK_CHECK_SLOT"
+      echo "::set-output-json forkEpoch $GLOAS_FORK_EPOCH"
+
+# prepare wallet and a single mnemonic (junk = first junkCount indices,
+# builder = the next builderCount indices)
+- name: generate_child_wallet
+  id: test_wallet
+  title: "Generate wallet for deposits"
+  config:
+    walletSeed: builder-prefork-queuefill-test
+    prefundMinBalance: 100000000000000000000  # 100 ETH
+  configVars:
+    privateKey: walletPrivkey
+
+- name: get_random_mnemonic
+  id: test_mnemonic
+  title: "Generate mnemonic"
+
+- name: get_pubkeys_from_mnemonic
+  id: builder_pubkeys
+  title: "Get pubkeys (junk + builder keys)"
+  configVars:
+    mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+    count: "| .junkCount + .builderCount"
+
+##
+## PHASE 1: at epoch F-3, fill the front of the pending-deposit queue with junk
+##
+
+- name: check_consensus_slot_range
+  title: "Wait for F-3 deposit slot (${{ tasks.calc_slots.outputs.stuffSlot }})"
+  timeout: 1h
+  configVars:
+    minSlotNumber: "tasks.calc_slots.outputs.stuffSlot"
+
+- name: generate_deposits
+  id: junk_wall
+  title: "Queue-fill: ${junkCount}x 1 ETH regular (0x01) deposits"
+  config:
+    awaitReceipt: true
+    awaitInclusion: true
+    failOnReject: true
+  configVars:
+    limitTotal: "junkCount"
+    limitPerSlot: "junkCount"
+    indexCount: "junkCount"
+    startIndex: "| 0"
+    depositAmount: "junkDepositAmount"
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+    depositContract: "depositContract"
+    # 0x01 eth1 withdrawal credentials -> regular validators.
+    withdrawalCredentials: '| "0x01" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+
+##
+## PHASE 2: behind the wall (later slot, still epoch F-3), the builder deposit
+##
+
+- name: generate_deposits
+  id: builder_deposit
+  title: "Builder deposit (0x03) BEHIND the wall (index >= ${junkCount})"
+  config:
+    awaitReceipt: true
+    awaitInclusion: true
+    failOnReject: true
+  configVars:
+    limitTotal: "builderCount"
+    limitPerSlot: "builderCount"
+    indexCount: "builderCount"
+    startIndex: "junkCount"
+    depositAmount: "builderDepositAmount"
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+    depositContract: "depositContract"
+    # 0x03 builder credentials.
+    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+
+##
+## PHASE 3: at the first gloas block, the builder deposit must have been onboarded
+##  (i.e. it survived the boundary drain instead of becoming a stuck validator)
+##
+
+- name: check_consensus_slot_range
+  title: "Wait for first GLOAS block (slot ${{ tasks.calc_slots.outputs.forkCheckSlot }})"
+  timeout: 1h
+  configVars:
+    minSlotNumber: "tasks.calc_slots.outputs.forkCheckSlot"
+
+- name: run_task_matrix
+  title: "Verify builder survived the wall and was onboarded"
+  timeout: 20m
+  configVars:
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[(.junkCount):(.junkCount + .builderCount)]"
+  config:
+    runConcurrent: true
+    matrixVar: "builderPubkey"
+    task:
+      name: check_consensus_builder_status
+      title: "Verify ${builderPubkey} onboarded as a builder"
+      timeout: 10m
+      configVars:
+        builderPubKey: "builderPubkey"
+
+##
+## PHASE 4: THE EXPERIMENT — builder must be ACTIVE during the first gloas epoch
+##  expectActive requires deposit_epoch < finalized; with the F-3 deposit that
+##  should already hold at epoch F. failOnCheckMiss => hard pass/fail of the
+##  "active at the fork" hypothesis. On miss, the task log prints deposit_epoch
+##  vs finalized_epoch.
+##
+
+- name: run_task_matrix
+  title: "EXPERIMENT: builder active IN epoch F (${{ tasks.calc_slots.outputs.forkEpoch }})?"
+  timeout: 10m
+  configVars:
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[(.junkCount):(.junkCount + .builderCount)]"
+  config:
+    runConcurrent: true
+    matrixVar: "builderPubkey"
+    task:
+      name: check_consensus_builder_status
+      title: "Verify builder ${builderPubkey} is active in the first gloas epoch"
+      config:
+        expectActive: true
+        failOnCheckMiss: true
+      configVars:
+        builderPubKey: "builderPubkey"
