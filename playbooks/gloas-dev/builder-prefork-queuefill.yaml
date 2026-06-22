@@ -49,6 +49,11 @@ config:
   junkCount: 20
   builderDepositAmount: 5
   junkDepositAmount: 1
+  # Optional: deposit for a SPECIFIC builder key (e.g. buildoor's) instead of a
+  # random one, so an external builder using the same mnemonic+index can bid on
+  # the onboarded builder. Leave empty to use a freshly generated mnemonic.
+  builderMnemonic: ''
+  builderKeyIndex: 0
 
 tasks:
 - name: check_clients_are_healthy
@@ -127,14 +132,20 @@ tasks:
 
 - name: get_random_mnemonic
   id: test_mnemonic
-  title: "Generate mnemonic"
+  title: "Generate junk-wall mnemonic"
+
+- name: get_random_mnemonic
+  id: builder_mnemonic_rand
+  title: "Generate fallback builder mnemonic"
 
 - name: get_pubkeys_from_mnemonic
   id: builder_pubkeys
-  title: "Get pubkeys (junk + builder keys)"
+  title: "Get builder pubkey(s)"
   configVars:
-    mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    count: "| .junkCount + .builderCount"
+    # Builder uses a SEPARATE mnemonic from the junk wall (no index collision).
+    # Use the configured builderMnemonic (e.g. buildoor's) if set, else a random one.
+    mnemonic: '| if .builderMnemonic != "" then .builderMnemonic else .tasks.builder_mnemonic_rand.outputs.mnemonic end'
+    count: "| .builderKeyIndex + .builderCount"
 
 ##
 ## PHASE 1: at epoch F-3, fill the front of the pending-deposit queue with junk
@@ -180,10 +191,10 @@ tasks:
     limitTotal: "builderCount"
     limitPerSlot: "builderCount"
     indexCount: "builderCount"
-    startIndex: "junkCount"
+    startIndex: "builderKeyIndex"
     depositAmount: "builderDepositAmount"
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-    mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+    mnemonic: '| if .builderMnemonic != "" then .builderMnemonic else .tasks.builder_mnemonic_rand.outputs.mnemonic end'
     depositContract: "depositContract"
     # 0x03 builder credentials.
     withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
@@ -203,7 +214,7 @@ tasks:
   title: "Verify builder survived the wall and was onboarded"
   timeout: 20m
   configVars:
-    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[(.junkCount):(.junkCount + .builderCount)]"
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[(.builderKeyIndex):(.builderKeyIndex + .builderCount)]"
   config:
     runConcurrent: true
     matrixVar: "builderPubkey"
@@ -226,7 +237,7 @@ tasks:
   title: "EXPERIMENT: builder active IN epoch F (${{ tasks.calc_slots.outputs.forkEpoch }})?"
   timeout: 10m
   configVars:
-    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[(.junkCount):(.junkCount + .builderCount)]"
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[(.builderKeyIndex):(.builderKeyIndex + .builderCount)]"
   config:
     runConcurrent: true
     matrixVar: "builderPubkey"

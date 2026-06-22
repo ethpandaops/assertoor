@@ -43,6 +43,11 @@ config:
   depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
   builderCount: 5
   depositAmount: 5
+  # Optional: deposit for a SPECIFIC builder key (e.g. buildoor's) instead of a
+  # random one, so an external builder using the same mnemonic+index can bid on
+  # the onboarded builder. Leave empty to use a freshly generated mnemonic.
+  builderMnemonic: ''
+  builderKeyIndex: 0
 
 tasks:
 - name: check_clients_are_healthy
@@ -124,14 +129,16 @@ tasks:
 
 - name: get_random_mnemonic
   id: test_mnemonic
-  title: "Generate mnemonic for builders"
+  title: "Generate fallback mnemonic for builders"
 
 - name: get_pubkeys_from_mnemonic
   id: builder_pubkeys
   title: "Get pubkeys for all builder keys"
   configVars:
-    mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    count: "builderCount"
+    # Use the configured builderMnemonic if set, else the random fallback.
+    mnemonic: '| if .builderMnemonic != "" then .builderMnemonic else .tasks.test_mnemonic.outputs.mnemonic end'
+    # Derive enough keys to index from builderKeyIndex.
+    count: "| .builderKeyIndex + .builderCount"
 
 ##
 ## PHASE 1: PRE-FORK deposit via the STANDARD validator deposit contract
@@ -155,10 +162,10 @@ tasks:
   configVars:
     limitTotal: "builderCount"
     indexCount: "builderCount"
-    startIndex: "| 0"
+    startIndex: "builderKeyIndex"
     depositAmount: "depositAmount"
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-    mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+    mnemonic: '| if .builderMnemonic != "" then .builderMnemonic else .tasks.test_mnemonic.outputs.mnemonic end'
     depositContract: "depositContract"
     # 0x03 builder credentials: version byte + 11 zero bytes + 20-byte address
     withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
@@ -178,7 +185,7 @@ tasks:
   title: "Verify all ${builderCount} pending deposits were onboarded as builders"
   timeout: 30m
   configVars:
-    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[0:.builderCount]"
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[(.builderKeyIndex):(.builderKeyIndex + .builderCount)]"
   config:
     runConcurrent: true
     matrixVar: "builderPubkey"
@@ -208,7 +215,7 @@ tasks:
   title: "Verify all ${builderCount} onboarded builders are active"
   timeout: 30m
   configVars:
-    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[0:.builderCount]"
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[(.builderKeyIndex):(.builderKeyIndex + .builderCount)]"
   config:
     runConcurrent: true
     matrixVar: "builderPubkey"
