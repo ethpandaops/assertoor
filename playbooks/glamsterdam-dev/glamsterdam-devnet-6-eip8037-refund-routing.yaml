@@ -1,0 +1,352 @@
+id: glamsterdam-devnet-6-eip8037-refund-routing
+name: "glamsterdam-devnet-6: EIP-8037 source-based gas refund routing live verification"
+timeout: 2h
+config:
+  walletPrivkey: ""
+  # EIP-8037: State creation gas refunds flow to tx.origin without the EIP-3529 cap.
+  #
+  # Background:
+  #   In Amsterdam (EIP-8037), when a tx creates new state (e.g. sets a storage slot
+  #   from 0→x) it is charged state gas = COST_PER_STATE_BYTE (1530) × StorageCreationSize (64)
+  #   = 97,920 per slot.
+  #
+  #   If the SAME transaction then clears that slot (x→0), restoring the original zero
+  #   value, the state gas is fully refunded (RefundState, no EIP-3529 1/5 cap).
+  #   This refund credits gasLeft directly, which is returned to the sender as ETH.
+  #
+  #   This is the "0→x→0 within same tx" SSTORE path (gas_table.go case 2.2.2.1):
+  #     RegularGas: SstoreResetGas − ColdSloadCost − WarmReadCost
+  #     StateGas refund: RefundState(64 × 1530 = 97920)  ← unlimited, no cap
+  #
+  #   Contrast with the EIP-3529 EVM refund counter (for clearing pre-existing storage,
+  #   case 2.1.2b), which IS capped at gasUsed/5 and only gives 4800/slot.
+  #
+  # Test approach (within-tx create+clear to trigger RefundState):
+  #   1. Deploy a StorageWriter contract with setAndClear(n) that:
+  #         - sets n slots from 0 → 1  (ChargeState: n × 97920 state gas spills to regular)
+  #         - immediately clears them back 1 → 0  (RefundState: n × 97920 added to StateGas)
+  #      After the first slot, RefundState builds a state reservoir that absorbs subsequent
+  #      slot charges without further regular-gas spillover.
+  #      Net effect: only 1 slot's worth (97920) of state gas spills to regular gas total.
+  #   2. Call setAndClear(8) and check receipt.gasUsed.
+  #   3. Assert gasUsed is in the "RefundState active" range:
+  #        With EIP-8037:    gasUsed ≈ 300000-500000  (only 1 spillover of 97920)
+  #        Without EIP-8037: gasUsed ≈ 900000-1100000 (all 8 spillovers = 783360 extra gas)
+  #      The two cases are easily distinguished — a ~3× difference in gasUsed.
+  #
+  # Why setAndClear in one tx?
+  #   If set() and clear() are separate txs, the second tx sees original=1 (not 0),
+  #   hitting case 2.1.2b (capped EVM refund, 4800/slot) NOT case 2.2.2.1 (RefundState).
+  #   Only when original==value==0 (restored to original zero within same tx) does
+  #   geth call RefundState and bypass the 1/5 cap.
+  #
+  # Note on balance accounting: RefundState increases gasLeft (not the EVM refund counter),
+  # so receipt.gasUsed ALREADY reflects the refund. The sender saves via lower gasUsed,
+  # not via a separate balance credit beyond the gasLeft return.
+
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    id: clientCheck
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  # Amsterdam activates at genesis (epoch 0); wait for epoch 2 so the chain is stable
+  - name: get_consensus_specs
+    id: consensusSpecs
+    title: "Get consensus chain specs"
+
+  - name: check_consensus_slot_range
+    title: "Wait for network to be stable (epoch 2)"
+    timeout: 1h
+    config:
+      minEpochNumber: 2
+
+  # Install foundry (forge + cast) for contract deployment and interaction
+  - name: run_shell
+    title: "Install foundry (forge + cast)"
+    id: installFoundry
+    timeout: 10m
+    config:
+      shell: bash
+      shellArgs: [--login]
+      command: |
+        set -e
+        # Use pre-installed foundry if available (built into Docker image)
+        if [ -x "/opt/foundry/.foundry/bin/cast" ]; then
+          FOUNDRY_HOME=/opt/foundry
+          echo "Using pre-installed foundry: $(/opt/foundry/.foundry/bin/cast --version)"
+        else
+          FOUNDRY_HOME=$(mktemp -d -t foundry-XXXXXXXXXX)
+          export SHELL=/bin/bash
+          export HOME=${FOUNDRY_HOME}
+          curl -L https://foundry.paradigm.xyz | bash
+          source ${FOUNDRY_HOME}/.bashrc || true
+          ${FOUNDRY_HOME}/.foundry/bin/foundryup
+        fi
+        echo "::set-output foundryHome ${FOUNDRY_HOME}"
+        if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/cast" ]; then
+          echo "cast not found after foundryup"
+          exit 1
+        fi
+        if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/forge" ]; then
+          echo "forge not found after foundryup"
+          exit 1
+        fi
+        echo "forge and cast installed at ${FOUNDRY_HOME}/.foundry/bin/"
+
+  # Generate a funded deployer wallet
+  - name: generate_child_wallet
+    id: deployerWallet
+    title: "Generate funded deployer wallet (5 ETH)"
+    config:
+      prefundMinBalance: 5000000000000000000  # 5 ETH (enough for forge deploy + setAndClear)
+      walletSeed: "eip8037-refund-routing-test"
+    configVars:
+      privateKey: "walletPrivkey"
+
+  # Deploy StorageWriter and run setAndClear(8) to verify EIP-8037 state gas refund
+  - name: run_shell
+    title: "Deploy StorageWriter, call setAndClear(8) in one tx, verify state gas refund to sender"
+    id: testRefundRouting
+    timeout: 15m
+    config:
+      shell: bash
+      shellArgs: [--login]
+      envVars:
+        WALLET_PRIVKEY: tasks.deployerWallet.outputs.childWallet.privkey
+        WALLET_ADDRESS: tasks.deployerWallet.outputs.childWallet.address
+        EL_RPC_HOST: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+        FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+      command: |
+        set -e
+        WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+        WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+        EL_RPC_HOST=$(echo $EL_RPC_HOST | jq -r)
+        FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+        export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+        export SHELL=/bin/bash
+        export HOME=${FOUNDRY_HOME}
+
+        echo "=== EIP-8037 Source-Based Gas Refund Routing (within-tx create+clear) ==="
+        echo "Wallet:  ${WALLET_ADDRESS}"
+        echo "RPC:     ${EL_RPC_HOST}"
+
+        WORK_DIR=$(mktemp -d -t eip8037-XXXXXXXXXX)
+        echo "::set-output workDir ${WORK_DIR}"
+
+        # StorageWriter: setAndClear(n) sets n slots 0→1 then 1→0 in ONE transaction.
+        #
+        # Why one tx? SSTORE gas_table.go case selection:
+        #   original=0, current=0→1, then value=0 within same tx:
+        #   → original(0)==value(0) AND original==(empty hash) → case 2.2.2.1
+        #   → RefundState(64 × CostPerStateByte = 97920) — no EIP-3529 cap!
+        #
+        # If separate txs: original=1 (from prior tx), case 2.1.2b → AddRefund(4800) only.
+        cat > ${WORK_DIR}/StorageWriter.sol << 'SOLEOF'
+        // SPDX-License-Identifier: MIT
+        pragma solidity ^0.8.0;
+        // EIP-8037 test: create n storage slots then clear them in one tx.
+        // Triggers the "0->x->0 within same tx" SSTORE case (gas_table.go 2.2.2.1)
+        // which calls RefundState(64 * CPSB = 97920) per slot — unlimited by EIP-3529.
+        contract StorageWriter {
+            uint256 public s0;
+            uint256 public s1;
+            uint256 public s2;
+            uint256 public s3;
+            uint256 public s4;
+            uint256 public s5;
+            uint256 public s6;
+            uint256 public s7;
+
+            // Set n slots to 1 then immediately clear them back to 0.
+            // Net storage change = 0, but state gas charged then fully refunded.
+            function setAndClear(uint256 n) external {
+                if (n > 0) { s0 = 1; s0 = 0; }
+                if (n > 1) { s1 = 1; s1 = 0; }
+                if (n > 2) { s2 = 1; s2 = 0; }
+                if (n > 3) { s3 = 1; s3 = 0; }
+                if (n > 4) { s4 = 1; s4 = 0; }
+                if (n > 5) { s5 = 1; s5 = 0; }
+                if (n > 6) { s6 = 1; s6 = 0; }
+                if (n > 7) { s7 = 1; s7 = 0; }
+            }
+        }
+        SOLEOF
+
+        echo ""
+        echo "Deploying StorageWriter..."
+        DEPLOY_OUT=$(forge create \
+          --rpc-url ${EL_RPC_HOST} \
+          --private-key ${WALLET_PRIVKEY} \
+          --legacy --broadcast \
+          --json \
+          ${WORK_DIR}/StorageWriter.sol:StorageWriter)
+
+        CONTRACT=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo // empty')
+        if [ -z "${CONTRACT}" ] || [ "${CONTRACT}" = "null" ]; then
+            _FROM=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.from // empty')
+            _NONHEX=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.nonce // "0x0"')
+            _NON=$(python3 -c "print(int('${_NONHEX}', 16))")
+            CONTRACT=$(cast compute-address --nonce "${_NON}" "${_FROM}" 2>/dev/null | awk '{print $NF}')
+        fi
+        echo "::set-output contractAddr ${CONTRACT}"
+        echo "Contract deployed at: ${CONTRACT}"
+
+        # Verify slots are zero before setAndClear
+        S0=$(cast call ${CONTRACT} "s0()(uint256)" --rpc-url ${EL_RPC_HOST})
+        echo "s0 before setAndClear(): ${S0} (expected: 0)"
+
+        # Call setAndClear(8) — creates and clears 8 slots in ONE transaction.
+        # Under EIP-8037, RefundState(97920) is called for each 1→0 restore within same tx.
+        # This adds to gasLeft (StateGas), enabling subsequent slots to use the reservoir.
+        # Net: only 1 slot's state gas (97920) spills to regular gas; 7 slots use the refund.
+        echo ""
+        echo "Calling setAndClear(8) — creates+clears 8 slots in ONE tx..."
+        SC_JSON=$(cast send ${CONTRACT} \
+          "setAndClear(uint256)" "8" \
+          --private-key ${WALLET_PRIVKEY} \
+          --rpc-url ${EL_RPC_HOST} \
+          --legacy \
+          --json)
+        SC_TX=$(echo "${SC_JSON}" | jq -r '.transactionHash')
+        GAS_USED=$(echo "${SC_JSON}" | jq -r '.gasUsed')
+        GAS_PRICE=$(echo "${SC_JSON}" | jq -r '.effectiveGasPrice')
+        echo "::set-output setAndClearTx ${SC_TX}"
+        echo "::set-output gasUsed ${GAS_USED}"
+        echo "::set-output gasPrice ${GAS_PRICE}"
+        echo "setAndClear(8) tx:    ${SC_TX}"
+        echo "gasUsed:              ${GAS_USED}"
+        echo "effectiveGasPrice:    ${GAS_PRICE} wei"
+
+        # Verify slots are still zero after setAndClear (net change is 0)
+        S0_AFTER=$(cast call ${CONTRACT} "s0()(uint256)" --rpc-url ${EL_RPC_HOST})
+        echo "s0 after setAndClear(): ${S0_AFTER} (expected: 0 — slots restored)"
+        if [ "${S0_AFTER}" != "0" ]; then
+          echo "FAIL: s0 is ${S0_AFTER} — setAndClear did not restore to 0"
+          exit 1
+        fi
+
+        # ----------------------------------------------------------------
+        # Verify EIP-8037 RefundState is active via gasUsed comparison.
+        #
+        # EIP-8037 active (RefundState builds state reservoir):
+        #   Only the FIRST slot spills 97920 to regular gas.
+        #   Subsequent slots charge from the RefundState reservoir (StateGas).
+        #   Expected gasUsed: 200000–550000
+        #
+        # EIP-8037 NOT active (no RefundState, all 8 spill to regular):
+        #   8 × 97920 = 783360 extra regular gas consumed.
+        #   Expected gasUsed: 900000–1200000
+        #
+        # The two cases differ by ~3×, making them unambiguously distinguishable.
+        # ----------------------------------------------------------------
+        python3 - << PYEOF
+        gas_used   = int("${GAS_USED}", 16) if "${GAS_USED}".startswith("0x") else int("${GAS_USED}")
+        gas_price  = int("${GAS_PRICE}", 16) if "${GAS_PRICE}".startswith("0x") else int("${GAS_PRICE}")
+
+        N_SLOTS         = 8
+        REFUND_PER_SLOT = 64 * 1530   # 97920: COST_PER_STATE_BYTE × StorageCreationSize
+
+        # EIP-8037 active: only 1 spillover of 97920 to regular gas.
+        # Regular ops for 8 set+clear ≈ 8 × (22100 + 3000) + intrinsic ~25000 = ~226800
+        # Plus 1 spillover: 97920. Total ≈ 324720. Allow 2× margin.
+        EIP8037_LOWER = 150_000
+        EIP8037_UPPER = 600_000
+
+        # EIP-8037 NOT active: all 8 spills → 783360 extra + regular ops ≈ 1010160
+        NO_EIP8037_LOWER = 750_000
+
+        print("")
+        print("=== EIP-8037 State Gas Refund Analysis (within-tx create+clear) ===")
+        print(f"gasUsed from receipt:    {gas_used:,}")
+        print(f"effectiveGasPrice:       {gas_price:,} wei")
+        print("")
+        print(f"EIP-8037 active range:   [{EIP8037_LOWER:,}, {EIP8037_UPPER:,}]")
+        print(f"  → only 1 state-gas spillover ({REFUND_PER_SLOT:,}) to regular gas")
+        print(f"  → 7 subsequent slots charge from RefundState reservoir (StateGas)")
+        print(f"No EIP-8037 range:       [{NO_EIP8037_LOWER:,}, ~1200000]")
+        print(f"  → all {N_SLOTS} slots spill state gas to regular ({N_SLOTS} × {REFUND_PER_SLOT:,} = {N_SLOTS * REFUND_PER_SLOT:,})")
+
+        if EIP8037_LOWER <= gas_used <= EIP8037_UPPER:
+            print(f"")
+            print(f"PASS: gasUsed {gas_used:,} is in EIP-8037 active range [{EIP8037_LOWER:,}, {EIP8037_UPPER:,}].")
+            print(f"      RefundState (0→x→0 within-tx) is reducing state-gas spillover. ✓")
+        elif gas_used >= NO_EIP8037_LOWER:
+            print(f"")
+            print(f"FAIL: gasUsed {gas_used:,} is in the no-EIP-8037 range (>= {NO_EIP8037_LOWER:,}).")
+            print(f"      All {N_SLOTS} slots appear to have spilled state gas to regular gas.")
+            print(f"      EIP-8037 RefundState for case 2.2.2.1 (0→x→0 within-tx) is NOT active. ✗")
+            exit(1)
+        else:
+            print(f"WARN: gasUsed {gas_used:,} is outside both expected ranges.")
+            print(f"      EIP-8037 range: [{EIP8037_LOWER:,}, {EIP8037_UPPER:,}]")
+            print(f"      No-EIP-8037:    [>= {NO_EIP8037_LOWER:,}]")
+            print(f"      Investigate SSTORE gas costs in Amsterdam for this client.")
+            exit(1)
+        PYEOF
+
+  # Final summary
+  - name: run_shell
+    title: "Print EIP-8037 source-based state gas refund test summary"
+    timeout: 1m
+    config:
+      shell: bash
+      envVars:
+        CONTRACT: tasks.testRefundRouting.outputs.contractAddr
+        SC_TX: tasks.testRefundRouting.outputs.setAndClearTx
+        GAS_USED: tasks.testRefundRouting.outputs.gasUsed
+        GAS_PRICE: tasks.testRefundRouting.outputs.gasPrice
+      command: |
+        CONTRACT=$(echo $CONTRACT | jq -r)
+        SC_TX=$(echo $SC_TX | jq -r)
+        GAS_USED=$(echo $GAS_USED | jq -r)
+        GAS_PRICE=$(echo $GAS_PRICE | jq -r)
+
+        GAS_USED_DEC=$(python3 -c "v='${GAS_USED}'; print(int(v,16) if v.startswith('0x') else int(v))")
+
+        echo "================================================================"
+        echo "EIP-8037 Source-Based State Gas Refund Routing — Summary"
+        echo "================================================================"
+        echo ""
+        echo "EIP-8037 (Amsterdam) key change:"
+        echo "  Within-tx SSTORE create+clear (0→x→0) triggers RefundState(97920/slot)."
+        echo "  RefundState credits StateGas reservoir (not regular gas): subsequent slots"
+        echo "  draw from the rebuilt reservoir instead of spilling to regular gas."
+        echo "  Net: only 1 of 8 slots spills 97920 to regular gas."
+        echo ""
+        echo "Test scenario: setAndClear(8) — set 8 slots then clear all in ONE tx."
+        echo "  StorageWriter contract: ${CONTRACT}"
+        echo "  setAndClear(8) tx:      ${SC_TX}"
+        echo "  gasUsed (receipt):      ${GAS_USED_DEC} gas"
+        echo "  effectiveGasPrice:      ${GAS_PRICE} wei/gas"
+        echo ""
+        echo "  EIP-8037 active range:  [150000, 600000] gas"
+        echo "    → only 1 spillover of 97920 to regular gas"
+        echo "  No-EIP-8037 range:      [>= 750000] gas"
+        echo "    → all 8 × 97920 = 783360 spill to regular gas"
+        echo ""
+        echo "  Status: PASS"
+        echo "================================================================"
+
+cleanupTasks:
+  - name: run_shell
+    title: "Cleanup foundry and work temp dirs"
+    config:
+      shell: bash
+      envVars:
+        FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+        WORK_DIR: tasks.testRefundRouting.outputs.workDir
+      command: |
+        FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+        WORK_DIR=$(echo $WORK_DIR | jq -r)
+        if [ ! -z "$FOUNDRY_HOME" ] && [ -d "$FOUNDRY_HOME" ]; then
+          rm -rf "$FOUNDRY_HOME"
+          echo "Cleaned up foundry temp dir ${FOUNDRY_HOME}"
+        fi
+        if [ ! -z "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
+          rm -rf "$WORK_DIR"
+          echo "Cleaned up work dir ${WORK_DIR}"
+        fi

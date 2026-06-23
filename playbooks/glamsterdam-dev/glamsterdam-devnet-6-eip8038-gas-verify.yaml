@@ -1,0 +1,562 @@
+id: glamsterdam-devnet-6-eip8038-gas-verify
+name: "glamsterdam-devnet-6: EIP-8038 SSTORE gas repricing verification"
+timeout: 2h
+config:
+  walletPrivkey: ""
+  # EIP-8038: COLD_STORAGE_WRITE = 5000 (replaces Prague's COLD_SLOAD + SSTORE_SET = 2100+20000=22100)
+  # WARM_ACCESS = 100 (unchanged from EIP-2929)
+  #
+  # EIP-2780 INTERACTION (Amsterdam v6.0.0 EELS tag):
+  #   TX_BASE:             21000 → 12000 (reduced)
+  #   COLD_STORAGE_ACCESS: 2100  → 3000  (increased — EIP-8038 only changes WRITE cost)
+  #
+  # Gas bounds for a single cold SSTORE via a minimal Solidity dispatch:
+  #   Prague (pre-Amsterdam): 21000 + 2100 + 20000 + ~1000 dispatch = ~44100
+  #   Amsterdam pre-EIP-2780: 21000 + 5000 (COLD_STORAGE_WRITE)     + ~1000 dispatch = ~27000
+  #   Amsterdam with EIP-2780: 12000 + 5000 (COLD_STORAGE_WRITE)    + ~1000 dispatch = ~18000
+  #
+  # Gas bounds for a cold SLOAD via eth_estimateGas:
+  #   Pre-EIP-2780: 21000 (TX_BASE) + 2100 (COLD_STORAGE_ACCESS) + ~500 dispatch = ~23600
+  #   EIP-2780:     12000 (TX_BASE) + 3000 (COLD_STORAGE_ACCESS) + ~500 dispatch = ~15500
+  #
+  # We test:
+  #   0. Detect TX_BASE via eth_estimateGas on zero-value zero-address self-transfer
+  #   1. Cold SSTORE: gasUsed in [TX_BASE+500, TX_BASE+8000+500] (EIP-8038 vs Prague ~TX_BASE+22100)
+  #   2. Cold SLOAD via eth_estimateGas: < TX_BASE + COLD_STORAGE_ACCESS + 1500 overhead
+  #   3. ETH transfer baseline: self-transfer costs exactly TX_BASE (detected in Test 0)
+
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    id: clientCheck
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  # Amsterdam activates at genesis (epoch 0); wait for epoch 2 so the chain is stable
+  - name: get_consensus_specs
+    id: consensusSpecs
+    title: "Get consensus chain specs"
+
+  - name: check_consensus_slot_range
+    title: "Wait for network to be stable (epoch 2)"
+    timeout: 1h
+    config:
+      minEpochNumber: 2
+
+  # install foundry (forge + cast) for contract deployment and interaction
+  - name: run_shell
+    title: "Install foundry (forge + cast)"
+    id: installFoundry
+    timeout: 10m
+    config:
+      shell: bash
+      shellArgs: [--login]
+      command: |
+        set -e
+        # Use pre-installed foundry if available (built into Docker image)
+        if [ -x "/opt/foundry/.foundry/bin/cast" ]; then
+          FOUNDRY_HOME=/opt/foundry
+          echo "Using pre-installed foundry: $(/opt/foundry/.foundry/bin/cast --version)"
+        else
+          FOUNDRY_HOME=$(mktemp -d -t foundry-XXXXXXXXXX)
+          export SHELL=/bin/bash
+          export HOME=${FOUNDRY_HOME}
+          curl -L https://foundry.paradigm.xyz | bash
+          source ${FOUNDRY_HOME}/.bashrc || true
+          ${FOUNDRY_HOME}/.foundry/bin/foundryup
+        fi
+        echo "::set-output foundryHome ${FOUNDRY_HOME}"
+        if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/cast" ]; then
+          echo "cast not found after foundryup"
+          exit 1
+        fi
+        if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/forge" ]; then
+          echo "forge not found after foundryup"
+          exit 1
+        fi
+        echo "forge and cast installed at ${FOUNDRY_HOME}/.foundry/bin/"
+
+  # Test 0: Detect TX_BASE — probe via eth_estimateGas on zero-value self-transfer from address zero.
+  # Returns 12000 (EIP-2780 active) or 21000 (pre-EIP-2780). Used to set correct bounds in Tests 1-2.
+  - name: run_shell
+    title: "Test 0: Detect TX_BASE (12000=EIP-2780 active, 21000=pre-EIP-2780)"
+    id: detectTxBase
+    timeout: 5m
+    config:
+      shell: bash
+      envVars:
+        EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+      command: |
+        set -e
+        EL_RPC=$(echo $EL_RPC | jq -r)
+        echo "=== Test 0: TX_BASE detection via eth_estimateGas ==="
+        PROBE=$(curl -s -X POST -H "Content-Type: application/json" \
+          --data '{"jsonrpc":"2.0","method":"eth_estimateGas","params":[{"from":"0x0000000000000000000000000000000000000000","to":"0x0000000000000000000000000000000000000000","value":"0x0"}],"id":1}' \
+          "${EL_RPC}")
+        TX_BASE_HEX=$(echo "${PROBE}" | jq -r '.result')
+        TX_BASE=$(printf '%d' "${TX_BASE_HEX}")
+        echo "::set-output txBase ${TX_BASE}"
+        if [ "${TX_BASE}" -eq 12000 ]; then
+          echo "EIP-2780 active: TX_BASE=12000, COLD_STORAGE_ACCESS=3000"
+          echo "  Cold SSTORE range: [12500, 21000] (12000+5000+dispatch vs Prague ~35000)"
+          echo "  Cold SLOAD bound:  < 17000  (12000+3000+~1500 dispatch)"
+        elif [ "${TX_BASE}" -eq 21000 ]; then
+          echo "Pre-EIP-2780: TX_BASE=21000, COLD_STORAGE_ACCESS=2100"
+          echo "  Cold SSTORE range: [21500, 30000] (21000+5000+dispatch vs Prague ~44100)"
+          echo "  Cold SLOAD bound:  < 24500  (21000+2100+~1400 dispatch)"
+        else
+          echo "WARN: unexpected TX_BASE=${TX_BASE}"
+        fi
+
+  # Test 1: Cold SSTORE gas cost (EIP-8038 primary check)
+  - name: run_tasks
+    title: "Test 1: Cold SSTORE gas cost under EIP-8038"
+    id: testColdSstore
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: coldSstoreWallet
+          title: "Generate funded wallet for cold SSTORE test"
+          config:
+            prefundMinBalance: 1000000000000000000000  # 1000 ETH
+            walletSeed: "eip8038-gas-verify-cold-sstore"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Deploy GasTest contract and measure cold SSTORE gas"
+          id: deployColdSstore
+          timeout: 10m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              WALLET_PRIVKEY: tasks.coldSstoreWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.coldSstoreWallet.outputs.childWallet.address
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+              TX_BASE: tasks.detectTxBase.outputs.txBase
+            command: |
+              set -e
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+              TX_BASE=$(echo $TX_BASE | jq -r 2>/dev/null || echo "${TX_BASE:-21000}")
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "=== EIP-8038 Cold SSTORE Gas Test ==="
+              echo "Wallet:   ${WALLET_ADDRESS}"
+              echo "RPC:      ${EL_RPC}"
+              echo "TX_BASE:  ${TX_BASE}"
+
+              # Write a minimal storage contract to a temp Solidity file.
+              # The contract has two functions:
+              #   store(uint256):  cold SSTORE to slot val (first write to this slot)
+              #   load():          warm SLOAD from slot val (reads back after previous tx)
+              # Both are deliberately minimal — no event emission, no extra state — so that
+              # the only EVM cost beyond fixed dispatch overhead is the SSTORE/SLOAD itself.
+              WORK_DIR=$(mktemp -d -t gastest-XXXXXXXXXX)
+              echo "::set-output workDir ${WORK_DIR}"
+
+              cat > ${WORK_DIR}/GasTest.sol << 'SOLEOF'
+              // SPDX-License-Identifier: MIT
+              pragma solidity ^0.8.0;
+
+              contract GasTest {
+                  uint256 public val;
+
+                  // Performs exactly ONE cold SSTORE to slot `val`.
+                  // On a freshly deployed contract the slot starts at zero,
+                  // so the first call does a cold write (COLD_STORAGE_WRITE).
+                  function store(uint256 v) external {
+                      val = v;
+                  }
+
+                  // Performs exactly ONE warm SLOAD from slot `val`.
+                  // Must be called after store() so the slot is already in the
+                  // access list (warm). Returns the value so the compiler cannot
+                  // optimise the SLOAD away.
+                  function load() external view returns (uint256) {
+                      return val;
+                  }
+              }
+              SOLEOF
+
+              # Deploy with forge create (--legacy avoids EIP-1559 complexities in devnet)
+              echo "Deploying GasTest contract..."
+              DEPLOY_OUT=$(forge create \
+                --rpc-url ${EL_RPC} \
+                --private-key ${WALLET_PRIVKEY} \
+                --legacy --broadcast \
+                --json \
+                ${WORK_DIR}/GasTest.sol:GasTest)
+
+              CONTRACT_ADDR=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo // empty')
+              if [ -z "${CONTRACT_ADDR}" ] || [ "${CONTRACT_ADDR}" = "null" ]; then
+                _FROM=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.from // empty')
+                _NONHEX=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.nonce // "0x0"')
+                _NON=$(python3 -c "print(int('${_NONHEX}', 16))")
+                CONTRACT_ADDR=$(cast compute-address --nonce "${_NON}" "${_FROM}" 2>/dev/null | awk '{print $NF}')
+              fi
+              echo "Contract deployed at: ${CONTRACT_ADDR}"
+              echo "::set-output contractAddress ${CONTRACT_ADDR}"
+
+              # Verify contract code exists
+              CODE=$(cast code ${CONTRACT_ADDR} --rpc-url ${EL_RPC})
+              if [ "${CODE}" = "0x" ] || [ -z "${CODE}" ]; then
+                echo "FAIL: contract code not found at ${CONTRACT_ADDR}"
+                exit 1
+              fi
+              echo "Contract code present (${#CODE} hex chars)"
+
+              # ----------------------------------------------------------------
+              # Cold SSTORE: call store(1) on the fresh contract.
+              # The slot `val` is zero-initialized => this is a cold write.
+              # EIP-8038 Amsterdam: COLD_STORAGE_WRITE = 5000 gas.
+              # Prague equivalent:  COLD_SLOAD (2100) + SSTORE_SET (20000) = 22100 gas.
+              # ----------------------------------------------------------------
+              echo ""
+              echo "Calling store(1) — cold SSTORE to slot val..."
+              TX_JSON=$(cast send ${CONTRACT_ADDR} \
+                "store(uint256)" 1 \
+                --private-key ${WALLET_PRIVKEY} \
+                --rpc-url ${EL_RPC} \
+                --legacy \
+                --json)
+
+              COLD_TX_HASH=$(echo "${TX_JSON}" | jq -r '.transactionHash')
+              echo "Cold SSTORE tx hash: ${COLD_TX_HASH}"
+              echo "::set-output coldTxHash ${COLD_TX_HASH}"
+
+              # Fetch receipt for gas used
+              RECEIPT=$(cast receipt ${COLD_TX_HASH} --rpc-url ${EL_RPC} --json)
+              STATUS=$(echo "${RECEIPT}" | jq -r '.status')
+              if [ "${STATUS}" != "0x1" ] && [ "${STATUS}" != "1" ]; then
+                echo "FAIL: store(1) transaction reverted (status=${STATUS})"
+                exit 1
+              fi
+
+              # gasUsed is hex in the RPC receipt; cast receipt --json returns decimal for gasUsed
+              COLD_GAS=$(echo "${RECEIPT}" | jq -r '.gasUsed')
+              # Handle possible hex format
+              if echo "${COLD_GAS}" | grep -q '^0x'; then
+                COLD_GAS=$(printf '%d' "${COLD_GAS}")
+              fi
+              echo "Cold SSTORE gasUsed: ${COLD_GAS}"
+              echo "::set-output coldGasUsed ${COLD_GAS}"
+              echo "::set-output coldBlockNumber $(echo "${RECEIPT}" | jq -r '.blockNumber')"
+
+              # ----------------------------------------------------------------
+              # Assertion: Amsterdam cold SSTORE should be well below Prague pricing.
+              # Bounds depend on detected TX_BASE (EIP-2780 interaction):
+              #   Pre-EIP-2780 (TX_BASE=21000): SSTORE range [21500, 30000]
+              #     Prague equiv: 21000+22100+dispatch ~= 44100
+              #   EIP-2780 (TX_BASE=12000, COLD_STORAGE_ACCESS=3000): SSTORE range [12500, 21000]
+              #     Prague equiv: 12000+23000+dispatch ~= 36000
+              # ----------------------------------------------------------------
+              COLD_GAS_INT=${COLD_GAS}
+              LOWER_BOUND=$((TX_BASE + 500))
+              UPPER_BOUND=$((TX_BASE + 9000))
+
+              if [ "${COLD_GAS_INT}" -lt "${LOWER_BOUND}" ]; then
+                echo "FAIL: Cold SSTORE gasUsed=${COLD_GAS_INT} is below TX_BASE+500 (${LOWER_BOUND})."
+                echo "      TX_BASE=${TX_BASE}. Receipt below TX_BASE indicates a malformed result."
+                exit 1
+              fi
+
+              if [ "${COLD_GAS_INT}" -gt "${UPPER_BOUND}" ]; then
+                echo "FAIL: Cold SSTORE gasUsed=${COLD_GAS_INT} exceeds Amsterdam upper bound (${UPPER_BOUND})."
+                echo "      TX_BASE=${TX_BASE}. Expected EIP-8038 total: TX_BASE+5000+dispatch = ~$((TX_BASE+6000))."
+                if [ "${TX_BASE}" -eq 21000 ]; then
+                  echo "      Prague would yield: TX_BASE(21000)+COLD_SLOAD(2100)+SSTORE_SET(20000)+dispatch ~= 44100."
+                else
+                  echo "      Prague would yield: TX_BASE(12000)+COLD_STORAGE_ACCESS(3000)+SSTORE_SET(20000)+dispatch ~= 36000."
+                fi
+                echo "      Likely cause: EIP-8038 not implemented (COLD_STORAGE_WRITE=5000 not active)."
+                exit 1
+              fi
+
+              echo "PASS: Cold SSTORE gasUsed=${COLD_GAS_INT} is in expected Amsterdam range [${LOWER_BOUND}, ${UPPER_BOUND}]."
+              echo "      TX_BASE=${TX_BASE}, EIP-8038 COLD_STORAGE_WRITE=5000 is in effect."
+
+        - name: run_shell
+          title: "Verify cold SLOAD cost after cold SSTORE"
+          id: verifyWarmSload
+          timeout: 5m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              CONTRACT_ADDR: tasks.deployColdSstore.outputs.contractAddress
+              WALLET_PRIVKEY: tasks.coldSstoreWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.coldSstoreWallet.outputs.childWallet.address
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+              TX_BASE: tasks.detectTxBase.outputs.txBase
+            command: |
+              set -e
+              CONTRACT_ADDR=$(echo $CONTRACT_ADDR | jq -r)
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+              TX_BASE=$(echo $TX_BASE | jq -r 2>/dev/null || echo "${TX_BASE:-21000}")
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "=== Cold SLOAD Cost Verification ==="
+              echo "Contract: ${CONTRACT_ADDR}"
+              echo "TX_BASE:  ${TX_BASE}"
+              echo ""
+              echo "Using eth_estimateGas on load() to measure cold SLOAD cost."
+              echo "EIP-8038 does NOT change COLD_STORAGE_ACCESS:"
+              echo "  pre-EIP-2780: COLD_STORAGE_ACCESS=2100 → estimate ~= TX_BASE(21000)+2100+dispatch = ~23600"
+              echo "  EIP-2780:     COLD_STORAGE_ACCESS=3000 → estimate ~= TX_BASE(12000)+3000+dispatch = ~15500"
+              echo ""
+
+              # eth_estimateGas resets the access list; the slot is cold in a new call context.
+              # This verifies the SLOAD cost is within range for the detected TX_BASE.
+
+              LOAD_SELECTOR="0x86d5c4be"  # keccak256("load()") truncated to 4 bytes = 0x86d5c4be
+
+              # Use eth_estimateGas for the load() call (treats slot as cold since new tx context)
+              ESTIMATE_RESP=$(curl -s -X POST \
+                -H "Content-Type: application/json" \
+                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_estimateGas\",\"params\":[{\"from\":\"${WALLET_ADDRESS}\",\"to\":\"${CONTRACT_ADDR}\",\"data\":\"${LOAD_SELECTOR}\"}],\"id\":1}" \
+                ${EL_RPC})
+
+              echo "eth_estimateGas response for load():"
+              echo "${ESTIMATE_RESP}" | jq '.'
+
+              ESTIMATE_HEX=$(echo "${ESTIMATE_RESP}" | jq -r '.result')
+              if [ "${ESTIMATE_HEX}" = "null" ] || [ -z "${ESTIMATE_HEX}" ]; then
+                echo "FAIL: eth_estimateGas returned null for load() call"
+                echo "Response: $(echo "${ESTIMATE_RESP}" | jq '.')"
+                exit 1
+              fi
+
+              LOAD_GAS=$(printf '%d' "${ESTIMATE_HEX}")
+              echo "Estimated gas for load() (cold SLOAD context): ${LOAD_GAS}"
+              echo "::set-output loadGasEstimate ${LOAD_GAS}"
+
+              # COLD_STORAGE_ACCESS: 2100 pre-EIP-2780, 3000 with EIP-2780.
+              # EIP-8038 only lowers COLD_STORAGE_WRITE (not COLD_STORAGE_ACCESS).
+              # Set upper bound based on detected TX_BASE:
+              #   pre-EIP-2780: TX_BASE(21000) + COLD_STORAGE_ACCESS(2100) + ~1400 overhead = 24500
+              #   EIP-2780:     TX_BASE(12000) + COLD_STORAGE_ACCESS(3000) + ~2000 overhead = 17000
+              if [ "${TX_BASE}" -eq 12000 ]; then
+                COLD_STORAGE_ACCESS=3000
+                SLOAD_UPPER=17000
+              else
+                COLD_STORAGE_ACCESS=2100
+                SLOAD_UPPER=24500
+              fi
+              EXPECTED_SLOAD=$((TX_BASE + COLD_STORAGE_ACCESS + 500))
+              echo "  Expected estimate ~${EXPECTED_SLOAD} (TX_BASE=${TX_BASE} + COLD_STORAGE_ACCESS=${COLD_STORAGE_ACCESS} + ~500 dispatch)"
+              echo "  Upper bound: ${SLOAD_UPPER}"
+
+              if [ "${LOAD_GAS}" -gt "${SLOAD_UPPER}" ]; then
+                echo "FAIL: load() gas estimate=${LOAD_GAS} exceeds upper bound (${SLOAD_UPPER})."
+                echo "      TX_BASE=${TX_BASE}, COLD_STORAGE_ACCESS=${COLD_STORAGE_ACCESS} (unchanged by EIP-8038)."
+                echo "      Expected estimate ~${EXPECTED_SLOAD}. Gas above ${SLOAD_UPPER} indicates unexpected overhead."
+                exit 1
+              fi
+
+              echo "PASS: load() gas estimate=${LOAD_GAS} is within expected range (< ${SLOAD_UPPER})."
+              echo "      TX_BASE=${TX_BASE}, COLD_STORAGE_ACCESS=${COLD_STORAGE_ACCESS} (unchanged by EIP-8038)."
+
+  # Test 2: ETH transfer baseline — verify self-transfer costs exactly TX_BASE.
+  # With EIP-2780 (TX_BASE=12000) or pre-EIP-2780 (TX_BASE=21000), the detected value
+  # is used as the expected gasUsed for a zero-calldata self-transfer.
+  - name: run_tasks
+    title: "Test 2: Self-transfer gasUsed matches detected TX_BASE"
+    id: testTxBase
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: txBaseWallet
+          title: "Generate funded wallet for TX_BASE test"
+          config:
+            prefundMinBalance: 1000000000000000000000  # 1000 ETH
+            walletSeed: "eip8038-gas-verify-txbase"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Send self-transfer and verify gasUsed matches detected TX_BASE"
+          id: verifyTxBase
+          timeout: 5m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              WALLET_PRIVKEY: tasks.txBaseWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.txBaseWallet.outputs.childWallet.address
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+              TX_BASE: tasks.detectTxBase.outputs.txBase
+            command: |
+              set -e
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+              TX_BASE=$(echo $TX_BASE | jq -r 2>/dev/null || echo "${TX_BASE:-21000}")
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "=== TX_BASE Gas Cost Verification (EIP-2780) ==="
+              echo "Sender:   ${WALLET_ADDRESS}"
+              echo "TX_BASE:  ${TX_BASE} (detected in Test 0)"
+              echo ""
+              echo "Sending 1 wei to WALLET_ADDRESS (self-transfer — no NEWACCOUNT cost, no calldata)."
+              echo "Self-transfer gasUsed must equal TX_BASE exactly (no COLD_ACCOUNT_ACCESS for pre-warmed self)."
+              if [ "${TX_BASE}" -eq 12000 ]; then
+                echo "EIP-2780 active: expect gasUsed=12000"
+              else
+                echo "Pre-EIP-2780: expect gasUsed=21000"
+              fi
+
+              TX_JSON=$(cast send ${WALLET_ADDRESS} \
+                --value 1wei \
+                --private-key ${WALLET_PRIVKEY} \
+                --rpc-url ${EL_RPC} \
+                --legacy \
+                --json)
+
+              ETH_TX_HASH=$(echo "${TX_JSON}" | jq -r '.transactionHash')
+              echo "ETH transfer tx hash: ${ETH_TX_HASH}"
+
+              RECEIPT=$(cast receipt ${ETH_TX_HASH} --rpc-url ${EL_RPC} --json)
+              STATUS=$(echo "${RECEIPT}" | jq -r '.status')
+              if [ "${STATUS}" != "0x1" ] && [ "${STATUS}" != "1" ]; then
+                echo "FAIL: ETH transfer transaction failed (status=${STATUS})"
+                exit 1
+              fi
+
+              ETH_GAS=$(echo "${RECEIPT}" | jq -r '.gasUsed')
+              if echo "${ETH_GAS}" | grep -q '^0x'; then
+                ETH_GAS=$(printf '%d' "${ETH_GAS}")
+              fi
+              echo "ETH transfer gasUsed: ${ETH_GAS}"
+              echo "::set-output ethTransferGas ${ETH_GAS}"
+
+              # For a zero-calldata self-transfer, gasUsed must equal exactly TX_BASE.
+              # Per EIP-2929: tx.from and tx.to are pre-warmed (no COLD_ACCOUNT_ACCESS_COST).
+              # No NEWACCOUNT cost (self always exists). Expected: exactly TX_BASE.
+              # TX_BASE is 21000 pre-EIP-2780 or 12000 with EIP-2780.
+              EXPECTED_MIN=$((TX_BASE - 100))
+              EXPECTED_MAX=$((TX_BASE + 100))
+
+              if [ "${ETH_GAS}" -lt "${EXPECTED_MIN}" ]; then
+                echo "FAIL: Self-transfer gasUsed=${ETH_GAS} is below TX_BASE-100 (${EXPECTED_MIN})."
+                echo "      TX_BASE=${TX_BASE} (detected in Test 0). Receipt below TX_BASE is malformed."
+                exit 1
+              fi
+
+              if [ "${ETH_GAS}" -gt "${EXPECTED_MAX}" ]; then
+                echo "FAIL: Self-transfer gasUsed=${ETH_GAS} exceeds TX_BASE+100 (${EXPECTED_MAX})."
+                echo "      TX_BASE=${TX_BASE} (detected in Test 0). A zero-calldata self-transfer"
+                echo "      must cost exactly TX_BASE (no COLD_ACCOUNT_ACCESS, no NEWACCOUNT)."
+                exit 1
+              fi
+
+              echo "PASS: Self-transfer gasUsed=${ETH_GAS} matches TX_BASE=${TX_BASE}."
+              if [ "${TX_BASE}" -eq 12000 ]; then
+                echo "      EIP-2780 TX_BASE=12000 confirmed."
+              else
+                echo "      Pre-EIP-2780 TX_BASE=21000 confirmed."
+              fi
+
+  # Final summary
+  - name: run_shell
+    title: "Print EIP-8038 gas verification test summary"
+    timeout: 1m
+    config:
+      shell: bash
+      envVars:
+        COLD_GAS: tasks.deployColdSstore.outputs.coldGasUsed
+        COLD_TX: tasks.deployColdSstore.outputs.coldTxHash
+        LOAD_GAS: tasks.verifyWarmSload.outputs.loadGasEstimate
+        ETH_GAS: tasks.verifyTxBase.outputs.ethTransferGas
+        TX_BASE: tasks.detectTxBase.outputs.txBase
+      command: |
+        COLD_GAS=$(echo $COLD_GAS | jq -r)
+        COLD_TX=$(echo $COLD_TX | jq -r)
+        LOAD_GAS=$(echo $LOAD_GAS | jq -r)
+        ETH_GAS=$(echo $ETH_GAS | jq -r)
+        TX_BASE=$(echo $TX_BASE | jq -r 2>/dev/null || echo "${TX_BASE:-21000}")
+        if [ "${TX_BASE}" -eq 12000 ]; then
+          COLD_STORAGE_ACCESS=3000
+          GAS_MODEL="EIP-2780 active (TX_BASE=12000)"
+        else
+          COLD_STORAGE_ACCESS=2100
+          GAS_MODEL="pre-EIP-2780 (TX_BASE=21000)"
+        fi
+        LOWER_BOUND=$((TX_BASE + 500))
+        UPPER_BOUND=$((TX_BASE + 9000))
+        SLOAD_EXPECTED=$((TX_BASE + COLD_STORAGE_ACCESS + 500))
+        echo "================================================================"
+        echo "EIP-8038 SSTORE Gas Repricing Verification Summary"
+        echo "================================================================"
+        echo ""
+        echo "Gas model detected: ${GAS_MODEL}"
+        echo "EIP-8038 specification (Amsterdam):"
+        echo "  COLD_STORAGE_WRITE  = 5000  (replaces Prague: COLD_STORAGE_ACCESS+SSTORE_SET)"
+        echo "  COLD_STORAGE_ACCESS = ${COLD_STORAGE_ACCESS}  (EIP-2780 increases from 2100 to 3000)"
+        echo "  WARM_ACCESS         = 100   (unchanged)"
+        echo "  TX_BASE             = ${TX_BASE}"
+        echo ""
+        echo "Test 0: TX_BASE detection"
+        echo "  Detected:    ${TX_BASE}"
+        echo ""
+        echo "Test 1: Cold SSTORE (store(1) on fresh contract slot)"
+        echo "  Tx hash:     ${COLD_TX}"
+        echo "  gasUsed:     ${COLD_GAS}"
+        echo "  Expected:    [${LOWER_BOUND}, ${UPPER_BOUND}]  (TX_BASE+5000+dispatch)"
+        if [ "${TX_BASE}" -eq 12000 ]; then
+          echo "  Prague equiv would be: ~$((TX_BASE + 23000 + 1000))  (TX_BASE+COLD_STORAGE_ACCESS(3000)+SSTORE_SET(20000)+dispatch)"
+        else
+          echo "  Prague equiv would be: ~$((TX_BASE + 22100 + 1000))  (TX_BASE+COLD_STORAGE_ACCESS(2100)+SSTORE_SET(20000)+dispatch)"
+        fi
+        echo "  Status: PASS"
+        echo ""
+        echo "Test 1b: Cold SLOAD gas estimate (load() via eth_estimateGas)"
+        echo "  eth_estimateGas: ${LOAD_GAS}"
+        echo "  Expected:    ~${SLOAD_EXPECTED}  (TX_BASE=${TX_BASE}+COLD_STORAGE_ACCESS=${COLD_STORAGE_ACCESS}+dispatch)"
+        echo "  Note: COLD_STORAGE_ACCESS unchanged by EIP-8038 (EIP-2780 changes it to 3000)"
+        echo "  Status: PASS"
+        echo ""
+        echo "Test 2: Self-transfer TX_BASE verification"
+        echo "  gasUsed:     ${ETH_GAS}"
+        echo "  Expected:    ${TX_BASE} ± 100"
+        echo "  Status: PASS"
+        echo "================================================================"
+
+cleanupTasks:
+  - name: run_shell
+    title: "Cleanup foundry temp dirs"
+    config:
+      shell: bash
+      envVars:
+        FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+        WORK_DIR: tasks.deployColdSstore.outputs.workDir
+      command: |
+        FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+        WORK_DIR=$(echo $WORK_DIR | jq -r)
+        if [ ! -z "$FOUNDRY_HOME" ] && [ -d "$FOUNDRY_HOME" ]; then
+          rm -rf "$FOUNDRY_HOME"
+          echo "Cleaned up foundry temp dir ${FOUNDRY_HOME}"
+        fi
+        if [ ! -z "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
+          rm -rf "$WORK_DIR"
+          echo "Cleaned up work dir ${WORK_DIR}"
+        fi

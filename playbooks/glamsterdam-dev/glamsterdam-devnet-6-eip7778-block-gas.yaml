@@ -56,13 +56,19 @@ tasks:
       shellArgs: [--login]
       command: |
         set -e
-        FOUNDRY_HOME=$(mktemp -d -t foundry-XXXXXXXXXX)
+        # Use pre-installed foundry if available (built into Docker image)
+        if [ -x "/opt/foundry/.foundry/bin/cast" ]; then
+          FOUNDRY_HOME=/opt/foundry
+          echo "Using pre-installed foundry: $(/opt/foundry/.foundry/bin/cast --version)"
+        else
+          FOUNDRY_HOME=$(mktemp -d -t foundry-XXXXXXXXXX)
+          export SHELL=/bin/bash
+          export HOME=${FOUNDRY_HOME}
+          curl -L https://foundry.paradigm.xyz | bash
+          source ${FOUNDRY_HOME}/.bashrc || true
+          ${FOUNDRY_HOME}/.foundry/bin/foundryup
+        fi
         echo "::set-output foundryHome ${FOUNDRY_HOME}"
-        export SHELL=/bin/bash
-        export HOME=${FOUNDRY_HOME}
-        curl -L https://foundry.paradigm.xyz | bash
-        source ${FOUNDRY_HOME}/.bashrc || true
-        ${FOUNDRY_HOME}/.foundry/bin/foundryup
         if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/cast" ]; then
           echo "cast not found after foundryup"
           exit 1
@@ -126,9 +132,15 @@ tasks:
         DEPLOY_OUT=$(forge create \
           --rpc-url ${EL_RPC_HOST} \
           --private-key ${WALLET_PRIVKEY} \
-          --legacy --json \
+          --legacy --broadcast --json \
           ${WORK_DIR}/StorageClearer.sol:StorageClearer)
-        CONTRACT=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo')
+        CONTRACT=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo // empty')
+        if [ -z "${CONTRACT}" ] || [ "${CONTRACT}" = "null" ]; then
+            _FROM=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.from // empty')
+            _NONHEX=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.nonce // "0x0"')
+            _NON=$(python3 -c "print(int('${_NONHEX}', 16))")
+            CONTRACT=$(cast compute-address --nonce "${_NON}" "${_FROM}" 2>/dev/null | awk '{print $NF}')
+        fi
         echo "::set-output contractAddr ${CONTRACT}"
         echo "Contract: ${CONTRACT}"
 

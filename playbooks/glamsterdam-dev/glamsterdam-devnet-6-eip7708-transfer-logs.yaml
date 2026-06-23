@@ -1,0 +1,1271 @@
+id: glamsterdam-devnet-6-eip7708-transfer-logs
+name: "glamsterdam-devnet-6: EIP-7708 live ETH transfer log emission test"
+timeout: 2h
+config:
+  walletPrivkey: ""
+  # EIP-7708: ETH transfers emit Transfer(address,address,uint256) logs from this system address
+  # Source: ethereum/execution-specs src/ethereum/forks/amsterdam/vm/__init__.py
+  # SYSTEM_ADDRESS = bytes.fromhex("fffffffffffffffffffffffffffffffffffffffe")
+  transferLogAddress: "0xfffffffffffffffffffffffffffffffffffffffe"
+  # keccak256("Transfer(address,address,uint256)") = 0xddf252ad...
+  transferTopic: "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    id: clientCheck
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  # Wait for Amsterdam EL fork activation.
+  # Amsterdam is the EL fork carrying EIP-7708. We wait for a few blocks past
+  # the fork to ensure the EL is running Amsterdam rules before sending the
+  # test transaction.
+  - name: get_consensus_specs
+    id: consensusSpecs
+    title: "Get consensus chain specs"
+
+  - name: check_consensus_slot_range
+    title: "Wait for network to be stable (epoch 2)"
+    timeout: 1h
+    config:
+      minEpochNumber: 2
+
+  # install foundry (cast) for sending transactions and querying chain state
+  - name: run_shell
+    title: "Install foundry (cast)"
+    id: installFoundry
+    timeout: 10m
+    config:
+      shell: bash
+      shellArgs: [--login]
+      command: |
+        set -e
+        # Use pre-installed foundry if available (built into Docker image)
+        if [ -x "/opt/foundry/.foundry/bin/cast" ]; then
+          FOUNDRY_HOME=/opt/foundry
+          echo "Using pre-installed foundry: $(/opt/foundry/.foundry/bin/cast --version)"
+        else
+          FOUNDRY_HOME=$(mktemp -d -t foundry-XXXXXXXXXX)
+          export SHELL=/bin/bash
+          export HOME=${FOUNDRY_HOME}
+          curl -L https://foundry.paradigm.xyz | bash
+          source ${FOUNDRY_HOME}/.bashrc || true
+          ${FOUNDRY_HOME}/.foundry/bin/foundryup
+        fi
+        echo "::set-output foundryHome ${FOUNDRY_HOME}"
+        if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/cast" ]; then
+          echo "cast not found after foundryup"
+          exit 1
+        fi
+        if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/forge" ]; then
+          echo "forge not found after foundryup"
+          exit 1
+        fi
+        echo "cast and forge installed at ${FOUNDRY_HOME}/.foundry/bin/"
+
+  # Test 1: Simple EOA-to-EOA ETH transfer emits Transfer log
+  - name: run_tasks
+    title: "Test 1: Simple ETH transfer emits Transfer log"
+    id: testSimpleTransfer
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: transferWallet
+          title: "Generate funded wallet for ETH transfer test"
+          config:
+            prefundMinBalance: 1000000000000000000000  # 1000 ETH
+            walletSeed: "eip7708-transfer-log-test"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Send 1 ETH to a new address"
+          id: sendTransfer
+          timeout: 5m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              WALLET_PRIVKEY: tasks.transferWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.transferWallet.outputs.childWallet.address
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              # Generate a deterministic recipient address (different from sender)
+              RECIPIENT="0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead"
+
+              echo "Sender:    ${WALLET_ADDRESS}"
+              echo "Recipient: ${RECIPIENT}"
+              echo "RPC:       ${EL_RPC}"
+
+              BALANCE=$(cast balance ${WALLET_ADDRESS} --rpc-url ${EL_RPC})
+              echo "Wallet balance: ${BALANCE} wei"
+
+              # Send 1 ETH from test wallet to recipient
+              TX_HASH=$(cast send ${RECIPIENT} \
+                --value 1ether \
+                --private-key ${WALLET_PRIVKEY} \
+                --rpc-url ${EL_RPC} \
+                --json | jq -r '.transactionHash')
+
+              echo "Transfer tx hash: ${TX_HASH}"
+              echo "::set-output transferTxHash ${TX_HASH}"
+              echo "::set-output senderAddress ${WALLET_ADDRESS}"
+              echo "::set-output recipientAddress ${RECIPIENT}"
+
+        - name: run_shell
+          title: "Verify Transfer log in eth_getTransactionReceipt"
+          id: verifyReceiptLog
+          timeout: 5m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              TX_HASH: tasks.sendTransfer.outputs.transferTxHash
+              SENDER: tasks.sendTransfer.outputs.senderAddress
+              RECIPIENT: tasks.sendTransfer.outputs.recipientAddress
+              TRANSFER_LOG_ADDR: transferLogAddress
+              TRANSFER_TOPIC: transferTopic
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              TX_HASH=$(echo $TX_HASH | jq -r)
+              SENDER=$(echo $SENDER | jq -r)
+              RECIPIENT=$(echo $RECIPIENT | jq -r)
+              TRANSFER_LOG_ADDR=$(echo $TRANSFER_LOG_ADDR | jq -r)
+              TRANSFER_TOPIC=$(echo $TRANSFER_TOPIC | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "Checking receipt for tx: ${TX_HASH}"
+              echo "Expected Transfer log from: ${TRANSFER_LOG_ADDR}"
+              echo "Expected Transfer topic:    ${TRANSFER_TOPIC}"
+
+              # Fetch receipt via JSON-RPC
+              RECEIPT=$(curl -s -X POST \
+                -H "Content-Type: application/json" \
+                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getTransactionReceipt\",\"params\":[\"${TX_HASH}\"],\"id\":1}" \
+                ${EL_RPC})
+
+              echo "Raw receipt:"
+              echo "${RECEIPT}" | jq '.'
+
+              # Check tx succeeded
+              STATUS=$(echo "${RECEIPT}" | jq -r '.result.status')
+              if [ "${STATUS}" != "0x1" ] && [ "${STATUS}" != "1" ]; then
+                echo "FAIL: Transfer transaction failed (status=${STATUS})"
+                exit 1
+              fi
+
+              BLOCK_NUMBER=$(echo "${RECEIPT}" | jq -r '.result.blockNumber')
+              echo "Tx included in block: ${BLOCK_NUMBER}"
+              echo "::set-output transferBlockNumber ${BLOCK_NUMBER}"
+
+              # EIP-7708: a nonzero-value transfer MUST emit a Transfer log
+              LOG_COUNT=$(echo "${RECEIPT}" | jq -r '.result.logs | length')
+              echo "Log count in receipt: ${LOG_COUNT}"
+
+              if [ "${LOG_COUNT}" = "0" ] || [ "${LOG_COUNT}" = "null" ]; then
+                echo "FAIL: Expected at least 1 Transfer log from EIP-7708, got ${LOG_COUNT}"
+                echo "This client does not appear to implement EIP-7708 log emission."
+                exit 1
+              fi
+
+              # Verify the first log is the EIP-7708 Transfer log
+              LOG_ADDR=$(echo "${RECEIPT}" | jq -r '.result.logs[0].address')
+              LOG_TOPIC0=$(echo "${RECEIPT}" | jq -r '.result.logs[0].topics[0]')
+              LOG_TOPIC1=$(echo "${RECEIPT}" | jq -r '.result.logs[0].topics[1]')
+              LOG_TOPIC2=$(echo "${RECEIPT}" | jq -r '.result.logs[0].topics[2]')
+              LOG_DATA=$(echo "${RECEIPT}" | jq -r '.result.logs[0].data')
+
+              echo "Log[0].address: ${LOG_ADDR}"
+              echo "Log[0].topics[0] (event sig):  ${LOG_TOPIC0}"
+              echo "Log[0].topics[1] (sender):     ${LOG_TOPIC1}"
+              echo "Log[0].topics[2] (recipient):  ${LOG_TOPIC2}"
+              echo "Log[0].data (amount):          ${LOG_DATA}"
+
+              # Normalize to lowercase for comparison
+              LOG_ADDR_LC=$(echo "${LOG_ADDR}" | tr '[:upper:]' '[:lower:]')
+              TRANSFER_LOG_ADDR_LC=$(echo "${TRANSFER_LOG_ADDR}" | tr '[:upper:]' '[:lower:]')
+              LOG_TOPIC0_LC=$(echo "${LOG_TOPIC0}" | tr '[:upper:]' '[:lower:]')
+              TRANSFER_TOPIC_LC=$(echo "${TRANSFER_TOPIC}" | tr '[:upper:]' '[:lower:]')
+
+              # Check emitting address is the EIP-7708 system address (0xff...fe)
+              if [ "${LOG_ADDR_LC}" != "${TRANSFER_LOG_ADDR_LC}" ]; then
+                echo "FAIL: Expected log from system address ${TRANSFER_LOG_ADDR_LC}, got ${LOG_ADDR_LC}"
+                exit 1
+              fi
+              echo "PASS: Log emitted from correct system address ${TRANSFER_LOG_ADDR_LC}"
+
+              # Check topic[0] matches Transfer(address,address,uint256) signature
+              if [ "${LOG_TOPIC0_LC}" != "${TRANSFER_TOPIC_LC}" ]; then
+                echo "FAIL: Expected Transfer topic ${TRANSFER_TOPIC_LC}, got ${LOG_TOPIC0_LC}"
+                echo "Hint: keccak256(\"Transfer(address,address,uint256)\") = ${TRANSFER_TOPIC_LC}"
+                exit 1
+              fi
+              echo "PASS: Transfer event signature matches (topic[0] correct)"
+
+              # Verify topic[1] encodes the sender address (left-padded to 32 bytes)
+              SENDER_LC=$(echo "${SENDER}" | tr '[:upper:]' '[:lower:]' | sed 's/0x//')
+              EXPECTED_TOPIC1="0x000000000000000000000000${SENDER_LC}"
+              LOG_TOPIC1_LC=$(echo "${LOG_TOPIC1}" | tr '[:upper:]' '[:lower:]')
+              if [ "${LOG_TOPIC1_LC}" != "${EXPECTED_TOPIC1}" ]; then
+                echo "FAIL: topic[1] (sender) mismatch: expected ${EXPECTED_TOPIC1}, got ${LOG_TOPIC1_LC}"
+                exit 1
+              fi
+              echo "PASS: topic[1] encodes sender address correctly"
+
+              # Verify topic[2] encodes the recipient address (left-padded to 32 bytes)
+              RECIPIENT_LC=$(echo "${RECIPIENT}" | tr '[:upper:]' '[:lower:]' | sed 's/0x//')
+              EXPECTED_TOPIC2="0x000000000000000000000000${RECIPIENT_LC}"
+              LOG_TOPIC2_LC=$(echo "${LOG_TOPIC2}" | tr '[:upper:]' '[:lower:]')
+              if [ "${LOG_TOPIC2_LC}" != "${EXPECTED_TOPIC2}" ]; then
+                echo "FAIL: topic[2] (recipient) mismatch: expected ${EXPECTED_TOPIC2}, got ${LOG_TOPIC2_LC}"
+                exit 1
+              fi
+              echo "PASS: topic[2] encodes recipient address correctly"
+
+              # Verify data encodes 1 ETH = 1000000000000000000 wei (32-byte big-endian)
+              EXPECTED_DATA="0x0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+              LOG_DATA_LC=$(echo "${LOG_DATA}" | tr '[:upper:]' '[:lower:]')
+              if [ "${LOG_DATA_LC}" != "${EXPECTED_DATA}" ]; then
+                echo "FAIL: data (transfer amount) mismatch: expected ${EXPECTED_DATA} (1 ETH), got ${LOG_DATA_LC}"
+                exit 1
+              fi
+              echo "PASS: data encodes 1 ETH transfer amount correctly"
+
+              echo "::set-output receiptLogVerified true"
+
+        - name: run_shell
+          title: "Verify Transfer log via eth_getLogs"
+          id: verifyGetLogs
+          timeout: 5m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              TX_HASH: tasks.sendTransfer.outputs.transferTxHash
+              SENDER: tasks.sendTransfer.outputs.senderAddress
+              RECIPIENT: tasks.sendTransfer.outputs.recipientAddress
+              BLOCK_NUMBER: tasks.verifyReceiptLog.outputs.transferBlockNumber
+              TRANSFER_LOG_ADDR: transferLogAddress
+              TRANSFER_TOPIC: transferTopic
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              TX_HASH=$(echo $TX_HASH | jq -r)
+              SENDER=$(echo $SENDER | jq -r)
+              RECIPIENT=$(echo $RECIPIENT | jq -r)
+              BLOCK_NUMBER=$(echo $BLOCK_NUMBER | jq -r)
+              TRANSFER_LOG_ADDR=$(echo $TRANSFER_LOG_ADDR | jq -r)
+              TRANSFER_TOPIC=$(echo $TRANSFER_TOPIC | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "Querying eth_getLogs for block ${BLOCK_NUMBER}, address ${TRANSFER_LOG_ADDR}"
+
+              # Query eth_getLogs filtered to the system address in the transfer block
+              LOGS=$(curl -s -X POST \
+                -H "Content-Type: application/json" \
+                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getLogs\",\"params\":[{\"fromBlock\":\"${BLOCK_NUMBER}\",\"toBlock\":\"${BLOCK_NUMBER}\",\"address\":\"${TRANSFER_LOG_ADDR}\",\"topics\":[\"${TRANSFER_TOPIC}\"]}],\"id\":1}" \
+                ${EL_RPC})
+
+              echo "eth_getLogs response:"
+              echo "${LOGS}" | jq '.'
+
+              LOG_COUNT=$(echo "${LOGS}" | jq '.result | length')
+              echo "Matching logs returned: ${LOG_COUNT}"
+
+              if [ "${LOG_COUNT}" = "0" ] || [ "${LOG_COUNT}" = "null" ]; then
+                echo "FAIL: eth_getLogs returned no Transfer logs for block ${BLOCK_NUMBER}"
+                echo "The log was visible in the receipt but not via eth_getLogs — this is an EL bug."
+                exit 1
+              fi
+
+              # Find the log matching our tx hash
+              MATCHING=$(echo "${LOGS}" | jq --arg txhash "${TX_HASH}" \
+                '[.result[] | select(.transactionHash == $txhash)] | length')
+              echo "Logs matching our tx hash (${TX_HASH}): ${MATCHING}"
+
+              if [ "${MATCHING}" = "0" ] || [ "${MATCHING}" = "null" ]; then
+                echo "FAIL: No log matching tx hash ${TX_HASH} found via eth_getLogs"
+                exit 1
+              fi
+
+              echo "PASS: eth_getLogs correctly surfaces EIP-7708 Transfer log"
+              echo "::set-output getLogsVerified true"
+
+  # Test 2: Zero-value transfer must NOT emit a Transfer log
+  - name: run_tasks
+    title: "Test 2: Zero-value ETH transfer does NOT emit Transfer log"
+    id: testZeroValueTransfer
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: zeroTransferWallet
+          title: "Generate funded wallet for zero-value transfer test"
+          config:
+            prefundMinBalance: 1000000000000000000000  # 1000 ETH
+            walletSeed: "eip7708-zero-value-transfer-test"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Send 0 ETH and verify no Transfer log is emitted"
+          id: sendZeroTransfer
+          timeout: 5m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              WALLET_PRIVKEY: tasks.zeroTransferWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.zeroTransferWallet.outputs.childWallet.address
+              TRANSFER_TOPIC: transferTopic
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              TRANSFER_TOPIC=$(echo $TRANSFER_TOPIC | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              RECIPIENT="0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"
+              echo "Sender:    ${WALLET_ADDRESS}"
+              echo "Recipient: ${RECIPIENT}"
+              echo "Value:     0 ETH (zero-value — must NOT emit Transfer log per EIP-7708)"
+
+              TX_HASH=$(cast send ${RECIPIENT} \
+                --value 0 \
+                --private-key ${WALLET_PRIVKEY} \
+                --rpc-url ${EL_RPC} \
+                --json | jq -r '.transactionHash')
+
+              echo "Zero-value tx hash: ${TX_HASH}"
+
+              # Fetch receipt and verify no Transfer logs are present
+              RECEIPT=$(curl -s -X POST \
+                -H "Content-Type: application/json" \
+                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getTransactionReceipt\",\"params\":[\"${TX_HASH}\"],\"id\":1}" \
+                ${EL_RPC})
+
+              echo "Receipt:"
+              echo "${RECEIPT}" | jq '.'
+
+              # Filter for Transfer logs specifically (topic[0] matches Transfer sig)
+              TRANSFER_LOG_COUNT=$(echo "${RECEIPT}" | jq --arg topic "${TRANSFER_TOPIC}" \
+                '[.result.logs[] | select(.topics[0] == $topic)] | length')
+
+              echo "Transfer logs in receipt: ${TRANSFER_LOG_COUNT}"
+
+              if [ "${TRANSFER_LOG_COUNT}" != "0" ] && [ "${TRANSFER_LOG_COUNT}" != "null" ]; then
+                echo "FAIL: Zero-value transfer emitted ${TRANSFER_LOG_COUNT} Transfer log(s) — violates EIP-7708"
+                echo "EIP-7708 states: if transfer_amount == 0, return (no log emitted)"
+                exit 1
+              fi
+
+              echo "PASS: Zero-value transfer correctly emits no Transfer log"
+
+  # Test 3: Internal CALL-with-value emits Transfer log
+  # EIP-7708 applies to ALL ETH movements in the EVM, not just external transactions.
+  # This test deploys a Forwarder contract and calls it with 2 ETH, then verifies that
+  # the receipt contains TWO Transfer logs: one for EOA→Forwarder (external tx value)
+  # and one for Forwarder→recipient (internal CALL with value).
+  - name: run_tasks
+    title: "Test 3: Internal CALL-with-value also emits Transfer log (EIP-7708 full coverage)"
+    id: testInternalTransfer
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: internalTransferWallet
+          title: "Generate funded wallet for internal transfer test (10 ETH)"
+          config:
+            prefundMinBalance: 10000000000000000000  # 10 ETH (covers 2 ETH value + gas + forge deploy)
+            walletSeed: "eip7708-internal-transfer-test"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Deploy Forwarder contract and verify internal CALL Transfer log"
+          id: deployAndCallForwarder
+          timeout: 15m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              WALLET_PRIVKEY: tasks.internalTransferWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.internalTransferWallet.outputs.childWallet.address
+              TRANSFER_LOG_ADDR: transferLogAddress
+              TRANSFER_TOPIC: transferTopic
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              TRANSFER_LOG_ADDR=$(echo $TRANSFER_LOG_ADDR | jq -r)
+              TRANSFER_TOPIC=$(echo $TRANSFER_TOPIC | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "=== EIP-7708 Test 3: Internal CALL Transfer Log ==="
+              echo "Wallet: ${WALLET_ADDRESS}"
+              echo "RPC:    ${EL_RPC}"
+              echo ""
+              echo "Test goal: verify that internal EVM CALL-with-value also emits"
+              echo "  a Transfer log from the EIP-7708 system address (0xfff...ffe)."
+              echo "  External tx value:   EOA -> Forwarder  (2 ETH) -> Transfer log 1"
+              echo "  Internal CALL value: Forwarder -> recipient (2 ETH) -> Transfer log 2"
+              echo ""
+
+              # Create a temp dir for the Solidity source
+              WORK_DIR=$(mktemp -d -t eip7708-internal-XXXXXXXXXX)
+              echo "::set-output workDir ${WORK_DIR}"
+
+              # Write a minimal Forwarder contract that forwards all received ETH to an address
+              cat > ${WORK_DIR}/Forwarder.sol << 'SOLEOF'
+              // SPDX-License-Identifier: MIT
+              pragma solidity ^0.8.28;
+              // EIP-7708 internal transfer test: every nonzero-value ETH movement must emit
+              // a Transfer(from,to,value) log from 0xfffffffffffffffffffffffffffffffffffffffe.
+              // Calling forward(to) with msg.value causes TWO internal ETH moves:
+              //   1. tx.value from msg.sender into this contract (external tx)
+              //   2. msg.value forwarded from this contract to `to` (internal CALL)
+              // Both must appear as Transfer logs in the transaction receipt.
+              contract Forwarder {
+                  function forward(address payable to) external payable {
+                      (bool ok,) = to.call{value: msg.value}("");
+                      require(ok, "forward failed");
+                  }
+              }
+              SOLEOF
+
+              echo "Deploying Forwarder contract..."
+              DEPLOY_OUT=$(forge create \
+                --rpc-url ${EL_RPC} \
+                --private-key ${WALLET_PRIVKEY} \
+                --legacy --broadcast \
+                --json \
+                ${WORK_DIR}/Forwarder.sol:Forwarder 2>&1)
+
+              FORWARDER=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo // empty')
+              if [ -z "${FORWARDER}" ] || [ "${FORWARDER}" = "null" ]; then
+                _FROM=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.from // empty')
+                _NONHEX=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.nonce // "0x0"')
+                _NON=$(python3 -c "print(int('${_NONHEX}', 16))")
+                FORWARDER=$(cast compute-address --nonce "${_NON}" "${_FROM}" 2>/dev/null | awk '{print $NF}')
+              fi
+              DEPLOY_TX=$(echo "${DEPLOY_OUT}" | jq -r '.transactionHash // empty')
+
+              if [ -z "${FORWARDER}" ]; then
+                echo "FAIL: Forwarder contract deployment failed"
+                echo "forge output:"
+                echo "${DEPLOY_OUT}"
+                exit 1
+              fi
+              echo "Forwarder deployed at: ${FORWARDER} (tx: ${DEPLOY_TX})"
+              echo "::set-output forwarderAddr ${FORWARDER}"
+
+              # Recipient address (distinct from forwarder and wallet)
+              RECIPIENT="0x1234123412341234123412341234123412341234"
+
+              echo ""
+              echo "Calling Forwarder.forward(${RECIPIENT}) with 2 ETH..."
+              echo "Expected: 2 Transfer logs in receipt (EOA→Forwarder + Forwarder→recipient)"
+              echo ""
+
+              # Call forward(recipient) with 2 ETH — triggers TWO Transfer logs if EIP-7708 is correct
+              FORWARD_JSON=$(cast send ${FORWARDER} \
+                "forward(address)" ${RECIPIENT} \
+                --value 2ether \
+                --private-key ${WALLET_PRIVKEY} \
+                --rpc-url ${EL_RPC} \
+                --json)
+
+              FORWARD_TX=$(echo "${FORWARD_JSON}" | jq -r '.transactionHash')
+              FORWARD_STATUS=$(echo "${FORWARD_JSON}" | jq -r '.status')
+              echo "Forward tx hash: ${FORWARD_TX}"
+              echo "Forward status:  ${FORWARD_STATUS}"
+              echo "::set-output forwardTxHash ${FORWARD_TX}"
+
+              if [ "${FORWARD_STATUS}" != "0x1" ] && [ "${FORWARD_STATUS}" != "1" ]; then
+                echo "FAIL: forward() call failed (status=${FORWARD_STATUS})"
+                exit 1
+              fi
+
+              # Fetch full receipt to inspect all logs
+              RECEIPT=$(curl -s -X POST \
+                -H "Content-Type: application/json" \
+                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getTransactionReceipt\",\"params\":[\"${FORWARD_TX}\"],\"id\":1}" \
+                ${EL_RPC})
+
+              echo "Receipt logs:"
+              echo "${RECEIPT}" | jq '.result.logs'
+              echo ""
+
+              # Filter for Transfer logs (topic[0] == keccak256("Transfer(address,address,uint256)"))
+              TRANSFER_LOGS=$(echo "${RECEIPT}" | jq \
+                --arg topic "${TRANSFER_TOPIC}" \
+                '[.result.logs[] | select(.topics[0] == $topic)]')
+              TRANSFER_LOG_COUNT=$(echo "${TRANSFER_LOGS}" | jq 'length')
+
+              echo "Transfer logs in receipt (filtered by topic): ${TRANSFER_LOG_COUNT}"
+
+              if [ "${TRANSFER_LOG_COUNT}" != "2" ]; then
+                echo "FAIL: Expected exactly 2 Transfer logs (EOA→Forwarder + Forwarder→recipient)."
+                echo "      Got: ${TRANSFER_LOG_COUNT}"
+                echo "  If 0: client does not implement EIP-7708 at all."
+                echo "  If 1: client emits the external tx Transfer log but misses the internal CALL one."
+                echo "        This is an EIP-7708 partial-implementation bug."
+                exit 1
+              fi
+
+              echo "PASS: Found ${TRANSFER_LOG_COUNT} Transfer logs in receipt."
+
+              # Verify log[0] is EOA -> Forwarder
+              LOG0_ADDR=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].address' | tr '[:upper:]' '[:lower:]')
+              LOG0_FROM=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].topics[1]' | tr '[:upper:]' '[:lower:]')  # 32-byte padded from
+              LOG0_TO=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].topics[2]' | tr '[:upper:]' '[:lower:]')    # 32-byte padded to
+              LOG0_DATA=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].data' | tr '[:upper:]' '[:lower:]')
+
+              TRANSFER_LOG_ADDR_LC=$(echo "${TRANSFER_LOG_ADDR}" | tr '[:upper:]' '[:lower:]')
+              WALLET_LC=$(echo "${WALLET_ADDRESS}" | tr '[:upper:]' '[:lower:]' | sed 's/0x//')
+              FORWARDER_LC=$(echo "${FORWARDER}" | tr '[:upper:]' '[:lower:]' | sed 's/0x//')
+
+              echo "Log[0] — expected: ${TRANSFER_LOG_ADDR_LC} Transfer(wallet→forwarder, 2 ETH)"
+              echo "  address: ${LOG0_ADDR}"
+              echo "  from:    ${LOG0_FROM}"
+              echo "  to:      ${LOG0_TO}"
+              echo "  data:    ${LOG0_DATA}"
+
+              if [ "${LOG0_ADDR}" != "${TRANSFER_LOG_ADDR_LC}" ]; then
+                echo "FAIL: Log[0] emitting address mismatch: expected ${TRANSFER_LOG_ADDR_LC}, got ${LOG0_ADDR}"
+                exit 1
+              fi
+              EXPECTED_LOG0_FROM="0x000000000000000000000000${WALLET_LC}"
+              EXPECTED_LOG0_TO="0x000000000000000000000000${FORWARDER_LC}"
+              if [ "${LOG0_FROM}" != "${EXPECTED_LOG0_FROM}" ]; then
+                echo "FAIL: Log[0] 'from' mismatch: expected ${EXPECTED_LOG0_FROM}, got ${LOG0_FROM}"
+                exit 1
+              fi
+              if [ "${LOG0_TO}" != "${EXPECTED_LOG0_TO}" ]; then
+                echo "FAIL: Log[0] 'to' mismatch: expected ${EXPECTED_LOG0_TO} (Forwarder), got ${LOG0_TO}"
+                exit 1
+              fi
+              echo "PASS: Log[0] correctly records external tx ETH move (wallet → Forwarder)"
+
+              # Verify log[1] is Forwarder -> Recipient (internal CALL)
+              LOG1_ADDR=$(echo "${TRANSFER_LOGS}" | jq -r '.[1].address' | tr '[:upper:]' '[:lower:]')
+              LOG1_FROM=$(echo "${TRANSFER_LOGS}" | jq -r '.[1].topics[1]' | tr '[:upper:]' '[:lower:]')
+              LOG1_TO=$(echo "${TRANSFER_LOGS}" | jq -r '.[1].topics[2]' | tr '[:upper:]' '[:lower:]')
+              LOG1_DATA=$(echo "${TRANSFER_LOGS}" | jq -r '.[1].data' | tr '[:upper:]' '[:lower:]')
+              RECIPIENT_LC=$(echo "${RECIPIENT}" | tr '[:upper:]' '[:lower:]' | sed 's/0x//')
+
+              echo ""
+              echo "Log[1] — expected: ${TRANSFER_LOG_ADDR_LC} Transfer(forwarder→recipient, 2 ETH) [internal CALL]"
+              echo "  address: ${LOG1_ADDR}"
+              echo "  from:    ${LOG1_FROM}"
+              echo "  to:      ${LOG1_TO}"
+              echo "  data:    ${LOG1_DATA}"
+
+              if [ "${LOG1_ADDR}" != "${TRANSFER_LOG_ADDR_LC}" ]; then
+                echo "FAIL: Log[1] emitting address mismatch: expected ${TRANSFER_LOG_ADDR_LC}, got ${LOG1_ADDR}"
+                exit 1
+              fi
+              EXPECTED_LOG1_FROM="0x000000000000000000000000${FORWARDER_LC}"
+              EXPECTED_LOG1_TO="0x000000000000000000000000${RECIPIENT_LC}"
+              if [ "${LOG1_FROM}" != "${EXPECTED_LOG1_FROM}" ]; then
+                echo "FAIL: Log[1] 'from' mismatch: expected ${EXPECTED_LOG1_FROM} (Forwarder), got ${LOG1_FROM}"
+                exit 1
+              fi
+              if [ "${LOG1_TO}" != "${EXPECTED_LOG1_TO}" ]; then
+                echo "FAIL: Log[1] 'to' mismatch: expected ${EXPECTED_LOG1_TO} (recipient), got ${LOG1_TO}"
+                exit 1
+              fi
+              echo "PASS: Log[1] correctly records internal CALL ETH move (Forwarder → recipient)"
+              echo ""
+              echo "PASS: Both Transfer logs present — EIP-7708 correctly instruments internal CALL transfers"
+              echo "::set-output internalTransferVerified true"
+
+  # Test 4: CREATE-with-value emits Transfer log
+  # EIP-7708: ALL ETH movements emit Transfer logs — not just CALL-with-value but also
+  # contract creation transactions where value is attached. A tx creating a contract
+  # with 1 ETH should emit Transfer(deployer, new_contract, 1 ETH) in the receipt.
+  - name: run_tasks
+    title: "Test 4: CREATE-with-value also emits Transfer log (contract deployment with ETH)"
+    id: testCreateWithValue
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: createValueWallet
+          title: "Generate funded wallet for CREATE-with-value test (5 ETH)"
+          config:
+            prefundMinBalance: 5000000000000000000  # 5 ETH (covers 1 ETH value + gas + deploy)
+            walletSeed: "eip7708-create-with-value-test"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Deploy ValueReceiver with 1 ETH and verify Transfer log in deployment receipt"
+          id: deployWithValue
+          timeout: 15m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              WALLET_PRIVKEY: tasks.createValueWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.createValueWallet.outputs.childWallet.address
+              TRANSFER_LOG_ADDR: transferLogAddress
+              TRANSFER_TOPIC: transferTopic
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              TRANSFER_LOG_ADDR=$(echo $TRANSFER_LOG_ADDR | jq -r)
+              TRANSFER_TOPIC=$(echo $TRANSFER_TOPIC | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "=== EIP-7708 Test 4: CREATE-with-value Transfer Log ==="
+              echo "Wallet: ${WALLET_ADDRESS}"
+              echo "RPC:    ${EL_RPC}"
+              echo ""
+              echo "Test goal: verify that a contract deployment with value (CREATE tx + 1 ETH)"
+              echo "  emits a Transfer log from 0xfff...ffe for the ETH move to the new contract."
+              echo ""
+
+              WORK_DIR4=$(mktemp -d -t eip7708-create-XXXXXXXXXX)
+              echo "::set-output workDir4 ${WORK_DIR4}"
+
+              # Deploy a minimal payable contract to receive the CREATE-with-value ETH
+              cat > ${WORK_DIR4}/ValueReceiver.sol << 'SOLEOF'
+              // SPDX-License-Identifier: MIT
+              pragma solidity ^0.8.28;
+              // EIP-7708 CREATE-with-value test: deploying this contract with msg.value > 0
+              // must emit a Transfer(deployer, newAddress, value) log from 0xfff...ffe.
+              // Requires payable constructor so Solidity allows ETH during deployment.
+              contract ValueReceiver {
+                  constructor() payable {}
+                  receive() external payable {}
+              }
+              SOLEOF
+
+              echo "Deploying ValueReceiver.sol with 1 ETH value..."
+              DEPLOY_OUT=$(forge create \
+                --rpc-url ${EL_RPC} \
+                --private-key ${WALLET_PRIVKEY} \
+                --legacy --broadcast \
+                --value 1ether \
+                --json \
+                ${WORK_DIR4}/ValueReceiver.sol:ValueReceiver 2>&1)
+
+              RECEIVER=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo // empty')
+              if [ -z "${RECEIVER}" ] || [ "${RECEIVER}" = "null" ]; then
+                _FROM=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.from // empty')
+                _NONHEX=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.nonce // "0x0"')
+                _NON=$(python3 -c "print(int('${_NONHEX}', 16))")
+                RECEIVER=$(cast compute-address --nonce "${_NON}" "${_FROM}" 2>/dev/null | awk '{print $NF}')
+              fi
+              DEPLOY_TX=$(echo "${DEPLOY_OUT}" | jq -r '.transactionHash // empty')
+
+              if [ -z "${RECEIVER}" ]; then
+                echo "FAIL: ValueReceiver deployment with 1 ETH failed"
+                echo "forge output:"
+                echo "${DEPLOY_OUT}"
+                exit 1
+              fi
+              echo "ValueReceiver deployed at: ${RECEIVER} (tx: ${DEPLOY_TX})"
+              echo "::set-output receiverAddr ${RECEIVER}"
+              echo "::set-output deployTx4 ${DEPLOY_TX}"
+
+              # Verify 1 ETH is in the contract
+              RECEIVER_BALANCE=$(cast balance ${RECEIVER} --rpc-url ${EL_RPC} 2>/dev/null || echo "0")
+              echo "ValueReceiver balance after deploy: ${RECEIVER_BALANCE} wei (expected: 1000000000000000000)"
+
+              # Fetch the deployment receipt and look for Transfer logs
+              RECEIPT=$(curl -s -X POST \
+                -H "Content-Type: application/json" \
+                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getTransactionReceipt\",\"params\":[\"${DEPLOY_TX}\"],\"id\":1}" \
+                ${EL_RPC})
+
+              echo ""
+              echo "Deployment receipt logs:"
+              echo "${RECEIPT}" | jq '.result.logs'
+              echo ""
+
+              # Filter for Transfer logs from the EIP-7708 system address
+              TRANSFER_LOGS=$(echo "${RECEIPT}" | jq \
+                --arg topic "${TRANSFER_TOPIC}" \
+                '[.result.logs[] | select(.topics[0] == $topic)]')
+              TRANSFER_LOG_COUNT=$(echo "${TRANSFER_LOGS}" | jq 'length')
+              echo "Transfer logs in deployment receipt: ${TRANSFER_LOG_COUNT}"
+
+              if [ "${TRANSFER_LOG_COUNT}" = "0" ] || [ "${TRANSFER_LOG_COUNT}" = "null" ]; then
+                echo "FAIL: CREATE-with-value deployment emitted no Transfer logs."
+                echo "      A CREATE tx with value=1 ETH MUST emit Transfer(deployer, newContract, 1 ETH)."
+                echo "      This indicates EIP-7708 is not hooked for CREATE value transfers."
+                exit 1
+              fi
+
+              # Verify the Transfer log fields
+              LOG_ADDR=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].address' | tr '[:upper:]' '[:lower:]')
+              LOG_FROM=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].topics[1]' | tr '[:upper:]' '[:lower:]')
+              LOG_TO=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].topics[2]' | tr '[:upper:]' '[:lower:]')
+              LOG_DATA=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].data' | tr '[:upper:]' '[:lower:]')
+
+              TRANSFER_LOG_ADDR_LC=$(echo "${TRANSFER_LOG_ADDR}" | tr '[:upper:]' '[:lower:]')
+              WALLET_LC=$(echo "${WALLET_ADDRESS}" | tr '[:upper:]' '[:lower:]' | sed 's/0x//')
+              RECEIVER_LC=$(echo "${RECEIVER}" | tr '[:upper:]' '[:lower:]' | sed 's/0x//')
+
+              echo "Log[0] — expected: system_addr Transfer(wallet→receiver, 1 ETH) [CREATE deploy]"
+              echo "  address: ${LOG_ADDR}"
+              echo "  from:    ${LOG_FROM}"
+              echo "  to:      ${LOG_TO}"
+              echo "  data:    ${LOG_DATA}"
+
+              if [ "${LOG_ADDR}" != "${TRANSFER_LOG_ADDR_LC}" ]; then
+                echo "FAIL: Transfer log emitting address mismatch: expected ${TRANSFER_LOG_ADDR_LC}, got ${LOG_ADDR}"
+                exit 1
+              fi
+
+              EXPECTED_FROM="0x000000000000000000000000${WALLET_LC}"
+              EXPECTED_TO="0x000000000000000000000000${RECEIVER_LC}"
+
+              if [ "${LOG_FROM}" != "${EXPECTED_FROM}" ]; then
+                echo "FAIL: Transfer log 'from' mismatch: expected ${EXPECTED_FROM} (deployer), got ${LOG_FROM}"
+                exit 1
+              fi
+              if [ "${LOG_TO}" != "${EXPECTED_TO}" ]; then
+                echo "FAIL: Transfer log 'to' mismatch: expected ${EXPECTED_TO} (new contract), got ${LOG_TO}"
+                exit 1
+              fi
+
+              # Verify value = 1 ETH
+              EXPECTED_DATA="0x0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+              if [ "${LOG_DATA}" != "${EXPECTED_DATA}" ]; then
+                echo "FAIL: Transfer log data (value) mismatch: expected ${EXPECTED_DATA} (1 ETH), got ${LOG_DATA}"
+                exit 1
+              fi
+
+              echo "PASS: CREATE-with-value deployment emitted Transfer(deployer → newContract, 1 ETH)"
+              echo "      EIP-7708 correctly instruments CREATE value transfers"
+              echo "::set-output createValueVerified true"
+
+  # Test 5: SELFDESTRUCT with non-zero beneficiary emits Transfer log (EIP-7708 × EIP-8246)
+  # EIP-6780 (Cancun): SELFDESTRUCT called outside of the creation transaction no longer
+  # destroys the contract — it only moves ETH to the beneficiary (like a CALL-with-value).
+  # EIP-7708: All ETH movements must emit Transfer logs.
+  # So: deploy → call destroy(beneficiary) in a later tx → Transfer(contract, beneficiary, 1 ETH) logged.
+  - name: run_tasks
+    title: "Test 5: SELFDESTRUCT to beneficiary emits Transfer log (EIP-7708 × EIP-8246)"
+    id: testSelfDestructTransfer
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: selfDestructWallet
+          title: "Generate funded wallet for SELFDESTRUCT transfer test (5 ETH)"
+          config:
+            prefundMinBalance: 5000000000000000000  # 5 ETH
+            walletSeed: "eip7708-selfdestruct-transfer-test"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Deploy SelfDestructable, fund it, then destroy to beneficiary — verify Transfer log"
+          id: selfDestructToAddr
+          timeout: 15m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              WALLET_PRIVKEY: tasks.selfDestructWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.selfDestructWallet.outputs.childWallet.address
+              TRANSFER_LOG_ADDR: transferLogAddress
+              TRANSFER_TOPIC: transferTopic
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              TRANSFER_LOG_ADDR=$(echo $TRANSFER_LOG_ADDR | jq -r)
+              TRANSFER_TOPIC=$(echo $TRANSFER_TOPIC | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "=== EIP-7708 Test 5: SELFDESTRUCT to beneficiary emits Transfer log ==="
+              echo "Wallet: ${WALLET_ADDRESS}"
+              echo "RPC:    ${EL_RPC}"
+              echo ""
+              echo "Test goal: verify that SELFDESTRUCT(beneficiary) emits Transfer(contract, beneficiary, value)"
+              echo "  per EIP-7708. Post-EIP-6780, SELFDESTRUCT called outside of creation tx only moves"
+              echo "  ETH (contract is NOT destroyed). EIP-7708 must instrument this ETH movement."
+              echo ""
+
+              WORK_DIR5=$(mktemp -d -t eip7708-selfdestruct-XXXXXXXXXX)
+              echo "::set-output workDir5 ${WORK_DIR5}"
+
+              cat > ${WORK_DIR5}/SelfDestructable.sol << 'SOLEOF'
+              // SPDX-License-Identifier: MIT
+              pragma solidity ^0.8.28;
+              // EIP-7708 SELFDESTRUCT test: calling destroy(beneficiary) in a separate tx from creation
+              // moves contract ETH to beneficiary without destroying the contract (EIP-6780 semantics).
+              // EIP-7708 must emit Transfer(contract, beneficiary, balance) from 0xfff...ffe.
+              // EIP-8246 (no-burn): destroy(address(0)) drops ETH without emitting Transfer.
+              contract SelfDestructable {
+                  constructor() payable {}
+                  function destroy(address payable beneficiary) external {
+                      selfdestruct(beneficiary);
+                  }
+              }
+              SOLEOF
+
+              echo "Deploying SelfDestructable with 1 ETH..."
+              DEPLOY_OUT=$(forge create \
+                --rpc-url ${EL_RPC} \
+                --private-key ${WALLET_PRIVKEY} \
+                --legacy --broadcast \
+                --value 1ether \
+                --json \
+                ${WORK_DIR5}/SelfDestructable.sol:SelfDestructable 2>&1)
+
+              CONTRACT=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo // empty')
+              if [ -z "${CONTRACT}" ] || [ "${CONTRACT}" = "null" ]; then
+                _FROM=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.from // empty')
+                _NONHEX=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.nonce // "0x0"')
+                _NON=$(python3 -c "print(int('${_NONHEX}', 16))")
+                CONTRACT=$(cast compute-address --nonce "${_NON}" "${_FROM}" 2>/dev/null | awk '{print $NF}')
+              fi
+              DEPLOY_TX=$(echo "${DEPLOY_OUT}" | jq -r '.transactionHash // empty')
+
+              if [ -z "${CONTRACT}" ]; then
+                echo "FAIL: SelfDestructable deployment failed"
+                echo "forge output: ${DEPLOY_OUT}"
+                exit 1
+              fi
+              echo "SelfDestructable deployed at: ${CONTRACT} (tx: ${DEPLOY_TX})"
+              echo "::set-output sdContractAddr ${CONTRACT}"
+
+              # Use a fresh beneficiary address so balance delta is unambiguous
+              BENEFICIARY="0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead"
+              BALANCE_BEFORE=$(cast balance ${BENEFICIARY} --rpc-url ${EL_RPC} 2>/dev/null || echo "0")
+              echo "Beneficiary: ${BENEFICIARY}"
+              echo "Beneficiary balance before: ${BALANCE_BEFORE} wei"
+              echo ""
+              echo "Calling destroy(beneficiary) — this is a SEPARATE tx from creation (EIP-6780 applies)"
+              echo "  Expected: ETH moves from ${CONTRACT} to ${BENEFICIARY}"
+              echo "  Expected: Transfer(${CONTRACT}, ${BENEFICIARY}, 1e18) logged from 0xff..fe"
+              echo ""
+
+              # Call destroy in a new tx — EIP-6780: contract NOT destroyed, ETH moved
+              DESTROY_JSON=$(cast send ${CONTRACT} \
+                "destroy(address)" ${BENEFICIARY} \
+                --private-key ${WALLET_PRIVKEY} \
+                --rpc-url ${EL_RPC} \
+                --json)
+
+              DESTROY_TX=$(echo "${DESTROY_JSON}" | jq -r '.transactionHash')
+              DESTROY_STATUS=$(echo "${DESTROY_JSON}" | jq -r '.status')
+              echo "destroy tx: ${DESTROY_TX}"
+              echo "status:     ${DESTROY_STATUS}"
+              echo "::set-output sdDestroyTx ${DESTROY_TX}"
+
+              if [ "${DESTROY_STATUS}" != "0x1" ] && [ "${DESTROY_STATUS}" != "1" ]; then
+                echo "FAIL: destroy() call failed (status=${DESTROY_STATUS})"
+                exit 1
+              fi
+
+              # Verify beneficiary received 1 ETH
+              BALANCE_AFTER=$(cast balance ${BENEFICIARY} --rpc-url ${EL_RPC} 2>/dev/null || echo "0")
+              echo "Beneficiary balance after: ${BALANCE_AFTER} wei"
+              EXPECTED_WEI="1000000000000000000"
+              DELTA=$((${BALANCE_AFTER} - ${BALANCE_BEFORE}))
+              if [ "${DELTA}" != "${EXPECTED_WEI}" ]; then
+                echo "FAIL: beneficiary balance delta=${DELTA}, expected 1e18 (1 ETH)"
+                exit 1
+              fi
+              echo "Beneficiary received exactly 1 ETH ✓"
+
+              # Fetch the destroy tx receipt and check for Transfer log
+              RECEIPT=$(curl -s -X POST \
+                -H "Content-Type: application/json" \
+                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getTransactionReceipt\",\"params\":[\"${DESTROY_TX}\"],\"id\":1}" \
+                ${EL_RPC})
+
+              TRANSFER_LOGS=$(echo "${RECEIPT}" | jq \
+                --arg topic "${TRANSFER_TOPIC}" \
+                '[.result.logs[] | select(.topics[0] == $topic)]')
+              TRANSFER_LOG_COUNT=$(echo "${TRANSFER_LOGS}" | jq 'length')
+              echo ""
+              echo "Transfer logs in destroy receipt: ${TRANSFER_LOG_COUNT}"
+
+              if [ "${TRANSFER_LOG_COUNT}" = "0" ] || [ "${TRANSFER_LOG_COUNT}" = "null" ]; then
+                echo "FAIL: SELFDESTRUCT to beneficiary emitted no Transfer log."
+                echo "      EIP-7708 must instrument all ETH movements including SELFDESTRUCT."
+                exit 1
+              fi
+
+              LOG_ADDR=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].address' | tr '[:upper:]' '[:lower:]')
+              LOG_FROM=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].topics[1]' | tr '[:upper:]' '[:lower:]')
+              LOG_TO=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].topics[2]' | tr '[:upper:]' '[:lower:]')
+              LOG_DATA=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].data' | tr '[:upper:]' '[:lower:]')
+
+              TRANSFER_LOG_ADDR_LC=$(echo "${TRANSFER_LOG_ADDR}" | tr '[:upper:]' '[:lower:]')
+              CONTRACT_LC=$(echo "${CONTRACT}" | tr '[:upper:]' '[:lower:]' | sed 's/0x//')
+              BENEFICIARY_LC=$(echo "${BENEFICIARY}" | tr '[:upper:]' '[:lower:]' | sed 's/0x//')
+
+              echo "Transfer log[0]:"
+              echo "  address (must be 0xff..fe): ${LOG_ADDR}"
+              echo "  from (must be contract):    ${LOG_FROM}"
+              echo "  to   (must be beneficiary): ${LOG_TO}"
+              echo "  data (must be 1 ETH):       ${LOG_DATA}"
+
+              if [ "${LOG_ADDR}" != "${TRANSFER_LOG_ADDR_LC}" ]; then
+                echo "FAIL: Transfer log emitting address mismatch: expected ${TRANSFER_LOG_ADDR_LC}, got ${LOG_ADDR}"
+                exit 1
+              fi
+
+              EXPECTED_FROM="0x000000000000000000000000${CONTRACT_LC}"
+              EXPECTED_TO="0x000000000000000000000000${BENEFICIARY_LC}"
+              if [ "${LOG_FROM}" != "${EXPECTED_FROM}" ]; then
+                echo "FAIL: Transfer log 'from' mismatch: expected ${EXPECTED_FROM} (contract), got ${LOG_FROM}"
+                exit 1
+              fi
+              if [ "${LOG_TO}" != "${EXPECTED_TO}" ]; then
+                echo "FAIL: Transfer log 'to' mismatch: expected ${EXPECTED_TO} (beneficiary), got ${LOG_TO}"
+                exit 1
+              fi
+
+              EXPECTED_DATA="0x0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+              if [ "${LOG_DATA}" != "${EXPECTED_DATA}" ]; then
+                echo "FAIL: Transfer log value mismatch: expected ${EXPECTED_DATA} (1 ETH), got ${LOG_DATA}"
+                exit 1
+              fi
+
+              echo ""
+              echo "PASS: SELFDESTRUCT to beneficiary emitted Transfer(contract → beneficiary, 1 ETH)"
+              echo "      EIP-7708 correctly instruments SELFDESTRUCT ETH movements"
+              echo "::set-output sdTransferVerified true"
+
+  # Test 6: SELFDESTRUCT to address(0) emits Transfer log (EIP-7708 tracks all ETH movements)
+  # EIP-8246 only prevents the burn when a contract created in the same tx SELFDESTRUCTs to itself.
+  # It does NOT change EIP-6780 behavior: SELFDESTRUCT in a non-creation tx still moves ETH to
+  # the beneficiary, including address(0). EIP-7708 emits Transfer(contract, address(0), value)
+  # for this case — any non-zero ETH movement generates a Transfer log regardless of the recipient.
+  - name: run_tasks
+    title: "Test 6: SELFDESTRUCT to address(0) emits Transfer log (EIP-7708 tracks all ETH moves)"
+    id: testSelfDestructNoBurn
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: selfDestructNoBurnWallet
+          title: "Generate funded wallet for SELFDESTRUCT-to-zero test (5 ETH)"
+          config:
+            prefundMinBalance: 5000000000000000000  # 5 ETH
+            walletSeed: "eip7708-selfdestruct-tozero-test"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Deploy SelfDestructable, destroy to address(0) — verify Transfer log emitted and address(0) credited"
+          id: selfDestructToZero
+          timeout: 15m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              WALLET_PRIVKEY: tasks.selfDestructNoBurnWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.selfDestructNoBurnWallet.outputs.childWallet.address
+              TRANSFER_LOG_ADDR: transferLogAddress
+              TRANSFER_TOPIC: transferTopic
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+              WORK_DIR5: tasks.selfDestructToAddr.outputs.workDir5
+            command: |
+              set -e
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              TRANSFER_LOG_ADDR=$(echo $TRANSFER_LOG_ADDR | jq -r)
+              TRANSFER_TOPIC=$(echo $TRANSFER_TOPIC | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+              WORK_DIR5=$(echo $WORK_DIR5 | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "=== EIP-7708 Test 6: SELFDESTRUCT to address(0) emits Transfer log ==="
+              echo "Wallet: ${WALLET_ADDRESS}"
+              echo "RPC:    ${EL_RPC}"
+              echo ""
+              echo "Test goal: EIP-7708 emits Transfer log for ALL ETH movements."
+              echo "  SELFDESTRUCT(address(0)) in a non-creation tx is governed by EIP-6780:"
+              echo "  ETH moves from contract to address(0) (EIP-6780, contract not destroyed)."
+              echo "  EIP-7708 must emit Transfer(contract, address(0), amount) for this."
+              echo "  EIP-8246 does NOT change this — it only prevents the burn for same-tx"
+              echo "  SELFDESTRUCT-to-self (newContract=true, beneficiary=self)."
+              echo ""
+
+              FUND_WEI=500000000000000000  # 0.5 ETH
+              ADDR_ZERO="0x0000000000000000000000000000000000000000"
+              BALANCE_ZERO_BEFORE=$(cast balance ${ADDR_ZERO} --rpc-url ${EL_RPC} 2>/dev/null || echo "0")
+              echo "address(0) balance before: ${BALANCE_ZERO_BEFORE} wei"
+
+              # Deploy a fresh SelfDestructable with 0.5 ETH using the .sol from Test 5
+              echo "Deploying SelfDestructable with 0.5 ETH (creation tx)..."
+              DEPLOY_OUT=$(forge create \
+                --rpc-url ${EL_RPC} \
+                --private-key ${WALLET_PRIVKEY} \
+                --legacy --broadcast \
+                --value 0.5ether \
+                --json \
+                ${WORK_DIR5}/SelfDestructable.sol:SelfDestructable 2>&1)
+
+              CONTRACT6=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo // empty')
+              if [ -z "${CONTRACT6}" ] || [ "${CONTRACT6}" = "null" ]; then
+                _FROM=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.from // empty')
+                _NONHEX=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.nonce // "0x0"')
+                _NON=$(python3 -c "print(int('${_NONHEX}', 16))")
+                CONTRACT6=$(cast compute-address --nonce "${_NON}" "${_FROM}" 2>/dev/null | awk '{print $NF}')
+              fi
+              DEPLOY_TX6=$(echo "${DEPLOY_OUT}" | jq -r '.transactionHash // empty')
+
+              if [ -z "${CONTRACT6}" ]; then
+                echo "FAIL: SelfDestructable (Test 6) deployment failed"
+                echo "forge output: ${DEPLOY_OUT}"
+                exit 1
+              fi
+              echo "SelfDestructable (Test 6) deployed at: ${CONTRACT6} (tx: ${DEPLOY_TX6})"
+              echo "::set-output sdNoBurnContractAddr ${CONTRACT6}"
+
+              echo ""
+              echo "Calling destroy(address(0)) in a separate tx (non-creation tx, EIP-6780 applies)..."
+              echo "Expected: ETH moves to address(0), Transfer log emitted."
+              DESTROY_JSON=$(cast send ${CONTRACT6} \
+                "destroy(address)" ${ADDR_ZERO} \
+                --private-key ${WALLET_PRIVKEY} \
+                --rpc-url ${EL_RPC} \
+                --json)
+
+              DESTROY_TX=$(echo "${DESTROY_JSON}" | jq -r '.transactionHash')
+              DESTROY_STATUS=$(echo "${DESTROY_JSON}" | jq -r '.status')
+              echo "destroy tx: ${DESTROY_TX}"
+              echo "status:     ${DESTROY_STATUS}"
+              echo "::set-output sdNoBurnDestroyTx ${DESTROY_TX}"
+
+              if [ "${DESTROY_STATUS}" != "0x1" ] && [ "${DESTROY_STATUS}" != "1" ]; then
+                echo "FAIL: destroy(address(0)) call failed (status=${DESTROY_STATUS})"
+                exit 1
+              fi
+
+              # EIP-6780: address(0) balance MUST increase by exactly 0.5 ETH
+              BALANCE_ZERO_AFTER=$(cast balance ${ADDR_ZERO} --rpc-url ${EL_RPC} 2>/dev/null || echo "0")
+              echo ""
+              echo "address(0) balance after: ${BALANCE_ZERO_AFTER} wei"
+              EXPECTED_ZERO=$(echo "${BALANCE_ZERO_BEFORE} + ${FUND_WEI}" | bc)
+              if [ "${BALANCE_ZERO_AFTER}" != "${EXPECTED_ZERO}" ]; then
+                echo "FAIL: address(0) balance not increased by 0.5 ETH as expected by EIP-6780!"
+                echo "  Before: ${BALANCE_ZERO_BEFORE}"
+                echo "  After:  ${BALANCE_ZERO_AFTER}"
+                echo "  Expected: ${EXPECTED_ZERO} (before + 0.5 ETH)"
+                exit 1
+              fi
+              echo "EIP-6780 confirmed: address(0) received 0.5 ETH (before=${BALANCE_ZERO_BEFORE}, after=${BALANCE_ZERO_AFTER})"
+
+              # EIP-7708: Transfer log MUST appear (ETH moved from contract to address(0))
+              RECEIPT=$(curl -s -X POST \
+                -H "Content-Type: application/json" \
+                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getTransactionReceipt\",\"params\":[\"${DESTROY_TX}\"],\"id\":1}" \
+                ${EL_RPC})
+
+              TRANSFER_LOGS=$(echo "${RECEIPT}" | jq \
+                --arg topic "${TRANSFER_TOPIC}" \
+                --arg logaddr "${TRANSFER_LOG_ADDR}" \
+                '[.result.logs[] | select(.topics[0] == $topic and (.address | ascii_downcase) == ($logaddr | ascii_downcase))]')
+              TRANSFER_LOG_COUNT=$(echo "${TRANSFER_LOGS}" | jq 'length')
+              echo ""
+              echo "Transfer logs from system address in destroy(address(0)) receipt: ${TRANSFER_LOG_COUNT} (expected 1)"
+
+              if [ "${TRANSFER_LOG_COUNT}" = "0" ] || [ "${TRANSFER_LOG_COUNT}" = "null" ]; then
+                echo "FAIL: destroy(address(0)) emitted NO Transfer log."
+                echo "      EIP-7708 must emit Transfer(contract, address(0), amount) for any ETH movement."
+                echo "      EIP-8246 does not prevent this — it only affects same-tx SELFDESTRUCT-to-self."
+                exit 1
+              fi
+
+              # Verify the Transfer log: from=contract, to=address(0), value=0.5 ETH
+              LOG_FROM=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].topics[1]' | sed 's/0x000000000000000000000000/0x/')
+              LOG_TO=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].topics[2]' | sed 's/0x000000000000000000000000/0x/')
+              LOG_VALUE_HEX=$(echo "${TRANSFER_LOGS}" | jq -r '.[0].data')
+              LOG_VALUE=$(printf "%d" ${LOG_VALUE_HEX} 2>/dev/null || python3 -c "print(int('${LOG_VALUE_HEX}', 16))")
+
+              echo "Transfer log: from=${LOG_FROM} to=${LOG_TO} value=${LOG_VALUE} wei"
+
+              if [ "${LOG_VALUE}" != "${FUND_WEI}" ]; then
+                echo "FAIL: Transfer log value ${LOG_VALUE} != expected ${FUND_WEI}"
+                exit 1
+              fi
+
+              echo ""
+              echo "PASS: SELFDESTRUCT to address(0) emitted Transfer log"
+              echo "      EIP-7708 correctly tracks ETH movement to address(0)"
+              echo "      (EIP-6780: non-creation-tx SELFDESTRUCT moves ETH to any beneficiary)"
+              echo "::set-output sdNoBurnVerified true"
+
+  # Final summary
+  - name: run_shell
+    title: "Print EIP-7708 test summary"
+    timeout: 1m
+    config:
+      shell: bash
+      envVars:
+        TRANSFER_TX_HASH: tasks.sendTransfer.outputs.transferTxHash
+        RECEIPT_VERIFIED: tasks.verifyReceiptLog.outputs.receiptLogVerified
+        GETLOGS_VERIFIED: tasks.verifyGetLogs.outputs.getLogsVerified
+        BLOCK_NUMBER: tasks.verifyReceiptLog.outputs.transferBlockNumber
+        FORWARDER_ADDR: tasks.deployAndCallForwarder.outputs.forwarderAddr
+        FORWARD_TX: tasks.deployAndCallForwarder.outputs.forwardTxHash
+        INTERNAL_VERIFIED: tasks.deployAndCallForwarder.outputs.internalTransferVerified
+        RECEIVER_ADDR: tasks.deployWithValue.outputs.receiverAddr
+        DEPLOY_TX4: tasks.deployWithValue.outputs.deployTx4
+        CREATE_VERIFIED: tasks.deployWithValue.outputs.createValueVerified
+        SD_CONTRACT: tasks.selfDestructToAddr.outputs.sdContractAddr
+        SD_DESTROY_TX: tasks.selfDestructToAddr.outputs.sdDestroyTx
+        SD_TRANSFER_VERIFIED: tasks.selfDestructToAddr.outputs.sdTransferVerified
+        SD_NOBURN_CONTRACT: tasks.selfDestructToZero.outputs.sdNoBurnContractAddr
+        SD_NOBURN_TX: tasks.selfDestructToZero.outputs.sdNoBurnDestroyTx
+        SD_NOBURN_VERIFIED: tasks.selfDestructToZero.outputs.sdNoBurnVerified
+      command: |
+        TRANSFER_TX_HASH=$(echo $TRANSFER_TX_HASH | jq -r)
+        RECEIPT_VERIFIED=$(echo $RECEIPT_VERIFIED | jq -r)
+        GETLOGS_VERIFIED=$(echo $GETLOGS_VERIFIED | jq -r)
+        BLOCK_NUMBER=$(echo $BLOCK_NUMBER | jq -r)
+        FORWARDER_ADDR=$(echo $FORWARDER_ADDR | jq -r)
+        FORWARD_TX=$(echo $FORWARD_TX | jq -r)
+        INTERNAL_VERIFIED=$(echo $INTERNAL_VERIFIED | jq -r)
+        RECEIVER_ADDR=$(echo $RECEIVER_ADDR | jq -r)
+        DEPLOY_TX4=$(echo $DEPLOY_TX4 | jq -r)
+        CREATE_VERIFIED=$(echo $CREATE_VERIFIED | jq -r)
+        SD_CONTRACT=$(echo $SD_CONTRACT | jq -r)
+        SD_DESTROY_TX=$(echo $SD_DESTROY_TX | jq -r)
+        SD_TRANSFER_VERIFIED=$(echo $SD_TRANSFER_VERIFIED | jq -r)
+        SD_NOBURN_CONTRACT=$(echo $SD_NOBURN_CONTRACT | jq -r)
+        SD_NOBURN_TX=$(echo $SD_NOBURN_TX | jq -r)
+        SD_NOBURN_VERIFIED=$(echo $SD_NOBURN_VERIFIED | jq -r)
+        echo "============================================================"
+        echo "EIP-7708 ETH Transfer Log Emission Test Summary"
+        echo "============================================================"
+        echo ""
+        echo "EIP-7708 Transfer log specification:"
+        echo "  Emitting address: 0xfffffffffffffffffffffffffffffffffffffffe"
+        echo "  Event:            Transfer(address indexed from, address indexed to, uint256 value)"
+        echo "  Topic[0]:         0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+        echo "  Condition:        transfer_amount > 0 (zero-value transfers emit no log)"
+        echo ""
+        echo "Test 1: Nonzero ETH transfer emits Transfer log"
+        echo "  Tx hash:             ${TRANSFER_TX_HASH}"
+        echo "  Included in block:   ${BLOCK_NUMBER}"
+        echo "  eth_getTransactionReceipt.logs: ${RECEIPT_VERIFIED}"
+        echo "  eth_getLogs query:              ${GETLOGS_VERIFIED}"
+        echo "  Status: PASS"
+        echo ""
+        echo "Test 2: Zero-value ETH transfer emits no Transfer log"
+        echo "  Status: PASS"
+        echo ""
+        echo "Test 3: Internal CALL-with-value emits Transfer log (not just external tx)"
+        echo "  Forwarder contract: ${FORWARDER_ADDR}"
+        echo "  Forward tx:         ${FORWARD_TX}"
+        echo "  Internal transfer verified: ${INTERNAL_VERIFIED}"
+        echo "  Status: PASS"
+        echo ""
+        echo "Test 4: CREATE-with-value deployment emits Transfer log"
+        echo "  ValueReceiver contract: ${RECEIVER_ADDR}"
+        echo "  Deploy tx:              ${DEPLOY_TX4}"
+        echo "  CREATE value verified:  ${CREATE_VERIFIED}"
+        echo "  Status: PASS"
+        echo ""
+        echo "Test 5: SELFDESTRUCT to beneficiary emits Transfer log (EIP-7708 × EIP-8246)"
+        echo "  SelfDestructable contract: ${SD_CONTRACT}"
+        echo "  Destroy tx:                ${SD_DESTROY_TX}"
+        echo "  SELFDESTRUCT Transfer verified: ${SD_TRANSFER_VERIFIED}"
+        echo "  Status: PASS"
+        echo ""
+        echo "Test 6: SELFDESTRUCT to address(0) emits Transfer log (EIP-7708 × EIP-6780)"
+        echo "  SelfDestructable contract: ${SD_NOBURN_CONTRACT}"
+        echo "  Destroy tx:                ${SD_NOBURN_TX}"
+        echo "  Transfer to address(0) verified: ${SD_NOBURN_VERIFIED}"
+        echo "  (EIP-6780 non-creation-tx: ETH moves to address(0); EIP-7708: Transfer log emitted)"
+        echo "  Status: PASS"
+        echo "============================================================"
+
+cleanupTasks:
+  - name: run_shell
+    title: "Cleanup foundry and temp dirs"
+    config:
+      shell: bash
+      envVars:
+        FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+        WORK_DIR: tasks.deployAndCallForwarder.outputs.workDir
+        WORK_DIR4: tasks.deployWithValue.outputs.workDir4
+        WORK_DIR5: tasks.selfDestructToAddr.outputs.workDir5
+      command: |
+        FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+        if [ ! -z "$FOUNDRY_HOME" ] && [ -d "$FOUNDRY_HOME" ]; then
+          rm -rf "$FOUNDRY_HOME"
+          echo "Cleaned up foundry temp dir ${FOUNDRY_HOME}"
+        fi
+        WORK_DIR=$(echo $WORK_DIR | jq -r)
+        if [ ! -z "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
+          rm -rf "$WORK_DIR"
+          echo "Cleaned up forwarder work dir ${WORK_DIR}"
+        fi
+        WORK_DIR4=$(echo $WORK_DIR4 | jq -r)
+        if [ ! -z "$WORK_DIR4" ] && [ -d "$WORK_DIR4" ]; then
+          rm -rf "$WORK_DIR4"
+          echo "Cleaned up ValueReceiver work dir ${WORK_DIR4}"
+        fi
+        WORK_DIR5=$(echo $WORK_DIR5 | jq -r)
+        if [ ! -z "$WORK_DIR5" ] && [ -d "$WORK_DIR5" ]; then
+          rm -rf "$WORK_DIR5"
+          echo "Cleaned up SelfDestructable work dir ${WORK_DIR5}"
+        fi

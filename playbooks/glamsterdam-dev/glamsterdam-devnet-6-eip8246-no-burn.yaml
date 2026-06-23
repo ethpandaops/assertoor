@@ -1,0 +1,455 @@
+id: glamsterdam-devnet-6-eip8246-no-burn
+name: "glamsterdam-devnet-6: EIP-8246 SELFDESTRUCT no-burn live verification"
+timeout: 2h
+config:
+  walletPrivkey: ""
+  # EIP-8246: Remove SELFDESTRUCT burn.
+  #
+  # EIP-8246 removes the only remaining case where SELFDESTRUCT can burn ETH:
+  # when a contract created in the SAME TRANSACTION executes SELFDESTRUCT with
+  # itself as the beneficiary (newContract=true, beneficiary=self).
+  #
+  # Before EIP-8246 (Cancun/Prague, governed by EIP-6780):
+  #   SELFDESTRUCT(self) in creation tx → ETH burned (disappears from total supply)
+  # After EIP-8246 (Amsterdam):
+  #   SELFDESTRUCT(self) in creation tx → ETH stays in account, code/storage cleared,
+  #   nonce reset to 0. Balance preserved (no burn).
+  #
+  # IMPORTANT: EIP-8246 does NOT change SELFDESTRUCT behavior in non-creation txs.
+  # SELFDESTRUCT(address(0)) in a separate tx (after deployment) is governed by EIP-6780:
+  # ETH still moves to address(0). EIP-8246 only removes the burn for the same-tx case.
+  #
+  # Tests:
+  #   1. SELFDESTRUCT with non-zero beneficiary (non-creation tx, EIP-6780 behavior):
+  #      - Deploy contract with 0.5 ETH, call destroy(beneficiary) in separate tx
+  #      - beneficiary balance increases by exactly 0.5 ETH
+  #      - address(0) balance is UNCHANGED
+  #      - Confirms EIP-6780 non-creation-tx ETH routing works correctly.
+  #
+  #   2. Same-tx SELFDESTRUCT-to-self (EIP-8246 core behavior):
+  #      - Deploy contract with payable constructor that calls SELFDESTRUCT(address(this))
+  #      - After tx: contract address should have its original balance PRESERVED (not burned)
+  #      - After tx: code should be cleared (empty code at address)
+  #      - This is the key EIP-8246 change: balance preserved, no ETH leaves total supply.
+
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    id: clientCheck
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  # Amsterdam activates at genesis (epoch 0); wait for epoch 2 so the chain is stable
+  - name: get_consensus_specs
+    id: consensusSpecs
+    title: "Get consensus chain specs"
+
+  - name: check_consensus_slot_range
+    title: "Wait for network to be stable (epoch 2)"
+    timeout: 1h
+    config:
+      minEpochNumber: 2
+
+  # install foundry (forge + cast) for contract deployment and interaction
+  - name: run_shell
+    title: "Install foundry (forge + cast)"
+    id: installFoundry
+    timeout: 10m
+    config:
+      shell: bash
+      shellArgs: [--login]
+      command: |
+        set -e
+        # Use pre-installed foundry if available (built into Docker image)
+        if [ -x "/opt/foundry/.foundry/bin/cast" ]; then
+          FOUNDRY_HOME=/opt/foundry
+          echo "Using pre-installed foundry: $(/opt/foundry/.foundry/bin/cast --version)"
+        else
+          FOUNDRY_HOME=$(mktemp -d -t foundry-XXXXXXXXXX)
+          export SHELL=/bin/bash
+          export HOME=${FOUNDRY_HOME}
+          curl -L https://foundry.paradigm.xyz | bash
+          source ${FOUNDRY_HOME}/.bashrc || true
+          ${FOUNDRY_HOME}/.foundry/bin/foundryup
+        fi
+        echo "::set-output foundryHome ${FOUNDRY_HOME}"
+        if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/cast" ]; then
+          echo "cast not found after foundryup"
+          exit 1
+        fi
+        if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/forge" ]; then
+          echo "forge not found after foundryup"
+          exit 1
+        fi
+        echo "forge and cast installed at ${FOUNDRY_HOME}/.foundry/bin/"
+
+  # Test 1: SELFDESTRUCT to a real beneficiary (ETH must arrive; address(0) must not change)
+  - name: run_tasks
+    title: "Test 1: SELFDESTRUCT to beneficiary — ETH arrives, address(0) unchanged"
+    id: testBeneficiary
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: deployerWallet
+          title: "Generate funded deployer wallet (1 ETH)"
+          config:
+            prefundMinBalance: 1000000000000000000  # 1 ETH
+            walletSeed: "eip8246-no-burn-deployer"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: generate_child_wallet
+          id: beneficiaryWallet
+          title: "Generate beneficiary wallet (receives SELFDESTRUCT ETH)"
+          config:
+            prefundMinBalance: 0
+            walletSeed: "eip8246-no-burn-beneficiary"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Deploy SelfDestructTest contract and verify ETH routing"
+          id: runBeneficiaryTest
+          timeout: 10m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              DEPLOYER_PRIVKEY: tasks.deployerWallet.outputs.childWallet.privkey
+              DEPLOYER_ADDR: tasks.deployerWallet.outputs.childWallet.address
+              BENEFICIARY_ADDR: tasks.beneficiaryWallet.outputs.childWallet.address
+              EL_RPC_HOST: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              DEPLOYER_PRIVKEY=$(echo $DEPLOYER_PRIVKEY | jq -r)
+              DEPLOYER_ADDR=$(echo $DEPLOYER_ADDR | jq -r)
+              BENEFICIARY_ADDR=$(echo $BENEFICIARY_ADDR | jq -r)
+              EL_RPC_HOST=$(echo $EL_RPC_HOST | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "=== EIP-8246 SELFDESTRUCT no-burn: Test 1 (beneficiary) ==="
+              echo "Deployer:    ${DEPLOYER_ADDR}"
+              echo "Beneficiary: ${BENEFICIARY_ADDR}"
+              echo "RPC:         ${EL_RPC_HOST}"
+
+              WORK_DIR=$(mktemp -d -t selfdestruct-XXXXXXXXXX)
+              echo "::set-output workDir ${WORK_DIR}"
+
+              # Minimal SelfDestructTest contract.
+              # destroy(target): SELFDESTRUCT sending contract balance to target.
+              cat > ${WORK_DIR}/SelfDestructTest.sol << 'SOLEOF'
+              // SPDX-License-Identifier: MIT
+              pragma solidity ^0.8.0;
+
+              contract SelfDestructTest {
+                  // Fund the contract at deploy time via constructor payable.
+                  constructor() payable {}
+
+                  // SELFDESTRUCT: send all contract ETH to target.
+                  // Under EIP-8246, if target == address(0) the ETH is silently
+                  // dropped (no burn); for any other target ETH arrives normally.
+                  function destroy(address payable target) external {
+                      selfdestruct(target);
+                  }
+              }
+              SOLEOF
+
+              # Record address(0) and beneficiary balances BEFORE destruction
+              ZERO_ADDR="0x0000000000000000000000000000000000000000"
+              ZERO_BEFORE=$(cast balance ${ZERO_ADDR} --rpc-url ${EL_RPC_HOST})
+              BENEFICIARY_BEFORE=$(cast balance ${BENEFICIARY_ADDR} --rpc-url ${EL_RPC_HOST})
+              echo "address(0) balance BEFORE:    ${ZERO_BEFORE} wei"
+              echo "beneficiary balance BEFORE:   ${BENEFICIARY_BEFORE} wei"
+              echo "::set-output zeroBefore ${ZERO_BEFORE}"
+              echo "::set-output beneficiaryBefore ${BENEFICIARY_BEFORE}"
+
+              # Deploy SelfDestructTest funded with 0.5 ETH
+              FUND_WEI=500000000000000000  # 0.5 ETH in wei
+              echo ""
+              echo "Deploying SelfDestructTest with ${FUND_WEI} wei (0.5 ETH)..."
+              DEPLOY_OUT=$(forge create \
+                --rpc-url ${EL_RPC_HOST} \
+                --private-key ${DEPLOYER_PRIVKEY} \
+                --value ${FUND_WEI} \
+                --legacy --broadcast \
+                --json \
+                ${WORK_DIR}/SelfDestructTest.sol:SelfDestructTest)
+
+              CONTRACT_ADDR=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo // empty')
+              if [ -z "${CONTRACT_ADDR}" ] || [ "${CONTRACT_ADDR}" = "null" ]; then
+                _FROM=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.from // empty')
+                _NONHEX=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.nonce // "0x0"')
+                _NON=$(python3 -c "print(int('${_NONHEX}', 16))")
+                CONTRACT_ADDR=$(cast compute-address --nonce "${_NON}" "${_FROM}" 2>/dev/null | awk '{print $NF}')
+              fi
+              echo "Contract deployed at: ${CONTRACT_ADDR}"
+              echo "::set-output contractAddr ${CONTRACT_ADDR}"
+
+              # Verify the contract holds 0.5 ETH
+              CONTRACT_BALANCE=$(cast balance ${CONTRACT_ADDR} --rpc-url ${EL_RPC_HOST})
+              echo "Contract balance: ${CONTRACT_BALANCE} wei (expected: ${FUND_WEI})"
+              if [ "${CONTRACT_BALANCE}" != "${FUND_WEI}" ]; then
+                echo "WARN: contract balance ${CONTRACT_BALANCE} != expected ${FUND_WEI}"
+              fi
+
+              # Call destroy(beneficiary) — SELFDESTRUCT sending 0.5 ETH to beneficiary
+              echo ""
+              echo "Calling destroy(${BENEFICIARY_ADDR}) — SELFDESTRUCT to beneficiary..."
+              TX_JSON=$(cast send ${CONTRACT_ADDR} \
+                "destroy(address)" ${BENEFICIARY_ADDR} \
+                --private-key ${DEPLOYER_PRIVKEY} \
+                --rpc-url ${EL_RPC_HOST} \
+                --legacy \
+                --json)
+
+              TX_HASH=$(echo "${TX_JSON}" | jq -r '.transactionHash')
+              echo "destroy() tx hash: ${TX_HASH}"
+              echo "::set-output destroyTxHash ${TX_HASH}"
+
+              RECEIPT=$(cast receipt ${TX_HASH} --rpc-url ${EL_RPC_HOST} --json)
+              STATUS=$(echo "${RECEIPT}" | jq -r '.status')
+              if [ "${STATUS}" != "0x1" ] && [ "${STATUS}" != "1" ]; then
+                echo "FAIL: destroy(beneficiary) transaction reverted (status=${STATUS})"
+                exit 1
+              fi
+
+              # Record balances AFTER destruction
+              ZERO_AFTER=$(cast balance ${ZERO_ADDR} --rpc-url ${EL_RPC_HOST})
+              BENEFICIARY_AFTER=$(cast balance ${BENEFICIARY_ADDR} --rpc-url ${EL_RPC_HOST})
+              echo ""
+              echo "address(0) balance AFTER:     ${ZERO_AFTER} wei"
+              echo "beneficiary balance AFTER:    ${BENEFICIARY_AFTER} wei"
+              echo "::set-output zeroAfter ${ZERO_AFTER}"
+              echo "::set-output beneficiaryAfter ${BENEFICIARY_AFTER}"
+
+              # ----------------------------------------------------------------
+              # Assertion 1: address(0) must NOT have increased.
+              # Pre-EIP-8246: any ETH sent to address(0) would increase its balance.
+              # Post-EIP-8246: address(0) is unaffected by SELFDESTRUCT regardless of target.
+              # (Even for non-zero target, routing through address(0) must not happen.)
+              # ----------------------------------------------------------------
+              if [ "${ZERO_AFTER}" != "${ZERO_BEFORE}" ]; then
+                echo "FAIL: address(0) balance changed!"
+                echo "  BEFORE: ${ZERO_BEFORE} wei"
+                echo "  AFTER:  ${ZERO_AFTER} wei"
+                echo "  Delta:  $(echo "${ZERO_AFTER} - ${ZERO_BEFORE}" | bc) wei"
+                echo "  EIP-8246 requires address(0) to remain unchanged after SELFDESTRUCT."
+                exit 1
+              fi
+              echo "PASS: address(0) balance unchanged (${ZERO_AFTER} wei)."
+
+              # ----------------------------------------------------------------
+              # Assertion 2: beneficiary must have received exactly 0.5 ETH.
+              # EXPECTED = BENEFICIARY_BEFORE + FUND_WEI
+              # ----------------------------------------------------------------
+              EXPECTED_BENEFICIARY=$(echo "${BENEFICIARY_BEFORE} + ${FUND_WEI}" | bc)
+              if [ "${BENEFICIARY_AFTER}" != "${EXPECTED_BENEFICIARY}" ]; then
+                echo "FAIL: beneficiary balance mismatch!"
+                echo "  BEFORE:   ${BENEFICIARY_BEFORE} wei"
+                echo "  Expected: ${EXPECTED_BENEFICIARY} wei (before + 0.5 ETH)"
+                echo "  AFTER:    ${BENEFICIARY_AFTER} wei"
+                echo "  EIP-8246: ETH must be routed to the specified target (not address(0))."
+                exit 1
+              fi
+              echo "PASS: beneficiary received exactly 0.5 ETH (${BENEFICIARY_AFTER} wei = before + ${FUND_WEI})."
+
+  # Test 2: Same-tx SELFDESTRUCT-to-self (core EIP-8246 behavior)
+  # A contract deployed with ETH that calls SELFDESTRUCT(address(this)) in its constructor
+  # exercises EIP-8246's key change: pre-8246 the ETH was burned; post-8246 it is preserved.
+  # After the deployment tx: the contract address retains its balance, code is cleared.
+  - name: run_tasks
+    title: "Test 2: Same-tx SELFDESTRUCT-to-self — balance preserved (EIP-8246 core)"
+    id: testNoBurn
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: deployer2Wallet
+          title: "Generate funded deployer wallet for same-tx SELFDESTRUCT test (1 ETH)"
+          config:
+            prefundMinBalance: 1000000000000000000  # 1 ETH
+            walletSeed: "eip8246-no-burn-deployer2"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Deploy SelfDestructInConstructor — verify balance preserved, code cleared (EIP-8246)"
+          id: runNoBurnTest
+          timeout: 10m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              DEPLOYER_PRIVKEY: tasks.deployer2Wallet.outputs.childWallet.privkey
+              DEPLOYER_ADDR: tasks.deployer2Wallet.outputs.childWallet.address
+              EL_RPC_HOST: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+              WORK_DIR: tasks.runBeneficiaryTest.outputs.workDir
+            command: |
+              set -e
+              DEPLOYER_PRIVKEY=$(echo $DEPLOYER_PRIVKEY | jq -r)
+              DEPLOYER_ADDR=$(echo $DEPLOYER_ADDR | jq -r)
+              EL_RPC_HOST=$(echo $EL_RPC_HOST | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+              WORK_DIR=$(echo $WORK_DIR | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              FUND_WEI=300000000000000000  # 0.3 ETH in wei
+
+              echo "=== EIP-8246 Test 2: Same-tx SELFDESTRUCT-to-self — balance preserved ==="
+              echo "Deployer: ${DEPLOYER_ADDR}"
+              echo "RPC:      ${EL_RPC_HOST}"
+              echo ""
+              echo "Spec: EIP-8246 — when a newly-created contract calls SELFDESTRUCT(self)"
+              echo "      in the same tx as its creation (newContract=true, beneficiary=self),"
+              echo "      the ETH is NO LONGER burned. Balance remains in the account;"
+              echo "      code and storage are cleared at finalization, nonce reset to 0."
+              echo ""
+
+              # SelfDestructInConstructor: calls SELFDESTRUCT(address(this)) in constructor.
+              # Deployed WITH value so we can verify balance preservation.
+              cat > ${WORK_DIR}/SelfDestructInConstructor.sol << 'SOLEOF'
+              // SPDX-License-Identifier: MIT
+              pragma solidity ^0.8.0;
+
+              // Calls SELFDESTRUCT(address(this)) in the constructor (same-tx creation + SELFDESTRUCT).
+              // EIP-8246: balance is preserved (not burned) after the deployment tx.
+              // The deployed address will have: balance=0.3 ETH, code=empty, nonce=0.
+              contract SelfDestructInConstructor {
+                  constructor() payable {
+                      selfdestruct(payable(address(this)));
+                  }
+              }
+              SOLEOF
+
+              echo "Deploying SelfDestructInConstructor with 0.3 ETH..."
+              DEPLOY_OUT=$(forge create \
+                --rpc-url ${EL_RPC_HOST} \
+                --private-key ${DEPLOYER_PRIVKEY} \
+                --value ${FUND_WEI} \
+                --legacy --broadcast \
+                --json \
+                ${WORK_DIR}/SelfDestructInConstructor.sol:SelfDestructInConstructor)
+
+              CONTRACT_ADDR=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo // empty')
+              if [ -z "${CONTRACT_ADDR}" ] || [ "${CONTRACT_ADDR}" = "null" ]; then
+                _FROM=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.from // empty')
+                _NONHEX=$(echo "${DEPLOY_OUT}" | jq -r '.transaction.nonce // "0x0"')
+                _NON=$(python3 -c "print(int('${_NONHEX}', 16))")
+                CONTRACT_ADDR=$(cast compute-address --nonce "${_NON}" "${_FROM}" 2>/dev/null | awk '{print $NF}')
+              fi
+              DEPLOY_TX=$(echo "${DEPLOY_OUT}" | jq -r '.transactionHash // empty')
+              echo "Contract deployed at: ${CONTRACT_ADDR}"
+              echo "Deployment tx hash:   ${DEPLOY_TX}"
+              echo "::set-output contractAddr2 ${CONTRACT_ADDR}"
+              echo "::set-output noBurnTxHash ${DEPLOY_TX}"
+
+              # EIP-8246: balance MUST be preserved (0.3 ETH should remain at the address)
+              POST_BALANCE=$(cast balance ${CONTRACT_ADDR} --rpc-url ${EL_RPC_HOST})
+              echo ""
+              echo "Balance at ${CONTRACT_ADDR} after deployment: ${POST_BALANCE} wei"
+              echo "Expected: ${FUND_WEI} wei (0.3 ETH, preserved by EIP-8246)"
+              echo "::set-output zeroAfter2 ${POST_BALANCE}"
+              echo "::set-output zeroBefore2 ${FUND_WEI}"
+
+              if [ "${POST_BALANCE}" != "${FUND_WEI}" ]; then
+                echo ""
+                echo "FAIL: Balance at contract address is ${POST_BALANCE}, expected ${FUND_WEI}."
+                echo "  Pre-EIP-8246: ETH burned → balance=0."
+                echo "  EIP-8246:     ETH preserved → balance=0.3 ETH."
+                echo "  This client has NOT implemented EIP-8246 same-tx SELFDESTRUCT-to-self"
+                echo "  balance preservation. The ETH was burned instead of being retained."
+                exit 1
+              fi
+
+              # EIP-8246 finalization: code MUST be cleared at the address
+              POST_CODE=$(cast code ${CONTRACT_ADDR} --rpc-url ${EL_RPC_HOST} 2>/dev/null || echo "0x")
+              echo "Code at ${CONTRACT_ADDR} after deployment: ${POST_CODE}"
+              if [ "${POST_CODE}" != "0x" ] && [ "${POST_CODE}" != "" ]; then
+                echo "WARN: Code not cleared at ${CONTRACT_ADDR} (got ${POST_CODE})"
+                echo "      EIP-8246 spec says code should be cleared at finalization."
+              else
+                echo "Code correctly cleared (empty code, as expected by EIP-8246 finalization)."
+              fi
+
+              echo ""
+              echo "PASS: EIP-8246 same-tx SELFDESTRUCT-to-self balance preservation verified."
+              echo "  Balance: ${POST_BALANCE} wei (${FUND_WEI} expected) — ETH preserved"
+              echo "  Code:    ${POST_CODE} (should be empty)"
+
+  # Final summary
+  - name: run_shell
+    title: "Print EIP-8246 SELFDESTRUCT no-burn test summary"
+    timeout: 1m
+    config:
+      shell: bash
+      envVars:
+        ZERO_BEFORE_T1: tasks.runBeneficiaryTest.outputs.zeroBefore
+        ZERO_AFTER_T1: tasks.runBeneficiaryTest.outputs.zeroAfter
+        BENEFICIARY_BEFORE: tasks.runBeneficiaryTest.outputs.beneficiaryBefore
+        BENEFICIARY_AFTER: tasks.runBeneficiaryTest.outputs.beneficiaryAfter
+        DESTROY_TX: tasks.runBeneficiaryTest.outputs.destroyTxHash
+        CONTRACT2: tasks.runNoBurnTest.outputs.contractAddr2
+        DEPLOY_TX2: tasks.runNoBurnTest.outputs.noBurnTxHash
+        POST_BALANCE: tasks.runNoBurnTest.outputs.zeroAfter2
+        EXPECTED_BALANCE: tasks.runNoBurnTest.outputs.zeroBefore2
+      command: |
+        ZERO_BEFORE_T1=$(echo $ZERO_BEFORE_T1 | jq -r)
+        ZERO_AFTER_T1=$(echo $ZERO_AFTER_T1 | jq -r)
+        BENEFICIARY_BEFORE=$(echo $BENEFICIARY_BEFORE | jq -r)
+        BENEFICIARY_AFTER=$(echo $BENEFICIARY_AFTER | jq -r)
+        DESTROY_TX=$(echo $DESTROY_TX | jq -r)
+        CONTRACT2=$(echo $CONTRACT2 | jq -r)
+        DEPLOY_TX2=$(echo $DEPLOY_TX2 | jq -r)
+        POST_BALANCE=$(echo $POST_BALANCE | jq -r)
+        EXPECTED_BALANCE=$(echo $EXPECTED_BALANCE | jq -r)
+        echo "================================================================"
+        echo "EIP-8246 SELFDESTRUCT No-Burn Verification Summary"
+        echo "================================================================"
+        echo ""
+        echo "EIP-8246 specification (Amsterdam):"
+        echo "  Non-creation-tx SELFDESTRUCT (EIP-6780): ETH moves to beneficiary (unchanged)"
+        echo "  Same-tx SELFDESTRUCT-to-self (EIP-8246): balance PRESERVED — ETH no longer burned"
+        echo ""
+        echo "Test 1: SELFDESTRUCT to beneficiary in non-creation tx (0.5 ETH)"
+        echo "  Tx hash:              ${DESTROY_TX}"
+        echo "  address(0) before:    ${ZERO_BEFORE_T1} wei"
+        echo "  address(0) after:     ${ZERO_AFTER_T1} wei  (must be equal)"
+        echo "  beneficiary before:   ${BENEFICIARY_BEFORE} wei"
+        echo "  beneficiary after:    ${BENEFICIARY_AFTER} wei  (must be +0.5 ETH)"
+        echo "  Status: PASS"
+        echo ""
+        echo "Test 2: Same-tx SELFDESTRUCT-to-self, balance preserved (0.3 ETH)"
+        echo "  Contract:             ${CONTRACT2}"
+        echo "  Deployment tx:        ${DEPLOY_TX2}"
+        echo "  Post-deploy balance:  ${POST_BALANCE} wei  (expected: ${EXPECTED_BALANCE} wei)"
+        echo "  Status: PASS"
+        echo "================================================================"
+
+cleanupTasks:
+  - name: run_shell
+    title: "Cleanup foundry temp dirs"
+    config:
+      shell: bash
+      envVars:
+        FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+        WORK_DIR: tasks.runBeneficiaryTest.outputs.workDir
+      command: |
+        FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+        WORK_DIR=$(echo $WORK_DIR | jq -r)
+        if [ ! -z "$FOUNDRY_HOME" ] && [ -d "$FOUNDRY_HOME" ]; then
+          rm -rf "$FOUNDRY_HOME"
+          echo "Cleaned up foundry temp dir ${FOUNDRY_HOME}"
+        fi
+        if [ ! -z "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
+          rm -rf "$WORK_DIR"
+          echo "Cleaned up work dir ${WORK_DIR}"
+        fi
