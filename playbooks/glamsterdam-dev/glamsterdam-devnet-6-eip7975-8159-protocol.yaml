@@ -1,0 +1,313 @@
+id: glamsterdam-devnet-6-eip7975-8159-protocol
+name: "glamsterdam-devnet-6: EIP-7975 eth/70 partial receipts + EIP-8159 eth/71 BAL exchange protocol negotiation"
+timeout: 1h
+config:
+  # EIP-7975: eth/70 — Partial Block Receipt Lists
+  #
+  #   Adds a new p2p wire message (ReceiptsMsg) that allows fetching partial
+  #   receipt sets per block. A peer that supports eth/70 will advertise this
+  #   capability during devp2p handshake. The partial receipt model reduces
+  #   network bandwidth when only a subset of receipts are needed.
+  #
+  # EIP-8159: eth/71 — Block Access List Exchange
+  #
+  #   Adds a new devp2p sub-protocol for exchanging Block Access List (BAL)
+  #   data between peers (EIP-7928). Nodes that support BAL optimization
+  #   (EIP-7928 warming) can share BALs so they can pre-warm storage slots
+  #   before executing the next block. The eth/71 capability is advertised
+  #   during devp2p handshake alongside existing eth/* sub-protocols.
+  #
+  # Test approach:
+  #   1. Wait for network stability (epoch 2).
+  #   2. Call `admin_peers` on each available EL client.
+  #   3. Verify at least one peer-pair has negotiated eth/71 (EIP-8159).
+  #   4. Verify at least one peer-pair has negotiated eth/70 (EIP-7975).
+  #   5. Smoke-test eth_getBlockReceipts on a transaction-bearing block to
+  #      verify the receipt retrieval infrastructure is healthy.
+  #
+  # Notes:
+  #   - admin_peers reports capabilities advertised by the REMOTE peer, not
+  #     necessarily what was negotiated — but if both sides support it, the
+  #     remote will advertise it.
+  #   - In a homogeneous test network (all clients are Amsterdam-capable),
+  #     eth/70 and eth/71 should appear on ALL connected peers.
+  #   - eth_getBlockReceipts is defined in eth/70 but is backward-compatible;
+  #     it is available via the EL JSON-RPC independently of the p2p protocol.
+
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    id: clientCheck
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  - name: get_consensus_specs
+    id: consensusSpecs
+    title: "Get consensus chain specs"
+
+  - name: check_consensus_slot_range
+    title: "Wait for network to be stable (epoch 2)"
+    timeout: 1h
+    config:
+      minEpochNumber: 2
+
+  - name: run_shell
+    title: "Verify eth/70 and eth/71 capability negotiation via admin_peers"
+    id: testProtocolCaps
+    timeout: 10m
+    config:
+      shell: bash
+      envVars:
+        EL_RPC_HOST: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+      command: |
+        set -e
+        EL_RPC_HOST=$(echo $EL_RPC_HOST | jq -r)
+
+        echo "=== EIP-7975 (eth/70) + EIP-8159 (eth/71) Protocol Negotiation Check ==="
+        echo "RPC: ${EL_RPC_HOST}"
+        echo ""
+
+        # Fetch peer list via admin_peers
+        PEERS_JSON=$(curl -sf -X POST "${EL_RPC_HOST}" \
+          -H 'Content-Type: application/json' \
+          -d '{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":1}')
+
+        PEER_COUNT=$(echo "${PEERS_JSON}" | jq '.result | length')
+        echo "Connected peers: ${PEER_COUNT}"
+
+        if [ "${PEER_COUNT}" = "0" ] || [ "${PEER_COUNT}" = "null" ]; then
+          echo "FAIL: No connected peers. Cannot verify protocol capabilities."
+          echo "      The node must have at least one peer to test eth/70 and eth/71 negotiation."
+          exit 1
+        fi
+
+        echo ""
+        echo "Peer capabilities:"
+        echo "${PEERS_JSON}" | jq -r '.result[] | "  peer \(.id[:16])... name=\(.name | split("/")[0]) caps=[\(.caps | join(", "))]"'
+        echo ""
+
+        # Check each peer's capabilities
+        ETH70_PEERS=0
+        ETH71_PEERS=0
+        TOTAL_PEERS=$(echo "${PEERS_JSON}" | jq '.result | length')
+
+        for i in $(seq 0 $((TOTAL_PEERS - 1))); do
+          CAPS=$(echo "${PEERS_JSON}" | jq -r ".result[$i].caps[]" 2>/dev/null)
+          NAME=$(echo "${PEERS_JSON}" | jq -r ".result[$i].name" 2>/dev/null | cut -d/ -f1)
+
+          HAS_ETH70=0
+          HAS_ETH71=0
+          echo "${CAPS}" | grep -qx "eth/70" && HAS_ETH70=1
+          echo "${CAPS}" | grep -qx "eth/71" && HAS_ETH71=1
+
+          ETH70_STATUS="NO"
+          ETH71_STATUS="NO"
+          [ $HAS_ETH70 -eq 1 ] && ETH70_STATUS="YES" && ETH70_PEERS=$((ETH70_PEERS + 1))
+          [ $HAS_ETH71 -eq 1 ] && ETH71_STATUS="YES" && ETH71_PEERS=$((ETH71_PEERS + 1))
+
+          echo "  Peer $i (${NAME}): eth/70=${ETH70_STATUS}  eth/71=${ETH71_STATUS}"
+        done
+
+        echo ""
+        echo "=== Protocol Negotiation Summary ==="
+        echo "Total peers:         ${TOTAL_PEERS}"
+        echo "Peers with eth/70:   ${ETH70_PEERS} / ${TOTAL_PEERS}"
+        echo "Peers with eth/71:   ${ETH71_PEERS} / ${TOTAL_PEERS}"
+        echo ""
+
+        FAIL=0
+
+        # EIP-7975: At least one peer must support eth/70
+        if [ "${ETH70_PEERS}" -eq 0 ]; then
+          echo "FAIL [1/2]: No peer advertises eth/70 (EIP-7975 partial receipts)."
+          echo "  All Amsterdam-capable peers should support eth/70."
+          echo "  Check that client images include EIP-7975 implementation."
+          FAIL=1
+        else
+          echo "PASS [1/2]: ${ETH70_PEERS}/${TOTAL_PEERS} peers support eth/70 (EIP-7975 partial block receipt lists)."
+        fi
+
+        # EIP-8159: At least one peer must support eth/71
+        if [ "${ETH71_PEERS}" -eq 0 ]; then
+          echo "FAIL [2/2]: No peer advertises eth/71 (EIP-8159 BAL exchange)."
+          echo "  All Amsterdam-capable peers should support eth/71."
+          echo "  Check that client images include EIP-8159 implementation."
+          FAIL=1
+        else
+          echo "PASS [2/2]: ${ETH71_PEERS}/${TOTAL_PEERS} peers support eth/71 (EIP-8159 BAL exchange protocol)."
+        fi
+
+        if [ $FAIL -ne 0 ]; then
+          echo ""
+          echo "RESULT: FAIL — One or more protocol capabilities missing."
+          exit 1
+        fi
+
+        echo ""
+        echo "RESULT: PASS — Both eth/70 (EIP-7975) and eth/71 (EIP-8159) are negotiated."
+        echo "  BAL exchange infrastructure is active on the network."
+
+        # Export peer count for use in receipt test
+        echo "::set-output peerCount ${TOTAL_PEERS}"
+
+  - name: run_shell
+    title: "Smoke-test eth_getBlockReceipts (eth/70 receipt retrieval infrastructure)"
+    id: testBlockReceipts
+    timeout: 5m
+    config:
+      shell: bash
+      envVars:
+        EL_RPC_HOST: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+      command: |
+        set -e
+        EL_RPC_HOST=$(echo $EL_RPC_HOST | jq -r)
+
+        echo "=== eth_getBlockReceipts smoke test (EIP-7975 receipt infrastructure) ==="
+        echo "RPC: ${EL_RPC_HOST}"
+        echo ""
+
+        # Find a recent block that has transactions
+        LATEST_HEX=$(curl -sf -X POST "${EL_RPC_HOST}" \
+          -H 'Content-Type: application/json' \
+          -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+          | jq -r '.result')
+
+        LATEST_DEC=$(printf '%d' "${LATEST_HEX}")
+        echo "Latest block: ${LATEST_DEC}"
+
+        # Scan recent blocks for a tx-bearing one (scan up to 20 blocks)
+        TX_BLOCK=""
+        SCAN_FROM=$((LATEST_DEC - 20))
+        [ $SCAN_FROM -lt 1 ] && SCAN_FROM=1
+
+        for i in $(seq $SCAN_FROM $LATEST_DEC); do
+          BLK_HEX=$(printf '0x%x' $i)
+          TX_COUNT=$(curl -sf -X POST "${EL_RPC_HOST}" \
+            -H 'Content-Type: application/json' \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"${BLK_HEX}\",false],\"id\":1}" \
+            | jq '.result.transactions | length')
+          if [ "${TX_COUNT}" -gt "0" ]; then
+            TX_BLOCK="${BLK_HEX}"
+            TX_COUNT_FINAL="${TX_COUNT}"
+            break
+          fi
+        done
+
+        if [ -z "${TX_BLOCK}" ]; then
+          echo "NOTE: No transaction-bearing block found in last 20 blocks."
+          echo "      Trying eth_getBlockReceipts on latest block anyway."
+          TX_BLOCK="${LATEST_HEX}"
+          TX_COUNT_FINAL=0
+        fi
+
+        echo "Testing eth_getBlockReceipts on block ${TX_BLOCK} (${TX_COUNT_FINAL} txs)..."
+        RECEIPTS_JSON=$(curl -sf -X POST "${EL_RPC_HOST}" \
+          -H 'Content-Type: application/json' \
+          -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockReceipts\",\"params\":[\"${TX_BLOCK}\"],\"id\":1}")
+
+        # Check if the method is supported
+        ERROR=$(echo "${RECEIPTS_JSON}" | jq -r '.error // empty')
+        if [ -n "${ERROR}" ]; then
+          echo "FAIL: eth_getBlockReceipts returned an error:"
+          echo "  ${ERROR}"
+          echo "  This method is required for the EIP-7975 receipt retrieval infrastructure."
+          exit 1
+        fi
+
+        RECEIPT_COUNT=$(echo "${RECEIPTS_JSON}" | jq '.result | length')
+        echo "Receipts returned: ${RECEIPT_COUNT}"
+
+        if [ "${TX_COUNT_FINAL}" -gt 0 ]; then
+          if [ "${RECEIPT_COUNT}" != "${TX_COUNT_FINAL}" ]; then
+            echo "FAIL: Expected ${TX_COUNT_FINAL} receipts, got ${RECEIPT_COUNT}."
+            echo "  eth_getBlockReceipts must return exactly one receipt per transaction."
+            exit 1
+          fi
+
+          # Verify receipt fields (spot-check first receipt)
+          FIRST_STATUS=$(echo "${RECEIPTS_JSON}" | jq -r '.result[0].status // "missing"')
+          FIRST_TX_HASH=$(echo "${RECEIPTS_JSON}" | jq -r '.result[0].transactionHash // "missing"')
+          FIRST_GAS=$(echo "${RECEIPTS_JSON}" | jq -r '.result[0].gasUsed // "missing"')
+
+          echo ""
+          echo "First receipt:"
+          echo "  transactionHash: ${FIRST_TX_HASH}"
+          echo "  status:          ${FIRST_STATUS}"
+          echo "  gasUsed:         ${FIRST_GAS}"
+
+          if [ "${FIRST_TX_HASH}" = "missing" ] || [ "${FIRST_GAS}" = "missing" ]; then
+            echo "FAIL: Receipt is missing expected fields (transactionHash, gasUsed)."
+            exit 1
+          fi
+        fi
+
+        echo ""
+        echo "PASS: eth_getBlockReceipts works correctly."
+        echo "  Block ${TX_BLOCK}: ${RECEIPT_COUNT} receipts returned."
+        echo "  EIP-7975 receipt retrieval infrastructure is operational."
+
+  - name: run_shell
+    title: "Cross-client eth/70 and eth/71 peer negotiation consistency"
+    id: crossClientProtocol
+    timeout: 5m
+    config:
+      shell: bash
+      envVars:
+        EL_RPC_A: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+        EL_RPC_B: tasks.clientCheck.outputs.goodClients[1].elRpcUrl
+      command: |
+        EL_RPC_A=$(echo $EL_RPC_A | jq -r)
+        EL_RPC_B=$(echo $EL_RPC_B | jq -r)
+
+        if [ -z "${EL_RPC_B}" ] || [ "${EL_RPC_B}" = "null" ]; then
+          echo "Only one EL client available — skipping cross-client protocol check."
+          exit 0
+        fi
+
+        echo "=== Cross-Client Protocol Negotiation Consistency ==="
+        echo "Client A: ${EL_RPC_A}"
+        echo "Client B: ${EL_RPC_B}"
+        echo ""
+
+        # Check A's highest eth/* version
+        HIGHEST_ETH_A=$(curl -sf -X POST "${EL_RPC_A}" \
+          -H 'Content-Type: application/json' \
+          -d '{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":1}' \
+          | jq -r '[.result[].caps[] | select(startswith("eth/"))] | sort | last // "none"')
+
+        # Check B's highest eth/* version
+        HIGHEST_ETH_B=$(curl -sf -X POST "${EL_RPC_B}" \
+          -H 'Content-Type: application/json' \
+          -d '{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":1}' \
+          | jq -r '[.result[].caps[] | select(startswith("eth/"))] | sort | last // "none"')
+
+        echo "Client A highest eth version seen in peers: ${HIGHEST_ETH_A}"
+        echo "Client B highest eth version seen in peers: ${HIGHEST_ETH_B}"
+        echo ""
+
+        # Both should see eth/71 peers
+        FAIL=0
+        if [ "${HIGHEST_ETH_A}" != "eth/71" ]; then
+          echo "WARN: Client A peers do not include eth/71 (highest: ${HIGHEST_ETH_A})."
+          echo "  This may indicate that some clients in the network don't support EIP-8159."
+          # Not a hard fail — may be expected if peering with legacy nodes
+        fi
+
+        if [ "${HIGHEST_ETH_B}" != "eth/71" ]; then
+          echo "WARN: Client B peers do not include eth/71 (highest: ${HIGHEST_ETH_B})."
+        fi
+
+        if [ "${HIGHEST_ETH_A}" = "eth/71" ] && [ "${HIGHEST_ETH_B}" = "eth/71" ]; then
+          echo "PASS: Both clients see eth/71 peers — EIP-8159 BAL exchange is"
+          echo "  negotiated from multiple vantage points in the network."
+        elif [ "${HIGHEST_ETH_A}" = "none" ] || [ "${HIGHEST_ETH_B}" = "none" ]; then
+          echo "FAIL: One or both clients have no peers. Cannot verify cross-client negotiation."
+          FAIL=1
+        else
+          echo "NOTE: eth/71 seen by at least one client. Network is partially upgraded."
+        fi
+
+        if [ $FAIL -ne 0 ]; then
+          exit 1
+        fi

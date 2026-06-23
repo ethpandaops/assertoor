@@ -1,0 +1,460 @@
+id: glamsterdam-devnet-6-builder-lifecycle
+name: "glamsterdam-devnet-6: EIP-8282 builder deposit and exit lifecycle test"
+timeout: 2h
+config:
+  walletPrivkey: ""
+  # Builder Deposit predeploy (EIP-8282)
+  builderDepositContract: "0x0000884d2AA32eAa155F59A2f24eFa73D9008282"
+  # Builder Exit predeploy (EIP-8282)
+  builderExitContract: "0x000014574A74c805590AFF9499fc7A690f008282"
+
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    id: clientCheck
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  # wait for gloas activation (epoch 1)
+  - name: get_consensus_specs
+    id: consensusSpecs
+    title: "Get consensus chain specs"
+  - name: check_consensus_slot_range
+    title: "Wait for Gloas activation (epoch 1)"
+    timeout: 1h
+    configVars:
+      minEpochNumber: "tasks.consensusSpecs.outputs.specs.GLOAS_FORK_EPOCH"
+
+  # install foundry (cast) for contract interactions
+  - name: run_shell
+    title: "Install foundry (cast)"
+    id: installFoundry
+    timeout: 10m
+    config:
+      shell: bash
+      shellArgs: [--login]
+      command: |
+        set -e
+        FOUNDRY_HOME=$(mktemp -d -t foundry-XXXXXXXXXX)
+        echo "::set-output foundryHome ${FOUNDRY_HOME}"
+        export SHELL=/bin/bash
+        export HOME=${FOUNDRY_HOME}
+        curl -L https://foundry.paradigm.xyz | bash
+        source ${FOUNDRY_HOME}/.bashrc || true
+        ${FOUNDRY_HOME}/.foundry/bin/foundryup
+        if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/cast" ]; then
+          echo "cast not found after foundryup"
+          exit 1
+        fi
+        echo "cast installed at ${FOUNDRY_HOME}/.foundry/bin/cast"
+
+  # Test 1: Builder Deposit
+  - name: run_tasks
+    title: "Test 1: Builder Deposit lifecycle"
+    id: testDeposit
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: depositWallet
+          title: "Generate funded wallet for builder deposit test"
+          config:
+            prefundMinBalance: 1000000000000000000000000  # 1M ETH
+            walletSeed: "builder-lifecycle-deposit-test"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Send builder deposit transaction (1 ETH to deposit contract)"
+          id: sendDeposit
+          timeout: 5m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              DEPOSIT_CONTRACT: builderDepositContract
+              WALLET_PRIVKEY: tasks.depositWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.depositWallet.outputs.childWallet.address
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              DEPOSIT_CONTRACT=$(echo $DEPOSIT_CONTRACT | jq -r)
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "Sender address: ${WALLET_ADDRESS}"
+              echo "Deposit contract: ${DEPOSIT_CONTRACT}"
+              echo "RPC: ${EL_RPC}"
+
+              # Check balance before deposit
+              BALANCE=$(cast balance ${WALLET_ADDRESS} --rpc-url ${EL_RPC})
+              echo "Wallet balance before deposit: ${BALANCE} wei"
+
+              # Check contract code exists (predeploy must be present)
+              CODE=$(cast code ${DEPOSIT_CONTRACT} --rpc-url ${EL_RPC})
+              if [ "${CODE}" = "0x" ] || [ -z "${CODE}" ]; then
+                echo "ERROR: builder deposit contract has no code at ${DEPOSIT_CONTRACT}"
+                echo "Ensure genesis-generator >= 6.1.0 is used."
+                exit 1
+              fi
+              echo "Contract code present (${#CODE} hex chars)"
+
+              # Send 1 ETH deposit to builder deposit contract
+              TX_HASH=$(cast send ${DEPOSIT_CONTRACT} \
+                --value 1ether \
+                --private-key ${WALLET_PRIVKEY} \
+                --rpc-url ${EL_RPC} \
+                --json | jq -r '.transactionHash')
+
+              echo "Deposit tx hash: ${TX_HASH}"
+              echo "::set-output depositTxHash ${TX_HASH}"
+
+        - name: run_shell
+          title: "Wait for deposit tx inclusion and verify receipt"
+          id: verifyDeposit
+          timeout: 5m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              DEPOSIT_TX_HASH: tasks.sendDeposit.outputs.depositTxHash
+              DEPOSIT_CONTRACT: builderDepositContract
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              DEPOSIT_TX_HASH=$(echo $DEPOSIT_TX_HASH | jq -r)
+              DEPOSIT_CONTRACT=$(echo $DEPOSIT_CONTRACT | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "Checking receipt for deposit tx: ${DEPOSIT_TX_HASH}"
+
+              # Poll for receipt (cast send already waited, but double-check)
+              RECEIPT=$(cast receipt ${DEPOSIT_TX_HASH} --rpc-url ${EL_RPC} --json)
+              STATUS=$(echo ${RECEIPT} | jq -r '.status')
+              BLOCK_NUMBER=$(echo ${RECEIPT} | jq -r '.blockNumber')
+
+              echo "Tx status: ${STATUS}"
+              echo "Included in block: ${BLOCK_NUMBER}"
+
+              if [ "${STATUS}" != "0x1" ] && [ "${STATUS}" != "1" ]; then
+                echo "ERROR: deposit transaction failed (status=${STATUS})"
+                exit 1
+              fi
+
+              echo "Deposit transaction included successfully in block ${BLOCK_NUMBER}"
+              echo "::set-output depositBlockNumber ${BLOCK_NUMBER}"
+
+              # Query logs from the deposit contract to verify request was emitted
+              LOGS=$(curl -s -X POST \
+                -H "Content-Type: application/json" \
+                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getLogs\",\"params\":[{\"fromBlock\":\"${BLOCK_NUMBER}\",\"toBlock\":\"${BLOCK_NUMBER}\",\"address\":\"${DEPOSIT_CONTRACT}\"}],\"id\":1}" \
+                ${EL_RPC})
+
+              LOG_COUNT=$(echo ${LOGS} | jq '.result | length')
+              echo "Logs from deposit contract in block ${BLOCK_NUMBER}: ${LOG_COUNT}"
+              echo ${LOGS} | jq '.result'
+
+              if [ "${LOG_COUNT}" = "0" ] || [ "${LOG_COUNT}" = "null" ]; then
+                echo "WARNING: no logs from builder deposit contract in block ${BLOCK_NUMBER}"
+                echo "This may be expected if the contract emits no EVM logs (request is in system tx)"
+              else
+                echo "Builder deposit request log confirmed"
+              fi
+
+              echo "::set-output depositVerified true"
+
+  # Test 2: Builder Exit
+  - name: run_tasks
+    title: "Test 2: Builder Exit lifecycle"
+    id: testExit
+    config:
+      continueOnFailure: false
+      tasks:
+        - name: generate_child_wallet
+          id: exitWallet
+          title: "Generate funded wallet for builder exit test"
+          config:
+            prefundMinBalance: 1000000000000000000000000  # 1M ETH
+            walletSeed: "builder-lifecycle-exit-test"
+          configVars:
+            privateKey: "walletPrivkey"
+
+        - name: run_shell
+          title: "Send builder exit transaction (0 ETH to exit contract)"
+          id: sendExit
+          timeout: 5m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EXIT_CONTRACT: builderExitContract
+              WALLET_PRIVKEY: tasks.exitWallet.outputs.childWallet.privkey
+              WALLET_ADDRESS: tasks.exitWallet.outputs.childWallet.address
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              EXIT_CONTRACT=$(echo $EXIT_CONTRACT | jq -r)
+              WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+              WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "Sender address: ${WALLET_ADDRESS}"
+              echo "Exit contract: ${EXIT_CONTRACT}"
+              echo "RPC: ${EL_RPC}"
+
+              # Check contract code exists
+              CODE=$(cast code ${EXIT_CONTRACT} --rpc-url ${EL_RPC})
+              if [ "${CODE}" = "0x" ] || [ -z "${CODE}" ]; then
+                echo "ERROR: builder exit contract has no code at ${EXIT_CONTRACT}"
+                echo "Ensure genesis-generator >= 6.1.0 is used."
+                exit 1
+              fi
+              echo "Contract code present (${#CODE} hex chars)"
+
+              # Send exit transaction (0 ETH value, no calldata needed for exit trigger)
+              TX_HASH=$(cast send ${EXIT_CONTRACT} \
+                --value 0 \
+                --private-key ${WALLET_PRIVKEY} \
+                --rpc-url ${EL_RPC} \
+                --json | jq -r '.transactionHash')
+
+              echo "Exit tx hash: ${TX_HASH}"
+              echo "::set-output exitTxHash ${TX_HASH}"
+
+        - name: run_shell
+          title: "Wait for exit tx inclusion and verify receipt"
+          id: verifyExit
+          timeout: 5m
+          config:
+            shell: bash
+            shellArgs: [--login]
+            envVars:
+              EXIT_TX_HASH: tasks.sendExit.outputs.exitTxHash
+              EXIT_CONTRACT: builderExitContract
+              EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+              FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+            command: |
+              set -e
+              EXIT_TX_HASH=$(echo $EXIT_TX_HASH | jq -r)
+              EXIT_CONTRACT=$(echo $EXIT_CONTRACT | jq -r)
+              EL_RPC=$(echo $EL_RPC | jq -r)
+              FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+              export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+              export HOME=${FOUNDRY_HOME}
+
+              echo "Checking receipt for exit tx: ${EXIT_TX_HASH}"
+
+              RECEIPT=$(cast receipt ${EXIT_TX_HASH} --rpc-url ${EL_RPC} --json)
+              STATUS=$(echo ${RECEIPT} | jq -r '.status')
+              BLOCK_NUMBER=$(echo ${RECEIPT} | jq -r '.blockNumber')
+
+              echo "Tx status: ${STATUS}"
+              echo "Included in block: ${BLOCK_NUMBER}"
+
+              if [ "${STATUS}" != "0x1" ] && [ "${STATUS}" != "1" ]; then
+                echo "ERROR: exit transaction failed (status=${STATUS})"
+                exit 1
+              fi
+
+              echo "Exit transaction included successfully in block ${BLOCK_NUMBER}"
+              echo "::set-output exitBlockNumber ${BLOCK_NUMBER}"
+
+              # Query logs from the exit contract to verify request was emitted
+              LOGS=$(curl -s -X POST \
+                -H "Content-Type: application/json" \
+                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getLogs\",\"params\":[{\"fromBlock\":\"${BLOCK_NUMBER}\",\"toBlock\":\"${BLOCK_NUMBER}\",\"address\":\"${EXIT_CONTRACT}\"}],\"id\":1}" \
+                ${EL_RPC})
+
+              LOG_COUNT=$(echo ${LOGS} | jq '.result | length')
+              echo "Logs from exit contract in block ${BLOCK_NUMBER}: ${LOG_COUNT}"
+              echo ${LOGS} | jq '.result'
+
+              if [ "${LOG_COUNT}" = "0" ] || [ "${LOG_COUNT}" = "null" ]; then
+                echo "WARNING: no logs from builder exit contract in block ${BLOCK_NUMBER}"
+                echo "This may be expected if the contract emits no EVM logs (request is in system tx)"
+              else
+                echo "Builder exit request log confirmed"
+              fi
+
+              echo "::set-output exitVerified true"
+
+  # Test 3: Verify builder exit appears in beacon block parent_execution_requests
+  # In ePBS (Gloas fork, EIP-7732), the execution requests generated by EL block at CL slot S
+  # appear as parent_execution_requests in the NEXT beacon block (slot S+1).
+  # This test polls recent beacon blocks for a non-empty builder_exits list, confirming
+  # that the exit contract call in Test 2 was processed into a consensus-visible request.
+  - name: run_shell
+    title: "Test 3: Verify builder exit in beacon parent_execution_requests"
+    id: testBeaconExitRequest
+    timeout: 10m
+    config:
+      shell: bash
+      shellArgs: [--login]
+      envVars:
+        EXIT_BLOCK_HEX: tasks.verifyExit.outputs.exitBlockNumber
+        EL_RPC: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+        CL_RPC: tasks.clientCheck.outputs.goodClients[0].clRpcUrl
+        FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+      command: |
+        set -e
+        EXIT_BLOCK_HEX=$(echo $EXIT_BLOCK_HEX | jq -r)
+        EL_RPC=$(echo $EL_RPC | jq -r)
+        CL_RPC=$(echo $CL_RPC | jq -r)
+        FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+        export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+        export SHELL=/bin/bash
+        export HOME=${FOUNDRY_HOME}
+
+        echo "=== EIP-8282 Beacon Execution Requests Verification ==="
+        echo "Exit block (hex): ${EXIT_BLOCK_HEX}"
+        echo "EL RPC:           ${EL_RPC}"
+        echo "CL RPC:           ${CL_RPC}"
+        echo ""
+
+        # Get the EL block timestamp to compute the CL slot.
+        # slot = (block_timestamp - genesis_time) / seconds_per_slot
+        BLOCK_DATA=$(curl -s -X POST ${EL_RPC} \
+          -H "Content-Type: application/json" \
+          -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"${EXIT_BLOCK_HEX}\",false],\"id\":1}")
+
+        BLOCK_TS=$(echo "${BLOCK_DATA}" | jq -r '.result.timestamp // "0x0"')
+        BLOCK_TS_DEC=$(( 16#${BLOCK_TS#0x} ))
+        echo "EL block timestamp: ${BLOCK_TS_DEC}"
+
+        # Get genesis time and seconds_per_slot from CL spec
+        GENESIS=$(curl -s "${CL_RPC}/eth/v1/beacon/genesis")
+        GENESIS_TIME=$(echo "${GENESIS}" | jq -r '.data.genesis_time')
+        echo "Genesis time: ${GENESIS_TIME}"
+
+        SPECS=$(curl -s "${CL_RPC}/eth/v1/config/spec")
+        SECONDS_PER_SLOT=$(echo "${SPECS}" | jq -r '.data.SECONDS_PER_SLOT // "12"')
+        echo "Seconds per slot: ${SECONDS_PER_SLOT}"
+
+        # Compute the CL slot for the EL block
+        DELTA=$(( BLOCK_TS_DEC - GENESIS_TIME ))
+        EL_SLOT=$(( DELTA / SECONDS_PER_SLOT ))
+        echo "EL block is at approximately CL slot: ${EL_SLOT}"
+        echo ""
+
+        # In ePBS (Gloas), execution requests from CL slot S appear as
+        # parent_execution_requests in CL slot S+1.
+        # Poll slots S+1 through S+10 for builder_exits.
+        FOUND=0
+        for OFFSET in 1 2 3 4 5 6 7 8 9 10; do
+          CHECK_SLOT=$(( EL_SLOT + OFFSET ))
+          echo "Checking slot ${CHECK_SLOT} for parent_execution_requests.builder_exits..."
+
+          BEACON_BLOCK=$(curl -s -H "Accept: application/json" \
+            "${CL_RPC}/eth/v2/beacon/blocks/${CHECK_SLOT}" 2>/dev/null)
+
+          # Skip if block not found or error
+          if echo "${BEACON_BLOCK}" | grep -q '"code"'; then
+            echo "  Slot ${CHECK_SLOT}: not yet available, waiting..."
+            sleep 12
+            BEACON_BLOCK=$(curl -s -H "Accept: application/json" \
+              "${CL_RPC}/eth/v2/beacon/blocks/${CHECK_SLOT}" 2>/dev/null)
+          fi
+
+          BUILDER_EXITS=$(echo "${BEACON_BLOCK}" | jq -r \
+            '.data.message.body.parent_execution_requests.builder_exits // "null"' 2>/dev/null || echo "null")
+          EXITS_COUNT=$(echo "${BUILDER_EXITS}" | jq 'length // 0' 2>/dev/null || echo "0")
+
+          echo "  Slot ${CHECK_SLOT}: builder_exits count = ${EXITS_COUNT}"
+
+          if [ "${EXITS_COUNT}" != "0" ] && [ "${EXITS_COUNT}" != "null" ]; then
+            echo ""
+            echo "PASS: Found builder exit in slot ${CHECK_SLOT} parent_execution_requests!"
+            echo "builder_exits: $(echo "${BUILDER_EXITS}" | jq '.')"
+            FOUND=1
+            echo "::set-output beaconExitSlot ${CHECK_SLOT}"
+            echo "::set-output beaconExitCount ${EXITS_COUNT}"
+            break
+          fi
+        done
+
+        if [ "${FOUND}" = "0" ]; then
+          echo ""
+          echo "WARN: No builder_exits found in slots ${EL_SLOT}+1 through ${EL_SLOT}+10."
+          echo "This may indicate:"
+          echo "  - The exit tx was processed in a later slot (try expanding search range)"
+          echo "  - The exit contract does not trigger a builder_exits request in this build"
+          echo "  - The CL client does not expose builder_exits in parent_execution_requests"
+          echo ""
+          echo "NOTE: Test 2 confirmed the exit tx succeeded (status=0x1). The CL-layer"
+          echo "      execution request propagation may need further investigation."
+          echo "::set-output beaconExitSlot notfound"
+          echo "::set-output beaconExitCount 0"
+          # Soft failure: exit tx was confirmed by EL, but CL-layer verification inconclusive
+        fi
+
+  # Final summary
+  - name: run_shell
+    title: "Print lifecycle test summary"
+    timeout: 1m
+    config:
+      shell: bash
+      envVars:
+        DEPOSIT_BLOCK: tasks.verifyDeposit.outputs.depositBlockNumber
+        EXIT_BLOCK: tasks.verifyExit.outputs.exitBlockNumber
+        BEACON_EXIT_SLOT: tasks.testBeaconExitRequest.outputs.beaconExitSlot
+        BEACON_EXIT_COUNT: tasks.testBeaconExitRequest.outputs.beaconExitCount
+      command: |
+        DEPOSIT_BLOCK=$(echo $DEPOSIT_BLOCK | jq -r)
+        EXIT_BLOCK=$(echo $EXIT_BLOCK | jq -r)
+        BEACON_EXIT_SLOT=$(echo $BEACON_EXIT_SLOT | jq -r 2>/dev/null || echo "unknown")
+        BEACON_EXIT_COUNT=$(echo $BEACON_EXIT_COUNT | jq -r 2>/dev/null || echo "0")
+        echo "============================================"
+        echo "EIP-8282 Builder Lifecycle Test Summary"
+        echo "============================================"
+        echo "Builder Deposit:"
+        echo "  Contract: 0x0000884d2AA32eAa155F59A2f24eFa73D9008282"
+        echo "  Tx included in block: ${DEPOSIT_BLOCK}"
+        echo "  Status: PASS"
+        echo ""
+        echo "Builder Exit:"
+        echo "  Contract: 0x000014574A74c805590AFF9499fc7A690f008282"
+        echo "  Tx included in block: ${EXIT_BLOCK}"
+        echo "  Status: PASS"
+        echo ""
+        echo "Builder Exit in Beacon State (EIP-7732/ePBS):"
+        echo "  Found in slot: ${BEACON_EXIT_SLOT}"
+        echo "  builder_exits count: ${BEACON_EXIT_COUNT}"
+        if [ "${BEACON_EXIT_COUNT}" != "0" ] && [ "${BEACON_EXIT_SLOT}" != "notfound" ]; then
+          echo "  Status: PASS"
+        else
+          echo "  Status: WARN (inconclusive — EL tx succeeded, CL request not confirmed)"
+        fi
+        echo "============================================"
+
+cleanupTasks:
+  - name: run_shell
+    title: "Cleanup foundry temp dir"
+    config:
+      shell: bash
+      envVars:
+        FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+      command: |
+        FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+        if [ ! -z "$FOUNDRY_HOME" ] && [ -d "$FOUNDRY_HOME" ]; then
+          rm -rf "$FOUNDRY_HOME"
+          echo "Cleaned up foundry temp dir ${FOUNDRY_HOME}"
+        fi

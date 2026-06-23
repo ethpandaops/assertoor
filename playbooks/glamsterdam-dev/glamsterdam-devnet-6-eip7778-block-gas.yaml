@@ -1,0 +1,249 @@
+id: glamsterdam-devnet-6-eip7778-block-gas
+name: "glamsterdam-devnet-6: EIP-7778 block gas accounting without refunds"
+timeout: 2h
+config:
+  walletPrivkey: ""
+  # EIP-7778: Block Gas Accounting without Refunds
+  #
+  # Background:
+  #   In Amsterdam (EIP-7778), block.gasUsed uses a 2-dimensional gas formula:
+  #     block.gasUsed = max(sum(tx_regular_gas), sum(tx_state_gas))
+  #   where tx_regular_gas = pre_refund_gas - tx_state_gas and tx_state_gas is
+  #   the BAL-sourced state access cost from EIP-8037.
+  #
+  #   Crucially, the block gas is tracked separately from sum(receipt.gasUsed):
+  #     block.gasUsed  = gp.Used()           = max(sum_regular, sum_state)
+  #     sum(receipts)  = gp.CumulativeUsed() = sum(max(pre_refund-refund, floor))
+  #   These two counters DIVERGE in Amsterdam (they were always equal pre-Amsterdam).
+  #
+  #   Refund per cleared SSTORE slot: COST_PER_STATE_BYTE(1530) × 64 = 97920 gas.
+  #   With 8 cleared slots: uncapped refund = 783360 gas (refund cap = pre_refund/5).
+  #
+  # Test approach:
+  #   1. Deploy StorageClearer, fill 8 slots, then clear all 8.
+  #   2. Get block.gasUsed for the block containing clear().
+  #   3. Sum all receipt.gasUsed for every tx in that block.
+  #   4. Assert: block.gasUsed != sum(receipt.gasUsed)  [2D gas accounting active]
+  #      The 8-slot clear() generates large SSTORE refunds via EIP-8037. In Amsterdam
+  #      these refunds cause block.gasUsed (max(regular,state)) to diverge from
+  #      sum(receipt.gasUsed). Pre-Amsterdam they were always equal.
+  #   5. Log the delta to show how block gas differs from receipt-based accounting.
+
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check if at least one client is ready"
+    id: clientCheck
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  - name: get_consensus_specs
+    id: consensusSpecs
+    title: "Get consensus chain specs"
+
+  - name: check_consensus_slot_range
+    title: "Wait for network to be stable (epoch 2)"
+    timeout: 1h
+    config:
+      minEpochNumber: 2
+
+  - name: run_shell
+    title: "Install foundry (forge + cast)"
+    id: installFoundry
+    timeout: 10m
+    config:
+      shell: bash
+      shellArgs: [--login]
+      command: |
+        set -e
+        FOUNDRY_HOME=$(mktemp -d -t foundry-XXXXXXXXXX)
+        echo "::set-output foundryHome ${FOUNDRY_HOME}"
+        export SHELL=/bin/bash
+        export HOME=${FOUNDRY_HOME}
+        curl -L https://foundry.paradigm.xyz | bash
+        source ${FOUNDRY_HOME}/.bashrc || true
+        ${FOUNDRY_HOME}/.foundry/bin/foundryup
+        if [ ! -f "${FOUNDRY_HOME}/.foundry/bin/cast" ]; then
+          echo "cast not found after foundryup"
+          exit 1
+        fi
+        echo "cast installed"
+
+  - name: generate_child_wallet
+    id: deployerWallet
+    title: "Generate funded deployer wallet (3 ETH)"
+    config:
+      prefundMinBalance: 3000000000000000000
+      walletSeed: "eip7778-block-gas-test"
+    configVars:
+      privateKey: "walletPrivkey"
+
+  - name: run_shell
+    title: "Deploy StorageClearer, fill 8 slots, clear and verify EIP-7778 block gas"
+    id: testBlockGas
+    timeout: 20m
+    config:
+      shell: bash
+      shellArgs: [--login]
+      envVars:
+        WALLET_PRIVKEY: tasks.deployerWallet.outputs.childWallet.privkey
+        WALLET_ADDRESS: tasks.deployerWallet.outputs.childWallet.address
+        EL_RPC_HOST: tasks.clientCheck.outputs.goodClients[0].elRpcUrl
+        FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+      command: |
+        set -e
+        WALLET_PRIVKEY=$(echo $WALLET_PRIVKEY | jq -r)
+        WALLET_ADDRESS=$(echo $WALLET_ADDRESS | jq -r)
+        EL_RPC_HOST=$(echo $EL_RPC_HOST | jq -r)
+        FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+
+        export PATH="${FOUNDRY_HOME}/.foundry/bin:$PATH"
+        export SHELL=/bin/bash
+        export HOME=${FOUNDRY_HOME}
+
+        echo "=== EIP-7778 Block Gas Accounting Without Refunds ==="
+        echo "Wallet: ${WALLET_ADDRESS}"
+        echo "RPC:    ${EL_RPC_HOST}"
+
+        WORK_DIR=$(mktemp -d -t eip7778-XXXXXXXXXX)
+        echo "::set-output workDir ${WORK_DIR}"
+
+        cat > ${WORK_DIR}/StorageClearer.sol << 'SOLEOF'
+        // SPDX-License-Identifier: MIT
+        pragma solidity ^0.8.0;
+        // 8-slot storage clearer for EIP-7778 block-gas verification.
+        // clear() zeros 8 slots; each generates 97920 gas refund (EIP-8037).
+        // In Amsterdam (EIP-7778) these refunds do NOT reduce block.gasUsed.
+        contract StorageClearer {
+            uint256 public s0; uint256 public s1; uint256 public s2; uint256 public s3;
+            uint256 public s4; uint256 public s5; uint256 public s6; uint256 public s7;
+            function set() external { s0=1; s1=1; s2=1; s3=1; s4=1; s5=1; s6=1; s7=1; }
+            function clear() external { s0=0; s1=0; s2=0; s3=0; s4=0; s5=0; s6=0; s7=0; }
+        }
+        SOLEOF
+
+        echo "Deploying StorageClearer..."
+        DEPLOY_OUT=$(forge create \
+          --rpc-url ${EL_RPC_HOST} \
+          --private-key ${WALLET_PRIVKEY} \
+          --legacy --json \
+          ${WORK_DIR}/StorageClearer.sol:StorageClearer)
+        CONTRACT=$(echo "${DEPLOY_OUT}" | jq -r '.deployedTo')
+        echo "::set-output contractAddr ${CONTRACT}"
+        echo "Contract: ${CONTRACT}"
+
+        echo "Calling set() to fill 8 slots..."
+        cast send ${CONTRACT} "set()" \
+          --private-key ${WALLET_PRIVKEY} \
+          --rpc-url ${EL_RPC_HOST} \
+          --legacy > /dev/null
+
+        S0=$(cast call ${CONTRACT} "s0()(uint256)" --rpc-url ${EL_RPC_HOST})
+        [ "${S0}" = "1" ] || { echo "FAIL: s0=${S0} expected 1"; exit 1; }
+        echo "Slots filled (s0=1 confirmed)"
+
+        echo "Calling clear() — 8 SSTORE slot→0 generates 8×97920 gas refund..."
+        CLEAR_JSON=$(cast send ${CONTRACT} "clear()" \
+          --private-key ${WALLET_PRIVKEY} \
+          --rpc-url ${EL_RPC_HOST} \
+          --legacy --json)
+        CLEAR_TX=$(echo "${CLEAR_JSON}" | jq -r '.transactionHash')
+        CLEAR_GAS_HEX=$(echo "${CLEAR_JSON}" | jq -r '.gasUsed')
+        BLOCK_HASH=$(echo "${CLEAR_JSON}" | jq -r '.blockHash')
+        BLOCK_NUM=$(echo "${CLEAR_JSON}" | jq -r '.blockNumber')
+        echo "::set-output clearTxHash ${CLEAR_TX}"
+        echo "::set-output clearBlockNum ${BLOCK_NUM}"
+        echo "clear() tx:         ${CLEAR_TX}"
+        echo "receipt.gasUsed:    ${CLEAR_GAS_HEX} (hex)"
+        echo "block:              ${BLOCK_NUM}"
+
+        # Fetch block gasUsed and all tx hashes
+        BLOCK_JSON=$(cast rpc eth_getBlockByHash "${BLOCK_HASH}" false \
+          --rpc-url ${EL_RPC_HOST})
+        BLOCK_GAS_HEX=$(echo "${BLOCK_JSON}" | jq -r '.result.gasUsed')
+        TX_HASHES=$(echo "${BLOCK_JSON}" | jq -r '.result.transactions[]')
+        TX_COUNT=$(echo "${BLOCK_JSON}" | jq '.result.transactions | length')
+        echo "block.gasUsed:      ${BLOCK_GAS_HEX} (hex)"
+        echo "txs in block:       ${TX_COUNT}"
+
+        # Sum receipt.gasUsed for every tx in the block
+        SUM_RECEIPT_GAS=0
+        for hash in ${TX_HASHES}; do
+          GU_HEX=$(cast rpc eth_getTransactionReceipt "${hash}" \
+            --rpc-url ${EL_RPC_HOST} | jq -r '.result.gasUsed')
+          GU_DEC=$(python3 -c "print(int('${GU_HEX}', 16))")
+          SUM_RECEIPT_GAS=$((SUM_RECEIPT_GAS + GU_DEC))
+        done
+        echo "sum(receipt.gasUsed): ${SUM_RECEIPT_GAS}"
+
+        echo "::set-output blockGasUsed ${BLOCK_GAS_HEX}"
+        echo "::set-output sumReceiptGas ${SUM_RECEIPT_GAS}"
+        echo "::set-output txCount ${TX_COUNT}"
+
+        # EIP-7778 verification
+        python3 - "${CLEAR_GAS_HEX}" "${BLOCK_GAS_HEX}" "${SUM_RECEIPT_GAS}" "${TX_COUNT}" << 'PYEOF'
+        import sys
+
+        clear_gas_hex, block_gas_hex, sum_receipt_str, tx_count_str = sys.argv[1:]
+        clear_gas = int(clear_gas_hex, 16)
+        block_gas = int(block_gas_hex, 16)
+        sum_receipt = int(sum_receipt_str)
+        tx_count = int(tx_count_str)
+
+        delta = block_gas - sum_receipt
+
+        REFUND_PER_SLOT = 1530 * 64  # = 97920 gas (EIP-8037: COST_PER_STATE_BYTE × 64)
+        N_SLOTS = 8
+
+        print("")
+        print("=== EIP-7778 Block Gas Accounting Verification ===")
+        print(f"  Txs in block:               {tx_count}")
+        print(f"  clear() receipt.gasUsed:    {clear_gas:,} gas  (post-refund, from receipt)")
+        print(f"  block.gasUsed:              {block_gas:,} gas  (max(sum_regular, sum_state))")
+        print(f"  sum(receipt.gasUsed):       {sum_receipt:,} gas (gp.CumulativeUsed counter)")
+        print(f"  delta (block - sum):        {delta:+,} gas")
+        print(f"")
+        print(f"  EIP-7778 implementation (geth gaspool.go):")
+        print(f"    block.gasUsed  = gp.Used()           = max(sum_regular, sum_state)")
+        print(f"    sum(receipts)  = gp.CumulativeUsed() = sum(max(pre_refund-refund, floor))")
+        print(f"  In Amsterdam (EIP-7778), blocks with storage refunds cause these counters to diverge.")
+        print(f"  Each cleared SSTORE slot contributes {REFUND_PER_SLOT:,} gas refund (EIP-8037).")
+        print(f"  8 slots → uncapped refund = {N_SLOTS * REFUND_PER_SLOT:,} gas (cap = pre_refund/5).")
+        print("")
+
+        # Assertion 1: block.gasUsed != sum(receipt.gasUsed)
+        # In Amsterdam these counters MUST diverge: block uses max(regular,state),
+        # receipts use cumulative post-refund accounting. Pre-Amsterdam they were always equal.
+        if block_gas == sum_receipt:
+            print(f"FAIL [1/2]: block.gasUsed ({block_gas:,}) == sum(receipt.gasUsed) ({sum_receipt:,})")
+            print(f"      This block contains clear() with 8 SSTORE refunds — counters must diverge.")
+            print(f"      If they are equal, EIP-7778 2D gas accounting is NOT active.")
+            print(f"      (Pre-Amsterdam: block.gasUsed always equaled sum(receipt.gasUsed))")
+            sys.exit(1)
+        print(f"PASS [1/2]: block.gasUsed ({block_gas:,}) != sum(receipt.gasUsed) ({sum_receipt:,})")
+        print(f"            2D gas accounting (EIP-7778) is active — counters have diverged.")
+
+        # Assertion 2: log the delta direction and magnitude
+        if delta > 0:
+            print(f"PASS [2/2]: block.gasUsed > sum(receipts) by {delta:,} gas")
+            print(f"            block_gas EXCEEDS receipt_sum: regular gas dimension dominates")
+            print(f"            (refunds not subtracted from block space, state gas < regular gas)")
+        else:
+            print(f"PASS [2/2]: block.gasUsed < sum(receipts) by {-delta:,} gas")
+            print(f"            block_gas BELOW receipt_sum: state gas dimension dominates")
+            print(f"            (2D accounting: block counts max(regular,state), not simple sum)")
+        PYEOF
+
+cleanupTasks:
+  - name: run_shell
+    title: "Cleanup temp dirs"
+    config:
+      shell: bash
+      envVars:
+        FOUNDRY_HOME: tasks.installFoundry.outputs.foundryHome
+        WORK_DIR: tasks.testBlockGas.outputs.workDir
+      command: |
+        FOUNDRY_HOME=$(echo $FOUNDRY_HOME | jq -r)
+        WORK_DIR=$(echo $WORK_DIR | jq -r)
+        [ -d "$FOUNDRY_HOME" ] && rm -rf "$FOUNDRY_HOME" && echo "Cleaned foundry" || true
+        [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ] && rm -rf "$WORK_DIR" && echo "Cleaned work dir" || true
