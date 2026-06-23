@@ -101,6 +101,11 @@ func (t *Task) Execute(ctx context.Context) error {
 	//nolint:gosec // ignore
 	command := exec.CommandContext(ctx, t.config.Shell, t.config.ShellArgs...)
 
+	// Inherit parent environment so spawned shells have HOME/PATH/USER.
+	// Without this, exec.Cmd.Env is nil and the child inherits nothing;
+	// user-supplied envVars below still take precedence via append order.
+	command.Env = append(command.Env, os.Environ()...)
+
 	stdin, err := command.StdinPipe()
 	if err != nil {
 		cmdLogger.Errorf("failed getting stdin pipe")
