@@ -1,0 +1,232 @@
+id: builder-prefork-onboard
+name: "GLOAS: Pre-fork builder onboarding (0x03 -> builder via fork dequeue)"
+description: |
+  Focused regression test for the GLOAS pre-fork builder onboarding path
+  (`onboard_builders_from_pending_deposits`).
+
+  This test ONLY exercises the case where a builder is created from a regular
+  validator deposit that is still sitting in the pending-deposit queue when the
+  fork happens:
+
+  1. Inside the UNFINALIZED window just before GLOAS activates (so the deposit is
+     still in state.pending_deposits at the fork), deposit `builderCount` keys via
+     the STANDARD validator deposit contract using 0x03 (builder) withdrawal
+     credentials. The deposit signatures are verified under the regular
+     DOMAIN_DEPOSIT, so the ordinary `generate_deposits` task is used unchanged.
+  2. Because these deposits reach the fork still pending (unprocessed), the GLOAS
+     fork transition dequeues them and converts them into builders via
+     `onboard_builders_from_pending_deposits`.
+  3. Verify, right after the first GLOAS block, that each pubkey now exists as a
+     builder in the beacon state (i.e. it was dequeued/onboarded at the fork).
+  4. Verify the onboarded builders go active.
+
+  TIMING IS LOAD-BEARING. `process_pending_deposits` only drains deposits whose
+  slot is already finalized (`if deposit.slot > finalized_slot: break`). If the
+  deposit is made too early it finalizes and is applied to the validator registry
+  as a regular validator BEFORE the fork, and `onboard_builders_from_pending_deposits`
+  never sees it (it also explicitly keeps deposits for existing validators in the
+  queue). So the deposit must land late enough to still be UNfinalized at the fork.
+  There is no minimum deposit amount to onboard a builder (per gloas spec
+  v1.7.0-alpha.11: add_builder_to_registry sets builder.balance = deposit.amount
+  with no MIN_ACTIVATION_BALANCE check); 32 ETH is only needed for regular
+  validator activation, not builder onboarding.
+
+  This test REQUIRES being started before the pre-fork deposit window. If that
+  window has already passed, the test fails fast (the path under test is no longer
+  reachable) rather than silently passing.
+version: 1.0.0
+tags: [gloas, builder, deposit, onboarding, prefork, eip-8282]
+timeout: 1h
+config:
+  walletPrivkey: ''
+  # Regular validator deposit contract (pre-fork builder onboarding via 0x03 creds).
+  depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
+  builderCount: 5
+  depositAmount: 5
+  # Optional: deposit for a SPECIFIC builder key (e.g. buildoor's) instead of a
+  # random one, so an external builder using the same mnemonic+index can bid on
+  # the onboarded builder. Leave empty to use a freshly generated mnemonic.
+  builderMnemonic: ''
+  builderKeyIndex: 0
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# get consensus specs and current slot, then calculate fork-relative timing
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+
+- name: check_consensus_slot_range
+  id: current_slot
+  title: "Get current slot"
+
+- name: run_shell
+  id: calc_slots
+  title: "Calculate pre-fork deposit window (must stay unfinalized at the fork)"
+  config:
+    envVars:
+      GLOAS_FORK_EPOCH: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
+      SLOTS_PER_EPOCH: "tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH"
+      CURRENT_SLOT: "tasks.current_slot.outputs.currentSlot"
+    command: |
+      set -e
+      GLOAS_FORK_EPOCH=$(echo "$GLOAS_FORK_EPOCH" | jq -r .)
+      SLOTS_PER_EPOCH=$(echo "$SLOTS_PER_EPOCH" | jq -r .)
+      CURRENT_SLOT=$(echo "$CURRENT_SLOT" | jq -r .)
+
+      ACTIVATION_SLOT=$((GLOAS_FORK_EPOCH * SLOTS_PER_EPOCH))
+
+      # The deposit must still be in state.pending_deposits at the fork to be
+      # onboarded. process_pending_deposits only drains FINALIZED deposits
+      # (`if deposit.slot > finalized_slot: break`), and finality lags >= 2
+      # epochs, so depositing ~1 epoch before the fork keeps it unfinalized
+      # (won't be drained into the validator registry) while still leaving
+      # slots for it to be included as a pending deposit.
+      PREFORK_SLOT=$((ACTIVATION_SLOT - SLOTS_PER_EPOCH))
+      if [ "$PREFORK_SLOT" -lt 0 ]; then PREFORK_SLOT=0; fi
+
+      # Need a couple slots of headroom before the fork to actually land the
+      # deposit as pending. If we're already inside that headroom, it's too late.
+      LATEST_DEPOSIT_SLOT=$((ACTIVATION_SLOT - 2))
+      if [ "$CURRENT_SLOT" -ge "$LATEST_DEPOSIT_SLOT" ]; then
+        echo "ERROR: too late to land a pre-fork pending deposit."
+        echo "  current slot:        $CURRENT_SLOT"
+        echo "  latest deposit slot: $LATEST_DEPOSIT_SLOT"
+        echo "  GLOAS activation:    slot $ACTIVATION_SLOT (epoch $GLOAS_FORK_EPOCH)"
+        echo "Start the test earlier so the 0x03 deposit is still pending"
+        echo "(and unfinalized) when GLOAS activates."
+        exit 1
+      fi
+
+      # First GLOAS block (+1 slot of margin) is where onboarding is observable.
+      ONBOARD_SLOT=$((ACTIVATION_SLOT + 1))
+      ACTIVE_EPOCH=$((GLOAS_FORK_EPOCH + 4))
+
+      echo "Current slot:       $CURRENT_SLOT"
+      echo "GLOAS activation:   epoch $GLOAS_FORK_EPOCH (slot $ACTIVATION_SLOT)"
+      echo "Pre-fork deposit:   slot $PREFORK_SLOT (latest safe: $LATEST_DEPOSIT_SLOT)"
+      echo "Onboard check:      slot $ONBOARD_SLOT"
+      echo "Active wait epoch:  $ACTIVE_EPOCH"
+
+      echo "::set-output-json preforkSlot $PREFORK_SLOT"
+      echo "::set-output-json onboardSlot $ONBOARD_SLOT"
+      echo "::set-output-json activeEpoch $ACTIVE_EPOCH"
+
+# prepare wallet and mnemonic
+- name: generate_child_wallet
+  id: test_wallet
+  title: "Generate wallet for builder deposits"
+  config:
+    walletSeed: builder-prefork-onboard-test
+    prefundMinBalance: 100000000000000000000  # 100 ETH
+  configVars:
+    privateKey: walletPrivkey
+
+- name: get_random_mnemonic
+  id: test_mnemonic
+  title: "Generate fallback mnemonic for builders"
+
+- name: get_pubkeys_from_mnemonic
+  id: builder_pubkeys
+  title: "Get pubkeys for all builder keys"
+  configVars:
+    # Use the configured builderMnemonic if set, else the random fallback.
+    mnemonic: '| if .builderMnemonic != "" then .builderMnemonic else .tasks.test_mnemonic.outputs.mnemonic end'
+    # Derive enough keys to index from builderKeyIndex.
+    count: "| .builderKeyIndex + .builderCount"
+
+##
+## PHASE 1: PRE-FORK deposit via the STANDARD validator deposit contract
+##  Wait into the unfinalized window (~1 epoch before the fork), then deposit
+##  builderCount keys with 0x03 credentials so they are still pending (and
+##  unfinalized, hence not yet drained into the validator registry) at the fork.
+##
+
+- name: check_consensus_slot_range
+  title: "Wait for pre-fork deposit slot (${{ tasks.calc_slots.outputs.preforkSlot }})"
+  timeout: 1h
+  configVars:
+    minSlotNumber: "tasks.calc_slots.outputs.preforkSlot"
+
+- name: generate_deposits
+  id: prefork_deposits
+  title: "Deposit ${builderCount} builders via STANDARD contract (0x03 creds)"
+  config:
+    awaitReceipt: true
+    failOnReject: true
+  configVars:
+    limitTotal: "builderCount"
+    indexCount: "builderCount"
+    startIndex: "builderKeyIndex"
+    depositAmount: "depositAmount"
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    mnemonic: '| if .builderMnemonic != "" then .builderMnemonic else .tasks.test_mnemonic.outputs.mnemonic end'
+    depositContract: "depositContract"
+    # 0x03 builder credentials: version byte + 11 zero bytes + 20-byte address
+    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+
+##
+## PHASE 2: Verify the fork DEQUEUED the pending deposits into builders
+##  Right after the first GLOAS block, each pubkey must now exist as a builder.
+##
+
+- name: check_consensus_slot_range
+  title: "Wait for first GLOAS block (slot ${{ tasks.calc_slots.outputs.onboardSlot }})"
+  timeout: 1h
+  configVars:
+    minSlotNumber: "tasks.calc_slots.outputs.onboardSlot"
+
+- name: run_task_matrix
+  title: "Verify all ${builderCount} pending deposits were onboarded as builders"
+  timeout: 30m
+  configVars:
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[(.builderKeyIndex):(.builderKeyIndex + .builderCount)]"
+  config:
+    runConcurrent: true
+    matrixVar: "builderPubkey"
+    task:
+      name: check_consensus_builder_status
+      title: "Verify ${builderPubkey} was onboarded as a builder"
+      # Existence-only check. Do NOT use expectActive here: a deposit onboarded
+      # AT the fork has deposit_epoch == GLOAS_FORK_EPOCH, which cannot be
+      # finalized yet, and expectActive requires deposit_epoch < finalized_epoch.
+      # Poll (no failOnCheckMiss) so we wait for the builder to appear in the
+      # builder set instead of failing on a single too-early read.
+      timeout: 10m
+      configVars:
+        builderPubKey: "builderPubkey"
+
+##
+## PHASE 3: Verify the onboarded builders go active
+##
+
+- name: check_consensus_slot_range
+  title: "Wait until builders should be active (epoch ${{ tasks.calc_slots.outputs.activeEpoch }})"
+  timeout: 1h
+  configVars:
+    minEpochNumber: "tasks.calc_slots.outputs.activeEpoch"
+
+- name: run_task_matrix
+  title: "Verify all ${builderCount} onboarded builders are active"
+  timeout: 30m
+  configVars:
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[(.builderKeyIndex):(.builderKeyIndex + .builderCount)]"
+  config:
+    runConcurrent: true
+    matrixVar: "builderPubkey"
+    task:
+      name: check_consensus_builder_status
+      title: "Verify builder ${builderPubkey} is active"
+      # Poll until the builder is active (deposit finalized + withdrawable_epoch
+      # == FAR_FUTURE) rather than asserting once: finalization timing varies, so
+      # let it converge within the timeout instead of failing on an early read.
+      timeout: 20m
+      config:
+        expectActive: true
+      configVars:
+        builderPubKey: "builderPubkey"

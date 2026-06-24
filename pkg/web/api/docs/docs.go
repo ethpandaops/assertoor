@@ -60,6 +60,79 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/dashboard_config": {
+            "get": {
+                "description": "Returns the persisted dashboard layout (JSON blob).\nPublic read; mutations are auth-gated via PUT.\nReturns 204 when no config has been saved yet — the\nUI falls back to a built-in default in that case.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Get the active dashboard config",
+                "operationId": "getDashboardConfig",
+                "responses": {
+                    "200": {
+                        "description": "Dashboard config JSON",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No config persisted yet"
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Auth-required. Persists the supplied JSON blob as the\nactive dashboard layout. The body is treated as\nopaque — the server only checks that it parses as\nvalid JSON; semantic validation lives in the client.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Replace the active dashboard config",
+                "operationId": "putDashboardConfig",
+                "responses": {
+                    "200": {
+                        "description": "Saved",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/global_variables": {
             "get": {
                 "description": "Returns the names of all configured global variables. Values are not included as they may contain sensitive data.",
@@ -141,6 +214,45 @@ const docTemplate = `{
                         "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/network_status": {
+            "get": {
+                "description": "Aggregated snapshot of the chain (head, finalized,\njustified, current slot/epoch) and the orchestration\nstate (client readiness counts, test queue depth).\nPowers the dashboard ` + "`" + `network_status` + "`" + ` tile.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Network"
+                ],
+                "summary": "Get a network-wide status snapshot",
+                "operationId": "getNetworkStatus",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.NetworkStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -399,6 +511,172 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/test/{testId}/latest_result": {
+            "get": {
+                "description": "Walks recent runs of the test (newest first) and returns\nthe first $ASSERTOOR_TEST_RESULT markdown blob found.\nReturns 200 with metadata in headers (X-Run-Id, X-Run-Status,\nX-Run-Start-Time) and the markdown as the body.\nWhen ?meta=1 is set, returns a JSON envelope instead\n(handy for tile fetchers that want one round-trip).",
+                "produces": [
+                    "text/markdown",
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Get the latest run-level result markdown for a test",
+                "operationId": "getTestLatestResult",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Test ID",
+                        "name": "testId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Set to 1 to receive a JSON envelope",
+                        "name": "meta",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Markdown body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "204": {
+                        "description": "No result available across recent runs"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Test not found",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test/{testId}/next_run": {
+            "get": {
+                "description": "Walks each cron expression on the test's schedule\nand returns the next firing time per expression plus\nthe overall earliest one. Empty when the test has no\ncron schedule.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Get the next planned cron firings for a test",
+                "operationId": "getTestNextRun",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Test ID",
+                        "name": "testId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.GetTestNextRunResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Test not found",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test/{testId}/schedule": {
+            "put": {
+                "description": "Auth-required. Replaces the schedule (cron + startup\n+ skipQueue) for a registered test. Cron expressions\nare validated up-front; invalid input rejects the\nwhole request without changing state.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Test"
+                ],
+                "summary": "Update a test's run schedule",
+                "operationId": "putTestSchedule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Test ID",
+                        "name": "testId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New schedule",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/web_api.PutTestScheduleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Saved",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Test not found",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/test/{testId}/yaml": {
             "get": {
                 "description": "Returns the full YAML source for a test definition. For API-registered tests, returns the stored YAML. For external tests referenced by file/URL, loads and returns the content from the original source. Requires authentication as YAML may contain sensitive configuration.",
@@ -460,6 +738,39 @@ const docTemplate = `{
                         "description": "Server Error",
                         "schema": {
                             "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_queue": {
+            "get": {
+                "description": "Returns the pending test queue in execution order\nplus any currently running tests at the head. Used\nby the StartTestModal's QueuePicker to let users\nslot a new run at a chosen position.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get the current test runner queue",
+                "operationId": "getTestQueue",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/web_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/web_api.GetTestQueueResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -629,6 +940,52 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/test_run/{runId}/result": {
+            "get": {
+                "description": "Returns the markdown blob that tasks have collectively\nwritten to $ASSERTOOR_TEST_RESULT during the run, if any.\nRendered by the UI as the run's prominent Result panel.",
+                "produces": [
+                    "text/markdown",
+                    "application/json"
+                ],
+                "tags": [
+                    "TestRun"
+                ],
+                "summary": "Get the run-level result markdown",
+                "operationId": "getTestRunResult",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the test run",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Markdown body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "204": {
+                        "description": "No result set for this run"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Test run not found",
                         "schema": {
                             "$ref": "#/definitions/web_api.Response"
                         }
@@ -1544,6 +1901,73 @@ const docTemplate = `{
                 }
             }
         },
+        "web_api.GetTestNextRunEntry": {
+            "type": "object",
+            "properties": {
+                "expression": {
+                    "type": "string"
+                },
+                "next": {
+                    "type": "integer"
+                }
+            }
+        },
+        "web_api.GetTestNextRunEntryEarliest": {
+            "type": "object",
+            "properties": {
+                "expression": {
+                    "type": "string"
+                },
+                "next": {
+                    "type": "integer"
+                }
+            }
+        },
+        "web_api.GetTestNextRunResponse": {
+            "type": "object",
+            "properties": {
+                "earliest": {
+                    "$ref": "#/definitions/web_api.GetTestNextRunEntryEarliest"
+                },
+                "entries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/web_api.GetTestNextRunEntry"
+                    }
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetTestQueueEntry": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.TestStatus"
+                },
+                "test_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_api.GetTestQueueResponse": {
+            "type": "object",
+            "properties": {
+                "queue": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/web_api.GetTestQueueEntry"
+                    }
+                }
+            }
+        },
         "web_api.GetTestResponse": {
             "type": "object",
             "properties": {
@@ -1629,6 +2053,12 @@ const docTemplate = `{
                 },
                 "result_error": {
                     "type": "string"
+                },
+                "result_files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/web_api.GetTestRunTaskResult"
+                    }
                 },
                 "result_yaml": {
                     "type": "string"
@@ -1913,6 +2343,71 @@ const docTemplate = `{
                 }
             }
         },
+        "web_api.NetworkStatusResponse": {
+            "type": "object",
+            "properties": {
+                "chain_id": {
+                    "type": "integer"
+                },
+                "cl_ready_count": {
+                    "type": "integer"
+                },
+                "client_count": {
+                    "type": "integer"
+                },
+                "current_epoch": {
+                    "type": "integer"
+                },
+                "current_slot": {
+                    "type": "integer"
+                },
+                "el_head_hash": {
+                    "type": "string"
+                },
+                "el_head_number": {
+                    "type": "integer"
+                },
+                "el_ready_count": {
+                    "type": "integer"
+                },
+                "finalized_epoch": {
+                    "type": "integer"
+                },
+                "finalized_root": {
+                    "type": "string"
+                },
+                "genesis_time": {
+                    "type": "integer"
+                },
+                "head_root": {
+                    "type": "string"
+                },
+                "head_slot": {
+                    "type": "integer"
+                },
+                "justified_epoch": {
+                    "type": "integer"
+                },
+                "justified_root": {
+                    "type": "string"
+                },
+                "network_name": {
+                    "type": "string"
+                },
+                "slot_duration_ms": {
+                    "type": "integer"
+                },
+                "slots_per_epoch": {
+                    "type": "integer"
+                },
+                "tests_queued": {
+                    "type": "integer"
+                },
+                "tests_running": {
+                    "type": "integer"
+                }
+            }
+        },
         "web_api.PostTestRunCancelRequest": {
             "type": "object",
             "properties": {
@@ -1976,7 +2471,16 @@ const docTemplate = `{
                     "type": "object",
                     "additionalProperties": {}
                 },
+                "queue": {
+                    "description": "Queue is the modern (v2) way of expressing where the new test\nshould slot relative to the runner's pending queue. When unset\nthe request falls back to SkipQueue. See ScheduleQueueOption.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/web_api.ScheduleQueueOption"
+                        }
+                    ]
+                },
                 "skip_queue": {
+                    "description": "SkipQueue is the legacy boolean that drove \"off-queue parallel\nexecution\". Kept for backward compatibility — when Queue is\nsupplied it wins; otherwise we fall through to this field.\n\nDeprecated: use Queue with mode=\"immediate\".",
                     "type": "boolean"
                 },
                 "test_id": {
@@ -2126,12 +2630,50 @@ const docTemplate = `{
                 }
             }
         },
+        "web_api.PutTestScheduleRequest": {
+            "type": "object",
+            "properties": {
+                "schedule": {
+                    "description": "Schedule is the new schedule. May be null to clear.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.TestSchedule"
+                        }
+                    ]
+                }
+            }
+        },
         "web_api.Response": {
             "type": "object",
             "properties": {
                 "data": {},
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "web_api.ScheduleQueueMode": {
+            "type": "string",
+            "enum": [
+                "immediate",
+                "end",
+                "after"
+            ],
+            "x-enum-varnames": [
+                "ScheduleQueueModeImmediate",
+                "ScheduleQueueModeEnd",
+                "ScheduleQueueModeAfter"
+            ]
+        },
+        "web_api.ScheduleQueueOption": {
+            "type": "object",
+            "properties": {
+                "after_run_id": {
+                    "description": "AfterRunID is honoured only when Mode == \"after\". The new test\nis placed immediately after that run in the pending queue. If\nthe referenced run is no longer queued the request silently\nfalls back to \"append to end\".",
+                    "type": "integer"
+                },
+                "mode": {
+                    "$ref": "#/definitions/web_api.ScheduleQueueMode"
                 }
             }
         }

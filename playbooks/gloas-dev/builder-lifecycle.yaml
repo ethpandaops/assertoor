@@ -1,29 +1,47 @@
 id: builder-lifecycle
-name: "GLOAS: Builder Lifecycle Test"
+name: "GLOAS: Builder Lifecycle Test (both onboarding paths)"
 description: |
-  End-to-end lifecycle for GLOAS builders (validators with 0x03
-  withdrawal credentials). Walks 10 builder keys through:
+  End-to-end lifecycle for GLOAS builders (EIP-8282), exercising BOTH ways a
+  builder can be onboarded.
 
-  1. Deposit 6 builders across the GLOAS activation boundary (3 before,
-     3 after).
-  2. Wait for all 6 to become active.
-  3. Exit them with alternating voluntary / EL-triggered exits, 10 slots
-     apart, ensuring exits span at least 2 epochs.
-  4. Wait for builders 0–2 to be fully withdrawn (balance == 0).
-  5. Deposit 4 new builders (keys 6–9) and verify **builder index reuse**:
-     keys 6/7/8 get the now-empty indices 0/1/2; key 9 gets a new index.
-  6. Send no-op partial withdrawal & consolidation requests against
-     active builders (should have no effect).
-  7. EL-triggered exit all newly-deposited builders.
+  When the test is started BEFORE GLOAS activation:
+  1. PRE-FORK onboarding: deposit builderCount builders a few slots BEFORE GLOAS
+     activates, using the regular validator deposit contract with 0x03 (builder)
+     withdrawal credentials. These deposits sit in the pending-deposit queue and,
+     because they reach the fork unprocessed, are converted to builders at the
+     fork by `onboard_builders_from_pending_deposits`. Their signatures are
+     verified under the regular DOMAIN_DEPOSIT (NOT the builder domain), so the
+     ordinary `generate_deposits` task is used unchanged.
+  2. POST-FORK deposits: after the first GLOAS block (once the builder deposit
+     system contract's fee inhibitor has been cleared), deposit builderCount more
+     builders via the new builder deposit system contract (raw calldata, signed
+     under DOMAIN_BUILDER_DEPOSIT).
 
-  Verifies the GLOAS builder pool tracks deposits / exits / index reuse
-  correctly across epoch boundaries.
+  When the test is started AFTER GLOAS activation, the pre-fork path is no longer
+  possible, so ALL 2*builderCount builders are deposited via the new builder
+  deposit contract instead.
+
+  Then:
+  3. Wait for all builders to become active.
+  4. Exit them via builder exit requests (EIP-8282), spread across 2 epochs, and
+     verify they enter the exiting state.
+  5. (Only when MIN_BUILDER_WITHDRAWABILITY_DELAY < 10 epochs) Wait for the exited
+     builders to be fully withdrawn (balance 0), re-deposit a fresh set via the
+     builder contract, and verify they REUSE the freed builder indices. With the
+     default delay (8192 epochs) full withdrawal is not observable in a
+     short-lived run, so that phase is skipped.
 version: 1.0.0
-tags: [gloas, builder, lifecycle, deposit, exit, withdrawal, el-triggered, voluntary]
-timeout: 24h
+tags: [gloas, builder, lifecycle, deposit, exit, eip-8282]
+timeout: 2h
 config:
   walletPrivkey: ''
+  # Regular validator deposit contract (pre-fork builder onboarding via 0x03 creds).
   depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
+  # EIP-8282 builder system contracts (post-fork deposits / exits).
+  builderDepositContract: '0x0000884d2AA32eAa155F59A2f24eFa73D9008282'
+  builderExitContract: '0x000014574A74c805590AFF9499fc7A690f008282'
+  # Builders per onboarding path.
+  builderCount: 5
   depositAmount: 5
 
 tasks:
@@ -44,7 +62,7 @@ tasks:
 
 - name: run_shell
   id: calc_slots
-  title: "Calculate deposit timing slots"
+  title: "Calculate fork-relative deposit timing"
   config:
     envVars:
       GLOAS_FORK_EPOCH: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
@@ -52,39 +70,46 @@ tasks:
       CURRENT_SLOT: "tasks.current_slot.outputs.currentSlot"
     command: |
       set -e
-      GLOAS_FORK_EPOCH=$(echo $GLOAS_FORK_EPOCH | jq -r .)
-      SLOTS_PER_EPOCH=$(echo $SLOTS_PER_EPOCH | jq -r .)
-      CURRENT_SLOT=$(echo $CURRENT_SLOT | jq -r .)
+      GLOAS_FORK_EPOCH=$(echo "$GLOAS_FORK_EPOCH" | jq -r .)
+      SLOTS_PER_EPOCH=$(echo "$SLOTS_PER_EPOCH" | jq -r .)
+      CURRENT_SLOT=$(echo "$CURRENT_SLOT" | jq -r .)
 
-      GLOAS_ACTIVATION_SLOT=$((GLOAS_FORK_EPOCH * SLOTS_PER_EPOCH))
+      ACTIVATION_SLOT=$((GLOAS_FORK_EPOCH * SLOTS_PER_EPOCH))
+      # Pre-fork deposits land a few slots before activation so they reach the fork
+      # still pending and get onboarded as builders.
+      PREFORK_SLOT_COUNT=$((SLOTS_PER_EPOCH / 3))
+      PREFORK_SLOT=$((ACTIVATION_SLOT - PREFORK_SLOT_COUNT))
 
-      if [ "$CURRENT_SLOT" -lt "$((GLOAS_ACTIVATION_SLOT - 5))" ]; then
-        # Pre-GLOAS: deposit around GLOAS activation boundary
-        DEPOSIT1_SLOT=$((GLOAS_ACTIVATION_SLOT - 5))
-        DEPOSIT2_SLOT=$((GLOAS_ACTIVATION_SLOT + 5))
-        WAIT_EPOCH=$((GLOAS_FORK_EPOCH + 1))
-        echo "Mode: pre-GLOAS (deposits around GLOAS activation)"
+      if [ "$CURRENT_SLOT" -lt "$PREFORK_SLOT" ]; then
+        # Started before the fork: exercise both onboarding paths.
+        IS_PREFORK=true
+        POSTFORK_SLOT=$((ACTIVATION_SLOT + 4))
+        ACTIVE_EPOCH=$((GLOAS_FORK_EPOCH + 4))
+        echo "Mode: pre-fork start (regular-contract onboarding + new-contract deposits)"
       else
-        # Post-GLOAS: deposit around next epoch boundary
-        # Find next epoch boundary at least 10 slots in the future
-        MIN_FUTURE=$((CURRENT_SLOT + 10))
-        TARGET_EPOCH=$(( (MIN_FUTURE + SLOTS_PER_EPOCH - 1) / SLOTS_PER_EPOCH ))
-        EPOCH_BOUNDARY_SLOT=$((TARGET_EPOCH * SLOTS_PER_EPOCH))
-        DEPOSIT1_SLOT=$((EPOCH_BOUNDARY_SLOT - 5))
-        DEPOSIT2_SLOT=$((EPOCH_BOUNDARY_SLOT + 5))
-        WAIT_EPOCH=$((TARGET_EPOCH + 1))
-        echo "Mode: post-GLOAS (deposits around epoch $TARGET_EPOCH boundary)"
+        # Started at/after the fork: pre-fork onboarding is no longer possible,
+        # so deposit everything via the new builder contract.
+        IS_PREFORK=false
+        # A couple slots ahead, and at least 2 slots past activation so the
+        # builder deposit contract's EXCESS_INHIBITOR has been cleared.
+        POSTFORK_SLOT=$((CURRENT_SLOT + 2))
+        if [ "$POSTFORK_SLOT" -lt "$((ACTIVATION_SLOT + 2))" ]; then
+          POSTFORK_SLOT=$((ACTIVATION_SLOT + 2))
+        fi
+        ACTIVE_EPOCH=$(( (POSTFORK_SLOT / SLOTS_PER_EPOCH) + 4 ))
+        echo "Mode: post-fork start (all builders via the new builder contract)"
       fi
 
-      echo "Current slot: $CURRENT_SLOT"
-      echo "GLOAS activation slot: $GLOAS_ACTIVATION_SLOT"
-      echo "Deposit 1 slot: $DEPOSIT1_SLOT"
-      echo "Deposit 2 slot: $DEPOSIT2_SLOT"
-      echo "Wait epoch: $WAIT_EPOCH"
+      echo "Current slot:       $CURRENT_SLOT"
+      echo "GLOAS activation:   epoch $GLOAS_FORK_EPOCH (slot $ACTIVATION_SLOT)"
+      echo "Pre-fork deposits:  slot $PREFORK_SLOT (used: $IS_PREFORK)"
+      echo "Post-fork deposits: slot $POSTFORK_SLOT"
+      echo "Active wait epoch:  $ACTIVE_EPOCH"
 
-      echo "::set-output-json deposit1Slot $DEPOSIT1_SLOT"
-      echo "::set-output-json deposit2Slot $DEPOSIT2_SLOT"
-      echo "::set-output-json waitEpoch $WAIT_EPOCH"
+      echo "::set-output-json isPreFork $IS_PREFORK"
+      echo "::set-output-json preforkSlot $PREFORK_SLOT"
+      echo "::set-output-json postforkSlot $POSTFORK_SLOT"
+      echo "::set-output-json activeEpoch $ACTIVE_EPOCH"
 
 # prepare wallet and mnemonic
 - name: generate_child_wallet
@@ -102,508 +127,277 @@ tasks:
 
 - name: get_pubkeys_from_mnemonic
   id: builder_pubkeys
-  title: "Get pubkeys for all 10 builder keys"
+  title: "Get pubkeys for all builder keys"
   configVars:
     mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-  config:
-    count: 10
+    # 2*builderCount for the two onboarding paths, plus builderCount fresh keys
+    # for the (conditional) index-reuse re-deposit.
+    count: "| .builderCount * 3"
 
 ##
-## PHASE 1: Deposit 6 builders (3 before boundary, 3 after)
+## PHASE 1a: PRE-FORK onboarding (only when started before the fork)
+##  Deposit builderCount builders (keys 0..builderCount-1) via the regular deposit
+##  contract with 0x03 credentials, before GLOAS activates. They are onboarded as
+##  builders at the fork (onboard_builders_from_pending_deposits), which verifies
+##  the signature under the regular DOMAIN_DEPOSIT.
 ##
 
 - name: check_consensus_slot_range
-  title: "Wait for deposit 1 slot"
-  timeout: 2h
+  title: "Wait for pre-fork deposit slot (${{ tasks.calc_slots.outputs.preforkSlot }})"
+  timeout: 1h
+  if: "| .tasks.calc_slots.outputs.isPreFork"
   configVars:
-    minSlotNumber: "tasks.calc_slots.outputs.deposit1Slot"
+    minSlotNumber: "tasks.calc_slots.outputs.preforkSlot"
 
 - name: generate_deposits
-  id: deposit_batch1
-  title: "Deposit builders 0-2 with 0x03 credentials"
+  id: prefork_deposits
+  title: "Pre-fork: deposit ${builderCount} builders (regular contract, 0x03 creds)"
+  if: "| .tasks.calc_slots.outputs.isPreFork"
   config:
-    limitTotal: 3
-    limitPerSlot: 3
-    indexCount: 3
-    startIndex: 0
     awaitReceipt: true
-    awaitInclusion: true
+    failOnReject: true
   configVars:
+    limitTotal: "builderCount"
+    indexCount: "builderCount"
+    startIndex: "| 0"
+    depositAmount: "depositAmount"
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
     mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
     depositContract: "depositContract"
-    depositAmount: "depositAmount"
+    # 0x03 builder credentials: version byte + 11 zero bytes + 20-byte address
     withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
-# Verify batch 1 deposit receipts
-- name: run_shell
-  title: "Verify deposit receipts for builders 0-2"
-  config:
-    envVars:
-      RECEIPTS: "tasks.deposit_batch1.outputs.depositReceipts"
-    command: |
-      set -e
-      COUNT=$(echo "$RECEIPTS" | jq 'length')
-      FAILED=$(echo "$RECEIPTS" | jq '[.[] | select(.status != "0x1")] | length')
-      echo "Batch 1: $COUNT receipts, $FAILED failed"
-      if [ "$FAILED" -gt 0 ]; then
-        echo "ERROR: some deposits failed"
-        echo "$RECEIPTS" | jq '.[] | select(.status != "0x1")'
-        exit 1
-      fi
+##
+## PHASE 1b: POST-FORK deposits
+##  After the first GLOAS block, deposit builders via the new builder deposit
+##  system contract (EIP-8282). When started before the fork this deposits the
+##  second half (keys builderCount..2*builderCount-1); when started after the
+##  fork it ALSO deposits the first half (keys 0..builderCount-1), since the
+##  pre-fork path was skipped.
+##
 
 - name: check_consensus_slot_range
-  title: "Wait for deposit 2 slot"
-  timeout: 2h
+  title: "Wait for post-fork deposit slot (${{ tasks.calc_slots.outputs.postforkSlot }})"
+  timeout: 1h
   configVars:
-    minSlotNumber: "tasks.calc_slots.outputs.deposit2Slot"
+    minSlotNumber: "tasks.calc_slots.outputs.postforkSlot"
 
-- name: generate_deposits
-  id: deposit_batch2
-  title: "Deposit builders 3-5 with 0x03 credentials"
+# First half via the new contract — only when the pre-fork path was skipped.
+- name: generate_builder_deposits
+  id: postfork_deposits_first
+  title: "Post-fork: deposit first ${builderCount} builders (EIP-8282 contract)"
+  if: "| .tasks.calc_slots.outputs.isPreFork | not"
   config:
-    limitTotal: 3
-    limitPerSlot: 3
-    indexCount: 3
-    startIndex: 3
     awaitReceipt: true
     awaitInclusion: true
+    failOnReject: true
   configVars:
+    limitTotal: "builderCount"
+    indexCount: "builderCount"
+    startIndex: "| 0"
+    depositAmount: "depositAmount"
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
     mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    depositContract: "depositContract"
-    depositAmount: "depositAmount"
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+    builderDepositContract: "builderDepositContract"
 
-# Verify batch 2 deposit receipts
-- name: run_shell
-  title: "Verify deposit receipts for builders 3-5"
+# Second half via the new contract — always.
+- name: generate_builder_deposits
+  id: postfork_deposits_second
+  title: "Post-fork: deposit second ${builderCount} builders (EIP-8282 contract)"
   config:
-    envVars:
-      RECEIPTS: "tasks.deposit_batch2.outputs.depositReceipts"
-    command: |
-      set -e
-      COUNT=$(echo "$RECEIPTS" | jq 'length')
-      FAILED=$(echo "$RECEIPTS" | jq '[.[] | select(.status != "0x1")] | length')
-      echo "Batch 2: $COUNT receipts, $FAILED failed"
-      if [ "$FAILED" -gt 0 ]; then
-        echo "ERROR: some deposits failed"
-        echo "$RECEIPTS" | jq '.[] | select(.status != "0x1")'
-        exit 1
-      fi
+    awaitReceipt: true
+    awaitInclusion: true
+    failOnReject: true
+  configVars:
+    limitTotal: "builderCount"
+    indexCount: "builderCount"
+    startIndex: "builderCount"
+    depositAmount: "depositAmount"
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+    builderDepositContract: "builderDepositContract"
 
 ##
-## PHASE 2: Wait for all 6 builders to become active
+## PHASE 2: Wait for all builders (both paths) to become active
 ##
 
 - name: check_consensus_slot_range
-  title: "Wait for next epoch after deposits"
-  timeout: 30m
+  title: "Wait until builders should be active (epoch ${{ tasks.calc_slots.outputs.activeEpoch }})"
+  timeout: 1h
   configVars:
-    minEpochNumber: "tasks.calc_slots.outputs.waitEpoch"
+    minEpochNumber: "tasks.calc_slots.outputs.activeEpoch"
 
 - name: run_task_matrix
-  title: "Wait for all 6 builders to become active"
-  timeout: 2h
+  title: "Verify all ${{ .builderCount * 2 }} builders are active"
+  timeout: 1h
   configVars:
-    matrixValues: "tasks.builder_pubkeys.outputs.pubkeys[:6]"
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[0:(.builderCount * 2)]"
   config:
     runConcurrent: true
     matrixVar: "builderPubkey"
     task:
       name: check_consensus_builder_status
-      title: "Wait for builder ${builderPubkey} to become active"
+      title: "Verify builder ${builderPubkey} is active"
       config:
         expectActive: true
+        failOnCheckMiss: true
       configVars:
         builderPubKey: "builderPubkey"
 
 ##
-## PHASE 3: Exit builders with alternating voluntary / EL-triggered exits, 10 slots apart
-##         Ensure exits span at least 2 epochs
+## PHASE 3: Exit all builders via builder exit requests (EIP-8282)
+##  Both halves exit via the builder exit contract, sent from the builder's
+##  execution address (the test wallet). The two halves are exited an epoch apart
+##  to exercise the exit queue across an epoch boundary.
 ##
 
-# Record epoch at start of exits
 - name: check_consensus_slot_range
   id: exit_start
   title: "Record epoch at start of exits"
 
-# Builder 0: voluntary exit (fallback to EL)
-- name: run_tasks
-  title: "Exit builder 0 (voluntary, EL fallback)"
-  config:
-    continueOnFailure: true
-    tasks:
-    - name: generate_exits
-      id: vol_exit_0
-      title: "Try voluntary exit for builder 0"
-      timeout: 2m
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        indexCount: 1
-        startIndex: 0
-        builderExit: true
-        sendToAllClients: true
-        awaitInclusion: true
-      configVars:
-        mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    - name: generate_withdrawal_requests
-      title: "Fallback: EL-triggered exit for builder 0"
-      if: "| .tasks.vol_exit_0.result != 1"
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        withdrawAmount: 0
-        awaitReceipt: true
-        failOnReject: true
-      configVars:
-        sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[0]"
-        walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-
-# Wait 10 slots
-- name: check_consensus_slot_range
-  id: post_exit0
-  title: "Get current slot after builder 0 exit"
-- name: check_consensus_slot_range
-  title: "Wait 10 slots"
-  timeout: 30m
-  configVars:
-    minSlotNumber: "| (.tasks.post_exit0.outputs.currentSlot | tonumber) + 10"
-
-# Builder 1: EL-triggered exit
-- name: generate_withdrawal_requests
-  title: "Exit builder 1 via EL-triggered exit"
-  config:
-    limitTotal: 1
-    limitPerSlot: 1
-    withdrawAmount: 0
-    awaitReceipt: true
-    failOnReject: true
-  configVars:
-    sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[1]"
-    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-
-# Wait 10 slots
-- name: check_consensus_slot_range
-  id: post_exit1
-  title: "Get current slot after builder 1 exit"
-- name: check_consensus_slot_range
-  title: "Wait 10 slots"
-  timeout: 30m
-  configVars:
-    minSlotNumber: "| (.tasks.post_exit1.outputs.currentSlot | tonumber) + 10"
-
-# Builder 2: voluntary exit (fallback to EL)
-- name: run_tasks
-  title: "Exit builder 2 (voluntary, EL fallback)"
-  config:
-    continueOnFailure: true
-    tasks:
-    - name: generate_exits
-      id: vol_exit_2
-      title: "Try voluntary exit for builder 2"
-      timeout: 1m
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        indexCount: 1
-        startIndex: 2
-        builderExit: true
-        sendToAllClients: true
-        awaitInclusion: true
-      configVars:
-        mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    - name: generate_withdrawal_requests
-      title: "Fallback: EL-triggered exit for builder 2"
-      if: "| .tasks.vol_exit_2.result != 1"
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        withdrawAmount: 0
-        awaitReceipt: true
-        failOnReject: true
-      configVars:
-        sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[2]"
-        walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-
-# After first 3 exits: ensure we cross an epoch boundary before continuing
-- name: check_consensus_slot_range
-  title: "Ensure exits span at least 2 epochs"
-  timeout: 30m
-  configVars:
-    minEpochNumber: "| (.tasks.exit_start.outputs.currentEpoch | tonumber) + 1"
-
-# Builder 3: EL-triggered exit
-- name: generate_withdrawal_requests
-  title: "Exit builder 3 via EL-triggered exit"
-  config:
-    limitTotal: 1
-    limitPerSlot: 1
-    withdrawAmount: 0
-    awaitReceipt: true
-    failOnReject: true
-  configVars:
-    sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[3]"
-    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-
-# Builder 4: voluntary exit (fallback to EL)
-- name: run_tasks
-  title: "Exit builder 4 (voluntary, EL fallback)"
-  config:
-    continueOnFailure: true
-    tasks:
-    - name: generate_exits
-      id: vol_exit_4
-      title: "Try voluntary exit for builder 4"
-      timeout: 1m
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        indexCount: 1
-        startIndex: 4
-        builderExit: true
-        sendToAllClients: true
-        awaitInclusion: true
-      configVars:
-        mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    - name: generate_withdrawal_requests
-      title: "Fallback: EL-triggered exit for builder 4"
-      if: "| .tasks.vol_exit_4.result != 1"
-      config:
-        limitTotal: 1
-        limitPerSlot: 1
-        withdrawAmount: 0
-        awaitReceipt: true
-        failOnReject: true
-      configVars:
-        sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[4]"
-        walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-
-# Builder 5: EL-triggered exit
-- name: generate_withdrawal_requests
-  title: "Exit builder 5 via EL-triggered exit"
-  config:
-    limitTotal: 1
-    limitPerSlot: 1
-    withdrawAmount: 0
-    awaitReceipt: true
-    failOnReject: true
-  configVars:
-    sourcePubkey: "tasks.builder_pubkeys.outputs.pubkeys[5]"
-    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-
-##
-## PHASE 4: Wait for builders 0-2 to be fully withdrawn (balance == 0)
-##         Builders 0-2 exited in epoch N, builders 3-5 exited in epoch N+1
-##
-
-- name: run_task_options
-  title: "Wait for builders 0-2 to be fully withdrawn (non-fatal)"
-  config:
-    ignoreFailure: true
-    task:
-      name: run_task_matrix
-      title: "Wait for builders 0-2 to be fully withdrawn"
-      timeout: 30m
-      configVars:
-        matrixValues: "tasks.builder_pubkeys.outputs.pubkeys[:3]"
-      config:
-        runConcurrent: true
-        matrixVar: "builderPubkey"
-        task:
-          name: check_consensus_builder_status
-          title: "Wait for builder ${builderPubkey} to be withdrawn"
-          config:
-            expectExiting: true
-            maxBuilderBalance: 0
-          configVars:
-            builderPubKey: "builderPubkey"
-
-##
-## PHASE 5: Deposit 4 new builders (keys 6-9) to test index reuse
-##         Builders 0-2 are withdrawn (balance 0) -> indices 0-2 reusable
-##         Builders 3-5 still exiting (later epoch) -> indices 3-5 NOT reusable
-##         Expected: key 6->idx 0, key 7->idx 1, key 8->idx 2, key 9->idx 6
-##
-
-- name: generate_deposits
-  id: deposit_batch3
-  title: "Deposit builders 6-9 with 0x03 credentials"
-  config:
-    limitTotal: 4
-    limitPerSlot: 4
-    indexCount: 4
-    startIndex: 6
-    awaitReceipt: true
-    awaitInclusion: true
-  configVars:
-    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-    mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
-    depositContract: "depositContract"
-    depositAmount: "depositAmount"
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
-
-# Verify batch 3 deposit receipts
-- name: run_shell
-  title: "Verify deposit receipts for builders 6-9"
-  config:
-    envVars:
-      RECEIPTS: "tasks.deposit_batch3.outputs.depositReceipts"
-    command: |
-      set -e
-      COUNT=$(echo "$RECEIPTS" | jq 'length')
-      FAILED=$(echo "$RECEIPTS" | jq '[.[] | select(.status != "0x1")] | length')
-      echo "Batch 3: $COUNT receipts, $FAILED failed"
-      if [ "$FAILED" -gt 0 ]; then
-        echo "ERROR: some deposits failed"
-        echo "$RECEIPTS" | jq '.[] | select(.status != "0x1")'
-        exit 1
-      fi
-
-# Wait for new builders to become active
+# Exit the first half (keys 0..builderCount-1)
 - name: run_task_matrix
-  title: "Wait for builders 6-9 to become active"
-  timeout: 2h
+  title: "Exit first ${builderCount} builders (EIP-8282)"
   configVars:
-    matrixValues: "tasks.builder_pubkeys.outputs.pubkeys[6:10]"
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[0:.builderCount]"
   config:
     runConcurrent: true
     matrixVar: "builderPubkey"
     task:
-      name: check_consensus_builder_status
-      title: "Wait for builder ${builderPubkey} to become active"
-      config:
-        expectActive: true
-      configVars:
-        builderPubKey: "builderPubkey"
-
-##
-## PHASE 6: Verify builder index reuse (non-fatal)
-##         key 6 -> index 0, key 7 -> index 1, key 8 -> index 2, key 9 -> index 6
-##
-
-- name: run_tasks
-  title: "Verify builder index reuse"
-  config:
-    continueOnFailure: true
-    tasks:
-    - name: check_consensus_builder_status
-      title: "Verify key 6 reused builder index 0"
-      config:
-        failOnCheckMiss: true
-      configVars:
-        builderPubKey: "tasks.builder_pubkeys.outputs.pubkeys[6]"
-        builderIndex: "| 0"
-
-    - name: check_consensus_builder_status
-      title: "Verify key 7 reused builder index 1"
-      config:
-        failOnCheckMiss: true
-      configVars:
-        builderPubKey: "tasks.builder_pubkeys.outputs.pubkeys[7]"
-        builderIndex: "| 1"
-
-    - name: check_consensus_builder_status
-      title: "Verify key 8 reused builder index 2"
-      config:
-        failOnCheckMiss: true
-      configVars:
-        builderPubKey: "tasks.builder_pubkeys.outputs.pubkeys[8]"
-        builderIndex: "| 2"
-
-    - name: check_consensus_builder_status
-      title: "Verify key 9 got new builder index 6"
-      config:
-        failOnCheckMiss: true
-      configVars:
-        builderPubKey: "tasks.builder_pubkeys.outputs.pubkeys[9]"
-        builderIndex: "| 6"
-
-##
-## PHASE 7: Test invalid withdrawal & consolidation requests on active builders
-##         These should have no effect but we want to exercise the code paths
-##
-
-# Partial withdrawal requests (amount > 0) for active builders - should be no-ops
-- name: run_task_matrix
-  title: "Send partial withdrawal requests for active builders (expect no effect)"
-  configVars:
-    matrixValues: "tasks.builder_pubkeys.outputs.pubkeys[6:10]"
-  config:
-    runConcurrent: true
-    matrixVar: "builderPubkey"
-    task:
-      name: run_task_options
-      title: "Partial withdrawal request for ${builderPubkey}"
-      config:
-        ignoreFailure: true
-        task:
-          name: generate_withdrawal_requests
-          title: "Send partial withdrawal for ${builderPubkey}"
-          config:
-            limitTotal: 1
-            limitPerSlot: 1
-            withdrawAmount: 1000000000  # 1 ETH in gwei
-            awaitReceipt: true
-          configVars:
-            sourcePubkey: "builderPubkey"
-            walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-
-# Consolidation requests for active builders - should be no-ops
-- name: run_task_matrix
-  title: "Send consolidation requests for active builders (expect no effect)"
-  configVars:
-    matrixValues: "tasks.builder_pubkeys.outputs.pubkeys[6:9]"
-  config:
-    runConcurrent: true
-    matrixVar: "builderPubkey"
-    task:
-      name: run_task_options
-      title: "Consolidation request for ${builderPubkey}"
-      config:
-        ignoreFailure: true
-        task:
-          name: generate_consolidations
-          title: "Send consolidation for ${builderPubkey}"
-          config:
-            limitTotal: 1
-            limitPerSlot: 1
-            awaitReceipt: true
-          configVars:
-            sourcePubkey: "builderPubkey"
-            targetPublicKey: "tasks.builder_pubkeys.outputs.pubkeys[9]"
-            walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
-
-##
-## PHASE 8: Wait an epoch, then exit all newly deposited builders
-##
-
-- name: check_consensus_slot_range
-  id: pre_final_exits
-  title: "Get current epoch before final exits"
-- name: check_consensus_slot_range
-  title: "Wait for next epoch"
-  timeout: 30m
-  configVars:
-    minEpochNumber: "| (.tasks.pre_final_exits.outputs.currentEpoch | tonumber) + 1"
-
-# Exit all 4 new builders via EL-triggered exits
-- name: run_task_matrix
-  title: "Exit builders 6-9 via EL-triggered exit"
-  configVars:
-    matrixValues: "tasks.builder_pubkeys.outputs.pubkeys[6:10]"
-  config:
-    matrixVar: "builderPubkey"
-    task:
-      name: generate_withdrawal_requests
-      title: "EL-triggered exit for ${builderPubkey}"
+      name: generate_builder_exits
+      title: "Builder exit for ${builderPubkey}"
       config:
         limitTotal: 1
         limitPerSlot: 1
-        withdrawAmount: 0
         awaitReceipt: true
         failOnReject: true
       configVars:
         sourcePubkey: "builderPubkey"
         walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+        builderExitContract: "builderExitContract"
+
+# Wait for the next epoch so the second batch exits in a later epoch
+- name: check_consensus_slot_range
+  title: "Wait one epoch before exiting the second half"
+  timeout: 30m
+  configVars:
+    minEpochNumber: "| (.tasks.exit_start.outputs.currentEpoch | tonumber) + 1"
+
+# Exit the second half (keys builderCount..2*builderCount-1)
+- name: run_task_matrix
+  title: "Exit second ${builderCount} builders (EIP-8282)"
+  configVars:
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[.builderCount:(.builderCount * 2)]"
+  config:
+    runConcurrent: true
+    matrixVar: "builderPubkey"
+    task:
+      name: generate_builder_exits
+      title: "Builder exit for ${builderPubkey}"
+      config:
+        limitTotal: 1
+        limitPerSlot: 1
+        awaitReceipt: true
+        failOnReject: true
+      configVars:
+        sourcePubkey: "builderPubkey"
+        walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+        builderExitContract: "builderExitContract"
+
+##
+## PHASE 4: Verify all builders have entered the exiting state
+##  (withdrawable_epoch set; full withdrawal itself takes
+##  MIN_BUILDER_WITHDRAWABILITY_DELAY and is awaited only in phase 5).
+##
+
+- name: run_task_matrix
+  title: "Verify all builders are exiting"
+  timeout: 30m
+  configVars:
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[0:(.builderCount * 2)]"
+  config:
+    runConcurrent: true
+    matrixVar: "builderPubkey"
+    task:
+      name: check_consensus_builder_status
+      title: "Verify builder ${builderPubkey} is exiting"
+      config:
+        expectExiting: true
+        failOnCheckMiss: true
+      configVars:
+        builderPubKey: "builderPubkey"
+
+##
+## PHASE 5: Builder index reuse (only when MIN_BUILDER_WITHDRAWABILITY_DELAY < 10)
+##  Wait for all exited builders to be fully withdrawn (balance 0), then re-deposit
+##  builderCount fresh builders (keys 2*builderCount..3*builderCount-1) via the
+##  builder contract. get_index_for_new_builder reuses the lowest free index, so
+##  processed in submission (key) order the fresh builders reuse indices
+##  0..builderCount-1.
+##
+
+- name: run_task_matrix
+  title: "Wait for all builders to be fully withdrawn (balance 0)"
+  timeout: 1h
+  if: "| (.tasks.get_specs.outputs.specs.MIN_BUILDER_WITHDRAWABILITY_DELAY | tonumber) < 10"
+  configVars:
+    matrixValues: "| .tasks.builder_pubkeys.outputs.pubkeys[0:(.builderCount * 2)]"
+  config:
+    runConcurrent: true
+    matrixVar: "builderPubkey"
+    task:
+      name: check_consensus_builder_status
+      title: "Wait for builder ${builderPubkey} to be withdrawn"
+      config:
+        expectExiting: true
+        maxBuilderBalance: 0
+      configVars:
+        builderPubKey: "builderPubkey"
+
+- name: generate_builder_deposits
+  id: reuse_deposits
+  title: "Re-deposit ${builderCount} fresh builders to test index reuse"
+  if: "| (.tasks.get_specs.outputs.specs.MIN_BUILDER_WITHDRAWABILITY_DELAY | tonumber) < 10"
+  config:
+    awaitReceipt: true
+    awaitInclusion: true
+    failOnReject: true
+  configVars:
+    limitTotal: "builderCount"
+    indexCount: "builderCount"
+    startIndex: "| .builderCount * 2"
+    depositAmount: "depositAmount"
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
+    builderDepositContract: "builderDepositContract"
+
+- name: check_consensus_slot_range
+  id: reuse_active_wait
+  title: "Record epoch before waiting for reused builders to activate"
+  if: "| (.tasks.get_specs.outputs.specs.MIN_BUILDER_WITHDRAWABILITY_DELAY | tonumber) < 10"
+
+- name: check_consensus_slot_range
+  title: "Wait for reused builders to finalize+activate"
+  timeout: 30m
+  if: "| (.tasks.get_specs.outputs.specs.MIN_BUILDER_WITHDRAWABILITY_DELAY | tonumber) < 10"
+  configVars:
+    minEpochNumber: "| (.tasks.reuse_active_wait.outputs.currentEpoch | tonumber) + 3"
+
+- name: run_task_matrix
+  title: "Verify fresh builders reused freed builder indices 0..${{ .builderCount - 1 }}"
+  if: "| (.tasks.get_specs.outputs.specs.MIN_BUILDER_WITHDRAWABILITY_DELAY | tonumber) < 10"
+  configVars:
+    # [index, pubkey] pairs for the re-deposited keys; the i-th fresh builder
+    # should reuse freed builder index i.
+    matrixValues: "| .builderCount as $n | .tasks.builder_pubkeys.outputs.pubkeys as $pk | [range(0; $n)] | map([., $pk[(. + ($n * 2))]])"
+  config:
+    runConcurrent: true
+    matrixVar: "reuseEntry"
+    task:
+      name: check_consensus_builder_status
+      title: "Verify reused builder ${{ .reuseEntry[1] }} has index ${{ .reuseEntry[0] }}"
+      config:
+        failOnCheckMiss: true
+      configVars:
+        builderPubKey: "| .reuseEntry[1]"
+        builderIndex: "| .reuseEntry[0]"
