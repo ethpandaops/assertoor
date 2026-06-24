@@ -79,9 +79,9 @@ tasks:
   # Generate a funded deployer wallet
   - name: generate_child_wallet
     id: deployerWallet
-    title: "Generate funded deployer wallet (1 ETH)"
+    title: "Generate funded deployer wallet (1000 ETH)"
     config:
-      prefundMinBalance: 1000000000000000000  # 1 ETH
+      prefundMinBalance: 1000000000000000000000  # 1000 ETH — Amsterdam state gas makes 30KB cost ~47M gas, 60KB ~94M gas
       walletSeed: "eip7954-initcode-test"
     configVars:
       privateKey: "walletPrivkey"
