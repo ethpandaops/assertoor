@@ -499,10 +499,15 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 						continue
 					}
 
+					// committeeBits is a bitfield.Bitvector64, whose BitAt only works at
+					// the mainnet 8-byte size; under smaller presets it is shorter, so we
+					// test the bits length-agnostically (see committeeBitSet).
+					committeeBitsBytes := []byte(committeeBits)
+
 					aggregationBitsOffset := uint64(0)
 
 					for committee := uint64(0); committee < specs.MaxCommitteesPerSlot; committee++ {
-						if !committeeBits.BitAt(committee) {
+						if !committeeBitSet(committeeBitsBytes, committee) {
 							continue
 						}
 
@@ -557,6 +562,12 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 	t.logger.Debugf("aggregated epoch %v votes in %v", epoch, time.Since(t1))
 
 	return votes
+}
+
+// committeeBitSet reports whether the committee-th bit is set in b.
+func committeeBitSet(b []byte, committee uint64) bool {
+	byteIdx := committee / 8
+	return byteIdx < uint64(len(b)) && b[byteIdx]&(1<<(committee%8)) != 0
 }
 
 func (t *Task) aggregateAttestationVotes(votes *epochVotes, slot, committee uint64, aggregationBits bitfield.Bitfield, aggregationBitsOffset uint64) (voteAmount, voteCount, validatorCount uint64) {
