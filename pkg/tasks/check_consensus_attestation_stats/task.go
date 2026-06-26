@@ -506,7 +506,7 @@ func (t *Task) aggregateEpochVotes(ctx context.Context, epoch uint64) []*epochVo
 							continue
 						}
 
-						voteAmt, voteCnt, committeeSize := t.aggregateAttestationVotes(votes, uint64(attData.Slot), committee, attAggregationBits, 0)
+						voteAmt, voteCnt, committeeSize := t.aggregateAttestationVotes(votes, uint64(attData.Slot), committee, attAggregationBits, aggregationBitsOffset)
 						voteAmount += voteAmt
 						voteCount += voteCnt
 						aggregationBitsOffset += committeeSize
