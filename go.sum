@@ -79,8 +79,8 @@ github.com/ethereum/go-ethereum v1.17.3 h1:Ev/sQHH+UdKZHWjuVzhu2pxhi/sXaPZl23Q+Q
 github.com/ethereum/go-ethereum v1.17.3/go.mod h1:f2EhRwqewIZkGoQekywI2Y2RZAMTSavLNkD9qItFy1A=
 github.com/ethpandaops/ethwallclock v0.4.0 h1:+sgnhf4pk6hLPukP076VxkiLloE4L0Yk1yat+ZyHh1g=
 github.com/ethpandaops/ethwallclock v0.4.0/go.mod h1:y0Cu+mhGLlem19vnAV2x0hpFS5KZ7oOi2SWYayv9l24=
-github.com/ethpandaops/go-eth2-client v0.1.2 h1:nJr0YBmqHtbVeLeWEDyXwjCEO0AFt1Z0lIciMYlowfU=
-github.com/ethpandaops/go-eth2-client v0.1.2/go.mod h1:U3KdR8QSq8vqs9LWSGAF4ETHJpcB62E1DFf0gVMgWv0=
+github.com/ethpandaops/go-eth2-client v0.1.5 h1:MaWQ+KT+p7g+Lkx7pVuS+7omOAPYAKvtHXzGP8FjXTM=
+github.com/ethpandaops/go-eth2-client v0.1.5/go.mod h1:97Oq3omOQSGPPYgrbsOIIw2Pc4T5Ph21f8ZRyHJQBHU=
 github.com/ethpandaops/service-authenticatoor v0.0.1 h1:yZ0gKYf+kkj92piqqYprpF6HkhEIhCNmzDrsYth92KI=
 github.com/ethpandaops/service-authenticatoor v0.0.1/go.mod h1:+C6sQMBxY2E3u6BITSZakQrGRovNnB1CamuQh/RIaXI=
 github.com/ethpandaops/spamoor v1.2.1 h1:ndCCKVehEB9t8O7/wnpZfqQ846uiknX1IQ10Di/2vAE=
@@ -247,10 +247,10 @@ github.com/pion/transport/v2 v2.2.1 h1:7qYnCBlpgSJNYMbLCKuSY9KbQdBFoETvPNETv0y4N
 github.com/pion/transport/v2 v2.2.1/go.mod h1:cXXWavvCnFF6McHTft3DWS9iic2Mftcz1Aq29pGcU5g=
 github.com/pion/transport/v3 v3.0.1 h1:gDTlPJwROfSfz6QfSi0ZmeCSkFcnWWiiR9ES0ouANiM=
 github.com/pion/transport/v3 v3.0.1/go.mod h1:UY7kiITrlMv7/IKgd5eTUcaahZx5oUN3l9SzK5f5xE0=
-github.com/pk910/dynamic-ssz v1.3.2-0.20260505131440-111bcb265c8f h1:k1Dn2h+msg+T0c25hoiJ739ckCNt1dqKErLylois7ss=
-github.com/pk910/dynamic-ssz v1.3.2-0.20260505131440-111bcb265c8f/go.mod h1:ARK5qDyrJ/MHpaZHGJYvCKElvaMYTE9pXOQbvPDeE0U=
-github.com/pk910/hashtree-bindings v0.1.0 h1:w7NyRWFi2OaYEFvo9ADcE/QU6PMuVLl3hBgx92KiH9c=
-github.com/pk910/hashtree-bindings v0.1.0/go.mod h1:zrWt88783JmhBfcgni6kkIMYRdXTZi/FL//OyI5T/l4=
+github.com/pk910/dynamic-ssz v1.3.2 h1:65UR/O+ss+U2Dn86Rdl7LwehHo3u2ElutduS/pcuUXE=
+github.com/pk910/dynamic-ssz v1.3.2/go.mod h1:lqmnou2bjr2UWQ3C/L3082TGW0SFl/SwT7ionwM0+FU=
+github.com/pk910/hashtree-bindings v0.2.2 h1:gkczxxekBW2NeMK9N3OLj7Jepe7zPmJGVwr8LyofGsA=
+github.com/pk910/hashtree-bindings v0.2.2/go.mod h1:zrWt88783JmhBfcgni6kkIMYRdXTZi/FL//OyI5T/l4=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

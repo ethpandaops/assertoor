@@ -25,6 +25,8 @@ import (
 	generatebatchdeposits "github.com/ethpandaops/assertoor/pkg/tasks/generate_batch_deposits"
 	generateblobtransactions "github.com/ethpandaops/assertoor/pkg/tasks/generate_blob_transactions"
 	generateblschanges "github.com/ethpandaops/assertoor/pkg/tasks/generate_bls_changes"
+	generatebuilderdeposits "github.com/ethpandaops/assertoor/pkg/tasks/generate_builder_deposits"
+	generatebuilderexits "github.com/ethpandaops/assertoor/pkg/tasks/generate_builder_exits"
 	generatechildwallet "github.com/ethpandaops/assertoor/pkg/tasks/generate_child_wallet"
 	generateconsolidations "github.com/ethpandaops/assertoor/pkg/tasks/generate_consolidations"
 	generatedeposits "github.com/ethpandaops/assertoor/pkg/tasks/generate_deposits"
@@ -82,6 +84,8 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	generateblschanges.TaskDescriptor,
 	generatechildwallet.TaskDescriptor,
 	generateconsolidations.TaskDescriptor,
+	generatebuilderdeposits.TaskDescriptor,
+	generatebuilderexits.TaskDescriptor,
 	generateeoatransactions.TaskDescriptor,
 	generatedeposits.TaskDescriptor,
 	generateexits.TaskDescriptor,

@@ -1,0 +1,52 @@
+id: slash-validators
+name: "GLOAS: Slash validators (proposer 0-9, attester 10-19)"
+description: |
+  Small test that slashes 20 active validators from a supplied mnemonic:
+
+  - keys 0-9  via proposer slashings
+  - keys 10-19 via attester slashings
+
+  The validators must be active (e.g. genesis validators). awaitInclusion is on
+  so the test only passes once the slashings are actually included in blocks.
+version: 1.0.0
+tags: [gloas, slashing, proposer, attester]
+timeout: 30m
+config:
+  # Mnemonic of the (active) validators to slash, and the index of key 0.
+  validatorMnemonic: "apple topic worth benefit wet tragic toe essence table bleak fancy account current current canvas universe often dry law toilet about mimic hood south"
+  validatorStartIndex: 0
+  proposerSlashingCount: 10   # keys 0..9
+  attesterSlashingCount: 10   # keys 10..19
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# Proposer slashings for keys 0-9
+- name: generate_slashings
+  title: "Proposer slashings for keys 0-${proposerSlashingCount}"
+  timeout: 20m
+  config:
+    slashingType: "proposer"
+    awaitInclusion: true
+  configVars:
+    limitTotal: "proposerSlashingCount"
+    indexCount: "proposerSlashingCount"
+    startIndex: "validatorStartIndex"
+    mnemonic: "validatorMnemonic"
+
+# Attester slashings for keys 10-19
+- name: generate_slashings
+  title: "Attester slashings for ${attesterSlashingCount} keys starting at index ${proposerSlashingCount}"
+  timeout: 20m
+  config:
+    slashingType: "attester"
+    awaitInclusion: true
+  configVars:
+    limitTotal: "attesterSlashingCount"
+    indexCount: "attesterSlashingCount"
+    startIndex: "| .validatorStartIndex + .proposerSlashingCount"
+    mnemonic: "validatorMnemonic"

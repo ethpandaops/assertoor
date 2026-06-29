@@ -1,30 +1,32 @@
 id: builder-deposit-spam
-name: "GLOAS: Spam batched 0x03 builder deposits"
+name: "GLOAS: Spam builder deposits (EIP-8282)"
 description: |
-  Stress test for the GLOAS builder deposit path. Deploys a tiny batch
-  contract and uses it to register `totalDeposits` (default 1000)
-  builders with 0x03 credentials at `batchSize` (default 100) deposits
-  per tx, capped at `pendingBatches` in-flight.
+  Stress test for the GLOAS builder deposit path. Registers `totalDeposits`
+  (default 1000) builders via the builder deposit system contract (EIP-8282),
+  with up to `pendingDeposits` transactions in flight at a time.
 
-  After spamming, asserts the chain still finalizes (1 finalized epoch,
-  no more than 4 unfinalized) — i.e. the deposit storm does not break
-  finality.
+  Builder deposits are raw-calldata requests (no deposit() selector, no batch
+  contract), so each builder is its own transaction; throughput is controlled by
+  the in-flight cap rather than per-tx batching. The consensus layer validates
+  every BLS proof-of-possession individually on dequeue.
+
+  After spamming, asserts the chain still finalizes (1 finalized epoch, no more
+  than 4 unfinalized) — i.e. the deposit storm does not break finality.
 
   Optional `skipForkActivationCheck` to bypass the GLOAS-epoch wait on
   long-running devnets.
 version: 1.0.0
-tags: [gloas, builder, deposit, eip-6110, spam, stability]
+tags: [gloas, builder, deposit, eip-8282, spam, stability]
 timeout: 1h
 config:
   walletPrivkey: ''
-  depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
-  # Each batch tx fans out into batchSize deposits; CL validates every BLS signature individually.
-  batchSize: 100
+  # Builder deposit system contract (EIP-8282).
+  builderDepositContract: '0x0000884d2AA32eAa155F59A2f24eFa73D9008282'
   # Total deposits to push through the chain. Set to 0 to run unbounded until timeout.
   totalDeposits: 1000
-  # Hard cap of in-flight batches so we don't drown the mempool.
-  pendingBatches: 4
-  # Deposit amount per validator (ETH). 1 ETH keeps funding cheap on devnets.
+  # Hard cap of in-flight deposit transactions so we don't drown the mempool.
+  pendingDeposits: 200
+  # Deposit amount per builder (ETH). 1 ETH is the minimum builder deposit.
   depositAmount: 1
   # Percentage (0-100) of deposits to generate with corrupted signatures.
   invalidSigPerc: 0
@@ -57,7 +59,7 @@ tasks:
 
   - name: generate_child_wallet
     id: spam_wallet
-    title: Generate funded wallet for batched deposits
+    title: Generate funded wallet for builder deposits
     config:
       walletSeed: builder-deposit-spam
     configVars:
@@ -68,10 +70,10 @@ tasks:
 
   - name: get_random_mnemonic
     id: spam_mnemonic
-    title: Generate fresh mnemonic for spam validators
+    title: Generate fresh mnemonic for spam builders
 
-  - name: generate_batch_deposits
-    title: Deploy BatchDeposit and spam ${totalDeposits} 0x03 builder deposits in batches of ${batchSize}
+  - name: generate_builder_deposits
+    title: Spam ${totalDeposits} builder deposits (EIP-8282), up to ${pendingDeposits} in flight
     timeout: 45m
     config:
       awaitReceipt: true
@@ -80,14 +82,12 @@ tasks:
     configVars:
       walletPrivkey: tasks.spam_wallet.outputs.childWallet.privkey
       mnemonic: tasks.spam_mnemonic.outputs.mnemonic
-      depositContract: depositContract
-      batchSize: batchSize
+      builderDepositContract: builderDepositContract
       limitTotal: totalDeposits
-      limitPendingBatches: pendingBatches
+      indexCount: totalDeposits
+      limitPending: pendingDeposits
       depositAmount: depositAmount
       invalidSigPercent: invalidSigPerc
-      # 0x03 builder withdrawal credentials — version byte (0x03) + 11 zero bytes + 20-byte address.
-      withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.spam_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
   - name: check_consensus_finality
     title: Verify the chain still finalizes under deposit load

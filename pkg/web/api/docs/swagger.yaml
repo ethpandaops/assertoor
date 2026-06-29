@@ -184,6 +184,49 @@ definitions:
       state:
         type: string
     type: object
+  web_api.GetTestNextRunEntry:
+    properties:
+      expression:
+        type: string
+      next:
+        type: integer
+    type: object
+  web_api.GetTestNextRunEntryEarliest:
+    properties:
+      expression:
+        type: string
+      next:
+        type: integer
+    type: object
+  web_api.GetTestNextRunResponse:
+    properties:
+      earliest:
+        $ref: '#/definitions/web_api.GetTestNextRunEntryEarliest'
+      entries:
+        items:
+          $ref: '#/definitions/web_api.GetTestNextRunEntry'
+        type: array
+      test_id:
+        type: string
+    type: object
+  web_api.GetTestQueueEntry:
+    properties:
+      name:
+        type: string
+      run_id:
+        type: integer
+      status:
+        $ref: '#/definitions/types.TestStatus'
+      test_id:
+        type: string
+    type: object
+  web_api.GetTestQueueResponse:
+    properties:
+      queue:
+        items:
+          $ref: '#/definitions/web_api.GetTestQueueEntry'
+        type: array
+    type: object
   web_api.GetTestResponse:
     properties:
       basePath:
@@ -242,6 +285,10 @@ definitions:
         type: string
       result_error:
         type: string
+      result_files:
+        items:
+          $ref: '#/definitions/web_api.GetTestRunTaskResult'
+        type: array
       result_yaml:
         type: string
       run_concurrent:
@@ -427,6 +474,49 @@ definitions:
       time:
         type: string
     type: object
+  web_api.NetworkStatusResponse:
+    properties:
+      chain_id:
+        type: integer
+      cl_ready_count:
+        type: integer
+      client_count:
+        type: integer
+      current_epoch:
+        type: integer
+      current_slot:
+        type: integer
+      el_head_hash:
+        type: string
+      el_head_number:
+        type: integer
+      el_ready_count:
+        type: integer
+      finalized_epoch:
+        type: integer
+      finalized_root:
+        type: string
+      genesis_time:
+        type: integer
+      head_root:
+        type: string
+      head_slot:
+        type: integer
+      justified_epoch:
+        type: integer
+      justified_root:
+        type: string
+      network_name:
+        type: string
+      slot_duration_ms:
+        type: integer
+      slots_per_epoch:
+        type: integer
+      tests_queued:
+        type: integer
+      tests_running:
+        type: integer
+    type: object
   web_api.PostTestRunCancelRequest:
     properties:
       skip_cleanup:
@@ -468,7 +558,20 @@ definitions:
       config:
         additionalProperties: {}
         type: object
+      queue:
+        allOf:
+        - $ref: '#/definitions/web_api.ScheduleQueueOption'
+        description: |-
+          Queue is the modern (v2) way of expressing where the new test
+          should slot relative to the runner's pending queue. When unset
+          the request falls back to SkipQueue. See ScheduleQueueOption.
       skip_queue:
+        description: |-
+          SkipQueue is the legacy boolean that drove "off-queue parallel
+          execution". Kept for backward compatibility — when Queue is
+          supplied it wins; otherwise we fall through to this field.
+
+          Deprecated: use Queue with mode="immediate".
         type: boolean
       test_id:
         type: string
@@ -567,11 +670,40 @@ definitions:
       test_id:
         type: string
     type: object
+  web_api.PutTestScheduleRequest:
+    properties:
+      schedule:
+        allOf:
+        - $ref: '#/definitions/types.TestSchedule'
+        description: Schedule is the new schedule. May be null to clear.
+    type: object
   web_api.Response:
     properties:
       data: {}
       status:
         type: string
+    type: object
+  web_api.ScheduleQueueMode:
+    enum:
+    - immediate
+    - end
+    - after
+    type: string
+    x-enum-varnames:
+    - ScheduleQueueModeImmediate
+    - ScheduleQueueModeEnd
+    - ScheduleQueueModeAfter
+  web_api.ScheduleQueueOption:
+    properties:
+      after_run_id:
+        description: |-
+          AfterRunID is honoured only when Mode == "after". The new test
+          is placed immediately after that run in the pending queue. If
+          the referenced run is no longer queued the request silently
+          falls back to "append to end".
+        type: integer
+      mode:
+        $ref: '#/definitions/web_api.ScheduleQueueMode'
     type: object
 info:
   contact: {}
@@ -607,6 +739,63 @@ paths:
       summary: Get list of configured clients
       tags:
       - Client
+  /api/v1/dashboard_config:
+    get:
+      description: |-
+        Returns the persisted dashboard layout (JSON blob).
+        Public read; mutations are auth-gated via PUT.
+        Returns 204 when no config has been saved yet — the
+        UI falls back to a built-in default in that case.
+      operationId: getDashboardConfig
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Dashboard config JSON
+          schema:
+            items:
+              type: integer
+            type: array
+        "204":
+          description: No config persisted yet
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get the active dashboard config
+      tags:
+      - Dashboard
+    put:
+      consumes:
+      - application/json
+      description: |-
+        Auth-required. Persists the supplied JSON blob as the
+        active dashboard layout. The body is treated as
+        opaque — the server only checks that it parses as
+        valid JSON; semantic validation lives in the client.
+      operationId: putDashboardConfig
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Saved
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Replace the active dashboard config
+      tags:
+      - Dashboard
   /api/v1/global_variables:
     get:
       description: Returns the names of all configured global variables. Values are
@@ -664,6 +853,33 @@ paths:
       summary: Get application logs
       tags:
       - Logs
+  /api/v1/network_status:
+    get:
+      description: |-
+        Aggregated snapshot of the chain (head, finalized,
+        justified, current slot/epoch) and the orchestration
+        state (client readiness counts, test queue depth).
+        Powers the dashboard `network_status` tile.
+      operationId: getNetworkStatus
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.NetworkStatusResponse'
+              type: object
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get a network-wide status snapshot
+      tags:
+      - Network
   /api/v1/playbook_library:
     get:
       description: |-
@@ -825,6 +1041,128 @@ paths:
       summary: Get test definition by test ID
       tags:
       - Test
+  /api/v1/test/{testId}/latest_result:
+    get:
+      description: |-
+        Walks recent runs of the test (newest first) and returns
+        the first $ASSERTOOR_TEST_RESULT markdown blob found.
+        Returns 200 with metadata in headers (X-Run-Id, X-Run-Status,
+        X-Run-Start-Time) and the markdown as the body.
+        When ?meta=1 is set, returns a JSON envelope instead
+        (handy for tile fetchers that want one round-trip).
+      operationId: getTestLatestResult
+      parameters:
+      - description: Test ID
+        in: path
+        name: testId
+        required: true
+        type: string
+      - description: Set to 1 to receive a JSON envelope
+        in: query
+        name: meta
+        type: string
+      produces:
+      - text/markdown
+      - application/json
+      responses:
+        "200":
+          description: Markdown body
+          schema:
+            type: string
+        "204":
+          description: No result available across recent runs
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "404":
+          description: Test not found
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get the latest run-level result markdown for a test
+      tags:
+      - Test
+  /api/v1/test/{testId}/next_run:
+    get:
+      description: |-
+        Walks each cron expression on the test's schedule
+        and returns the next firing time per expression plus
+        the overall earliest one. Empty when the test has no
+        cron schedule.
+      operationId: getTestNextRun
+      parameters:
+      - description: Test ID
+        in: path
+        name: testId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetTestNextRunResponse'
+              type: object
+        "404":
+          description: Test not found
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get the next planned cron firings for a test
+      tags:
+      - Test
+  /api/v1/test/{testId}/schedule:
+    put:
+      consumes:
+      - application/json
+      description: |-
+        Auth-required. Replaces the schedule (cron + startup
+        + skipQueue) for a registered test. Cron expressions
+        are validated up-front; invalid input rejects the
+        whole request without changing state.
+      operationId: putTestSchedule
+      parameters:
+      - description: Test ID
+        in: path
+        name: testId
+        required: true
+        type: string
+      - description: New schedule
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/web_api.PutTestScheduleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Saved
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "404":
+          description: Test not found
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "500":
+          description: Server Error
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Update a test's run schedule
+      tags:
+      - Test
   /api/v1/test/{testId}/yaml:
     get:
       description: Returns the full YAML source for a test definition. For API-registered
@@ -869,6 +1207,29 @@ paths:
       summary: Get test YAML source by test ID
       tags:
       - Test
+  /api/v1/test_queue:
+    get:
+      description: |-
+        Returns the pending test queue in execution order
+        plus any currently running tests at the head. Used
+        by the StartTestModal's QueuePicker to let users
+        slot a new run at a chosen position.
+      operationId: getTestQueue
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/web_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/web_api.GetTestQueueResponse'
+              type: object
+      summary: Get the current test runner queue
+      tags:
+      - TestRun
   /api/v1/test_run/{runId}:
     get:
       description: Returns the run details with given ID. Includes a summary and a
@@ -974,6 +1335,40 @@ paths:
           schema:
             $ref: '#/definitions/web_api.Response'
       summary: Get detailed test run by run ID
+      tags:
+      - TestRun
+  /api/v1/test_run/{runId}/result:
+    get:
+      description: |-
+        Returns the markdown blob that tasks have collectively
+        written to $ASSERTOOR_TEST_RESULT during the run, if any.
+        Rendered by the UI as the run's prominent Result panel.
+      operationId: getTestRunResult
+      parameters:
+      - description: ID of the test run
+        in: path
+        name: runId
+        required: true
+        type: string
+      produces:
+      - text/markdown
+      - application/json
+      responses:
+        "200":
+          description: Markdown body
+          schema:
+            type: string
+        "204":
+          description: No result set for this run
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "404":
+          description: Test run not found
+          schema:
+            $ref: '#/definitions/web_api.Response'
+      summary: Get the run-level result markdown
       tags:
       - TestRun
   /api/v1/test_run/{runId}/status:

@@ -1,18 +1,23 @@
 id: builder-deposit
-name: "GLOAS: Builder Deposit (0x03 credentials)"
+name: "GLOAS: Builder Deposit (EIP-8282)"
 description: |
   Minimal deposit test for the GLOAS builder role. Generates a fresh
-  wallet + mnemonic and submits a single 5-ETH deposit with 0x03
-  withdrawal credentials (i.e. `0x03 || 11×0x00 || 20-byte address`).
+  wallet + mnemonic and submits a single builder deposit to the builder
+  deposit system contract (EIP-8282).
 
-  Verifies the deposit pipeline accepts builder-tagged credentials
-  on a GLOAS devnet. Awaits both EL receipt and CL inclusion.
+  Builder deposits are submitted as raw calldata (no deposit() selector):
+  `pubkey || withdrawal_credentials || amount || signature`, signed under
+  DOMAIN_BUILDER_DEPOSIT. The withdrawal credentials default to 0x03 +
+  the funding wallet address, so the same wallet can later exit the
+  builder. Awaits both EL receipt and CL inclusion as a builder deposit
+  request.
 version: 1.0.0
-tags: [gloas, builder, deposit, eip-6110]
+tags: [gloas, builder, deposit, eip-8282]
 timeout: 30m
 config:
   walletPrivkey: ''
-  depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'  # Mainnet deposit contract
+  # Builder deposit system contract (EIP-8282).
+  builderDepositContract: '0x0000884d2AA32eAa155F59A2f24eFa73D9008282'
 tasks:
   - name: check_clients_are_healthy
     title: Check if at least one client is ready
@@ -21,7 +26,7 @@ tasks:
       minClientCount: 1
   - name: generate_child_wallet
     id: test_wallet
-    title: Generate wallet for deposit operations
+    title: Generate wallet for builder deposit operations
     config:
       walletSeed: builder-deposit-test
       prefundMinBalance: 10000000000000000000
@@ -29,16 +34,16 @@ tasks:
       privateKey: walletPrivkey
   - name: get_random_mnemonic
     id: test_mnemonic
-    title: Generate random mnemonic for test validator
-  - name: generate_deposits
-    title: Generate validator deposit with 0x03 credentials
+    title: Generate random mnemonic for test builder
+  - name: generate_builder_deposits
+    title: Generate builder deposit (EIP-8282)
     config:
       limitTotal: 1
+      indexCount: 1
       depositAmount: 5
       awaitReceipt: true
       awaitInclusion: true
     configVars:
       walletPrivkey: tasks.test_wallet.outputs.childWallet.privkey
       mnemonic: tasks.test_mnemonic.outputs.mnemonic
-      depositContract: depositContract
-      withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+      builderDepositContract: builderDepositContract

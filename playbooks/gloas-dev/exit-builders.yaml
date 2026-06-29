@@ -1,0 +1,64 @@
+id: exit-builders
+name: "GLOAS: Exit builders deposited by prefork-queue-fill-public"
+description: |
+  Small test that exits the builders created by `prefork-queue-fill-public`.
+
+  The queue-fill run deposits `builderCount` builders (EIP-8282) from a fresh
+  random mnemonic (its `builder_mnemonic` task output), funded by a child wallet
+  derived from the `gloas-prefork-public-builders` seed. The builders' 0x03
+  withdrawal credentials embed that wallet address, so only that wallet may exit
+  them.
+
+  As of GLOAS, builder exits are NOT voluntary exits — they are submitted as
+  execution-layer requests to the builder exit system contract (EIP-8282) from
+  the builder's execution address. This test regenerates the builder wallet from
+  the same seed and submits a builder exit request for each builder pubkey.
+
+  Mnemonic: copy the random `builderMnemonic` from the queue-fill run's
+  `builder_mnemonic` task output. builderStartIndex / builderCount must cover the
+  same key range that was deposited (defaults match the queue-fill defaults).
+version: 1.0.0
+tags: [gloas, builder, exit, eip-8282]
+timeout: 30m
+config:
+  # Funding wallet (must match the one used by the queue-fill run so the builder
+  # wallet is derived identically).
+  walletPrivkey: ""
+  # Mnemonic of the deposited builders (from the queue-fill run's builder_mnemonic).
+  builderMnemonic: ""
+  builderStartIndex: 0
+  builderCount: 500
+  # Builder exit system contract (EIP-8282).
+  builderExitContract: "0x000014574A74c805590AFF9499fc7A690f008282"
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# Regenerate the builder wallet from the same seed used by prefork-queue-fill-public.
+# This wallet holds the 0x03 execution address authorized to exit the builders.
+- name: generate_child_wallet
+  id: builder_wallet
+  title: "Regenerate builder wallet (exit sender)"
+  config:
+    walletSeed: "gloas-prefork-public-builders"
+    prefundMinBalance: 1000000000000000000
+  configVars:
+    privateKey: "walletPrivkey"
+
+- name: generate_builder_exits
+  title: "Exit ${builderCount} builders (from index ${builderStartIndex})"
+  timeout: 25m
+  config:
+    awaitReceipt: true
+    failOnReject: true
+  configVars:
+    limitTotal: "builderCount"
+    sourceIndexCount: "builderCount"
+    sourceStartIndex: "builderStartIndex"
+    sourceMnemonic: "builderMnemonic"
+    walletPrivkey: "tasks.builder_wallet.outputs.childWallet.privkey"
+    builderExitContract: "builderExitContract"

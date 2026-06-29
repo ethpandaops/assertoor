@@ -286,47 +286,28 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 
 	var exitIndex phase0.ValidatorIndex
 
-	if t.config.BuilderExit {
-		// Look up builder by pubkey in the builder set
-		builderSet := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetBuilderSet()
+	// Look up validator by pubkey in the validator set.
+	// Note: builder exits are no longer voluntary exits as of EIP-8282 (Gloas) — they are
+	// submitted as execution-layer requests to the builder exit contract. Use the
+	// generate_builder_exits task for builders.
+	var validator *v1.Validator
 
-		var found bool
-
-		for _, info := range builderSet {
-			if bytes.Equal(info.Builder.PublicKey[:], validatorPubkey) {
-				exitIndex = consensus.ConvertBuilderIndexToValidatorIndex(info.Index)
-				found = true
-
-				t.logger.Infof("found builder: index %v, flagged index %v", info.Index, exitIndex)
-
-				break
-			}
+	for _, val := range t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet() {
+		if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
+			validator = val
+			break
 		}
-
-		if !found {
-			return 0, fmt.Errorf("builder not found: 0x%x", validatorPubkey)
-		}
-	} else {
-		// Look up validator by pubkey in the validator set
-		var validator *v1.Validator
-
-		for _, val := range t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool().GetValidatorSet() {
-			if bytes.Equal(val.Validator.PublicKey[:], validatorPubkey) {
-				validator = val
-				break
-			}
-		}
-
-		if validator == nil {
-			return 0, fmt.Errorf("validator not found: 0x%x", validatorPubkey)
-		}
-
-		if validator.Validator.ExitEpoch != 18446744073709551615 {
-			return 0, fmt.Errorf("validator %v is already exited", validator.Index)
-		}
-
-		exitIndex = validator.Index
 	}
+
+	if validator == nil {
+		return 0, fmt.Errorf("validator not found: 0x%x", validatorPubkey)
+	}
+
+	if validator.Validator.ExitEpoch != 18446744073709551615 {
+		return 0, fmt.Errorf("validator %v is already exited", validator.Index)
+	}
+
+	exitIndex = validator.Index
 
 	// select clients
 	clientPool := t.ctx.Scheduler.GetServices().ClientPool()
@@ -409,7 +390,7 @@ func (t *Task) generateVoluntaryExit(ctx context.Context, accountIdx uint64, for
 
 			lastErr = submitErr
 		} else {
-			t.logger.WithField("client", client.GetName()).Infof("sent voluntary exit for index %v (builder: %v)", exitIndex, t.config.BuilderExit)
+			t.logger.WithField("client", client.GetName()).Infof("sent voluntary exit for index %v", exitIndex)
 
 			successCount++
 		}

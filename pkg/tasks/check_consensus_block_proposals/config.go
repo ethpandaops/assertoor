@@ -3,25 +3,27 @@ package checkconsensusblockproposals
 import "math/big"
 
 type Config struct {
-	CheckLookback                int    `yaml:"checkLookback" json:"checkLookback" desc:"Number of slots to look back when checking for block proposals."`
-	BlockCount                   int    `yaml:"blockCount" json:"blockCount" desc:"Number of matching blocks required to pass the check."`
-	PayloadTimeout               int    `yaml:"payloadTimeout" json:"payloadTimeout" desc:"Timeout in seconds to wait for execution payload (gloas+). Default: 12"`
-	GraffitiPattern              string `yaml:"graffitiPattern" json:"graffitiPattern" desc:"Regex pattern to match block graffiti."`
-	ValidatorNamePattern         string `yaml:"validatorNamePattern" json:"validatorNamePattern" desc:"Regex pattern to match validator names."`
-	ExtraDataPattern             string `yaml:"extraDataPattern" json:"extraDataPattern" desc:"Regex pattern to match execution payload extra data."`
-	MinAttestationCount          int    `yaml:"minAttestationCount" json:"minAttestationCount" desc:"Minimum number of attestations required in the block."`
-	MinDepositCount              int    `yaml:"minDepositCount" json:"minDepositCount" desc:"Minimum number of deposits required in the block."`
-	MinExitCount                 int    `yaml:"minExitCount" json:"minExitCount" desc:"Minimum number of voluntary exits required in the block."`
-	MinSlashingCount             int    `yaml:"minSlashingCount" json:"minSlashingCount" desc:"Minimum number of slashings (attester + proposer) required in the block."`
-	MinAttesterSlashingCount     int    `yaml:"minAttesterSlashingCount" json:"minAttesterSlashingCount" desc:"Minimum number of attester slashings required in the block."`
-	MinProposerSlashingCount     int    `yaml:"minProposerSlashingCount" json:"minProposerSlashingCount" desc:"Minimum number of proposer slashings required in the block."`
-	MinBlsChangeCount            int    `yaml:"minBlsChangeCount" json:"minBlsChangeCount" desc:"Minimum number of BLS to execution changes required in the block."`
-	MinWithdrawalCount           int    `yaml:"minWithdrawalCount" json:"minWithdrawalCount" desc:"Minimum number of withdrawals required in the block."`
-	MinTransactionCount          int    `yaml:"minTransactionCount" json:"minTransactionCount" desc:"Minimum number of transactions required in the block."`
-	MinBlobCount                 int    `yaml:"minBlobCount" json:"minBlobCount" desc:"Minimum number of blob sidecars required in the block."`
-	MinDepositRequestCount       int    `yaml:"minDepositRequestCount" json:"minDepositRequestCount" desc:"Minimum number of deposit requests required in the block."`
-	MinWithdrawalRequestCount    int    `yaml:"minWithdrawalRequestCount" json:"minWithdrawalRequestCount" desc:"Minimum number of withdrawal requests required in the block."`
-	MinConsolidationRequestCount int    `yaml:"minConsolidationRequestCount" json:"minConsolidationRequestCount" desc:"Minimum number of consolidation requests required in the block."`
+	CheckLookback                 int    `yaml:"checkLookback" json:"checkLookback" desc:"Number of slots to look back when checking for block proposals."`
+	BlockCount                    int    `yaml:"blockCount" json:"blockCount" desc:"Number of matching blocks required to pass the check."`
+	PayloadTimeout                int    `yaml:"payloadTimeout" json:"payloadTimeout" desc:"Timeout in seconds to wait for execution payload (gloas+). Default: 12"`
+	GraffitiPattern               string `yaml:"graffitiPattern" json:"graffitiPattern" desc:"Regex pattern to match block graffiti."`
+	ValidatorNamePattern          string `yaml:"validatorNamePattern" json:"validatorNamePattern" desc:"Regex pattern to match validator names."`
+	ExtraDataPattern              string `yaml:"extraDataPattern" json:"extraDataPattern" desc:"Regex pattern to match execution payload extra data."`
+	MinAttestationCount           int    `yaml:"minAttestationCount" json:"minAttestationCount" desc:"Minimum number of attestations required in the block."`
+	MinDepositCount               int    `yaml:"minDepositCount" json:"minDepositCount" desc:"Minimum number of deposits required in the block."`
+	MinExitCount                  int    `yaml:"minExitCount" json:"minExitCount" desc:"Minimum number of voluntary exits required in the block."`
+	MinSlashingCount              int    `yaml:"minSlashingCount" json:"minSlashingCount" desc:"Minimum number of slashings (attester + proposer) required in the block."`
+	MinAttesterSlashingCount      int    `yaml:"minAttesterSlashingCount" json:"minAttesterSlashingCount" desc:"Minimum number of attester slashings required in the block."`
+	MinProposerSlashingCount      int    `yaml:"minProposerSlashingCount" json:"minProposerSlashingCount" desc:"Minimum number of proposer slashings required in the block."`
+	MinBlsChangeCount             int    `yaml:"minBlsChangeCount" json:"minBlsChangeCount" desc:"Minimum number of BLS to execution changes required in the block."`
+	MinWithdrawalCount            int    `yaml:"minWithdrawalCount" json:"minWithdrawalCount" desc:"Minimum number of withdrawals required in the block."`
+	MinTransactionCount           int    `yaml:"minTransactionCount" json:"minTransactionCount" desc:"Minimum number of transactions required in the block."`
+	MinBlobCount                  int    `yaml:"minBlobCount" json:"minBlobCount" desc:"Minimum number of blob sidecars required in the block."`
+	MinDepositRequestCount        int    `yaml:"minDepositRequestCount" json:"minDepositRequestCount" desc:"Minimum number of deposit requests required in the block."`
+	MinWithdrawalRequestCount     int    `yaml:"minWithdrawalRequestCount" json:"minWithdrawalRequestCount" desc:"Minimum number of withdrawal requests required in the block."`
+	MinConsolidationRequestCount  int    `yaml:"minConsolidationRequestCount" json:"minConsolidationRequestCount" desc:"Minimum number of consolidation requests required in the block."`
+	MinBuilderDepositRequestCount int    `yaml:"minBuilderDepositRequestCount" json:"minBuilderDepositRequestCount" desc:"Minimum number of builder deposit requests (EIP-8282) required in the block."`
+	MinBuilderExitRequestCount    int    `yaml:"minBuilderExitRequestCount" json:"minBuilderExitRequestCount" desc:"Minimum number of builder exit requests (EIP-8282) required in the block."`
 
 	ExpectDeposits  []string `yaml:"expectDeposits" json:"expectDeposits" desc:"List of validator public keys expected to have deposits in the block."`
 	ExpectExits     []string `yaml:"expectExits" json:"expectExits" desc:"List of validator public keys expected to have exits in the block."`
@@ -54,6 +56,15 @@ type Config struct {
 		SourcePubkey  string `yaml:"sourcePubkey" json:"sourcePubkey" desc:"Public key of the source validator."`
 		TargetPubkey  string `yaml:"targetPubkey" json:"targetPubkey" desc:"Public key of the target validator."`
 	} `yaml:"expectConsolidationRequests" json:"expectConsolidationRequests" desc:"List of expected consolidation requests in the block."`
+	ExpectBuilderDepositRequests []struct {
+		PublicKey             string   `yaml:"publicKey" json:"publicKey" desc:"Public key of the builder."`
+		WithdrawalCredentials string   `yaml:"withdrawalCredentials" json:"withdrawalCredentials" desc:"Withdrawal credentials (0x03-prefixed)."`
+		Amount                *big.Int `yaml:"amount" json:"amount" desc:"Builder deposit amount in gwei."`
+	} `yaml:"expectBuilderDepositRequests" json:"expectBuilderDepositRequests" desc:"List of expected builder deposit requests (EIP-8282) in the block."`
+	ExpectBuilderExitRequests []struct {
+		SourceAddress string `yaml:"sourceAddress" json:"sourceAddress" desc:"Source address initiating the builder exit."`
+		BuilderPubkey string `yaml:"builderPubkey" json:"builderPubkey" desc:"Public key of the builder to exit."`
+	} `yaml:"expectBuilderExitRequests" json:"expectBuilderExitRequests" desc:"List of expected builder exit requests (EIP-8282) in the block."`
 }
 
 func DefaultConfig() Config {

@@ -1,0 +1,85 @@
+id: slash-active-validators
+name: "GLOAS: Slash whichever of the deposited validators are active"
+description: |
+  Checks each of the validator keys from a supplied mnemonic (e.g. the 60
+  validators created by `prefork-queue-fill-public`) and slashes only the ones
+  that are currently active. Validators that never activated (the "gaps") are
+  detected and skipped instead of failing the test.
+
+  Per key:
+  - check_consensus_validator_status with failOnCheckMiss=true returns
+    immediately: success if the validator is active_ongoing, failure otherwise.
+  - On success the slashing runs; on failure the per-key run_tasks stops before
+    the slashing. Each key is wrapped in ignoreResult so skipped keys don't fail
+    the overall test.
+
+  Mnemonic: copy the random `validatorMnemonic` from the queue-fill run's
+  `val_mnemonic` task output. validatorStartIndex / validatorCount must cover
+  the same key range that was deposited.
+version: 1.0.0
+tags: [gloas, slashing, proposer, attester, validator-status]
+timeout: 30m
+config:
+  # Mnemonic of the deposited validators (from the queue-fill run).
+  validatorMnemonic: ""
+  validatorStartIndex: 0
+  validatorCount: 60
+  # Slashing type applied to every active validator: "proposer" or "attester".
+  slashingType: "proposer"
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# derive the pubkeys for the checked key range
+- name: get_pubkeys_from_mnemonic
+  id: val_pubkeys
+  title: "Derive pubkeys for ${validatorCount} keys (from index ${validatorStartIndex})"
+  configVars:
+    mnemonic: "validatorMnemonic"
+    startIndex: "validatorStartIndex"
+    count: "validatorCount"
+
+# check each key; slash it only if it is active_ongoing
+- name: run_task_matrix
+  title: "Check ${validatorCount} validators and slash the active ones (${slashingType})"
+  configVars:
+    matrixValues: "| [range(0; .validatorCount)]"
+  config:
+    runConcurrent: true
+    matrixVar: "keyIndex"
+    task:
+      name: run_task_options
+      title: "Slash key ${keyIndex} if active"
+      config:
+        # skipped (not-active) keys must not fail the overall test
+        ignoreResult: true
+        task:
+          name: run_tasks
+          title: "Check & slash key ${keyIndex}"
+          # default: stop on first failure -> if the status check fails (not
+          # active), the slashing below is never reached
+          config:
+            tasks:
+            - name: check_consensus_validator_status
+              id: is_active
+              title: "Is key ${keyIndex} active?"
+              timeout: 1m
+              config:
+                validatorStatus:
+                - active_ongoing
+                failOnCheckMiss: true
+              configVars:
+                validatorPubKey: "| .tasks.val_pubkeys.outputs.pubkeys[.keyIndex]"
+            - name: generate_slashings
+              title: "Slash active key ${keyIndex} (${slashingType})"
+              config:
+                limitTotal: 1
+                indexCount: 1
+              configVars:
+                slashingType: "slashingType"
+                startIndex: "| .validatorStartIndex + .keyIndex"
+                mnemonic: "validatorMnemonic"
