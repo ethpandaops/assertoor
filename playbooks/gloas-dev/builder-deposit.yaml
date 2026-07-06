@@ -7,7 +7,7 @@ description: |
 
   Builder deposits are submitted as raw calldata (no deposit() selector):
   `pubkey || withdrawal_credentials || amount || signature`, signed under
-  DOMAIN_BUILDER_DEPOSIT. The withdrawal credentials default to 0x03 +
+  DOMAIN_BUILDER_DEPOSIT. The withdrawal credentials default to 0xB0 +
   the funding wallet address, so the same wallet can later exit the
   builder. Awaits both EL receipt and CL inclusion as a builder deposit
   request.

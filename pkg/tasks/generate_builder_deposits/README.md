@@ -7,7 +7,7 @@ The raw 184-byte calldata layout is:
 
 ```
 0-48:    pubkey (48 bytes)
-48-80:   withdrawal credentials (32 bytes, 0x03-prefixed)
+48-80:   withdrawal credentials (32 bytes, 0xB0-prefixed)
 80-88:   amount (8 bytes, big-endian gwei)
 88-184:  signature (96 bytes, BLS proof-of-possession)
 ```
@@ -49,10 +49,10 @@ Builders are identified either by deriving keys from a `mnemonic` & key range, o
   Amount of ETH to deposit per builder. Must be at least `1` ETH (`BUILDER_MIN_DEPOSIT`).
 
 - **`withdrawalCredentials`**:
-  Custom withdrawal credentials (must be 0x03-prefixed, 32 bytes). If empty, credentials are derived from `builderAddress`, or from the funding wallet address.
+  Custom withdrawal credentials (must be 0xB0-prefixed, 32 bytes). If empty, credentials are derived from `builderAddress`, or from the funding wallet address.
 
 - **`builderAddress`**:
-  Execution address used to build the 0x03 withdrawal credentials when `withdrawalCredentials` is not set. This address is the only one allowed to exit the builder later.
+  Execution address used to build the 0xB0 withdrawal credentials when `withdrawalCredentials` is not set. This address is the only one allowed to exit the builder later.
 
 - **`topUpDeposit`**:
   If true, adds to an existing builder balance instead of registering a new builder.

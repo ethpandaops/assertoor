@@ -58,7 +58,7 @@ type Config struct {
 	} `yaml:"expectConsolidationRequests" json:"expectConsolidationRequests" desc:"List of expected consolidation requests in the block."`
 	ExpectBuilderDepositRequests []struct {
 		PublicKey             string   `yaml:"publicKey" json:"publicKey" desc:"Public key of the builder."`
-		WithdrawalCredentials string   `yaml:"withdrawalCredentials" json:"withdrawalCredentials" desc:"Withdrawal credentials (0x03-prefixed)."`
+		WithdrawalCredentials string   `yaml:"withdrawalCredentials" json:"withdrawalCredentials" desc:"Withdrawal credentials (0xB0-prefixed)."`
 		Amount                *big.Int `yaml:"amount" json:"amount" desc:"Builder deposit amount in gwei."`
 	} `yaml:"expectBuilderDepositRequests" json:"expectBuilderDepositRequests" desc:"List of expected builder deposit requests (EIP-8282) in the block."`
 	ExpectBuilderExitRequests []struct {

@@ -26,7 +26,7 @@ If `batchContract` is empty the task deploys a fresh forwarder bound to the conf
 - **`batchTxGasLimit`**: Gas limit per batched transaction. Default `12_000_000`.
 - **`depositAmount`**: ETH amount per deposit. Default `32` ETH.
 - **`depositTxFeeCap`** / **`depositTxTipCap`**: Fee/tip caps (wei) for batch transactions.
-- **`withdrawalCredentials`**: Required 32-byte withdrawal credentials shared by every deposit in every batch (e.g. `0x03 + 11 zero bytes + 20-byte address` for builder credentials).
+- **`withdrawalCredentials`**: Required 32-byte withdrawal credentials shared by every deposit in every batch (e.g. `0xB0 + 11 zero bytes + 20-byte address` for builder credentials).
 - **`clientPattern`** / **`excludeClientPattern`**: Client selection regexes.
 - **`awaitReceipt`**: Wait for every batch transaction receipt before completing.
 - **`failOnReject`**: Fail the task if any batch transaction is rejected or reverted.

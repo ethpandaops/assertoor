@@ -19,10 +19,10 @@ description: |
      0x01 -> 0x02 (compounding) credentials.
   5. Submit 100 consolidation requests (sources 50-149) targeting the now
      0x02 keys 0-49 (2 sources per target).
-  6. Deposit 1000 builders (0x03 credentials) from a second fresh mnemonic,
+  6. Deposit 1000 builders (0xB0 credentials) from a second fresh mnemonic,
      batched 100-per-tx via the REGULAR deposit contract. Pre-fork, builders are
      seeded this way (not via the EIP-8282 builder contract, which only accepts
-     submissions after activation): 0x03-credentialed deposits that reach the
+     submissions after activation): 0xB0-credentialed deposits that reach the
      fork still pending are onboarded as builders by
      onboard_builders_from_pending_deposits.
   7. Wait until 10 slots before GLOAS activation.
@@ -63,7 +63,7 @@ config:
   newValidatorDepCount02: 33   # 0x02 compounding credentials
   validatorDepositAmount: 32   # ETH per new validator
 
-  # Builder deposits (0x03 credentials via the regular deposit contract), batched.
+  # Builder deposits (0xB0 credentials via the regular deposit contract), batched.
   builderCount: 1000
   builderDepositAmount: 1      # ETH per builder
   builderBatchSize: 100
@@ -173,7 +173,7 @@ tasks:
     privateKey: "walletPrivkey"
     prefundMinBalance: "| ((.newValidatorDepCount00 + .newValidatorDepCount01 + .newValidatorDepCount02) * .validatorDepositAmount + 50) * 1000000000000000000"
 
-# wallet that funds the builder deposits + holds the 0x03 address
+# wallet that funds the builder deposits + holds the 0xB0 address
 - name: generate_child_wallet
   id: builder_wallet
   title: "Generate wallet funding the 1000 builder deposits"
@@ -198,7 +198,7 @@ tasks:
 ##  Stream A: 100 new validator deposits (mixed creds)
 ##  Stream C: BLS changes -> self-consolidations -> targeted consolidations
 ##
-## The 1000 builder deposits (0x03) are deliberately NOT in this concurrent
+## The 1000 builder deposits (0xB0) are deliberately NOT in this concurrent
 ## block: they run afterwards (see below) so they land in later EL blocks and
 ## sit at the END of the pending-deposit queue, behind the 100 regular
 ## validators. Stream C touches the consolidation/BLS queues only, so it does
@@ -333,7 +333,7 @@ tasks:
                 walletPrivkey: "tasks.req_wallet.outputs.childWallet.privkey"
 
 ##
-## Builder deposits (0x03) - queued LAST.
+## Builder deposits (0xB0) - queued LAST.
 ##  Runs only after the concurrent block above completes, i.e. after all 100
 ##  regular validator deposits have execution-layer receipts (awaitReceipt).
 ##  Because deposit-queue order follows EL block inclusion order, submitting
@@ -342,7 +342,7 @@ tasks:
 ##
 
 - name: generate_batch_deposits
-  title: "Deposit ${builderCount} builders (0x03) in batches of ${builderBatchSize} (queued last)"
+  title: "Deposit ${builderCount} builders (0xB0) in batches of ${builderBatchSize} (queued last)"
   timeout: 45m
   config:
     awaitReceipt: true
@@ -354,12 +354,12 @@ tasks:
     depositAmount: "builderDepositAmount"
     walletPrivkey: "tasks.builder_wallet.outputs.childWallet.privkey"
     mnemonic: "tasks.builder_mnemonic.outputs.mnemonic"
-    # Pre-fork builders go through the REGULAR deposit contract with 0x03 creds;
+    # Pre-fork builders go through the REGULAR deposit contract with 0xB0 creds;
     # they are onboarded as builders at the fork (the EIP-8282 builder contract
     # rejects submissions before activation).
     depositContract: "depositContract"
-    # 0x03 builder credentials: version byte + 11 zero bytes + 20-byte address
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.builder_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+    # 0xB0 builder credentials: version byte + 11 zero bytes + 20-byte address
+    withdrawalCredentials: '| "0xB0" + ("00" * 11) + (.tasks.builder_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
 ##
 ## Gate: wait until `withdrawalLeadSlots` slots before GLOAS activation

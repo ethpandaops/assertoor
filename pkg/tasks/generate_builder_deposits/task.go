@@ -556,7 +556,7 @@ func (t *Task) generateBuilderDeposit(ctx context.Context, accountIdx uint64, on
 }
 
 // builderWithdrawalCredentials returns the 32-byte withdrawal credentials for the
-// builder deposit. Builder deposits require 0x03-prefixed credentials.
+// builder deposit. Builder deposits require 0xB0-prefixed credentials.
 func (t *Task) builderWithdrawalCredentials() ([]byte, error) {
 	if t.config.TopUpDeposit {
 		// Credentials are ignored by the consensus layer for top-ups.
@@ -572,7 +572,7 @@ func (t *Task) builderWithdrawalCredentials() ([]byte, error) {
 		return creds, nil
 	}
 
-	// Derive 0x03 credentials from the builder address, or the funding wallet address.
+	// Derive 0xB0 credentials from the builder address, or the funding wallet address.
 	var addr ethcommon.Address
 	if t.config.BuilderAddress != "" {
 		addr = ethcommon.HexToAddress(t.config.BuilderAddress)
@@ -581,7 +581,7 @@ func (t *Task) builderWithdrawalCredentials() ([]byte, error) {
 	}
 
 	creds := make([]byte, 32)
-	creds[0] = 0x03
+	creds[0] = 0xB0
 	copy(creds[12:], addr[:])
 
 	return creds, nil

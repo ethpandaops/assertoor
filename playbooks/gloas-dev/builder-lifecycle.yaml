@@ -6,7 +6,7 @@ description: |
 
   When the test is started BEFORE GLOAS activation:
   1. PRE-FORK onboarding: deposit builderCount builders a few slots BEFORE GLOAS
-     activates, using the regular validator deposit contract with 0x03 (builder)
+     activates, using the regular validator deposit contract with 0xB0 (builder)
      withdrawal credentials. These deposits sit in the pending-deposit queue and,
      because they reach the fork unprocessed, are converted to builders at the
      fork by `onboard_builders_from_pending_deposits`. Their signatures are
@@ -35,7 +35,7 @@ tags: [gloas, builder, lifecycle, deposit, exit, eip-8282]
 timeout: 2h
 config:
   walletPrivkey: ''
-  # Regular validator deposit contract (pre-fork builder onboarding via 0x03 creds).
+  # Regular validator deposit contract (pre-fork builder onboarding via 0xB0 creds).
   depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
   # EIP-8282 builder system contracts (post-fork deposits / exits).
   builderDepositContract: '0x0000884d2AA32eAa155F59A2f24eFa73D9008282'
@@ -137,7 +137,7 @@ tasks:
 ##
 ## PHASE 1a: PRE-FORK onboarding (only when started before the fork)
 ##  Deposit builderCount builders (keys 0..builderCount-1) via the regular deposit
-##  contract with 0x03 credentials, before GLOAS activates. They are onboarded as
+##  contract with 0xB0 credentials, before GLOAS activates. They are onboarded as
 ##  builders at the fork (onboard_builders_from_pending_deposits), which verifies
 ##  the signature under the regular DOMAIN_DEPOSIT.
 ##
@@ -151,7 +151,7 @@ tasks:
 
 - name: generate_deposits
   id: prefork_deposits
-  title: "Pre-fork: deposit ${builderCount} builders (regular contract, 0x03 creds)"
+  title: "Pre-fork: deposit ${builderCount} builders (regular contract, 0xB0 creds)"
   if: "| .tasks.calc_slots.outputs.isPreFork"
   config:
     awaitReceipt: true
@@ -164,8 +164,8 @@ tasks:
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
     mnemonic: "tasks.test_mnemonic.outputs.mnemonic"
     depositContract: "depositContract"
-    # 0x03 builder credentials: version byte + 11 zero bytes + 20-byte address
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+    # 0xB0 builder credentials: version byte + 11 zero bytes + 20-byte address
+    withdrawalCredentials: '| "0xB0" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
 ##
 ## PHASE 1b: POST-FORK deposits

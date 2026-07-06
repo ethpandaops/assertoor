@@ -5,7 +5,7 @@ description: |
 
   The queue-fill run deposits `builderCount` builders (EIP-8282) from a fresh
   random mnemonic (its `builder_mnemonic` task output), funded by a child wallet
-  derived from the `gloas-prefork-public-builders` seed. The builders' 0x03
+  derived from the `gloas-prefork-public-builders` seed. The builders' 0xB0
   withdrawal credentials embed that wallet address, so only that wallet may exit
   them.
 
@@ -39,7 +39,7 @@ tasks:
     minClientCount: 1
 
 # Regenerate the builder wallet from the same seed used by prefork-queue-fill-public.
-# This wallet holds the 0x03 execution address authorized to exit the builders.
+# This wallet holds the 0xB0 execution address authorized to exit the builders.
 - name: generate_child_wallet
   id: builder_wallet
   title: "Regenerate builder wallet (exit sender)"

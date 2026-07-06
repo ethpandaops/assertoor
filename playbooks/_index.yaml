@@ -45,7 +45,7 @@ folders:
     name: GLOAS (ePBS)
     description: |-
       GLOAS-fork tests focused on the ePBS payload-publishing model and the
-      new builder role (validators with 0x03 withdrawal credentials).
+      new builder role (validators with 0xB0 withdrawal credentials).
 
       Includes builder lifecycle, builder deposit spam, and regression tests
       for the `process_previous_payload` ordering rule that affects how
@@ -472,11 +472,11 @@ playbooks:
     timeout: 4h
   - file: gloas-dev/builder-deposit-spam.yaml
     id: builder-deposit-spam
-    name: 'GLOAS: Spam batched 0x03 builder deposits'
+    name: 'GLOAS: Spam batched 0xB0 builder deposits'
     description: |-
       Stress test for the GLOAS builder deposit path. Deploys a tiny batch
       contract and uses it to register `totalDeposits` (default 1000)
-      builders with 0x03 credentials at `batchSize` (default 100) deposits
+      builders with 0xB0 credentials at `batchSize` (default 100) deposits
       per tx, capped at `pendingBatches` in-flight.
 
       After spamming, asserts the chain still finalizes (1 finalized epoch,
@@ -496,11 +496,11 @@ playbooks:
     timeout: 1h
   - file: gloas-dev/builder-deposit.yaml
     id: builder-deposit
-    name: 'GLOAS: Builder Deposit (0x03 credentials)'
+    name: 'GLOAS: Builder Deposit (0xB0 credentials)'
     description: |-
       Minimal deposit test for the GLOAS builder role. Generates a fresh
-      wallet + mnemonic and submits a single 5-ETH deposit with 0x03
-      withdrawal credentials (i.e. `0x03 || 11×0x00 || 20-byte address`).
+      wallet + mnemonic and submits a single 5-ETH deposit with 0xB0
+      withdrawal credentials (i.e. `0xB0 || 11×0x00 || 20-byte address`).
 
       Verifies the deposit pipeline accepts builder-tagged credentials
       on a GLOAS devnet. Awaits both EL receipt and CL inclusion.
@@ -515,7 +515,7 @@ playbooks:
     id: builder-lifecycle
     name: 'GLOAS: Builder Lifecycle Test'
     description: |-
-      End-to-end lifecycle for GLOAS builders (validators with 0x03
+      End-to-end lifecycle for GLOAS builders (validators with 0xB0
       withdrawal credentials). Walks 10 builder keys through:
 
       1. Deposit 6 builders across the GLOAS activation boundary (3 before,
