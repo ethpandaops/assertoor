@@ -19,7 +19,7 @@ type Config struct {
 	DepositAmount         uint64 `yaml:"depositAmount" json:"depositAmount" desc:"Amount of ETH to deposit per validator. Default 32 ETH."`
 	DepositTxFeeCap       int64  `yaml:"depositTxFeeCap" json:"depositTxFeeCap" desc:"Maximum fee cap (in wei) for batch transactions."`
 	DepositTxTipCap       int64  `yaml:"depositTxTipCap" json:"depositTxTipCap" desc:"Maximum priority tip (in wei) for batch transactions."`
-	WithdrawalCredentials string `yaml:"withdrawalCredentials" json:"withdrawalCredentials" require:"E" desc:"32-byte withdrawal credentials shared by all deposits in every batch. For 0x03 builder credentials use '0x03' + 11 zero bytes + 20-byte address."`
+	WithdrawalCredentials string `yaml:"withdrawalCredentials" json:"withdrawalCredentials" require:"E" desc:"32-byte withdrawal credentials shared by all deposits in every batch. For 0xB0 builder credentials use '0xB0' + 11 zero bytes + 20-byte address."`
 	ClientPattern         string `yaml:"clientPattern" json:"clientPattern" desc:"Regex pattern to select specific client endpoints for submitting transactions."`
 	ExcludeClientPattern  string `yaml:"excludeClientPattern" json:"excludeClientPattern" desc:"Regex pattern to exclude certain client endpoints."`
 	AwaitReceipt          bool   `yaml:"awaitReceipt" json:"awaitReceipt" desc:"Wait for batch transaction receipts on the execution layer before completing."`

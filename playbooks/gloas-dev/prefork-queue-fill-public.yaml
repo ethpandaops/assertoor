@@ -10,9 +10,9 @@ description: |
   2. Deposit a set of validators with a mixed credential set
      (0x02 first so keys 0..N are compounding, then 0x01, then 0x00) from a
      fresh mnemonic.
-  3. Deposit builders (0x03 credentials via the regular deposit contract),
+  3. Deposit builders (0xB0 credentials via the regular deposit contract),
      batched - submitted AFTER the regular deposits so they sit at the END of the
-     pending-deposit queue. Pre-fork, 0x03 deposits that reach the fork still
+     pending-deposit queue. Pre-fork, 0xB0 deposits that reach the fork still
      pending are onboarded as builders at activation.
   4. Wait until `withdrawalLeadSlots` (10) slots before activation.
   5. Submit 100 EL-triggered partial withdrawal requests (1 gwei each) for
@@ -45,7 +45,7 @@ config:
   newValidatorDepCount00: 20   # 0x00 BLS         (keys 40..59)
   validatorDepositAmount: 32   # ETH per new validator
 
-  # Builder deposits (0x03 credentials via the regular deposit contract), batched, queued last.
+  # Builder deposits (0xB0 credentials via the regular deposit contract), batched, queued last.
   builderCount: 500
   builderDepositAmount: 1      # ETH per builder
   builderBatchSize: 100
@@ -136,7 +136,7 @@ tasks:
     privateKey: "walletPrivkey"
     prefundMinBalance: "| ((.newValidatorDepCount00 + .newValidatorDepCount01 + .newValidatorDepCount02) * .validatorDepositAmount + 50) * 1000000000000000000"
 
-# wallet that funds the builder deposits + holds the 0x03 address
+# wallet that funds the builder deposits + holds the 0xB0 address
 - name: generate_child_wallet
   id: builder_wallet
   title: "Generate wallet funding the builder deposits"
@@ -214,14 +214,14 @@ tasks:
         depositContract: "depositContract"
 
 ##
-## Builder deposits (0x03) - queued LAST.
+## Builder deposits (0xB0) - queued LAST.
 ##  Submitted only after the regular validator deposits have execution-layer
 ##  receipts, so their deposit requests land in later EL blocks and sit at the
 ##  END of the pending-deposit queue.
 ##
 
 - name: generate_batch_deposits
-  title: "Deposit ${builderCount} builders (0x03) in batches of ${builderBatchSize} (queued last)"
+  title: "Deposit ${builderCount} builders (0xB0) in batches of ${builderBatchSize} (queued last)"
   timeout: 30m
   config:
     awaitReceipt: true
@@ -233,12 +233,12 @@ tasks:
     depositAmount: "builderDepositAmount"
     walletPrivkey: "tasks.builder_wallet.outputs.childWallet.privkey"
     mnemonic: "tasks.builder_mnemonic.outputs.mnemonic"
-    # Pre-fork builders go through the REGULAR deposit contract with 0x03 creds;
+    # Pre-fork builders go through the REGULAR deposit contract with 0xB0 creds;
     # they are onboarded as builders at the fork (the EIP-8282 builder contract
     # rejects submissions before activation).
     depositContract: "depositContract"
-    # 0x03 builder credentials: version byte + 11 zero bytes + 20-byte address
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.builder_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+    # 0xB0 builder credentials: version byte + 11 zero bytes + 20-byte address
+    withdrawalCredentials: '| "0xB0" + ("00" * 11) + (.tasks.builder_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
 ##
 ## Gate: wait until `withdrawalLeadSlots` slots before GLOAS activation

@@ -1,7 +1,7 @@
 name: GLOAS (ePBS)
 description: |
   GLOAS-fork tests focused on the ePBS payload-publishing model and the
-  new builder role (validators with 0x03 withdrawal credentials).
+  new builder role (validators with 0xB0 withdrawal credentials).
 
   Includes builder lifecycle, builder deposit spam, and regression tests
   for the `process_previous_payload` ordering rule that affects how

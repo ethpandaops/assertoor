@@ -20,7 +20,7 @@ description: |
   Construction:
     1. In epoch F-3, deposit `junkCount` (>= 16) regular 0x01 deposits of 1 ETH as
        a "wall" at the front of the pending-deposit queue.
-    2. Right after (later slot, same epoch F-3), deposit the 0x03 builder deposit,
+    2. Right after (later slot, same epoch F-3), deposit the 0xB0 builder deposit,
        so it sits BEHIND the wall, at queue index >= junkCount.
     3. At the F-1 -> F boundary, process_pending_deposits finalizes everything,
        drains the first 16 (wall), hits the count cap, and stops BEFORE the builder
@@ -33,7 +33,7 @@ description: |
   FAIL on the active check => trick did not achieve slot-0 activation (logs show
        deposit_epoch vs finalized_epoch; usually means it slipped to F+1).
   FAIL on the onboard check => builder deposit was drained into a validator
-       (wall too small / mistimed) and is now a stuck 0x03 validator.
+       (wall too small / mistimed) and is now a stuck 0xB0 validator.
 
   Requires being started before epoch F-3 and GLOAS_FORK_EPOCH >= 3.
 version: 1.0.0
@@ -182,7 +182,7 @@ tasks:
 
 - name: generate_deposits
   id: builder_deposit
-  title: "Builder deposit (0x03) BEHIND the wall (index >= ${junkCount})"
+  title: "Builder deposit (0xB0) BEHIND the wall (index >= ${junkCount})"
   config:
     awaitReceipt: true
     awaitInclusion: true
@@ -196,8 +196,8 @@ tasks:
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
     mnemonic: '| if .builderMnemonic != "" then .builderMnemonic else .tasks.builder_mnemonic_rand.outputs.mnemonic end'
     depositContract: "depositContract"
-    # 0x03 builder credentials.
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+    # 0xB0 builder credentials.
+    withdrawalCredentials: '| "0xB0" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
 ##
 ## PHASE 3: at the first gloas block, the builder deposit must have been onboarded

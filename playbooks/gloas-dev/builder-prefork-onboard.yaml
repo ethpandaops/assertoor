@@ -1,5 +1,5 @@
 id: builder-prefork-onboard
-name: "GLOAS: Pre-fork builder onboarding (0x03 -> builder via fork dequeue)"
+name: "GLOAS: Pre-fork builder onboarding (0xB0 -> builder via fork dequeue)"
 description: |
   Focused regression test for the GLOAS pre-fork builder onboarding path
   (`onboard_builders_from_pending_deposits`).
@@ -10,7 +10,7 @@ description: |
 
   1. Inside the UNFINALIZED window just before GLOAS activates (so the deposit is
      still in state.pending_deposits at the fork), deposit `builderCount` keys via
-     the STANDARD validator deposit contract using 0x03 (builder) withdrawal
+     the STANDARD validator deposit contract using 0xB0 (builder) withdrawal
      credentials. The deposit signatures are verified under the regular
      DOMAIN_DEPOSIT, so the ordinary `generate_deposits` task is used unchanged.
   2. Because these deposits reach the fork still pending (unprocessed), the GLOAS
@@ -39,7 +39,7 @@ tags: [gloas, builder, deposit, onboarding, prefork, eip-8282]
 timeout: 1h
 config:
   walletPrivkey: ''
-  # Regular validator deposit contract (pre-fork builder onboarding via 0x03 creds).
+  # Regular validator deposit contract (pre-fork builder onboarding via 0xB0 creds).
   depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
   builderCount: 5
   depositAmount: 5
@@ -98,7 +98,7 @@ tasks:
         echo "  current slot:        $CURRENT_SLOT"
         echo "  latest deposit slot: $LATEST_DEPOSIT_SLOT"
         echo "  GLOAS activation:    slot $ACTIVATION_SLOT (epoch $GLOAS_FORK_EPOCH)"
-        echo "Start the test earlier so the 0x03 deposit is still pending"
+        echo "Start the test earlier so the 0xB0 deposit is still pending"
         echo "(and unfinalized) when GLOAS activates."
         exit 1
       fi
@@ -143,7 +143,7 @@ tasks:
 ##
 ## PHASE 1: PRE-FORK deposit via the STANDARD validator deposit contract
 ##  Wait into the unfinalized window (~1 epoch before the fork), then deposit
-##  builderCount keys with 0x03 credentials so they are still pending (and
+##  builderCount keys with 0xB0 credentials so they are still pending (and
 ##  unfinalized, hence not yet drained into the validator registry) at the fork.
 ##
 
@@ -155,7 +155,7 @@ tasks:
 
 - name: generate_deposits
   id: prefork_deposits
-  title: "Deposit ${builderCount} builders via STANDARD contract (0x03 creds)"
+  title: "Deposit ${builderCount} builders via STANDARD contract (0xB0 creds)"
   config:
     awaitReceipt: true
     failOnReject: true
@@ -167,8 +167,8 @@ tasks:
     walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
     mnemonic: '| if .builderMnemonic != "" then .builderMnemonic else .tasks.test_mnemonic.outputs.mnemonic end'
     depositContract: "depositContract"
-    # 0x03 builder credentials: version byte + 11 zero bytes + 20-byte address
-    withdrawalCredentials: '| "0x03" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+    # 0xB0 builder credentials: version byte + 11 zero bytes + 20-byte address
+    withdrawalCredentials: '| "0xB0" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
 
 ##
 ## PHASE 2: Verify the fork DEQUEUED the pending deposits into builders

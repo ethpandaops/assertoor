@@ -16,8 +16,8 @@ type Config struct {
 	WalletPrivkey          string   `yaml:"walletPrivkey" json:"walletPrivkey" require:"C" desc:"Private key of the wallet used to fund builder deposit transactions."`
 	BuilderDepositContract string   `yaml:"builderDepositContract" json:"builderDepositContract" desc:"Address of the builder deposit system contract (EIP-8282)."`
 	DepositAmount          uint64   `yaml:"depositAmount" json:"depositAmount" desc:"Amount of ETH to deposit per builder (must be >= 1 ETH)."`
-	WithdrawalCredentials  string   `yaml:"withdrawalCredentials" json:"withdrawalCredentials" desc:"Custom withdrawal credentials to use (must be 0x03-prefixed). If empty, derived from builderAddress or the funding wallet address."`
-	BuilderAddress         string   `yaml:"builderAddress" json:"builderAddress" desc:"Execution address used to build 0x03 withdrawal credentials when withdrawalCredentials is not set. This address is the only one allowed to exit the builder."`
+	WithdrawalCredentials  string   `yaml:"withdrawalCredentials" json:"withdrawalCredentials" desc:"Custom withdrawal credentials to use (must be 0xB0-prefixed). If empty, derived from builderAddress or the funding wallet address."`
+	BuilderAddress         string   `yaml:"builderAddress" json:"builderAddress" desc:"Execution address used to build 0xB0 withdrawal credentials when withdrawalCredentials is not set. This address is the only one allowed to exit the builder."`
 	TopUpDeposit           bool     `yaml:"topUpDeposit" json:"topUpDeposit" desc:"If true, add to an existing builder balance instead of registering a new builder. Withdrawal credentials and signature are ignored by the consensus layer for top-ups."`
 	TxFeeCap               *big.Int `yaml:"txFeeCap" json:"txFeeCap" desc:"Maximum fee cap (in wei) for builder deposit transactions."`
 	TxTipCap               *big.Int `yaml:"txTipCap" json:"txTipCap" desc:"Maximum priority tip (in wei) for builder deposit transactions."`

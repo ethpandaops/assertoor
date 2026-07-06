@@ -3,7 +3,7 @@
 ### Description
 The `generate_builder_exits` task generates and submits builder exit requests to the Ethereum network as defined by EIP-8282 (Gloas). As of Gloas, builder exits are **no longer voluntary (consensus-layer) exits** — they are submitted as execution-layer requests to the builder exit system contract.
 
-The request is submitted as **raw calldata** (no function selector): the 48-byte builder public key. The contract prepends `msg.sender` as the source address when emitting the request, so the transaction **must be sent from the builder's execution address** (the address embedded in its 0x03 withdrawal credentials). Only that address is authorized to exit the builder.
+The request is submitted as **raw calldata** (no function selector): the 48-byte builder public key. The contract prepends `msg.sender` as the source address when emitting the request, so the transaction **must be sent from the builder's execution address** (the address embedded in its 0xB0 withdrawal credentials). Only that address is authorized to exit the builder.
 
 The builders to exit can be specified either by an explicit `sourcePubkey`, or by deriving keys from a `sourceMnemonic` & key range.
 
@@ -31,7 +31,7 @@ The builders to exit can be specified either by an explicit `sourcePubkey`, or b
   Number of builders to generate exit requests for.
 
 - **`walletPrivkey`**:
-  Private key of the wallet used to send builder exit transactions. Must match the builder's execution address (its 0x03 withdrawal credentials).
+  Private key of the wallet used to send builder exit transactions. Must match the builder's execution address (its 0xB0 withdrawal credentials).
 
 - **`builderExitContract`**:
   Address of the builder exit system contract (EIP-8282).

@@ -13,7 +13,7 @@ type Config struct {
 	SourceMnemonic       string   `yaml:"sourceMnemonic" json:"sourceMnemonic" require:"B.2" desc:"Mnemonic phrase to derive builder keys for exits."`
 	SourceStartIndex     int      `yaml:"sourceStartIndex" json:"sourceStartIndex" require:"B.2" desc:"Index within the mnemonic from which to start deriving builder keys."`
 	SourceIndexCount     int      `yaml:"sourceIndexCount" json:"sourceIndexCount" desc:"Number of builders to generate exit requests for."`
-	WalletPrivkey        string   `yaml:"walletPrivkey" json:"walletPrivkey" require:"C" desc:"Private key of the wallet used to send builder exit transactions. Must match the builder's execution address (its 0x03 withdrawal credentials)."`
+	WalletPrivkey        string   `yaml:"walletPrivkey" json:"walletPrivkey" require:"C" desc:"Private key of the wallet used to send builder exit transactions. Must match the builder's execution address (its 0xB0 withdrawal credentials)."`
 	BuilderExitContract  string   `yaml:"builderExitContract" json:"builderExitContract" desc:"Address of the builder exit system contract (EIP-8282)."`
 	TxAmount             *big.Int `yaml:"txAmount" json:"txAmount" desc:"Amount of ETH (in wei) to send with the builder exit transaction to cover the request fee."`
 	TxFeeCap             *big.Int `yaml:"txFeeCap" json:"txFeeCap" desc:"Maximum fee cap (in wei) for builder exit transactions."`
