@@ -1,8 +1,8 @@
 # Auto-generated playbook index
-# Generated: 2026-05-21T07:03:46Z
+# Generated: 2026-07-07T07:50:04Z
 # DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
 
-generated: 2026-05-21T07:03:46Z
+generated: 2026-07-07T07:50:04Z
 folders:
   - path: api-compatibility
     name: API Compatibility
@@ -472,16 +472,19 @@ playbooks:
     timeout: 4h
   - file: gloas-dev/builder-deposit-spam.yaml
     id: builder-deposit-spam
-    name: 'GLOAS: Spam batched 0xB0 builder deposits'
+    name: 'GLOAS: Spam builder deposits (EIP-8282)'
     description: |-
-      Stress test for the GLOAS builder deposit path. Deploys a tiny batch
-      contract and uses it to register `totalDeposits` (default 1000)
-      builders with 0xB0 credentials at `batchSize` (default 100) deposits
-      per tx, capped at `pendingBatches` in-flight.
+      Stress test for the GLOAS builder deposit path. Registers `totalDeposits`
+      (default 1000) builders via the builder deposit system contract (EIP-8282),
+      with up to `pendingDeposits` transactions in flight at a time.
 
-      After spamming, asserts the chain still finalizes (1 finalized epoch,
-      no more than 4 unfinalized) — i.e. the deposit storm does not break
-      finality.
+      Builder deposits are raw-calldata requests (no deposit() selector, no batch
+      contract), so each builder is its own transaction; throughput is controlled by
+      the in-flight cap rather than per-tx batching. The consensus layer validates
+      every BLS proof-of-possession individually on dequeue.
+
+      After spamming, asserts the chain still finalizes (1 finalized epoch, no more
+      than 4 unfinalized) — i.e. the deposit storm does not break finality.
 
       Optional `skipForkActivationCheck` to bypass the GLOAS-epoch wait on
       long-running devnets.
@@ -490,48 +493,64 @@ playbooks:
       - gloas
       - builder
       - deposit
-      - eip-6110
+      - eip-8282
       - spam
       - stability
     timeout: 1h
   - file: gloas-dev/builder-deposit.yaml
     id: builder-deposit
-    name: 'GLOAS: Builder Deposit (0xB0 credentials)'
+    name: 'GLOAS: Builder Deposit (EIP-8282)'
     description: |-
       Minimal deposit test for the GLOAS builder role. Generates a fresh
-      wallet + mnemonic and submits a single 5-ETH deposit with 0xB0
-      withdrawal credentials (i.e. `0xB0 || 11×0x00 || 20-byte address`).
+      wallet + mnemonic and submits a single builder deposit to the builder
+      deposit system contract (EIP-8282).
 
-      Verifies the deposit pipeline accepts builder-tagged credentials
-      on a GLOAS devnet. Awaits both EL receipt and CL inclusion.
+      Builder deposits are submitted as raw calldata (no deposit() selector):
+      `pubkey || withdrawal_credentials || amount || signature`, signed under
+      DOMAIN_BUILDER_DEPOSIT. The withdrawal credentials default to 0xB0 +
+      the funding wallet address, so the same wallet can later exit the
+      builder. Awaits both EL receipt and CL inclusion as a builder deposit
+      request.
     version: 1.0.0
     tags:
       - gloas
       - builder
       - deposit
-      - eip-6110
+      - eip-8282
     timeout: 30m
   - file: gloas-dev/builder-lifecycle.yaml
     id: builder-lifecycle
-    name: 'GLOAS: Builder Lifecycle Test'
+    name: 'GLOAS: Builder Lifecycle Test (both onboarding paths)'
     description: |-
-      End-to-end lifecycle for GLOAS builders (validators with 0xB0
-      withdrawal credentials). Walks 10 builder keys through:
+      End-to-end lifecycle for GLOAS builders (EIP-8282), exercising BOTH ways a
+      builder can be onboarded.
 
-      1. Deposit 6 builders across the GLOAS activation boundary (3 before,
-         3 after).
-      2. Wait for all 6 to become active.
-      3. Exit them with alternating voluntary / EL-triggered exits, 10 slots
-         apart, ensuring exits span at least 2 epochs.
-      4. Wait for builders 0–2 to be fully withdrawn (balance == 0).
-      5. Deposit 4 new builders (keys 6–9) and verify **builder index reuse**:
-         keys 6/7/8 get the now-empty indices 0/1/2; key 9 gets a new index.
-      6. Send no-op partial withdrawal & consolidation requests against
-         active builders (should have no effect).
-      7. EL-triggered exit all newly-deposited builders.
+      When the test is started BEFORE GLOAS activation:
+      1. PRE-FORK onboarding: deposit builderCount builders a few slots BEFORE GLOAS
+         activates, using the regular validator deposit contract with 0xB0 (builder)
+         withdrawal credentials. These deposits sit in the pending-deposit queue and,
+         because they reach the fork unprocessed, are converted to builders at the
+         fork by `onboard_builders_from_pending_deposits`. Their signatures are
+         verified under the regular DOMAIN_DEPOSIT (NOT the builder domain), so the
+         ordinary `generate_deposits` task is used unchanged.
+      2. POST-FORK deposits: after the first GLOAS block (once the builder deposit
+         system contract's fee inhibitor has been cleared), deposit builderCount more
+         builders via the new builder deposit system contract (raw calldata, signed
+         under DOMAIN_BUILDER_DEPOSIT).
 
-      Verifies the GLOAS builder pool tracks deposits / exits / index reuse
-      correctly across epoch boundaries.
+      When the test is started AFTER GLOAS activation, the pre-fork path is no longer
+      possible, so ALL 2*builderCount builders are deposited via the new builder
+      deposit contract instead.
+
+      Then:
+      3. Wait for all builders to become active.
+      4. Exit them via builder exit requests (EIP-8282), spread across 2 epochs, and
+         verify they enter the exiting state.
+      5. (Only when MIN_BUILDER_WITHDRAWABILITY_DELAY < 10 epochs) Wait for the exited
+         builders to be fully withdrawn (balance 0), re-deposit a fresh set via the
+         builder contract, and verify they REUSE the freed builder indices. With the
+         default delay (8192 epochs) full withdrawal is not observable in a
+         short-lived run, so that phase is skipped.
     version: 1.0.0
     tags:
       - gloas
@@ -539,10 +558,130 @@ playbooks:
       - lifecycle
       - deposit
       - exit
-      - withdrawal
-      - el-triggered
-      - voluntary
-    timeout: 24h
+      - eip-8282
+    timeout: 2h
+  - file: gloas-dev/builder-prefork-onboard.yaml
+    id: builder-prefork-onboard
+    name: 'GLOAS: Pre-fork builder onboarding (0xB0 -> builder via fork dequeue)'
+    description: |-
+      Focused regression test for the GLOAS pre-fork builder onboarding path
+      (`onboard_builders_from_pending_deposits`).
+
+      This test ONLY exercises the case where a builder is created from a regular
+      validator deposit that is still sitting in the pending-deposit queue when the
+      fork happens:
+
+      1. Inside the UNFINALIZED window just before GLOAS activates (so the deposit is
+         still in state.pending_deposits at the fork), deposit `builderCount` keys via
+         the STANDARD validator deposit contract using 0xB0 (builder) withdrawal
+         credentials. The deposit signatures are verified under the regular
+         DOMAIN_DEPOSIT, so the ordinary `generate_deposits` task is used unchanged.
+      2. Because these deposits reach the fork still pending (unprocessed), the GLOAS
+         fork transition dequeues them and converts them into builders via
+         `onboard_builders_from_pending_deposits`.
+      3. Verify, right after the first GLOAS block, that each pubkey now exists as a
+         builder in the beacon state (i.e. it was dequeued/onboarded at the fork).
+      4. Verify the onboarded builders go active.
+
+      TIMING IS LOAD-BEARING. `process_pending_deposits` only drains deposits whose
+      slot is already finalized (`if deposit.slot > finalized_slot: break`). If the
+      deposit is made too early it finalizes and is applied to the validator registry
+      as a regular validator BEFORE the fork, and `onboard_builders_from_pending_deposits`
+      never sees it (it also explicitly keeps deposits for existing validators in the
+      queue). So the deposit must land late enough to still be UNfinalized at the fork.
+      There is no minimum deposit amount to onboard a builder (per gloas spec
+      v1.7.0-alpha.11: add_builder_to_registry sets builder.balance = deposit.amount
+      with no MIN_ACTIVATION_BALANCE check); 32 ETH is only needed for regular
+      validator activation, not builder onboarding.
+
+      This test REQUIRES being started before the pre-fork deposit window. If that
+      window has already passed, the test fails fast (the path under test is no longer
+      reachable) rather than silently passing.
+    version: 1.0.0
+    tags:
+      - gloas
+      - builder
+      - deposit
+      - onboarding
+      - prefork
+      - eip-8282
+    timeout: 1h
+  - file: gloas-dev/builder-prefork-queuefill.yaml
+    id: builder-prefork-queuefill
+    name: 'GLOAS: Pre-fork builder active AT the fork (queue-fill trick)'
+    description: |-
+      Tests whether a builder can be ACTIVE in the very first gloas epoch (epoch F,
+      slot 0) instead of the usual F+1/F+2 floor, using the deposit-queue-position
+      trick.
+
+      Why F slot-0 is normally impossible (per gloas spec v1.7.0-alpha.11):
+        - is_active_builder requires `builder.deposit_epoch < finalized_checkpoint.epoch`.
+        - onboard_builders_from_pending_deposits only onboards deposits that are still
+          in state.pending_deposits at the fork boundary.
+        - process_pending_deposits drains only FINALIZED deposits, in order, capped at
+          MAX_PENDING_DEPOSITS_PER_EPOCH (= 16) per epoch.
+      So to be active at slot 0 of epoch F, the builder's deposit must be BOTH
+      finalized (deposit_epoch <= F-3) AND still in the pending queue at the fork. A
+      finalized deposit on an empty queue gets drained into the validator registry, so
+      the only way to keep it pending is to put >= 16 finalized deposits AHEAD of it so
+      the per-epoch drain (16) can't reach it at the F-1 -> F boundary.
+
+      Construction:
+        1. In epoch F-3, deposit `junkCount` (>= 16) regular 0x01 deposits of 1 ETH as
+           a "wall" at the front of the pending-deposit queue.
+        2. Right after (later slot, same epoch F-3), deposit the 0xB0 builder deposit,
+           so it sits BEHIND the wall, at queue index >= junkCount.
+        3. At the F-1 -> F boundary, process_pending_deposits finalizes everything,
+           drains the first 16 (wall), hits the count cap, and stops BEFORE the builder
+           deposit. upgrade_to_gloas then onboards the still-pending builder deposit
+           with deposit_epoch = F-3.
+        4. In epoch F, finalized ~ F-2 > F-3 = deposit_epoch, so is_active_builder is
+           already true -> the builder can bid for a payload in the first gloas epoch.
+
+      PASS  => the queue-fill trick works: builder active in epoch F.
+      FAIL on the active check => trick did not achieve slot-0 activation (logs show
+           deposit_epoch vs finalized_epoch; usually means it slipped to F+1).
+      FAIL on the onboard check => builder deposit was drained into a validator
+           (wall too small / mistimed) and is now a stuck 0xB0 validator.
+
+      Requires being started before epoch F-3 and GLOAS_FORK_EPOCH >= 3.
+    version: 1.0.0
+    tags:
+      - gloas
+      - builder
+      - deposit
+      - onboarding
+      - prefork
+      - queue
+      - eip-8282
+    timeout: 1h
+  - file: gloas-dev/exit-builders.yaml
+    id: exit-builders
+    name: 'GLOAS: Exit builders deposited by prefork-queue-fill-public'
+    description: |-
+      Small test that exits the builders created by `prefork-queue-fill-public`.
+
+      The queue-fill run deposits `builderCount` builders (EIP-8282) from a fresh
+      random mnemonic (its `builder_mnemonic` task output), funded by a child wallet
+      derived from the `gloas-prefork-public-builders` seed. The builders' 0xB0
+      withdrawal credentials embed that wallet address, so only that wallet may exit
+      them.
+
+      As of GLOAS, builder exits are NOT voluntary exits — they are submitted as
+      execution-layer requests to the builder exit system contract (EIP-8282) from
+      the builder's execution address. This test regenerates the builder wallet from
+      the same seed and submits a builder exit request for each builder pubkey.
+
+      Mnemonic: copy the random `builderMnemonic` from the queue-fill run's
+      `builder_mnemonic` task output. builderStartIndex / builderCount must cover the
+      same key range that was deposited (defaults match the queue-fill defaults).
+    version: 1.0.0
+    tags:
+      - gloas
+      - builder
+      - exit
+      - eip-8282
+    timeout: 30m
   - file: gloas-dev/exit-conflict.yaml
     id: gloas-exit-conflict
     name: 'GLOAS: EL-triggered vs voluntary exit conflict'
@@ -572,6 +711,146 @@ playbooks:
       - el-triggered
       - voluntary
     timeout: 30h
+  - file: gloas-dev/prefork-queue-fill-public.yaml
+    id: prefork-queue-fill-public
+    name: 'GLOAS: Fill pending queues before fork activation (public devnet)'
+    description: |-
+      Public-devnet variant of `prefork-queue-fill` that needs NO special genesis
+      mnemonic - it deposits all of its own validators and builders.
+
+      Compressed to fit a short pre-fork window (`leadEpochs`) before GLOAS activation:
+
+      1. Wait until `leadEpochs` epochs before GLOAS activation.
+      2. Deposit a set of validators with a mixed credential set
+         (0x02 first so keys 0..N are compounding, then 0x01, then 0x00) from a
+         fresh mnemonic.
+      3. Deposit builders (0xB0 credentials via the regular deposit contract),
+         batched - submitted AFTER the regular deposits so they sit at the END of the
+         pending-deposit queue. Pre-fork, 0xB0 deposits that reach the fork still
+         pending are onboarded as builders at activation.
+      4. Wait until `withdrawalLeadSlots` (10) slots before activation.
+      5. Submit 100 EL-triggered partial withdrawal requests (1 gwei each) for
+         keys 0-4, 20 per key.
+
+      IMPORTANT - intentionally invalid requests:
+      Freshly-deposited validators do NOT activate within such a short pre-fork
+      window (MAX_SEED_LOOKAHEAD is a fixed 4 epochs, plus finality lag). The 100
+      withdrawal requests are therefore expected to be skipped by the consensus
+      layer (their source validators are not active yet). They still fill the
+      execution-layer 7002 request queue and exercise the request path, which is
+      the point of this variant. Consolidations are intentionally omitted.
+
+      Goal: at GLOAS activation the pending-deposit queue (regular validators +
+      builders) and the EL withdrawal-request queue are non-empty.
+    version: 1.0.0
+    tags:
+      - gloas
+      - deposit
+      - builder
+      - withdrawal
+      - el-triggered
+      - queue
+      - public-devnet
+    timeout: 1h
+  - file: gloas-dev/prefork-queue-fill.yaml
+    id: prefork-queue-fill
+    name: 'GLOAS: Fill pending queues before fork activation'
+    description: |-
+      Fills the consensus-layer processing queues with a large backlog of
+      operations *before* GLOAS activates, so the fork has to process
+      non-empty pending-deposit / pending-builder / pending-consolidation
+      and EL-triggered withdrawal-request queues from its first slot.
+
+      Timeline (all timing is derived from chain specs, not hardcoded):
+
+      1. Wait until 2 epochs before GLOAS activation.
+      2. Deposit 100 new validators with a mixed credential set
+         (34x 0x00 BLS, 33x 0x01 eth1, 33x 0x02 compounding) from a fresh
+         mnemonic.
+      3. Submit 150 BLS changes (0x00 -> 0x01) for the supplied genesis
+         mnemonic (keys 0-149), pointing the withdrawal address at a wallet
+         we control.
+      4. Submit 50 self-consolidations (keys 0-49) to switch those keys from
+         0x01 -> 0x02 (compounding) credentials.
+      5. Submit 100 consolidation requests (sources 50-149) targeting the now
+         0x02 keys 0-49 (2 sources per target).
+      6. Deposit 1000 builders (0xB0 credentials) from a second fresh mnemonic,
+         batched 100-per-tx via the REGULAR deposit contract. Pre-fork, builders are
+         seeded this way (not via the EIP-8282 builder contract, which only accepts
+         submissions after activation): 0xB0-credentialed deposits that reach the
+         fork still pending are onboarded as builders by
+         onboard_builders_from_pending_deposits.
+      7. Wait until 10 slots before GLOAS activation.
+      8. Submit 200 EL-triggered partial withdrawal requests (1 gwei each) for
+         the supplied mnemonic keys 0-49, 4 requests per key.
+
+      Submission strategy is fire-and-forget: each step only confirms that its
+      execution-layer transactions landed (awaitReceipt), it does NOT wait for
+      the consensus layer to process the resulting queue entries. The goal is
+      queue *depth* at activation, not end-to-end processing.
+
+      NOTE: steps 2-6 depend on the credential chain (BLS change -> 0x01,
+      self-consolidation -> 0x02). Because requests sit in the 7251/7002
+      predeploy queues and drain only a few per block, the credential changes
+      have ample time to be processed before each request is actually dequeued
+      and validated on the consensus layer.
+    version: 1.0.0
+    tags:
+      - gloas
+      - deposit
+      - builder
+      - consolidation
+      - bls-change
+      - withdrawal
+      - el-triggered
+      - queue
+      - kurtosis
+    timeout: 2h
+  - file: gloas-dev/slash-active-validators.yaml
+    id: slash-active-validators
+    name: 'GLOAS: Slash whichever of the deposited validators are active'
+    description: |-
+      Checks each of the validator keys from a supplied mnemonic (e.g. the 60
+      validators created by `prefork-queue-fill-public`) and slashes only the ones
+      that are currently active. Validators that never activated (the "gaps") are
+      detected and skipped instead of failing the test.
+
+      Per key:
+      - check_consensus_validator_status with failOnCheckMiss=true returns
+        immediately: success if the validator is active_ongoing, failure otherwise.
+      - On success the slashing runs; on failure the per-key run_tasks stops before
+        the slashing. Each key is wrapped in ignoreResult so skipped keys don't fail
+        the overall test.
+
+      Mnemonic: copy the random `validatorMnemonic` from the queue-fill run's
+      `val_mnemonic` task output. validatorStartIndex / validatorCount must cover
+      the same key range that was deposited.
+    version: 1.0.0
+    tags:
+      - gloas
+      - slashing
+      - proposer
+      - attester
+      - validator-status
+    timeout: 30m
+  - file: gloas-dev/slash-validators.yaml
+    id: slash-validators
+    name: 'GLOAS: Slash validators (proposer 0-9, attester 10-19)'
+    description: |-
+      Small test that slashes 20 active validators from a supplied mnemonic:
+
+      - keys 0-9  via proposer slashings
+      - keys 10-19 via attester slashings
+
+      The validators must be active (e.g. genesis validators). awaitInclusion is on
+      so the test only passes once the slashings are actually included in blocks.
+    version: 1.0.0
+    tags:
+      - gloas
+      - slashing
+      - proposer
+      - attester
+    timeout: 30m
   - file: gloas-dev/slashing-exit-conflict.yaml
     id: slashing-exit-conflict
     name: 'GLOAS: Slashing vs voluntary exit conflict'
@@ -598,6 +877,59 @@ playbooks:
       - conflict
       - voluntary
     timeout: 30h
+  - file: gloas-dev/worst-case-block.yaml
+    id: worst-case-block
+    name: 'GLOAS: Worst-case block stress (all operation types at their limits)'
+    description: |-
+      Reconstructs the worst-case SignedBeaconBlock from consensus-specs PR #5436
+      (removal of MAX_DEPOSIT_REQUESTS_PER_PAYLOAD) by flooding every block
+      operation type at (or beyond) its per-block limit, all at the same time:
+
+        - deposit requests        : unbounded post-GLOAS (gas-limited on the EL)
+        - withdrawal requests     : MAX_WITHDRAWAL_REQUESTS_PER_PAYLOAD = 16
+        - consolidation requests  : MAX_CONSOLIDATION_REQUESTS_PER_PAYLOAD = 2
+        - builder deposit requests: MAX_BUILDER_DEPOSIT_REQUESTS_PER_PAYLOAD = 64
+        - builder exit requests   : MAX_BUILDER_EXIT_REQUESTS_PER_PAYLOAD = 16
+        - voluntary exits         : MAX_VOLUNTARY_EXITS = 16
+        - BLS-to-execution changes: MAX_BLS_TO_EXECUTION_CHANGES = 16
+        - proposer slashings      : MAX_PROPOSER_SLASHINGS = 16
+        - attester slashings      : MAX_ATTESTER_SLASHINGS_ELECTRA = 1
+
+      The headline assertion is a block carrying MORE deposit requests than the
+      old pre-GLOAS cap (8192), proving the consensus-layer limit is really gone.
+      On a giga-gas devnet, raise `depositRequestCount` / `minDepositRequestsPerBlock`
+      to 40000 to approach the ~10 MiB `MAX_SIGNED_BEACON_BLOCK_SIZE` bound
+      (40k deposit requests * 192 bytes = ~7.3 MiB of the block).
+
+      Notes:
+        - Deposit requests are sent as batched top-ups/deposits against
+          `validatorMnemonic` keys; indices that do not exist yet are created as
+          1 ETH pending validators (registry bloat is acceptable on a devnet).
+        - Withdrawal/consolidation requests are counted by the EL request queue
+          regardless of consensus-layer validity, so they stress payload size and
+          request-count limits even when the source address does not match the
+          validator's withdrawal credentials.
+        - `blsChange*` indices must point at validators that still have 0x00 BLS
+          withdrawal credentials.
+        - Validators in the slashing ranges get permanently slashed; point the
+          ranges at expendable indices.
+
+      !!! GAS REQUIREMENT !!!
+      One deposit() call costs ~10^5 gas. Landing >8192 deposit requests in a
+      single payload needs a block gas limit near 1 gigagas. On a normal-gas
+      devnet lower `minDepositRequestsPerBlock` accordingly.
+    version: 1.0.0
+    tags:
+      - gloas
+      - worst-case
+      - block-limit
+      - stress
+      - deposit
+      - slashing
+      - builder
+      - kurtosis
+      - high-gas
+    timeout: 2h
   - file: pectra-dev/blockhash-test-with-rpc-call.yaml
     id: blockhash-test
     name: BLOCKHASH / EIP-2935 RPC consistency test
