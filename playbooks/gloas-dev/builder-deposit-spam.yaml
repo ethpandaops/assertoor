@@ -21,7 +21,7 @@ timeout: 1h
 config:
   walletPrivkey: ''
   # Builder deposit system contract (EIP-8282).
-  builderDepositContract: '0x0000884d2AA32eAa155F59A2f24eFa73D9008282'
+  builderDepositContract: '0x0000bFF46984e3725691FA540a8C7589300D8282'
   # Total deposits to push through the chain. Set to 0 to run unbounded until timeout.
   totalDeposits: 1000
   # Hard cap of in-flight deposit transactions so we don't drown the mempool.

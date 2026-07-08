@@ -72,7 +72,7 @@ The builders to exit can be specified either by an explicit `sourcePubkey`, or b
     sourceStartIndex: 0
     sourceIndexCount: 0
     walletPrivkey: ""
-    builderExitContract: "0x000014574A74c805590AFF9499fc7A690f008282"
+    builderExitContract: "0x000064D678505ad48F8cCb093BC65613800E8282"
     txAmount: "1000000000000000"
     txFeeCap: "100000000000"
     txTipCap: "1000000000"

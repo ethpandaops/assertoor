@@ -105,7 +105,7 @@ Builders are identified either by deriving keys from a `mnemonic` & key range, o
     indexCount: 0
     publicKey: ""
     walletPrivkey: ""
-    builderDepositContract: "0x0000884d2AA32eAa155F59A2f24eFa73D9008282"
+    builderDepositContract: "0x0000bFF46984e3725691FA540a8C7589300D8282"
     depositAmount: 1
     withdrawalCredentials: ""
     builderAddress: ""

@@ -50,8 +50,8 @@ config:
   depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
   withdrawalContract: "0x00000961Ef480Eb55e80D19ad83579A64c007002"
   consolidationContract: "0x0000BBdDc7CE488642fb579F8B00f3a590007251"
-  builderDepositContract: "0x0000884d2AA32eAa155F59A2f24eFa73D9008282"
-  builderExitContract: "0x000014574A74c805590AFF9499fc7A690f008282"
+  builderDepositContract: "0x0000bFF46984e3725691FA540a8C7589300D8282"
+  builderExitContract: "0x000064D678505ad48F8cCb093BC65613800E8282"
   # Deposit-request flood: total to send, and how many must land in ONE block.
   # 8193 = old MAX_DEPOSIT_REQUESTS_PER_PAYLOAD + 1. Set both to 40000 on a
   # giga-gas devnet to reproduce the full ~10 MiB worst-case block.

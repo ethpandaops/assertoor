@@ -17,7 +17,7 @@ timeout: 30m
 config:
   walletPrivkey: ''
   # Builder deposit system contract (EIP-8282).
-  builderDepositContract: '0x0000884d2AA32eAa155F59A2f24eFa73D9008282'
+  builderDepositContract: '0x0000bFF46984e3725691FA540a8C7589300D8282'
 tasks:
   - name: check_clients_are_healthy
     title: Check if at least one client is ready
