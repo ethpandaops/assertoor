@@ -1,0 +1,356 @@
+id: worst-case-block
+name: "GLOAS: Worst-case block stress (all operation types at their limits)"
+description: |
+  Reconstructs the worst-case SignedBeaconBlock from consensus-specs PR #5436
+  (removal of MAX_DEPOSIT_REQUESTS_PER_PAYLOAD) by flooding every block
+  operation type at (or beyond) its per-block limit, all at the same time:
+
+    - deposit requests        : unbounded post-GLOAS (gas-limited on the EL)
+    - withdrawal requests     : MAX_WITHDRAWAL_REQUESTS_PER_PAYLOAD = 16
+    - consolidation requests  : MAX_CONSOLIDATION_REQUESTS_PER_PAYLOAD = 2
+    - builder deposit requests: MAX_BUILDER_DEPOSIT_REQUESTS_PER_PAYLOAD = 64
+    - builder exit requests   : MAX_BUILDER_EXIT_REQUESTS_PER_PAYLOAD = 16
+    - voluntary exits         : MAX_VOLUNTARY_EXITS = 16
+    - BLS-to-execution changes: MAX_BLS_TO_EXECUTION_CHANGES = 16
+    - proposer slashings      : MAX_PROPOSER_SLASHINGS = 16
+    - attester slashings      : MAX_ATTESTER_SLASHINGS_ELECTRA = 1
+
+  The headline assertion is a block carrying MORE deposit requests than the
+  old pre-GLOAS cap (8192), proving the consensus-layer limit is really gone.
+  On a giga-gas devnet, raise `depositRequestCount` / `minDepositRequestsPerBlock`
+  to 40000 to approach the ~10 MiB `MAX_SIGNED_BEACON_BLOCK_SIZE` bound
+  (40k deposit requests * 192 bytes = ~7.3 MiB of the block).
+
+  Notes:
+    - Deposit requests are sent as batched top-ups/deposits against
+      `validatorMnemonic` keys; indices that do not exist yet are created as
+      1 ETH pending validators (registry bloat is acceptable on a devnet).
+    - Withdrawal/consolidation requests are counted by the EL request queue
+      regardless of consensus-layer validity, so they stress payload size and
+      request-count limits even when the source address does not match the
+      validator's withdrawal credentials.
+    - `blsChange*` indices must point at validators that still have 0x00 BLS
+      withdrawal credentials.
+    - Validators in the slashing ranges get permanently slashed; point the
+      ranges at expendable indices.
+
+  !!! GAS REQUIREMENT !!!
+  One deposit() call costs ~10^5 gas. Landing >8192 deposit requests in a
+  single payload needs a block gas limit near 1 gigagas. On a normal-gas
+  devnet lower `minDepositRequestsPerBlock` accordingly.
+version: 1.0.0
+tags: [gloas, worst-case, block-limit, stress, deposit, slashing, builder, kurtosis, high-gas]
+timeout: 2h
+config:
+  # Funding wallet (must cover depositRequestCount + builderDepositCount ETH + fees).
+  walletPrivkey: ""
+  # Mnemonic of the chain's genesis validators (kurtosis default).
+  validatorMnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+  # System contracts.
+  depositContract: "0x00000000219ab540356cBB839Cbe05303d7705Fa"
+  withdrawalContract: "0x00000961Ef480Eb55e80D19ad83579A64c007002"
+  consolidationContract: "0x0000BBdDc7CE488642fb579F8B00f3a590007251"
+  builderDepositContract: "0x0000bFF46984e3725691FA540a8C7589300D8282"
+  builderExitContract: "0x000064D678505ad48F8cCb093BC65613800E8282"
+  # Deposit-request flood: total to send, and how many must land in ONE block.
+  # 8193 = old MAX_DEPOSIT_REQUESTS_PER_PAYLOAD + 1. Set both to 40000 on a
+  # giga-gas devnet to reproduce the full ~10 MiB worst-case block.
+  depositRequestCount: 16384
+  minDepositRequestsPerBlock: 8193
+  depositBatchSize: 512
+  depositBatchTxGasLimit: 64000000
+  depositAmount: 1
+  # Per-block CL limits to generate and assert (set any to 0 to skip).
+  voluntaryExitCount: 16
+  blsChangeCount: 16
+  proposerSlashingCount: 16
+  attesterSlashingCount: 1
+  withdrawalRequestCount: 16
+  consolidationRequestCount: 2
+  builderDepositCount: 64
+  builderExitCount: 16
+  # Non-overlapping validator index ranges within validatorMnemonic.
+  voluntaryExitStartIndex: 100
+  blsChangeStartIndex: 120
+  proposerSlashingStartIndex: 140
+  attesterSlashingStartIndex: 160
+  withdrawalRequestStartIndex: 170
+  consolidationStartIndex: 190
+  # How far back the per-type assertions may look for a matching block.
+  assertLookback: 64
+  # Set to true to skip waiting for the GLOAS fork to activate.
+  skipForkActivationCheck: false
+tasks:
+  - name: check_clients_are_healthy
+    title: "Check that at least one client is ready"
+    timeout: 5m
+    config:
+      minClientCount: 1
+
+  - name: get_consensus_specs
+    id: get_specs
+    title: "Get consensus chain specs"
+    if: "skipForkActivationCheck == false"
+
+  - name: check_consensus_slot_range
+    title: "Wait for GLOAS activation (epoch >= ${{ tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH }})"
+    timeout: 1h
+    if: "skipForkActivationCheck == false"
+    configVars:
+      minEpochNumber: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
+
+  - name: check_consensus_block_proposals
+    title: "Wait for a block proposal to settle fee estimation"
+    config:
+      blockCount: 2
+      checkLookback: 0
+
+  # Wallet that funds every EL-side request transaction.
+  - name: generate_child_wallet
+    id: spam_wallet
+    title: "Generate funded wallet for the operation storm"
+    config:
+      walletSeed: gloas-worst-case-block
+    configVars:
+      privateKey: walletPrivkey
+      # deposits + builder deposits (ETH) + 200 ETH headroom for request fees.
+      prefundMinBalance: "| ((.depositRequestCount * .depositAmount) + .builderDepositCount + 200) * 1000000000000000000"
+
+  - name: get_random_mnemonic
+    id: builder_mnemonic
+    title: "Generate fresh mnemonic for spam builders"
+
+  # Fire every operation type at once so they compete for the same blocks.
+  - name: run_tasks_concurrent
+    title: "Storm: flood all operation types concurrently"
+    timeout: 1h
+    config:
+      tasks:
+        - name: generate_batch_deposits
+          title: "Flood ${depositRequestCount} deposit requests (batches of ${depositBatchSize})"
+          config:
+            limitPerSlot: 0
+            limitPendingBatches: 64
+            startIndex: 0
+            awaitReceipt: true
+            failOnReject: true
+          configVars:
+            walletPrivkey: tasks.spam_wallet.outputs.childWallet.privkey
+            mnemonic: validatorMnemonic
+            depositContract: depositContract
+            limitTotal: depositRequestCount
+            indexCount: depositRequestCount
+            batchSize: depositBatchSize
+            batchTxGasLimit: depositBatchTxGasLimit
+            depositAmount: depositAmount
+            withdrawalCredentials: '| "0x01" + ("00" * 11) + (.tasks.spam_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+
+        - name: generate_exits
+          title: "Submit ${voluntaryExitCount} voluntary exits"
+          if: "voluntaryExitCount > 0"
+          config:
+            limitPerSlot: 0
+            awaitInclusion: true
+          configVars:
+            mnemonic: validatorMnemonic
+            limitTotal: voluntaryExitCount
+            indexCount: voluntaryExitCount
+            startIndex: voluntaryExitStartIndex
+
+        - name: generate_bls_changes
+          title: "Submit ${blsChangeCount} BLS-to-execution changes"
+          if: "blsChangeCount > 0"
+          config:
+            limitPerSlot: 0
+            awaitInclusion: true
+            targetAddress: "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA"
+          configVars:
+            mnemonic: validatorMnemonic
+            limitTotal: blsChangeCount
+            indexCount: blsChangeCount
+            startIndex: blsChangeStartIndex
+
+        - name: generate_slashings
+          title: "Submit ${proposerSlashingCount} proposer slashings"
+          if: "proposerSlashingCount > 0"
+          config:
+            slashingType: proposer
+            limitPerSlot: 0
+            awaitInclusion: true
+          configVars:
+            mnemonic: validatorMnemonic
+            limitTotal: proposerSlashingCount
+            indexCount: proposerSlashingCount
+            startIndex: proposerSlashingStartIndex
+
+        - name: generate_slashings
+          title: "Submit ${attesterSlashingCount} attester slashing(s)"
+          if: "attesterSlashingCount > 0"
+          config:
+            slashingType: attester
+            limitPerSlot: 0
+            awaitInclusion: true
+          configVars:
+            mnemonic: validatorMnemonic
+            limitTotal: attesterSlashingCount
+            indexCount: attesterSlashingCount
+            startIndex: attesterSlashingStartIndex
+
+        - name: generate_withdrawal_requests
+          title: "Send ${withdrawalRequestCount} EL withdrawal requests"
+          if: "withdrawalRequestCount > 0"
+          config:
+            limitPerSlot: 0
+            awaitReceipt: true
+            failOnReject: true
+          configVars:
+            walletPrivkey: tasks.spam_wallet.outputs.childWallet.privkey
+            sourceMnemonic: validatorMnemonic
+            withdrawalContract: withdrawalContract
+            limitTotal: withdrawalRequestCount
+            sourceIndexCount: withdrawalRequestCount
+            sourceStartIndex: withdrawalRequestStartIndex
+
+        - name: generate_consolidations
+          title: "Send ${consolidationRequestCount} consolidation requests"
+          if: "consolidationRequestCount > 0"
+          config:
+            limitPerSlot: 0
+            targetValidatorIndex: 0
+            awaitReceipt: true
+            failOnReject: true
+          configVars:
+            walletPrivkey: tasks.spam_wallet.outputs.childWallet.privkey
+            sourceMnemonic: validatorMnemonic
+            consolidationContract: consolidationContract
+            limitTotal: consolidationRequestCount
+            sourceIndexCount: consolidationRequestCount
+            sourceStartIndex: consolidationStartIndex
+
+        - name: generate_builder_deposits
+          title: "Register ${builderDepositCount} builders (EIP-8282 deposits)"
+          if: "builderDepositCount > 0"
+          config:
+            limitPerSlot: 0
+            depositAmount: 1
+            awaitReceipt: true
+            failOnReject: true
+          configVars:
+            walletPrivkey: tasks.spam_wallet.outputs.childWallet.privkey
+            mnemonic: tasks.builder_mnemonic.outputs.mnemonic
+            builderDepositContract: builderDepositContract
+            limitTotal: builderDepositCount
+            indexCount: builderDepositCount
+
+        - name: generate_builder_exits
+          title: "Send ${builderExitCount} builder exit requests (EIP-8282)"
+          if: "builderExitCount > 0"
+          config:
+            limitPerSlot: 0
+            awaitReceipt: true
+            failOnReject: true
+          configVars:
+            walletPrivkey: tasks.spam_wallet.outputs.childWallet.privkey
+            sourceMnemonic: tasks.builder_mnemonic.outputs.mnemonic
+            builderExitContract: builderExitContract
+            limitTotal: builderExitCount
+            sourceIndexCount: builderExitCount
+
+  # Per-type assertions: each operation type must have hit its per-block
+  # limit in at least one block within the lookback window.
+  - name: check_consensus_block_proposals
+    title: "Assert a block carried > pre-GLOAS deposit-request cap (>= ${minDepositRequestsPerBlock})"
+    timeout: 15m
+    config:
+      blockCount: 1
+    configVars:
+      checkLookback: assertLookback
+      minDepositRequestCount: minDepositRequestsPerBlock
+
+  - name: check_consensus_block_proposals
+    title: "Assert a block carried ${voluntaryExitCount} voluntary exits"
+    timeout: 10m
+    if: "voluntaryExitCount > 0"
+    config:
+      blockCount: 1
+    configVars:
+      checkLookback: assertLookback
+      minExitCount: voluntaryExitCount
+
+  - name: check_consensus_block_proposals
+    title: "Assert a block carried ${blsChangeCount} BLS changes"
+    timeout: 10m
+    if: "blsChangeCount > 0"
+    config:
+      blockCount: 1
+    configVars:
+      checkLookback: assertLookback
+      minBlsChangeCount: blsChangeCount
+
+  - name: check_consensus_block_proposals
+    title: "Assert a block carried ${proposerSlashingCount} proposer slashings"
+    timeout: 10m
+    if: "proposerSlashingCount > 0"
+    config:
+      blockCount: 1
+    configVars:
+      checkLookback: assertLookback
+      minProposerSlashingCount: proposerSlashingCount
+
+  - name: check_consensus_block_proposals
+    title: "Assert a block carried ${attesterSlashingCount} attester slashing(s)"
+    timeout: 10m
+    if: "attesterSlashingCount > 0"
+    config:
+      blockCount: 1
+    configVars:
+      checkLookback: assertLookback
+      minAttesterSlashingCount: attesterSlashingCount
+
+  - name: check_consensus_block_proposals
+    title: "Assert a block carried ${withdrawalRequestCount} withdrawal requests"
+    timeout: 10m
+    if: "withdrawalRequestCount > 0"
+    config:
+      blockCount: 1
+    configVars:
+      checkLookback: assertLookback
+      minWithdrawalRequestCount: withdrawalRequestCount
+
+  - name: check_consensus_block_proposals
+    title: "Assert a block carried ${consolidationRequestCount} consolidation requests"
+    timeout: 10m
+    if: "consolidationRequestCount > 0"
+    config:
+      blockCount: 1
+    configVars:
+      checkLookback: assertLookback
+      minConsolidationRequestCount: consolidationRequestCount
+
+  - name: check_consensus_block_proposals
+    title: "Assert a block carried ${builderDepositCount} builder deposit requests"
+    timeout: 10m
+    if: "builderDepositCount > 0"
+    config:
+      blockCount: 1
+    configVars:
+      checkLookback: assertLookback
+      minBuilderDepositRequestCount: builderDepositCount
+
+  - name: check_consensus_block_proposals
+    title: "Assert a block carried ${builderExitCount} builder exit requests"
+    timeout: 10m
+    if: "builderExitCount > 0"
+    config:
+      blockCount: 1
+    configVars:
+      checkLookback: assertLookback
+      minBuilderExitRequestCount: builderExitCount
+
+  - name: check_consensus_finality
+    title: "Verify the chain still finalizes after the worst-case storm"
+    timeout: 20m
+    config:
+      minFinalizedEpochs: 1
+      maxUnfinalizedEpochs: 4
+      failOnCheckMiss: true

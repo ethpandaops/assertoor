@@ -38,8 +38,8 @@ config:
   # Regular validator deposit contract (pre-fork builder onboarding via 0xB0 creds).
   depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
   # EIP-8282 builder system contracts (post-fork deposits / exits).
-  builderDepositContract: '0x0000884d2AA32eAa155F59A2f24eFa73D9008282'
-  builderExitContract: '0x000014574A74c805590AFF9499fc7A690f008282'
+  builderDepositContract: '0x0000bFF46984e3725691FA540a8C7589300D8282'
+  builderExitContract: '0x000064D678505ad48F8cCb093BC65613800E8282'
   # Builders per onboarding path.
   builderCount: 5
   depositAmount: 5

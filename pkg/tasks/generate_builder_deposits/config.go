@@ -33,7 +33,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		BuilderDepositContract: "0x0000884d2AA32eAa155F59A2f24eFa73D9008282",
+		BuilderDepositContract: "0x0000bFF46984e3725691FA540a8C7589300D8282",
 		DepositAmount:          1,                        // 1 ETH (BUILDER_MIN_DEPOSIT)
 		TxFeeCap:               big.NewInt(100000000000), // 100 gwei
 		TxTipCap:               big.NewInt(1000000000),   // 1 gwei
