@@ -262,6 +262,12 @@ func (v *Variables) ResolveQuery(queryStr string) (val interface{}, ok bool, err
 		return nil, false, nil
 	}
 
+	// gojq reports runtime evaluation errors as values of type error, so a
+	// failed query must be surfaced instead of being returned as a result.
+	if queryErr, isErr := val.(error); isErr {
+		return nil, false, fmt.Errorf("error evaluating variable query '%v': %w", queryStr, queryErr)
+	}
+
 	return val, true, nil
 }
 
@@ -294,6 +300,12 @@ func (v *Variables) ConsumeVars(config interface{}, consumeMap map[string]string
 		if !ok {
 			// no query result, skip variable assignment
 			continue
+		}
+
+		// gojq reports runtime evaluation errors as values of type error, so a
+		// failed query must be surfaced instead of being applied to the config.
+		if queryErr, isErr := val.(error); isErr {
+			return fmt.Errorf("error evaluating variable query '%v': %w", queryStr, queryErr)
 		}
 
 		if v, ok := val.(float64); ok {
