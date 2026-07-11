@@ -41,7 +41,7 @@ func (d *Dispatcher[T]) Unsubscribe(subscription *Subscription[T]) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	if subscription.dispatcher != nil {
+	if subscription.dispatcher == nil {
 		return
 	}
 
