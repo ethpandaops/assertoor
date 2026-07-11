@@ -16,14 +16,11 @@ type logDBWriter struct {
 	bufferSize uint64
 	flushDelay time.Duration
 
-	lastIdx      uint64
-	flushIdx     uint64
-	bufIdx       uint64
-	bufMtx       sync.Mutex
-	buf          []*db.TaskLog
-	flushMtx     sync.Mutex
-	flushing     bool
-	flushingChan chan bool
+	lastIdx        uint64
+	bufIdx         uint64
+	bufMtx         sync.Mutex
+	buf            []*db.TaskLog
+	flushScheduled bool
 }
 
 func newLogDBWriter(logger *LogScope, bufferSize uint64, flushDelay time.Duration) *logDBWriter {
@@ -44,7 +41,7 @@ func (lh *logDBWriter) Fire(entry *logrus.Entry) error {
 	defer lh.bufMtx.Unlock()
 
 	if lh.bufIdx >= lh.bufferSize {
-		lh.flushToDB()
+		lh.flushToDBLocked()
 	}
 
 	logIdx := lh.lastIdx + 1
@@ -69,59 +66,59 @@ func (lh *logDBWriter) Fire(entry *logrus.Entry) error {
 	lh.buf = append(lh.buf, taskLog)
 	lh.bufIdx++
 
-	lh.flushDelayed()
+	lh.scheduleFlushLocked()
 
 	return nil
 }
 
-func (lh *logDBWriter) flushDelayed() {
-	if lh.flushing {
+// scheduleFlushLocked arranges for the buffer to be flushed after flushDelay.
+// The caller must hold bufMtx. At most one delayed flush is pending at a time;
+// a flush triggered earlier by the buffer filling up simply leaves the pending
+// timer to find an empty buffer and do nothing.
+func (lh *logDBWriter) scheduleFlushLocked() {
+	if lh.flushScheduled {
 		return
 	}
 
-	lh.flushing = true
-	lh.flushingChan = make(chan bool)
+	lh.flushScheduled = true
+
+	delay := lh.flushDelay
+	if delay <= 0 {
+		delay = 2 * time.Second
+	}
 
 	go func() {
-		defer func() {
-			lh.flushing = false
-		}()
-
-		select {
-		case <-lh.flushingChan:
-			lh.flushingChan = nil
-			return
-		case <-time.After(2 * time.Second):
-		}
-
-		lh.flushingChan = nil
+		time.Sleep(delay)
 
 		lh.bufMtx.Lock()
 		defer lh.bufMtx.Unlock()
 
-		lh.flushToDB()
+		lh.flushScheduled = false
+		lh.flushToDBLocked()
 	}()
 }
 
-func (lh *logDBWriter) flushToDB() {
-	lh.flushMtx.Lock()
+// flush writes any buffered entries to the database.
+func (lh *logDBWriter) flush() {
+	lh.bufMtx.Lock()
+	defer lh.bufMtx.Unlock()
 
-	defer func() {
-		lh.flushMtx.Unlock()
-	}()
+	lh.flushToDBLocked()
+}
 
-	if flushingChan := lh.flushingChan; flushingChan != nil {
-		close(flushingChan)
-	}
-
+// flushToDBLocked writes the buffered entries to the database. The caller must
+// hold bufMtx. The buffer is always cleared afterwards, even on error, so a
+// persistent database failure cannot grow it without bound. Errors are reported
+// through the parent logger, not this writer's own logger, whose db hook would
+// re-enter Fire and deadlock on bufMtx.
+func (lh *logDBWriter) flushToDBLocked() {
 	if len(lh.buf) == 0 {
 		return
 	}
 
 	err := lh.logger.options.Database.RunTransaction(func(tx *sqlx.Tx) error {
 		for _, entry := range lh.buf {
-			err := lh.logger.options.Database.InsertTaskLog(tx, entry)
-			if err != nil {
+			if err := lh.logger.options.Database.InsertTaskLog(tx, entry); err != nil {
 				return err
 			}
 		}
@@ -129,13 +126,20 @@ func (lh *logDBWriter) flushToDB() {
 		return nil
 	})
 	if err != nil {
-		lh.logger.logger.Errorf("failed to write log entries to db: %v", err)
-		return
+		lh.logFlushError(err)
 	}
 
 	lh.buf = lh.buf[:0]
 	lh.bufIdx = 0
-	lh.flushIdx = lh.lastIdx
+}
+
+func (lh *logDBWriter) logFlushError(err error) {
+	if lh.logger.parentLogger != nil {
+		lh.logger.parentLogger.WithError(err).Error("failed to write task log entries to db")
+		return
+	}
+
+	logrus.WithError(err).Error("failed to write task log entries to db")
 }
 
 func (lh *logDBWriter) getBufferEntries() []*db.TaskLog {

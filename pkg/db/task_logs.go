@@ -18,7 +18,7 @@ func (db *Database) InsertTaskLog(tx *sqlx.Tx, log *TaskLog) error {
 			INSERT INTO task_logs (
 				run_id, task_id, log_idx, log_time, log_level, log_fields, log_message
 			) VALUES ($1, $2, $3, $4, $5, $6, $7)
-			ON CONFLICT (run_id, task_id, log_time) DO UPDATE SET
+			ON CONFLICT (run_id, task_id, log_idx) DO UPDATE SET
 				log_time = excluded.log_time,
 				log_level = excluded.log_level,
 				log_fields = excluded.log_fields,

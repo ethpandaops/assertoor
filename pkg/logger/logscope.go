@@ -98,7 +98,7 @@ func (ls *LogScope) GetLogger() *logrus.Logger {
 
 func (ls *LogScope) Flush() {
 	if ls.dbWriter != nil {
-		ls.dbWriter.flushToDB()
+		ls.dbWriter.flush()
 	}
 }
 
