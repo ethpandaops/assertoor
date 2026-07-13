@@ -84,7 +84,7 @@ tasks:
     envVars:
       DISRUPTOOR_URL: disruptoorApiUrl
       TARGET_INDEX: targetParticipantIndex
-      OTHER_PARTICIPANTS: "| [range(1; .tasks.client_check.outputs.totalCount + 1)] | map(select(. != (.targetParticipantIndex | tonumber)))"
+      OTHER_PARTICIPANTS: "| (.targetParticipantIndex | tonumber) as $target | [range(1; .tasks.client_check.outputs.totalCount + 1)] | map(select(. != $target))"
     command: |
       set -euo pipefail
       disruptoor_url=$(echo "$DISRUPTOOR_URL" | jq -r .)
