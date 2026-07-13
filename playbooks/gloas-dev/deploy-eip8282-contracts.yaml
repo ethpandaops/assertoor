@@ -1,0 +1,178 @@
+id: deploy-eip8282-contracts
+name: "GLOAS: Deploy EIP-8282 builder request contracts (pre-fork)"
+description: |
+  Deploys the EIP-8282 builder deposit (request type 0x03) and builder exit
+  (request type 0x04) system contracts onto a running devnet BEFORE the GLOAS
+  fork activates.
+
+  glamsterdam-devnet-7 deliberately omits these predeploys from genesis
+  (DEPLOY_EIP8282_CONTRACTS=false in the genesis generator) to exercise the
+  mainnet-like deployment workflow: from GLOAS activation onward every block
+  is INVALID unless both contracts exist, so they must be deployed as regular
+  transactions pre-fork. Intended to be registered as a startup test so the
+  contracts land right after the devnet comes up.
+
+  Deployment goes through the deterministic CREATE2 factory (predeployed in
+  devnet genesis as a well-known contract) using the vanity-mined salts from
+  ethereum/execution-specs#3091 — CREATE2(factory, salt, initcode) yields the
+  canonical ...8282 addresses the clients expect. The factory REVERTS when
+  CREATE2 fails (including the already-deployed collision case), so a
+  successful receipt is proof of deployment.
+
+  Idempotent: an eth_call precheck against the builder deposit contract's fee
+  getter detects existing code and skips deployment, so restarts of a
+  startup-scheduled run stay green. The exit contract cannot be prechecked the
+  same way — its constructor arms the slot-0 excess inhibitor, which makes its
+  fee getter revert by design until the first post-GLOAS system call — so its
+  deployment is asserted via the deploy receipt (both contracts only ever
+  deploy as a pair).
+version: 1.0.0
+tags: [gloas, builder, eip-8282, deployment, prefork]
+timeout: 30m
+schedule:
+  startup: true
+config:
+  walletPrivkey: ''
+  # Deterministic CREATE2 deployment factory (predeployed in devnet genesis).
+  create2Factory: '0x4e59b44847b379578588920cA78FbF26c0B4956C'
+  # EIP-8282 predeploy addresses (canonical, from the EIP / execution-specs#3091).
+  builderDepositContract: '0x0000bFF46984e3725691FA540a8C7589300D8282'
+  builderExitContract: '0x000064D678505ad48F8cCb093BC65613800E8282'
+  # Factory calldata: 32-byte vanity-mined salt ++ initcode, verbatim from
+  # ethereum/execution-specs#3091 builder_deposit_factory_deploy.json.
+  # The initcode's runtime is byte-identical to the egg v6.1.3 genesis
+  # predeploy (source: ethereum/sys-asm src/builder_deposits).
+  depositDeployData: '0x1f4f2c41c28e816e259b621c58b94b37309c8dec42c8f6e400001a46c9d96bf761027480600a5f395ff33373fffffffffffffffffffffffffffffffffffffffe1461011c575f54807fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff146102705760015460088111605257506058565b60089003015b601190600182026001905f5b5f821115607f57810190830284830290049160010191906064565b90939004925050503660b814609f57366102705734610270575f5260205ff35b8034106102705760383567ffffffffffffffff1680633b9aca001161027057633b9aca00029034031061027057600154600101600155600354806006026004015f358155600101602035815560010160403581556001016060358155600101608035815560010160a035905560b85f5f3760b85fa0600101600355005b60035460025480820380604011610131575060405b5f5b8181146101d7578281016006026004018160b8028154815260200181600101548152602001816002015480825260401c67ffffffffffffffff16816010018160381c81600701538160301c81600601538160281c81600501538160201c81600401538160181c81600301538160101c81600201538160081c816001015353602001816003015481526020018160040154815260200190600501549052600101610133565b91018092146101e957906002556101f4565b90505f6002555f6003555b36610242575f54600154817fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1461023057600882820111610238575b50505f610264565b0160089003610264565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff5b5f555f60015560b8025ff35b5f5ffd'
+  # Same, from builder_exit_factory_deploy.json (source: ethereum/sys-asm
+  # src/builder_exits). The constructor prefix (PUSH32 2^256-1, PUSH0, SSTORE)
+  # arms the slot-0 excess inhibitor at deployment.
+  exitDeployData: '0x89abb1878437213f971f849327423ed1d9c5cdb03970cd8f0000318b3ff101197fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff5f556101ca80602d5f395ff33373fffffffffffffffffffffffffffffffffffffffe1460e1575f54807fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff146101c65760015460028111605157506057565b60029003015b601190600182026001905f5b5f821115607e57810190830284830290049160010191906063565b909390049250505036603014609e57366101c657346101c6575f5260205ff35b34106101c657600154600101600155600354806003026004013381556001015f35815560010160203590553360601b5f5260305f60143760445fa0600101600355005b6003546002548082038060101160f5575060105b5f5b81811461012d5782810160030260040181604402815460601b8152601401816001015481526020019060020154905260010160f7565b910180921461013f579060025561014a565b90505f6002555f6003555b36610198575f54600154817fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff146101865760028282011161018e575b50505f6101ba565b01600290036101ba565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff5b5f555f6001556044025ff35b5f5ffd'
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+# The deposit contract has no inhibitor: with code present, an empty-calldata
+# eth_call hits the fee getter and returns a 32-byte fee; without code it
+# returns 0x. (Never reverts, unlike the exit contract's armed fee getter.)
+- name: check_eth_call
+  id: predeploy_check
+  title: "Probe builder deposit contract for existing code"
+  timeout: 2m
+  configVars:
+    callAddress: builderDepositContract
+
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+
+- name: check_consensus_slot_range
+  id: current_slot
+  title: "Get current slot"
+
+# Deploying after GLOAS activation is futile: without the contracts every
+# block since activation is invalid, so the deploy transactions can never be
+# included. Fail fast with a clear message instead of a receipt timeout.
+- name: run_shell
+  id: fork_guard
+  title: "Assert GLOAS has not activated yet"
+  if: "tasks.predeploy_check.outputs.callResult == \"0x\""
+  config:
+    envVars:
+      GLOAS_FORK_EPOCH: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
+      SLOTS_PER_EPOCH: "tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH"
+      CURRENT_SLOT: "tasks.current_slot.outputs.currentSlot"
+    command: |
+      set -e
+      GLOAS_FORK_EPOCH=$(echo "$GLOAS_FORK_EPOCH" | jq -r .)
+      SLOTS_PER_EPOCH=$(echo "$SLOTS_PER_EPOCH" | jq -r .)
+      CURRENT_SLOT=$(echo "$CURRENT_SLOT" | jq -r .)
+
+      ACTIVATION_SLOT=$((GLOAS_FORK_EPOCH * SLOTS_PER_EPOCH))
+      if [ "$CURRENT_SLOT" -ge "$ACTIVATION_SLOT" ]; then
+        echo "ERROR: GLOAS is active (slot $CURRENT_SLOT >= $ACTIVATION_SLOT)"
+        echo "and the EIP-8282 contracts are NOT deployed. Every block since"
+        echo "activation is invalid without them; the deploy transactions can"
+        echo "no longer be included. The network must be relaunched (or the"
+        echo "contracts baked into genesis via DEPLOY_EIP8282_CONTRACTS=true)."
+        exit 1
+      fi
+      echo "GLOAS activates at slot $ACTIVATION_SLOT (epoch $GLOAS_FORK_EPOCH), current slot $CURRENT_SLOT — proceeding."
+
+- name: generate_child_wallet
+  id: deployer_wallet
+  title: "Generate funded wallet for the deployment transactions"
+  if: "tasks.predeploy_check.outputs.callResult == \"0x\""
+  config:
+    walletSeed: eip8282-deployer
+    prefundMinBalance: 1000000000000000000 # 1 ETH (two ~0.4M gas txs)
+  configVars:
+    privateKey: walletPrivkey
+
+- name: generate_transaction
+  id: deploy_deposit_contract
+  title: "Deploy builder deposit contract (request type 0x03)"
+  if: "tasks.predeploy_check.outputs.callResult == \"0x\""
+  config:
+    gasLimit: 2000000
+    awaitReceipt: true
+    failOnReject: true
+  configVars:
+    privateKey: tasks.deployer_wallet.outputs.childWallet.privkey
+    targetAddress: create2Factory
+    callData: depositDeployData
+
+- name: generate_transaction
+  id: deploy_exit_contract
+  title: "Deploy builder exit contract (request type 0x04)"
+  if: "tasks.predeploy_check.outputs.callResult == \"0x\""
+  config:
+    gasLimit: 2000000
+    awaitReceipt: true
+    failOnReject: true
+  configVars:
+    privateKey: tasks.deployer_wallet.outputs.childWallet.privkey
+    targetAddress: create2Factory
+    callData: exitDeployData
+
+# Re-probe the deposit contract: it must now answer the fee getter. The exit
+# contract intentionally reverts on eth_call while the inhibitor is armed, so
+# its deployment is proven by the deploy_exit_contract receipt above.
+- name: check_eth_call
+  id: postdeploy_check
+  title: "Verify builder deposit contract answers its fee getter"
+  timeout: 2m
+  configVars:
+    callAddress: builderDepositContract
+
+- name: run_shell
+  id: verify_summary
+  title: "Assert deployment state and summarize"
+  config:
+    envVars:
+      PRE: "tasks.predeploy_check.outputs.callResult"
+      POST: "tasks.postdeploy_check.outputs.callResult"
+      DEPOSIT_ADDR: "builderDepositContract"
+      EXIT_ADDR: "builderExitContract"
+    command: |
+      set -e
+      PRE=$(echo "$PRE" | jq -r .)
+      POST=$(echo "$POST" | jq -r .)
+      DEPOSIT_ADDR=$(echo "$DEPOSIT_ADDR" | jq -r .)
+      EXIT_ADDR=$(echo "$EXIT_ADDR" | jq -r .)
+
+      if [ "$POST" = "0x" ]; then
+        echo "ERROR: builder deposit contract at $DEPOSIT_ADDR still has no code."
+        exit 1
+      fi
+
+      if [ "$PRE" = "0x" ]; then
+        echo "Deployed EIP-8282 contracts via CREATE2 factory:"
+      else
+        echo "EIP-8282 contracts were already deployed:"
+      fi
+      echo "  builder deposit: $DEPOSIT_ADDR (fee getter returned $POST)"
+      echo "  builder exit:    $EXIT_ADDR (fee getter reverts until the first post-GLOAS system call clears the inhibitor — deployment proven by receipt)"
