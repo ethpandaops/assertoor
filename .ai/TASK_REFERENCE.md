@@ -1130,6 +1130,53 @@ Executes a command with arguments.
 
 ---
 
+### run_network_disruption
+
+Applies or heals network disruptions (partitions, isolations, shaping) on a Kurtosis devnet via the [disruptoor](https://github.com/ethpandaops/disruptoor) HTTP API. Waits for the API to report healthy, performs the action, then reads back the applied state. Partition/isolation/shaping entries are passed to disruptoor verbatim (wire format of `PUT /v1/state`); disruptoor validation errors are surfaced in the task failure.
+
+**Config:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `disruptoorUrl` | string | required | Base URL of the disruptoor HTTP API (e.g. `http://disruptoor:7700`) |
+| `action` | string | "set" | `set` (replace whole state), `update` (merge entries by name), `clear` (heal everything) |
+| `partitions` | array[object] | [] | Partition entries: `name`, `groups` (2+ disjoint selectors), optional `scope`, `symmetric` |
+| `isolations` | array[object] | [] | Isolation entries: `name`, `target` selector cut off from the rest of the enclave (multi-container targets are isolated as a group), optional `scope` |
+| `shaping` | array[object] | [] | Shaping entries: `name`, `target`, `delay`/`jitter`/`loss`/`bandwidth`, `scope: [include_control]` |
+| `removeNames` | array[string] | [] | Entry names to remove before merging (`update` action only) |
+| `awaitApiTimeout` | duration | 30s | How long to wait for the API to report healthy before acting (0 = act immediately) |
+| `pollInterval` | duration | 2s | Interval between health probes |
+| `requestTimeout` | duration | 10s | Timeout for a single HTTP request |
+
+Selectors are ethereum-package label matches (e.g. `{node-index: 1, client-type: beacon}`); `scope` values are `cl_p2p`, `el_p2p`, `include_control` (default `[cl_p2p, el_p2p]`; `include_control` also cuts RPC/engine/metrics/VC-CL traffic).
+
+**Outputs:**
+| Variable | Type | Description |
+|----------|------|-------------|
+| `appliedState` | object | Disruptoor state after the action (reflects applied reality) |
+| `partitionCount` | int | Active partitions after the action |
+| `isolationCount` | int | Active isolations after the action |
+| `shapingCount` | int | Active shaping rules after the action |
+
+**Example:**
+```yaml
+- name: run_network_disruption
+  title: "Black out node 1's beacon client"
+  config:
+    disruptoorUrl: "http://disruptoor:7700"
+    isolations:
+      - name: blackout-target-cl
+        target: { node-index: 1, client-type: beacon }
+        scope: [cl_p2p, el_p2p, include_control]
+
+# heal (also use as a cleanupTask):
+- name: run_network_disruption
+  config:
+    disruptoorUrl: "http://disruptoor:7700"
+    action: clear
+```
+
+---
+
 ### run_spamoor_scenario
 
 Runs a spamoor stress testing scenario.
