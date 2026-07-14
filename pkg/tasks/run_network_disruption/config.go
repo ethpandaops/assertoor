@@ -34,7 +34,7 @@ type Config struct {
 	DisruptoorURL   string           `yaml:"disruptoorUrl" json:"disruptoorUrl" require:"A" desc:"Base URL of the disruptoor HTTP API (e.g. http://disruptoor:7700)."`
 	Action          Action           `yaml:"action" json:"action" desc:"Action to perform: set (replace the whole disruptoor state), update (merge entries by name into the current state), clear (heal everything)."`
 	Partitions      []map[string]any `yaml:"partitions" json:"partitions,omitempty" desc:"Disruptoor partition entries: each splits the enclave into 2+ disjoint groups."`
-	Isolations      []map[string]any `yaml:"isolations" json:"isolations,omitempty" desc:"Disruptoor isolation entries: each cuts its target selector off from every other container in the enclave (the counterparty group is computed by disruptoor)."`
+	Isolations      []map[string]any `yaml:"isolations" json:"isolations,omitempty" desc:"Disruptoor isolation entries: each cuts the containers matched by its target selector off from the rest of the enclave (the counterparty group is computed by disruptoor; a multi-container target is isolated as a group)."`
 	Shaping         []map[string]any `yaml:"shaping" json:"shaping,omitempty" desc:"Disruptoor shaping entries: per-target delay/jitter/loss/bandwidth degradation."`
 	RemoveNames     []string         `yaml:"removeNames" json:"removeNames,omitempty" desc:"Entry names to remove from the current state before merging (update action only)."`
 	AwaitAPITimeout helper.Duration  `yaml:"awaitApiTimeout" json:"awaitApiTimeout" desc:"How long to wait for the disruptoor API to report healthy before acting (0 = act immediately)."`

@@ -29,7 +29,7 @@ The `run_network_disruption` task drives a [disruptoor](https://github.com/ethpa
   Disruptoor partition entries. Each splits the enclave into 2+ disjoint groups; traffic crossing group boundaries is dropped. Fields: `name`, `groups` (list of selectors), optional `scope`, optional `symmetric`.
 
 - **`isolations`**:\
-  Disruptoor isolation entries. Each cuts its `target` selector off from **every other container** in the enclave — the counterparty group is computed by disruptoor at apply time, so it never needs to be enumerated and stays correct when the topology changes. Fields: `name`, `target` (selector), optional `scope`.
+  Disruptoor isolation entries. Each cuts the containers matched by its `target` selector off from **the rest of the enclave** — the counterparty group is computed by disruptoor at apply time, so it never needs to be enumerated and stays correct when the topology changes. A target matching multiple containers is isolated *as a group* (traffic among its members keeps flowing); declare one isolation per container to black out several containers individually. Fields: `name`, `target` (selector), optional `scope`.
 
 - **`shaping`**:\
   Disruptoor shaping entries: per-target `delay`/`jitter`/`loss`/`bandwidth` degradation. Requires `scope: [include_control]` acknowledgement (disruptoor v0 shapes all egress traffic).
@@ -83,6 +83,38 @@ Cuts participant 1's CL off from everything — other participants *and* its own
   config:
     disruptoorUrl: "http://disruptoor:7700"
     action: clear
+```
+
+### Isolate a whole participant
+
+Without `client-type`, the target matches the participant's CL, EL, and VC together — they keep talking to *each other* but lose the rest of the network. Useful for "node offline" scenarios where the stack itself stays coherent:
+
+```yaml
+- name: run_network_disruption
+  title: "Take participant 2 off the network"
+  config:
+    disruptoorUrl: "http://disruptoor:7700"
+    isolations:
+      - name: offline-node-2
+        target: { node-index: 2 }
+```
+
+### Variable-driven targets
+
+Task `config` is static YAML; to build entries from test variables, set the whole field via a `configVars` jq expression:
+
+```yaml
+- name: run_network_disruption
+  title: "Black out the configured participant"
+  configVars:
+    disruptoorUrl: "disruptoorApiUrl"
+    isolations: >-
+      | [{
+        name: "assertoor-blackout-target-cl",
+        target: {"node-index": (.targetParticipantIndex | tonumber), "client-type": "beacon"},
+        scope: ["cl_p2p", "el_p2p", "include_control"]
+      }]
+  config: {}
 ```
 
 ### Two-way network split

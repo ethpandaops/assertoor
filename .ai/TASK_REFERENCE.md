@@ -1140,7 +1140,7 @@ Applies or heals network disruptions (partitions, isolations, shaping) on a Kurt
 | `disruptoorUrl` | string | required | Base URL of the disruptoor HTTP API (e.g. `http://disruptoor:7700`) |
 | `action` | string | "set" | `set` (replace whole state), `update` (merge entries by name), `clear` (heal everything) |
 | `partitions` | array[object] | [] | Partition entries: `name`, `groups` (2+ disjoint selectors), optional `scope`, `symmetric` |
-| `isolations` | array[object] | [] | Isolation entries: `name`, `target` selector cut off from every other container, optional `scope` |
+| `isolations` | array[object] | [] | Isolation entries: `name`, `target` selector cut off from the rest of the enclave (multi-container targets are isolated as a group), optional `scope` |
 | `shaping` | array[object] | [] | Shaping entries: `name`, `target`, `delay`/`jitter`/`loss`/`bandwidth`, `scope: [include_control]` |
 | `removeNames` | array[string] | [] | Entry names to remove before merging (`update` action only) |
 | `awaitApiTimeout` | duration | 30s | How long to wait for the API to report healthy before acting (0 = act immediately) |
