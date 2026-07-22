@@ -12,7 +12,9 @@ export interface AuthState {
   authEnabled: boolean;
   isLoggedIn: boolean;
   user: string | null;
-  token: string | null;
+  // Expiry of the current session's token (ms). Display-only: the token
+  // itself is never cached in the app — authStore.getAuthHeader() fetches
+  // a fresh one from the authenticatoor client per request.
   expiresAt: number | null;  // Local timestamp
 }
 

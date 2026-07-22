@@ -22,7 +22,7 @@ export function useAuth() {
     return unsubscribe;
   }, []);
 
-  const getAuthHeader = useCallback((): string | null => {
+  const getAuthHeader = useCallback((): Promise<string | null> => {
     return authStore.getAuthHeader();
   }, []);
 

@@ -5,10 +5,9 @@ interface AuthContextValue {
   authEnabled: boolean;
   isLoggedIn: boolean;
   user: string | null;
-  token: string | null;
   expiresAt: number | null;
   loading: boolean;
-  getAuthHeader: () => string | null;
+  getAuthHeader: () => Promise<string | null>;
   login: () => void;
   logout: () => void;
   refreshToken: () => Promise<void>;

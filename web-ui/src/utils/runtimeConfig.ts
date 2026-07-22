@@ -17,20 +17,28 @@ declare global {
   }
 }
 
-// Minimal shape of window.ethpandaops.authenticatoor we rely on. Set by
-// the authenticatoor's client.js script (loaded at runtime when an auth
-// provider is configured).
+// TokenInfo pushed by the v2 authenticatoor client on every session
+// change ("status" events) and returned by getStatus().
+export interface AuthTokenInfo {
+  status: 'unauthenticated' | 'authenticated' | 'refreshing';
+  authenticated: boolean;
+  user: string;
+  exp: number;
+}
+
+// Minimal shape of the v2 window.ethpandaops.authenticatoor we rely on.
+// Set by the authenticatoor's client.js?v=2 script (loaded at runtime
+// when an auth provider is configured). The client owns the session —
+// shared across all ethpandaops apps via a hidden iframe — and refreshes
+// tokens before expiry; getToken() always resolves to a fresh token.
 export interface AuthenticatoorLib {
-  checkLogin: () => Promise<{
-    authenticated: boolean;
-    token: string;
-    exp: number;
-    user: string;
-  }>;
-  login: () => void;
-  logout: () => void;
-  getToken: () => string | null;
-  isLoggedIn: () => boolean;
+  version?: number;
+  addEventListener: (type: 'status', cb: (info: AuthTokenInfo) => void) => void;
+  removeEventListener: (type: 'status', cb: (info: AuthTokenInfo) => void) => void;
+  getStatus: () => Promise<AuthTokenInfo>;
+  getToken: () => Promise<string | null>;
+  login: () => Promise<boolean>;
+  logout: () => Promise<void>;
   authServiceURL: () => string;
 }
 

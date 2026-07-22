@@ -15,6 +15,8 @@ export function useEventStream(options: UseEventStreamOptions = {}) {
   const queryClient = useQueryClient();
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Invalidates in-flight async connects (token fetch) on reconnect/unmount.
+  const connectSeqRef = useRef(0);
 
   const handleEvent = useCallback(
     (event: SSEEvent) => {
@@ -89,54 +91,62 @@ export function useEventStream(options: UseEventStreamOptions = {}) {
       reconnectTimeoutRef.current = null;
     }
 
-    // Build URL based on whether we're watching a specific run
-    const authHeader = authStore.getAuthHeader();
-    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : undefined;
-    const baseUrl = runId ? `/api/v1/test_run/${runId}/events` : '/api/v1/events/stream';
-    const url = authToken ? `${baseUrl}?token=${encodeURIComponent(authToken)}` : baseUrl;
+    const seq = ++connectSeqRef.current;
 
-    const eventSource = new EventSource(url);
-    eventSourceRef.current = eventSource;
+    void (async () => {
+      // Fresh token from the auth client for the SSE query param
+      // (EventSource can't send headers).
+      const authToken = (await authStore.getAuthToken()) ?? undefined;
+      if (seq !== connectSeqRef.current) return; // superseded meanwhile
 
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data: SSEEvent = JSON.parse(event.data);
-        handleEvent(data);
-      } catch (error) {
-        console.error('Failed to parse SSE event:', error);
-      }
-    };
+      // Build URL based on whether we're watching a specific run
+      const baseUrl = runId ? `/api/v1/test_run/${runId}/events` : '/api/v1/events/stream';
+      const url = authToken ? `${baseUrl}?token=${encodeURIComponent(authToken)}` : baseUrl;
 
-    eventSource.onmessage = handleMessage;
+      const eventSource = new EventSource(url);
+      eventSourceRef.current = eventSource;
 
-    const eventTypes = [
-      'connected',
-      'test.started',
-      'test.completed',
-      'test.failed',
-      'task.created',
-      'task.started',
-      'task.progress',
-      'task.completed',
-      'task.failed',
-      'task.log',
-    ];
+      const handleMessage = (event: MessageEvent) => {
+        try {
+          const data: SSEEvent = JSON.parse(event.data);
+          handleEvent(data);
+        } catch (error) {
+          console.error('Failed to parse SSE event:', error);
+        }
+      };
 
-    eventTypes.forEach((eventType) => {
-      eventSource.addEventListener(eventType, handleMessage);
-    });
+      eventSource.onmessage = handleMessage;
 
-    eventSource.onerror = () => {
-      eventSource.close();
-      // Reconnect after 5 seconds
-      reconnectTimeoutRef.current = setTimeout(connect, 5000);
-    };
+      const eventTypes = [
+        'connected',
+        'test.started',
+        'test.completed',
+        'test.failed',
+        'task.created',
+        'task.started',
+        'task.progress',
+        'task.completed',
+        'task.failed',
+        'task.log',
+      ];
+
+      eventTypes.forEach((eventType) => {
+        eventSource.addEventListener(eventType, handleMessage);
+      });
+
+      eventSource.onerror = () => {
+        eventSource.close();
+        // Reconnect after 5 seconds
+        reconnectTimeoutRef.current = setTimeout(connect, 5000);
+      };
+    })();
   }, [runId, handleEvent]);
 
   useEffect(() => {
     connect();
 
     return () => {
+      connectSeqRef.current++; // cancel any in-flight async connect
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
@@ -147,6 +157,7 @@ export function useEventStream(options: UseEventStreamOptions = {}) {
   }, [connect]);
 
   const disconnect = useCallback(() => {
+    connectSeqRef.current++; // cancel any in-flight async connect
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
