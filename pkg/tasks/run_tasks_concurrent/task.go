@@ -124,11 +124,16 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	t.taskCtx = taskCtx
 
+	// populate the task index map before spawning any child goroutines.
+	// the watcher goroutines read this map, so writing it here first avoids
+	// a concurrent map read/write against the spawn loop below.
+	for i := range t.tasks {
+		t.taskIdxMap[t.tasks[i]] = i
+	}
+
 	// start child tasks
 	for i := range t.tasks {
 		taskWaitGroup.Add(1)
-
-		t.taskIdxMap[t.tasks[i]] = i
 
 		go func(i int) {
 			defer taskWaitGroup.Done()
