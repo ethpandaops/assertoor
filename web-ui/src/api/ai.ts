@@ -76,8 +76,8 @@ interface ApiResponse<T> {
   data: T;
 }
 
-function getAuthHeaders(): Record<string, string> {
-  const authHeader = authStore.getAuthHeader();
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const authHeader = await authStore.getAuthHeader();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -90,7 +90,7 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 async function fetchAIApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const headers = getAuthHeaders();
+  const headers = await getAuthHeaders();
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
@@ -149,40 +149,48 @@ export function streamAISession(
   onError: (error: Error) => void,
   onComplete: () => void
 ): () => void {
-  const authHeader = authStore.getAuthHeader();
-  let url = `${API_BASE}/ai/chat/${sessionId}/stream`;
+  let eventSource: EventSource | null = null;
+  let closed = false;
 
-  // Add auth token as query param for SSE (headers don't work well with EventSource)
-  if (authHeader) {
-    const token = authHeader.replace('Bearer ', '');
-    url += `?token=${encodeURIComponent(token)}`;
-  }
+  // The fresh token comes from the auth client asynchronously; open the
+  // stream once it resolves (no-op if the caller already cleaned up).
+  void (async () => {
+    const token = await authStore.getAuthToken();
+    if (closed) return;
 
-  const eventSource = new EventSource(url);
-
-  eventSource.addEventListener('update', (event) => {
-    try {
-      const session = JSON.parse(event.data) as AISession;
-      onUpdate(session);
-
-      // Close connection when session is complete or errored
-      if (session.status === 'complete' || session.status === 'error') {
-        eventSource.close();
-        onComplete();
-      }
-    } catch (err) {
-      onError(err instanceof Error ? err : new Error('Failed to parse session update'));
+    let url = `${API_BASE}/ai/chat/${sessionId}/stream`;
+    // Add auth token as query param for SSE (headers don't work well with EventSource)
+    if (token) {
+      url += `?token=${encodeURIComponent(token)}`;
     }
-  });
 
-  eventSource.onerror = () => {
-    eventSource.close();
-    onError(new Error('Connection to session stream failed'));
-  };
+    eventSource = new EventSource(url);
+
+    eventSource.addEventListener('update', (event) => {
+      try {
+        const session = JSON.parse(event.data) as AISession;
+        onUpdate(session);
+
+        // Close connection when session is complete or errored
+        if (session.status === 'complete' || session.status === 'error') {
+          eventSource?.close();
+          onComplete();
+        }
+      } catch (err) {
+        onError(err instanceof Error ? err : new Error('Failed to parse session update'));
+      }
+    });
+
+    eventSource.onerror = () => {
+      eventSource?.close();
+      onError(new Error('Connection to session stream failed'));
+    };
+  })();
 
   // Return cleanup function
   return () => {
-    eventSource.close();
+    closed = true;
+    eventSource?.close();
   };
 }
 

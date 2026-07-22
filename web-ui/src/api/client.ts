@@ -47,7 +47,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
 
 // Fetch API with Authorization header for protected endpoints
 async function fetchApiWithAuth<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const authHeader = authStore.getAuthHeader();
+  const authHeader = await authStore.getAuthHeader();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options?.headers as Record<string, string>),
@@ -225,7 +225,7 @@ export async function deleteTest(testId: string): Promise<void> {
 export async function registerTest(yaml: string): Promise<void> {
   // Send raw YAML with application/yaml content type
   // The backend expects either YAML body or JSON with test fields directly
-  const authHeader = authStore.getAuthHeader();
+  const authHeader = await authStore.getAuthHeader();
   const headers: Record<string, string> = {
     'Content-Type': 'application/yaml',
   };
@@ -282,7 +282,7 @@ export async function getDashboardConfig(): Promise<unknown | null> {
 }
 
 export async function putDashboardConfig(cfg: unknown): Promise<void> {
-  const authHeader = authStore.getAuthHeader();
+  const authHeader = await authStore.getAuthHeader();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };

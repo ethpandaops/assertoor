@@ -14,7 +14,8 @@ type WebConfig struct {
 
 	// AuthProviderURL is the canonical URL of a remote authenticatoor
 	// service. When set, API requests must carry a JWT verified against
-	// the service's JWKS, and the SPA loads <url>/client.js to drive
+	// the service's JWKS, and the SPA loads <url>/client-v2.js (the
+	// shared-session client with automatic token refresh) to drive
 	// login/logout. When empty, the API is unauthenticated.
 	AuthProviderURL string `yaml:"authProviderUrl" envconfig:"WEB_AUTH_PROVIDER_URL"`
 
