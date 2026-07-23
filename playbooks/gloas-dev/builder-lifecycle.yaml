@@ -304,6 +304,13 @@ tasks:
         walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
         builderExitContract: "builderExitContract"
 
+# Wait for another epoch so the second batch is in exited stated too
+- name: check_consensus_slot_range
+  title: "Wait another epoch before checking exit status"
+  timeout: 30m
+  configVars:
+    minEpochNumber: "| (.tasks.exit_start.outputs.currentEpoch | tonumber) + 2"
+
 ##
 ## PHASE 4: Verify all builders have entered the exiting state
 ##  (withdrawable_epoch set; full withdrawal itself takes
