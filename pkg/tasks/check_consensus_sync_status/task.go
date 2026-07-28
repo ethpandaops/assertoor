@@ -113,12 +113,22 @@ func (t *Task) Execute(ctx context.Context) error {
 }
 
 func (t *Task) processCheck(ctx context.Context, checkCount int) bool {
+	matchedClients := t.ctx.Scheduler.GetServices().ClientPool().GetClientsByNamePatterns(t.config.ClientPattern, "")
+
+	if len(matchedClients) == 0 {
+		t.logger.Warnf("no clients matched pattern %q, waiting", t.config.ClientPattern)
+		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("No clients matched pattern %q (attempt %d)", t.config.ClientPattern, checkCount))
+
+		return false
+	}
+
 	allResultsPass := true
 	goodClients := []*ClientInfo{}
 	failedClients := []*ClientInfo{}
 	failedClientNames := []string{}
 
-	for _, client := range t.ctx.Scheduler.GetServices().ClientPool().GetClientsByNamePatterns(t.config.ClientPattern, "") {
+	for _, client := range matchedClients {
 		var checkResult bool
 
 		checkLogger := t.logger.WithField("client", client.Config.Name)
