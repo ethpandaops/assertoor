@@ -159,7 +159,10 @@ func (t *Task) processCheck(checkCount int) (bool, error) {
 		requiredPassCount = totalClientCount
 	}
 
-	resultPass := passResultCount >= requiredPassCount
+	// A pattern that matches no clients must never pass: with minClientCount
+	// left at its default, requiredPassCount would otherwise collapse to 0
+	// and 0 >= 0 reports every client healthy having checked none of them.
+	resultPass := totalClientCount > 0 && passResultCount >= requiredPassCount
 
 	if goodClientsData, err := vars.GeneralizeData(goodClients); err == nil {
 		t.ctx.Outputs.SetVar("goodClients", goodClientsData)
