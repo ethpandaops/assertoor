@@ -511,7 +511,12 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 		Attestation2: att2,
 	}
 
-	return versionedAttesterSlashing(specs.DataVersionAtSlot(phase0.Slot(slot1)), slashing)
+	version, err := specs.DataVersionAtSlot(phase0.Slot(slot1))
+	if err != nil {
+		return nil, fmt.Errorf("cannot build attester slashing: %w", err)
+	}
+
+	return versionedAttesterSlashing(version, slashing)
 }
 
 // versionedAttesterSlashing rewraps a phase0-shaped attester slashing into the
