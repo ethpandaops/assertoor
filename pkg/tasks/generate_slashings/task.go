@@ -383,7 +383,17 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkStat
 	if attesterSlashing != nil {
 		t.logger.WithField("client", client.GetName()).Infof("sending attester slashing for validator %v", validator.Index)
 
-		err = client.GetRPCClient().SubmitAttesterSlashing(ctx, attesterSlashing)
+		// The V1 pool endpoint was removed from the beacon APIs in the Electra
+		// release; submit via V2 with the network's current fork version.
+		clPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
+		slot, _, _ := clPool.GetBlockCache().GetWallclock().Now()
+
+		consensusVersion := consensus.ForkVersionElectra
+		if specs := clPool.GetBlockCache().GetSpecs(); specs != nil {
+			consensusVersion = specs.ConsensusForkVersionAtSlot(phase0.Slot(slot.Number()))
+		}
+
+		err = client.GetRPCClient().SubmitAttesterSlashingV2(ctx, attesterSlashing, consensusVersion)
 		if err != nil {
 			return 0, err
 		}

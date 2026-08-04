@@ -43,6 +43,32 @@ func (chain *ChainSpec) IsGloasActive(slot phase0.Slot) bool {
 	return uint64(slot) >= chain.GloasForkEpoch*chain.SlotsPerEpoch
 }
 
+// Consensus fork version names as used in the Eth-Consensus-Version header.
+const (
+	ForkVersionElectra = "electra"
+	ForkVersionFulu    = "fulu"
+	ForkVersionGloas   = "gloas"
+)
+
+// ConsensusForkVersionAtSlot returns the consensus fork version (as used in the
+// Eth-Consensus-Version header) that is active at the given slot: "gloas",
+// "fulu" or "electra". Pre-Electra networks also report "electra"; callers
+// are expected to fall back to pre-Electra endpoints when the V2 endpoint is
+// not available.
+func (chain *ChainSpec) ConsensusForkVersionAtSlot(slot phase0.Slot) string {
+	if chain.IsGloasActive(slot) {
+		return ForkVersionGloas
+	}
+
+	// Division-based comparison: FAR_FUTURE fork epochs (2^64-1) would overflow
+	// an epoch*SlotsPerEpoch multiplication.
+	if chain.FuluForkEpoch > 0 && chain.SlotsPerEpoch > 0 && uint64(slot)/chain.SlotsPerEpoch >= chain.FuluForkEpoch {
+		return ForkVersionFulu
+	}
+
+	return ForkVersionElectra
+}
+
 func (chain *ChainSpec) CheckMismatch(chain2 *ChainSpec) []string {
 	mismatches := []string{}
 
