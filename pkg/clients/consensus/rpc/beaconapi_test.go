@@ -3,19 +3,44 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	nethttp "net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/ethpandaops/go-eth2-client/spec"
-	"github.com/ethpandaops/go-eth2-client/spec/gloas"
+	"github.com/ethpandaops/go-eth2-client/spec/all"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
+// attesterSlashing builds a versioned slashing the same way generate_slashings
+// does, so this test covers that construction too.
+func attesterSlashing(t *testing.T, version spec.DataVersion) *spec.VersionedAttesterSlashing {
+	t.Helper()
+
+	attestation := &all.IndexedAttestation{
+		Version:          version,
+		AttestingIndices: []uint64{42},
+		Data:             &phase0.AttestationData{Slot: 640, Source: &phase0.Checkpoint{}, Target: &phase0.Checkpoint{}},
+	}
+
+	versioned, err := (&all.AttesterSlashing{
+		Version:      version,
+		Attestation1: attestation,
+		Attestation2: attestation,
+	}).ToVersioned()
+	if err != nil {
+		t.Fatalf("failed building %v attester slashing: %v", version, err)
+	}
+
+	return versioned
+}
+
 // TestSubmitAttesterSlashing asserts that slashing submission goes through
-// go-eth2-client's versioned pool endpoint and that the Eth-Consensus-Version
-// header follows the slashing's fork rather than a hardcoded value.
+// go-eth2-client's versioned pool endpoint, that the Eth-Consensus-Version
+// header follows the slashing's fork rather than a hardcoded value, and that a
+// pre-electra slashing fails on the fork instead of on the endpoint.
 func TestSubmitAttesterSlashing(t *testing.T) {
 	var (
 		postCount int
@@ -53,42 +78,63 @@ func TestSubmitAttesterSlashing(t *testing.T) {
 		t.Fatalf("failed initializing beacon client: %v", err)
 	}
 
-	attestation := &gloas.IndexedAttestation{
-		AttestingIndices: []uint64{42},
-		Data:             &phase0.AttestationData{Slot: 640, Source: &phase0.Checkpoint{}, Target: &phase0.Checkpoint{}},
+	tests := []struct {
+		name       string
+		version    spec.DataVersion
+		wantHeader string
+	}{
+		{name: "Electra", version: spec.DataVersionElectra, wantHeader: "electra"},
+		{name: "Fulu", version: spec.DataVersionFulu, wantHeader: "fulu"},
+		{name: "Gloas", version: spec.DataVersionGloas, wantHeader: "gloas"},
+		{name: "PreElectraRejected", version: spec.DataVersionDeneb},
 	}
 
-	err = client.SubmitAttesterSlashing(ctx, &spec.VersionedAttesterSlashing{
-		Version: spec.DataVersionGloas,
-		Gloas: &gloas.AttesterSlashing{
-			Attestation1: attestation,
-			Attestation2: attestation,
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed submitting attester slashing: %v", err)
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			postCount, gotPath, gotHeader, gotBody = 0, "", "", nil
 
-	if postCount != 1 {
-		t.Errorf("submissions = %d, want 1", postCount)
-	}
+			err := client.SubmitAttesterSlashing(ctx, attesterSlashing(t, test.version))
 
-	if gotPath != "/eth/v2/beacon/pool/attester_slashings" {
-		t.Errorf("path = %q, want the v2 pool endpoint", gotPath)
-	}
+			if test.wantHeader == "" {
+				if !errors.Is(err, ErrPreElectraSlashing) {
+					t.Fatalf("error = %v, want ErrPreElectraSlashing", err)
+				}
 
-	if gotHeader != "gloas" {
-		t.Errorf("Eth-Consensus-Version = %q, want %q", gotHeader, "gloas")
-	}
+				if postCount != 0 {
+					t.Errorf("submissions = %d, want 0: a rejected fork must not reach the node", postCount)
+				}
 
-	var body map[string]json.RawMessage
-	if err := json.Unmarshal(gotBody, &body); err != nil {
-		t.Fatalf("failed parsing submitted body: %v", err)
-	}
+				return
+			}
 
-	for _, key := range []string{"attestation_1", "attestation_2"} {
-		if raw, ok := body[key]; !ok || string(raw) == "null" {
-			t.Errorf("submitted body %v = %q, want the fork-specific attestation", key, string(raw))
-		}
+			if err != nil {
+				t.Fatalf("failed submitting attester slashing: %v", err)
+			}
+
+			if postCount != 1 {
+				t.Fatalf("submissions = %d, want 1", postCount)
+			}
+
+			if gotPath != "/eth/v2/beacon/pool/attester_slashings" {
+				t.Errorf("path = %q, want the v2 pool endpoint", gotPath)
+			}
+
+			if gotHeader != test.wantHeader {
+				t.Errorf("Eth-Consensus-Version = %q, want %q", gotHeader, test.wantHeader)
+			}
+
+			var body map[string]json.RawMessage
+			if err := json.Unmarshal(gotBody, &body); err != nil {
+				t.Fatalf("failed parsing submitted body: %v", err)
+			}
+
+			// A version/arm mismatch marshals to a null body under an
+			// otherwise valid header, so assert the payload is really there.
+			for _, key := range []string{"attestation_1", "attestation_2"} {
+				if raw, ok := body[key]; !ok || string(raw) == "null" {
+					t.Errorf("submitted body %v = %q, want the fork-specific attestation", key, string(raw))
+				}
+			}
+		})
 	}
 }

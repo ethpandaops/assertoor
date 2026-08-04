@@ -13,8 +13,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/types"
 	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/ethpandaops/go-eth2-client/spec"
-	"github.com/ethpandaops/go-eth2-client/spec/electra"
-	"github.com/ethpandaops/go-eth2-client/spec/gloas"
+	"github.com/ethpandaops/go-eth2-client/spec/all"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
@@ -495,81 +494,26 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 	signingRoot2 := common.ComputeSigningRoot(msgRoot2, dom)
 	sig2 := secKey.SignHash(signingRoot2[:])
 
-	att1 := &phase0.IndexedAttestation{
-		AttestingIndices: []uint64{validatorIndex},
-		Data:             attestationData1,
-		Signature:        phase0.BLSSignature(sig1.Serialize()),
-	}
-	att2 := &phase0.IndexedAttestation{
-		AttestingIndices: []uint64{validatorIndex},
-		Data:             attestationData2,
-		Signature:        phase0.BLSSignature(sig2.Serialize()),
-	}
+	// all.AttesterSlashing is fork-agnostic: ToVersioned selects the arm the
+	// fork requires, and go-eth2-client derives the Eth-Consensus-Version
+	// header from the same version. No fork-specific types here.
+	version := specs.DataVersionAtSlot(phase0.Slot(slot1))
 
-	slashing := &phase0.AttesterSlashing{
-		Attestation1: att1,
-		Attestation2: att2,
-	}
-
-	version, err := specs.DataVersionAtSlot(phase0.Slot(slot1))
-	if err != nil {
-		return nil, fmt.Errorf("cannot build attester slashing: %w", err)
-	}
-
-	return versionedAttesterSlashing(version, slashing)
-}
-
-// versionedAttesterSlashing rewraps a phase0-shaped attester slashing into the
-// arm of spec.VersionedAttesterSlashing matching the given fork. EIP-7549
-// (electra) and the progressive-list migration (gloas) each gave
-// IndexedAttestation its own Go type. The JSON on the wire is unchanged, but
-// go-eth2-client marshals the arm selected by Version and derives the
-// Eth-Consensus-Version header from that same field, so the arm has to match.
-func versionedAttesterSlashing(version spec.DataVersion, slashing *phase0.AttesterSlashing) (*spec.VersionedAttesterSlashing, error) {
-	versioned := &spec.VersionedAttesterSlashing{Version: version}
-
-	switch version {
-	case spec.DataVersionElectra:
-		versioned.Electra = electraAttesterSlashing(slashing)
-	case spec.DataVersionFulu:
-		versioned.Fulu = electraAttesterSlashing(slashing)
-	case spec.DataVersionGloas:
-		versioned.Gloas = gloasAttesterSlashing(slashing)
-	default:
-		return nil, fmt.Errorf("cannot submit attester slashing for fork %v: no versioned pool endpoint", version)
-	}
-
-	return versioned, nil
-}
-
-func electraAttesterSlashing(slashing *phase0.AttesterSlashing) *electra.AttesterSlashing {
-	return &electra.AttesterSlashing{
-		Attestation1: electraIndexedAttestation(slashing.Attestation1),
-		Attestation2: electraIndexedAttestation(slashing.Attestation2),
-	}
-}
-
-func electraIndexedAttestation(att *phase0.IndexedAttestation) *electra.IndexedAttestation {
-	return &electra.IndexedAttestation{
-		AttestingIndices: att.AttestingIndices,
-		Data:             att.Data,
-		Signature:        att.Signature,
-	}
-}
-
-func gloasAttesterSlashing(slashing *phase0.AttesterSlashing) *gloas.AttesterSlashing {
-	return &gloas.AttesterSlashing{
-		Attestation1: gloasIndexedAttestation(slashing.Attestation1),
-		Attestation2: gloasIndexedAttestation(slashing.Attestation2),
-	}
-}
-
-func gloasIndexedAttestation(att *phase0.IndexedAttestation) *gloas.IndexedAttestation {
-	return &gloas.IndexedAttestation{
-		AttestingIndices: att.AttestingIndices,
-		Data:             att.Data,
-		Signature:        att.Signature,
-	}
+	return (&all.AttesterSlashing{
+		Version: version,
+		Attestation1: &all.IndexedAttestation{
+			Version:          version,
+			AttestingIndices: []uint64{validatorIndex},
+			Data:             attestationData1,
+			Signature:        phase0.BLSSignature(sig1.Serialize()),
+		},
+		Attestation2: &all.IndexedAttestation{
+			Version:          version,
+			AttestingIndices: []uint64{validatorIndex},
+			Data:             attestationData2,
+			Signature:        phase0.BLSSignature(sig2.Serialize()),
+		},
+	}).ToVersioned()
 }
 
 func (t *Task) generateProposerSlashing(validatorIndex uint64, validatorKey *e2types.BLSPrivateKey, forkState *phase0.Fork) (*phase0.ProposerSlashing, error) {

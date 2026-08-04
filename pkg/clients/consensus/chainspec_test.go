@@ -1,111 +1,115 @@
 package consensus
 
 import (
-	"errors"
+	"context"
 	"testing"
 
 	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
+	"github.com/sirupsen/logrus"
 )
 
 func TestDataVersionAtSlot(t *testing.T) {
-	specs := &ChainSpec{
-		ElectraForkEpoch: 0,
-		FuluForkEpoch:    10,
-		GloasForkEpoch:   20,
-		SlotsPerEpoch:    32,
+	// Every fork scheduled, one epoch apart, so each rung of the ladder is
+	// reachable and the boundaries are exact.
+	scheduled := &ChainSpec{
+		AltairForkEpoch:    1,
+		BellatrixForkEpoch: 2,
+		CappellaForkEpoch:  3,
+		DenebForkEpoch:     4,
+		ElectraForkEpoch:   5,
+		FuluForkEpoch:      6,
+		GloasForkEpoch:     7,
+		HezeForkEpoch:      8,
+		SlotsPerEpoch:      32,
+	}
+
+	// A chain that never leaves electra: later forks unscheduled, as a beacon
+	// node reports them.
+	electraOnly := &ChainSpec{
+		AltairForkEpoch:    0,
+		BellatrixForkEpoch: 0,
+		CappellaForkEpoch:  0,
+		DenebForkEpoch:     0,
+		ElectraForkEpoch:   0,
+		FuluForkEpoch:      FarFutureEpoch,
+		GloasForkEpoch:     FarFutureEpoch,
+		HezeForkEpoch:      FarFutureEpoch,
+		SlotsPerEpoch:      32,
 	}
 
 	tests := []struct {
-		name         string
-		spec         *ChainSpec
-		slot         phase0.Slot
-		expected     spec.DataVersion
-		expectPreErr bool
+		name     string
+		spec     *ChainSpec
+		slot     phase0.Slot
+		expected spec.DataVersion
 	}{
-		{name: "ElectraBeforeFulu", spec: specs, slot: 0, expected: spec.DataVersionElectra},
-		{name: "FuluAtForkEpoch", spec: specs, slot: phase0.Slot(10 * 32), expected: spec.DataVersionFulu},
-		{name: "FuluBeforeGloas", spec: specs, slot: phase0.Slot(20*32 - 1), expected: spec.DataVersionFulu},
-		{name: "GloasAtForkEpoch", spec: specs, slot: phase0.Slot(20 * 32), expected: spec.DataVersionGloas},
-		{name: "GloasAfterForkEpoch", spec: specs, slot: phase0.Slot(25 * 32), expected: spec.DataVersionGloas},
+		{name: "Phase0BeforeAltair", spec: scheduled, slot: 0, expected: spec.DataVersionPhase0},
+		{name: "Altair", spec: scheduled, slot: 1 * 32, expected: spec.DataVersionAltair},
+		{name: "Bellatrix", spec: scheduled, slot: 2 * 32, expected: spec.DataVersionBellatrix},
+		{name: "Capella", spec: scheduled, slot: 3 * 32, expected: spec.DataVersionCapella},
+		{name: "Deneb", spec: scheduled, slot: 4 * 32, expected: spec.DataVersionDeneb},
+		{name: "DenebUntilElectra", spec: scheduled, slot: 5*32 - 1, expected: spec.DataVersionDeneb},
+		{name: "Electra", spec: scheduled, slot: 5 * 32, expected: spec.DataVersionElectra},
+		{name: "Fulu", spec: scheduled, slot: 6 * 32, expected: spec.DataVersionFulu},
+		{name: "Gloas", spec: scheduled, slot: 7 * 32, expected: spec.DataVersionGloas},
+		{name: "Heze", spec: scheduled, slot: 8 * 32, expected: spec.DataVersionHeze},
+		{name: "HezeStaysAtHead", spec: scheduled, slot: 500 * 32, expected: spec.DataVersionHeze},
+
+		// A fork epoch of 0 means genesis, not "unscheduled".
+		{name: "GenesisElectra", spec: electraOnly, slot: 0, expected: spec.DataVersionElectra},
+		{name: "UnscheduledForksNeverActivate", spec: electraOnly, slot: 1e6, expected: spec.DataVersionElectra},
+
 		{
-			name:     "GloasNotScheduled",
-			spec:     &ChainSpec{FuluForkEpoch: 10, SlotsPerEpoch: 32},
-			slot:     phase0.Slot(100 * 32),
-			expected: spec.DataVersionFulu,
-		},
-		{
-			name:     "NoForksScheduled",
-			spec:     &ChainSpec{SlotsPerEpoch: 32},
-			slot:     phase0.Slot(100 * 32),
-			expected: spec.DataVersionElectra,
-		},
-		{
+			// SlotsPerEpoch is only zero before the spec has been fetched.
 			name:     "ZeroSlotsPerEpoch",
-			spec:     &ChainSpec{FuluForkEpoch: 10, GloasForkEpoch: 20},
-			slot:     phase0.Slot(100 * 32),
-			expected: spec.DataVersionElectra,
-		},
-		{
-			name:     "FarFutureForkEpochsNoOverflow",
-			spec:     &ChainSpec{FuluForkEpoch: ^uint64(0), GloasForkEpoch: ^uint64(0), SlotsPerEpoch: 32},
-			slot:     phase0.Slot(100 * 32),
-			expected: spec.DataVersionElectra,
-		},
-		{
-			// Electra scheduled at a later epoch is the one case where the slot
-			// is positively known to predate electra, so the caller has to be
-			// told rather than handed an electra-shaped submission.
-			name:         "BeforeScheduledElectra",
-			spec:         &ChainSpec{ElectraForkEpoch: 5, FuluForkEpoch: 10, SlotsPerEpoch: 32},
-			slot:         phase0.Slot(4 * 32),
-			expectPreErr: true,
-		},
-		{
-			name:     "AtScheduledElectra",
-			spec:     &ChainSpec{ElectraForkEpoch: 5, FuluForkEpoch: 10, SlotsPerEpoch: 32},
-			slot:     phase0.Slot(5 * 32),
-			expected: spec.DataVersionElectra,
-		},
-		{
-			// Electra unreported (0) is indistinguishable from genesis-activated,
-			// so it must not be reported as pre-electra.
-			name:     "UnreportedElectraNotPreElectra",
-			spec:     &ChainSpec{SlotsPerEpoch: 32},
-			slot:     0,
-			expected: spec.DataVersionElectra,
-		},
-		{
-			name:     "ZeroSlotsPerEpochWithScheduledElectra",
-			spec:     &ChainSpec{ElectraForkEpoch: 5},
-			slot:     0,
-			expected: spec.DataVersionElectra,
+			spec:     &ChainSpec{ElectraForkEpoch: 0},
+			slot:     100 * 32,
+			expected: spec.DataVersionPhase0,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := test.spec.DataVersionAtSlot(test.slot)
-
-			if test.expectPreErr {
-				if !errors.Is(err, ErrPreElectraFork) {
-					t.Fatalf("DataVersionAtSlot(%d) error = %v, want ErrPreElectraFork", test.slot, err)
-				}
-
-				if got != spec.DataVersionUnknown {
-					t.Errorf("DataVersionAtSlot(%d) = %v, want unknown alongside the error", test.slot, got)
-				}
-
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("DataVersionAtSlot(%d) failed: %v", test.slot, err)
-			}
-
-			if got != test.expected {
+			if got := test.spec.DataVersionAtSlot(test.slot); got != test.expected {
 				t.Errorf("DataVersionAtSlot(%d) = %v, want %v", test.slot, got, test.expected)
 			}
 		})
+	}
+}
+
+// TestSetClientSpecsForkDefaults pins the distinction the fork ladder rests on:
+// a fork epoch a beacon node does not report at all must read as unscheduled,
+// while a reported 0 must read as genesis. Both arrive as the same Go zero
+// value unless the spec is seeded first.
+func TestSetClientSpecsForkDefaults(t *testing.T) {
+	cache, err := NewBlockCache(context.Background(), logrus.New(), 10)
+	if err != nil {
+		t.Fatalf("failed creating block cache: %v", err)
+	}
+
+	// A node that knows nothing past electra omits FULU/GLOAS/HEZE entirely.
+	err = cache.SetClientSpecs(map[string]interface{}{
+		"SLOTS_PER_EPOCH":    uint64(32),
+		"ALTAIR_FORK_EPOCH":  uint64(0),
+		"DENEB_FORK_EPOCH":   uint64(0),
+		"ELECTRA_FORK_EPOCH": uint64(0),
+	})
+	if err != nil {
+		t.Fatalf("failed setting client specs: %v", err)
+	}
+
+	specs := cache.GetSpecs()
+
+	if specs.FuluForkEpoch != FarFutureEpoch {
+		t.Errorf("unreported FuluForkEpoch = %d, want FarFutureEpoch", specs.FuluForkEpoch)
+	}
+
+	if specs.ElectraForkEpoch != 0 {
+		t.Errorf("reported ElectraForkEpoch = %d, want 0", specs.ElectraForkEpoch)
+	}
+
+	if got := specs.DataVersionAtSlot(1e6); got != spec.DataVersionElectra {
+		t.Errorf("DataVersionAtSlot = %v, want electra: unreported forks must not activate", got)
 	}
 }

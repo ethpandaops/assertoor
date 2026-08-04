@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	nethttp "net/http"
@@ -510,12 +511,21 @@ func (bc *BeaconClient) SubmitVoluntaryExits(ctx context.Context, exit *phase0.S
 	return nil
 }
 
+// ErrPreElectraSlashing reports an attester slashing whose fork predates
+// electra. The versioned pool endpoint was introduced in the electra release,
+// so a node on an earlier fork does not serve it.
+var ErrPreElectraSlashing = errors.New("attester slashing predates the versioned pool endpoint")
+
 // SubmitAttesterSlashing submits a versioned attester slashing through
 // go-eth2-client's V2 pool endpoint (/eth/v2/beacon/pool/attester_slashings).
 // The client library derives the Eth-Consensus-Version header from the
 // slashing's version. The V1 endpoint was deprecated in the electra release of
 // the beacon APIs and removed from the spec (ethereum/beacon-APIs#549).
 func (bc *BeaconClient) SubmitAttesterSlashing(ctx context.Context, slashing *spec.VersionedAttesterSlashing) error {
+	if slashing.Version < spec.DataVersionElectra {
+		return fmt.Errorf("%w: fork is %v", ErrPreElectraSlashing, slashing.Version)
+	}
+
 	submitter, isOk := bc.clientSvc.(eth2client.AttesterSlashingSubmitterV2)
 	if !isOk {
 		return fmt.Errorf("submit attester slashing not supported")
