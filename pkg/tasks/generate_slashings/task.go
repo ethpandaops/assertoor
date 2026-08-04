@@ -13,6 +13,8 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/types"
 	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/ethpandaops/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec/electra"
+	"github.com/ethpandaops/go-eth2-client/spec/gloas"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
@@ -346,7 +348,7 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkStat
 		return 0, fmt.Errorf("validator %v is not active", validator.Index)
 	}
 
-	var attesterSlashing *phase0.AttesterSlashing
+	var attesterSlashing *spec.VersionedAttesterSlashing
 
 	var proposerSlashing *phase0.ProposerSlashing
 
@@ -383,17 +385,7 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkStat
 	if attesterSlashing != nil {
 		t.logger.WithField("client", client.GetName()).Infof("sending attester slashing for validator %v", validator.Index)
 
-		// The V1 pool endpoint was removed from the beacon APIs in the Electra
-		// release; submit via V2 with the network's current fork version.
-		clPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
-		slot, _, _ := clPool.GetBlockCache().GetWallclock().Now()
-
-		consensusVersion := consensus.ForkVersionElectra
-		if specs := clPool.GetBlockCache().GetSpecs(); specs != nil {
-			consensusVersion = specs.ConsensusForkVersionAtSlot(phase0.Slot(slot.Number()))
-		}
-
-		err = client.GetRPCClient().SubmitAttesterSlashingV2(ctx, attesterSlashing, consensusVersion)
+		err = client.GetRPCClient().SubmitAttesterSlashing(ctx, attesterSlashing)
 		if err != nil {
 			return 0, err
 		}
@@ -420,7 +412,7 @@ func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {
 	return bip39.NewSeed(mnemonic, ""), nil
 }
 
-func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validatorKey *e2types.BLSPrivateKey, forkState *phase0.Fork) (*phase0.AttesterSlashing, error) {
+func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validatorKey *e2types.BLSPrivateKey, forkState *phase0.Fork) (*spec.VersionedAttesterSlashing, error) {
 	// surround attester slashing case:
 	// different target, different source
 	// source1 < source 2
@@ -514,10 +506,65 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 		Signature:        phase0.BLSSignature(sig2.Serialize()),
 	}
 
-	return &phase0.AttesterSlashing{
+	slashing := &phase0.AttesterSlashing{
 		Attestation1: att1,
 		Attestation2: att2,
-	}, nil
+	}
+
+	return versionedAttesterSlashing(specs.DataVersionAtSlot(phase0.Slot(slot1)), slashing)
+}
+
+// versionedAttesterSlashing rewraps a phase0-shaped attester slashing into the
+// arm of spec.VersionedAttesterSlashing matching the given fork. EIP-7549
+// (electra) and the progressive-list migration (gloas) each gave
+// IndexedAttestation its own Go type. The JSON on the wire is unchanged, but
+// go-eth2-client marshals the arm selected by Version and derives the
+// Eth-Consensus-Version header from that same field, so the arm has to match.
+func versionedAttesterSlashing(version spec.DataVersion, slashing *phase0.AttesterSlashing) (*spec.VersionedAttesterSlashing, error) {
+	versioned := &spec.VersionedAttesterSlashing{Version: version}
+
+	switch version {
+	case spec.DataVersionElectra:
+		versioned.Electra = electraAttesterSlashing(slashing)
+	case spec.DataVersionFulu:
+		versioned.Fulu = electraAttesterSlashing(slashing)
+	case spec.DataVersionGloas:
+		versioned.Gloas = gloasAttesterSlashing(slashing)
+	default:
+		return nil, fmt.Errorf("cannot submit attester slashing for fork %v: no versioned pool endpoint", version)
+	}
+
+	return versioned, nil
+}
+
+func electraAttesterSlashing(slashing *phase0.AttesterSlashing) *electra.AttesterSlashing {
+	return &electra.AttesterSlashing{
+		Attestation1: electraIndexedAttestation(slashing.Attestation1),
+		Attestation2: electraIndexedAttestation(slashing.Attestation2),
+	}
+}
+
+func electraIndexedAttestation(att *phase0.IndexedAttestation) *electra.IndexedAttestation {
+	return &electra.IndexedAttestation{
+		AttestingIndices: att.AttestingIndices,
+		Data:             att.Data,
+		Signature:        att.Signature,
+	}
+}
+
+func gloasAttesterSlashing(slashing *phase0.AttesterSlashing) *gloas.AttesterSlashing {
+	return &gloas.AttesterSlashing{
+		Attestation1: gloasIndexedAttestation(slashing.Attestation1),
+		Attestation2: gloasIndexedAttestation(slashing.Attestation2),
+	}
+}
+
+func gloasIndexedAttestation(att *phase0.IndexedAttestation) *gloas.IndexedAttestation {
+	return &gloas.IndexedAttestation{
+		AttestingIndices: att.AttestingIndices,
+		Data:             att.Data,
+		Signature:        att.Signature,
+	}
 }
 
 func (t *Task) generateProposerSlashing(validatorIndex uint64, validatorKey *e2types.BLSPrivateKey, forkState *phase0.Fork) (*phase0.ProposerSlashing, error) {

@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/ethpandaops/go-eth2-client/spec"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
@@ -43,30 +44,27 @@ func (chain *ChainSpec) IsGloasActive(slot phase0.Slot) bool {
 	return uint64(slot) >= chain.GloasForkEpoch*chain.SlotsPerEpoch
 }
 
-// Consensus fork version names as used in the Eth-Consensus-Version header.
-const (
-	ForkVersionElectra = "electra"
-	ForkVersionFulu    = "fulu"
-	ForkVersionGloas   = "gloas"
-)
-
-// ConsensusForkVersionAtSlot returns the consensus fork version (as used in the
-// Eth-Consensus-Version header) that is active at the given slot: "gloas",
-// "fulu" or "electra". Pre-Electra networks also report "electra"; callers
-// are expected to fall back to pre-Electra endpoints when the V2 endpoint is
-// not available.
-func (chain *ChainSpec) ConsensusForkVersionAtSlot(slot phase0.Slot) string {
+// DataVersionAtSlot returns the consensus fork active at the given slot, as the
+// spec.DataVersion that selects the arm of a versioned type and drives the
+// Eth-Consensus-Version header. Electra is the floor: the versioned pool
+// endpoints it is used for only exist from electra onwards.
+//
+// A fork epoch of 0 is treated as "not scheduled" rather than "active since
+// genesis", matching IsGloasActive. Beacon nodes that predate a fork omit its
+// epoch from /eth/v1/config/spec, which unmarshals to 0, and reporting a fork
+// the node has never heard of is the worse failure mode.
+func (chain *ChainSpec) DataVersionAtSlot(slot phase0.Slot) spec.DataVersion {
 	if chain.IsGloasActive(slot) {
-		return ForkVersionGloas
+		return spec.DataVersionGloas
 	}
 
 	// Division-based comparison: FAR_FUTURE fork epochs (2^64-1) would overflow
 	// an epoch*SlotsPerEpoch multiplication.
 	if chain.FuluForkEpoch > 0 && chain.SlotsPerEpoch > 0 && uint64(slot)/chain.SlotsPerEpoch >= chain.FuluForkEpoch {
-		return ForkVersionFulu
+		return spec.DataVersionFulu
 	}
 
-	return ForkVersionElectra
+	return spec.DataVersionElectra
 }
 
 func (chain *ChainSpec) CheckMismatch(chain2 *ChainSpec) []string {

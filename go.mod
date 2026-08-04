@@ -7,7 +7,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/ethpandaops/ethwallclock v0.4.0
-	github.com/ethpandaops/go-eth2-client v0.1.6
+	github.com/ethpandaops/go-eth2-client v0.1.7-0.20260804142719-11c20aff398e
 	github.com/ethpandaops/service-authenticatoor v0.0.2
 	github.com/ethpandaops/spamoor v1.2.2
 	github.com/glebarez/go-sqlite v1.22.0

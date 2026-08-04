@@ -510,37 +510,20 @@ func (bc *BeaconClient) SubmitVoluntaryExits(ctx context.Context, exit *phase0.S
 	return nil
 }
 
-// SubmitAttesterSlashing submits an attester slashing via the legacy V1
-// endpoint. The V1 endpoint was deprecated in the Electra release of the
-// beacon APIs; use SubmitAttesterSlashingV2 for the spec-compliant path.
-func (bc *BeaconClient) SubmitAttesterSlashing(ctx context.Context, slashing *phase0.AttesterSlashing) error {
-	return bc.postJSON(ctx, fmt.Sprintf("%s/eth/v1/beacon/pool/attester_slashings", bc.endpoint), slashing, nil)
-}
-
-// SubmitAttesterSlashingV2 submits an attester slashing via the V2 endpoint
-// (/eth/v2/beacon/pool/attester_slashings) with the given consensus version in
-// the Eth-Consensus-Version header. The V1 endpoint was deprecated in the
-// Electra release of the beacon APIs and removed from the spec
-// (ethereum/beacon-APIs#549), so V2 is the primary path. On any V2 failure
-// (missing endpoint on pre-Electra nodes, or clients that reject the version
-// header on pre-Electra chains) the legacy V1 submission is attempted; if
-// that also fails, both errors are returned.
-func (bc *BeaconClient) SubmitAttesterSlashingV2(ctx context.Context, slashing *phase0.AttesterSlashing, consensusVersion string) error {
-	v2Err := bc.postJSONWithHeaders(
-		ctx,
-		fmt.Sprintf("%s/eth/v2/beacon/pool/attester_slashings", bc.endpoint),
-		slashing, nil,
-		map[string]string{"Eth-Consensus-Version": consensusVersion},
-	)
-	if v2Err == nil {
-		return nil
+// SubmitAttesterSlashing submits a versioned attester slashing through
+// go-eth2-client's V2 pool endpoint (/eth/v2/beacon/pool/attester_slashings).
+// The client library derives the Eth-Consensus-Version header from the
+// slashing's version. The V1 endpoint was deprecated in the electra release of
+// the beacon APIs and removed from the spec (ethereum/beacon-APIs#549).
+func (bc *BeaconClient) SubmitAttesterSlashing(ctx context.Context, slashing *spec.VersionedAttesterSlashing) error {
+	submitter, isOk := bc.clientSvc.(eth2client.AttesterSlashingSubmitterV2)
+	if !isOk {
+		return fmt.Errorf("submit attester slashing not supported")
 	}
 
-	if v1Err := bc.SubmitAttesterSlashing(ctx, slashing); v1Err != nil {
-		return fmt.Errorf("v2 submission failed: %v; v1 fallback failed: %v", v2Err, v1Err)
-	}
-
-	return nil
+	return submitter.SubmitAttesterSlashingV2(ctx, &api.SubmitAttesterSlashingOpts{
+		AttesterSlashing: slashing,
+	})
 }
 
 func (bc *BeaconClient) SubmitProposerSlashing(ctx context.Context, slashing *phase0.ProposerSlashing) error {
