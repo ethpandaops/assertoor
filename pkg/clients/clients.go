@@ -40,6 +40,11 @@ type ClientConfig struct {
 	ConsensusHeaders map[string]string `yaml:"consensusHeaders"`
 	ExecutionURL     string            `yaml:"executionUrl"`
 	ExecutionHeaders map[string]string `yaml:"executionHeaders"`
+	// ExecutionGroups are the spamoor client groups this execution endpoint
+	// belongs to. Scenarios select senders by group (client_group), so an
+	// endpoint in a dedicated group (e.g. a builder's tx intake) only receives
+	// transactions from scenarios that ask for it. Empty means "default".
+	ExecutionGroups []string `yaml:"executionGroups"`
 }
 
 func NewClientPool(logger logrus.FieldLogger) (*ClientPool, error) {
@@ -95,6 +100,7 @@ func (pool *ClientPool) AddClient(config *ClientConfig) error {
 		Name:    config.Name,
 		URL:     config.ExecutionURL,
 		Headers: config.ExecutionHeaders,
+		Groups:  config.ExecutionGroups,
 	})
 	if err != nil {
 		return fmt.Errorf("could not init consensus client: %w", err)

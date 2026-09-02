@@ -22,6 +22,7 @@ type ClientConfig struct {
 	URL     string
 	Name    string
 	Headers map[string]string
+	Groups  []string // spamoor client groups; empty = default
 }
 
 type Client struct {

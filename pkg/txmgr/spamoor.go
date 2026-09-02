@@ -94,6 +94,10 @@ func (s *Spamoor) getClientOptions(client *execution.Client) *spamoor.ClientOpti
 	rpcURL := client.GetEndpointConfig().URL
 	rpcURL = fmt.Sprintf("name(%s)%s", client.GetName(), rpcURL)
 
+	if groups := client.GetEndpointConfig().Groups; len(groups) > 0 {
+		rpcURL = fmt.Sprintf("group(%s)%s", strings.Join(groups, ","), rpcURL)
+	}
+
 	if headers := client.GetEndpointConfig().Headers; len(headers) > 0 {
 		headerParts := make([]string, 0, len(headers))
 		for key, value := range headers {

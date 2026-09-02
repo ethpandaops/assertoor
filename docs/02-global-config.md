@@ -25,6 +25,13 @@ endpoints:
   - name: "node-1"
     executionUrl: "http://127.0.0.1:8545"
     consensusUrl: "http://127.0.0.1:5052"
+  # An endpoint in a dedicated spamoor client group only receives transactions
+  # from scenarios that select that group (client_group). Use this to point a
+  # scenario at a builder's tx intake instead of the public txpool.
+  - name: "buildoor-intake"
+    executionUrl: "http://127.0.0.1:8085/rpc"
+    consensusUrl: "http://127.0.0.1:5052"
+    executionGroups: ["builder"]
 
 validatorNames:
   inventoryYaml: "./validator-names.yaml"
