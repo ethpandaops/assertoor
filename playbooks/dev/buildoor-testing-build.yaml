@@ -50,6 +50,12 @@ config:
   minTxsPerBlock: 20
   throughput: 300
   baseFeeGwei: 100
+  # spamoor's scenarioYaml takes these in WEI (the --refill-* CLI flags take
+  # ETH, the YAML fields do not). Too small and the wallets are "funded" with
+  # dust, pass the balance check, and every transaction is then skipped for
+  # insufficient funds.
+  refillAmountWei: 50000000000000000000   # 50 ETH
+  refillBalanceWei: 10000000000000000000  # 10 ETH
 tasks:
 - name: check_clients_are_healthy
   title: "Check if at least one client is ready"
@@ -85,7 +91,7 @@ tasks:
       title: "spamoor eoatx into the builder intake"
       configVars:
         privateKey: "spamoorPrivkey"
-        scenarioYaml: ". as $v | {throughput: $v.throughput, max_pending: ($v.throughput * 10), max_wallets: 30, base_fee: $v.baseFeeGwei, tip_fee: 2, refill_amount: 50, refill_balance: 10, rebroadcast: 30, client_group: $v.clientGroup}"
+        scenarioYaml: ". as $v | {throughput: $v.throughput, max_pending: ($v.throughput * 10), max_wallets: 30, base_fee: $v.baseFeeGwei, tip_fee: 2, refill_amount: $v.refillAmountWei, refill_balance: $v.refillBalanceWei, rebroadcast: 30, client_group: $v.clientGroup}"
       config:
         scenarioName: eoatx
     foregroundTask:
