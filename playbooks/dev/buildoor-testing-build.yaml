@@ -8,17 +8,35 @@ description: |
   order, same count. A single mismatch, missed payload or unknown block fails
   the test.
 
-  Endpoint setup: register the buildoor intake as an execution endpoint in a
-  dedicated client group so this scenario can address it. "-default" takes it
-  out of the group-less selections (wallet funding, deployments, scenarios
-  without a client_group) as well, so nothing else feeds the intake and the
-  built blocks hold only this scenario's transactions:
+  Endpoint setup. While the builder is on the testing source its blocks are
+  the ONLY way a transaction gets included: anything sent to a normal EL sits
+  in the public txpool forever, because buildoor builds solely from its
+  intake. That includes spamoor's own wallet funding and refills, which use
+  the group-less "default" selection rather than this scenario's client_group.
+
+  So every endpoint spamoor may pick must be the intake. The simple form is to
+  give this playbook a config where the intake is the only execution endpoint
+  (it proxies all reads to the EL, so the client checks still work):
 
     endpoints:
       - name: buildoor-intake
         executionUrl: http://buildoor:8080/rpc
         consensusUrl: http://beacon:5052
-        executionGroups: [builder, "-default"]
+
+  With several execution endpoints, keep the intake in "default" and take the
+  others out of it, so the scenario reaches every node it needs while funding
+  can only land somewhere that gets built (needs a spamoor with group removal,
+  ethpandaops/spamoor#283):
+
+    endpoints:
+      - name: buildoor-intake
+        executionUrl: http://buildoor:8080/rpc
+        consensusUrl: http://beacon:5052
+        executionGroups: [builder]
+      - name: node-2
+        executionUrl: http://node2:8545
+        consensusUrl: http://beacon2:5052
+        executionGroups: ["-default"]
 
   The buildoor geth must serve the testing namespace (--http.api ...,testing).
 version: 1.0.0
