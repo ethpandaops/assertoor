@@ -134,8 +134,10 @@ tasks:
           configVars:
             url: ".buildoorUrl + \"/api/buildoor/tx-queue\""
             # Cumulative counters, so this covers the whole run, not just now.
+            # Leading "." matters: assertoor prepends one to a configVars
+            # expression that lacks it, turning a bare [..] into an index.
             assertions: >-
-              [
+              . | [
                 {name: "no-mismatch", query: ".plan_checks.mismatch", operator: "eq", value: 0},
                 {name: "no-missing-blocks", query: ".plan_checks.block_not_found", operator: "eq", value: 0},
                 {name: "no-missed-payloads", query: ".plan_checks.missed", operator: "eq", value: 0}
