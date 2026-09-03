@@ -9,13 +9,16 @@ description: |
   the test.
 
   Endpoint setup: register the buildoor intake as an execution endpoint in a
-  dedicated client group, so only this scenario's transactions go there:
+  dedicated client group so this scenario can address it. "-default" takes it
+  out of the group-less selections (wallet funding, deployments, scenarios
+  without a client_group) as well, so nothing else feeds the intake and the
+  built blocks hold only this scenario's transactions:
 
     endpoints:
       - name: buildoor-intake
         executionUrl: http://buildoor:8080/rpc
         consensusUrl: http://beacon:5052
-        executionGroups: [builder]
+        executionGroups: [builder, "-default"]
 
   The buildoor geth must serve the testing namespace (--http.api ...,testing).
 version: 1.0.0
@@ -82,19 +85,34 @@ tasks:
             checkLookback: 64
             extraDataPattern: "^buildoor"
 
+        # Two checks on purpose. The tally lags the proposals it counts (the
+        # verifier fetches the block from the EL after inclusion), and an
+        # unsatisfied assertion is a FAILURE rather than a wait under
+        # failOnCheckMiss - so the count is polled without it, and only the
+        # must-be-zero counters fail fast.
         - name: check_http_json
-          title: "Every included tx plan verified as an exact match"
-          timeout: 2m
+          title: "Wait for ${minVerifiedBlocks} verified tx plans"
+          timeout: 5m
           configVars:
             url: ".buildoorUrl + \"/api/buildoor/tx-queue\""
-            # zero mismatches, zero unknown blocks, zero missed payloads, and
-            # at least minVerifiedBlocks exact matches
             assertions: >-
               . as $v | [
+                {name: "enough-matches", query: ".plan_checks.match", operator: "gte", value: $v.minVerifiedBlocks}
+              ]
+          config:
+            pollInterval: 5s
+
+        - name: check_http_json
+          title: "No tx plan was mismatched, missed or unverifiable"
+          timeout: 1m
+          configVars:
+            url: ".buildoorUrl + \"/api/buildoor/tx-queue\""
+            # Cumulative counters, so this covers the whole run, not just now.
+            assertions: >-
+              [
                 {name: "no-mismatch", query: ".plan_checks.mismatch", operator: "eq", value: 0},
                 {name: "no-missing-blocks", query: ".plan_checks.block_not_found", operator: "eq", value: 0},
-                {name: "no-missed-payloads", query: ".plan_checks.missed", operator: "eq", value: 0},
-                {name: "enough-matches", query: ".plan_checks.match", operator: "gte", value: $v.minVerifiedBlocks}
+                {name: "no-missed-payloads", query: ".plan_checks.missed", operator: "eq", value: 0}
               ]
           config:
             failOnCheckMiss: true

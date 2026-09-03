@@ -41,9 +41,19 @@ type ClientConfig struct {
 	ExecutionURL     string            `yaml:"executionUrl"`
 	ExecutionHeaders map[string]string `yaml:"executionHeaders"`
 	// ExecutionGroups are the spamoor client groups this execution endpoint
-	// belongs to. Scenarios select senders by group (client_group), so an
-	// endpoint in a dedicated group (e.g. a builder's tx intake) only receives
-	// transactions from scenarios that ask for it. Empty means "default".
+	// belongs to, so a scenario can direct its transactions at specific
+	// endpoints via its client_group option.
+	//
+	// Membership is ADDITIVE: every client is in "default", which is also the
+	// group used by every selection that names none (wallet funding and
+	// refills, contract deployments, scenarios without client_group). Naming a
+	// group therefore does not stop that traffic. To reserve an endpoint —
+	// e.g. a builder's private tx intake that must hold only one scenario's
+	// transactions — also remove it from the default group with "-default".
+	// Removal requires a spamoor version that supports it; assertoor fails at
+	// startup if the linked one ignores the entry.
+	//
+	//	executionGroups: ["builder", "-default"]
 	ExecutionGroups []string `yaml:"executionGroups"`
 }
 

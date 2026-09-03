@@ -46,6 +46,10 @@ func NewSpamoor(ctx context.Context, logger logrus.FieldLogger, executionPool *e
 	}
 
 	for i, client := range clientPool.GetAllClients() {
+		if err := verifyClientGroups(endpoints[i].GetEndpointConfig(), client); err != nil {
+			return nil, err
+		}
+
 		s.clients[endpoints[i]] = client
 	}
 
@@ -272,4 +276,33 @@ func (s *Spamoor) NewWalletPoolByPrivkey(ctx context.Context, logger logrus.Fiel
 	walletPool := spamoor.NewWalletPool(ctx, logger, rootWallet, s.clientPool, s.txpool)
 
 	return walletPool, nil
+}
+
+// verifyClientGroups checks that spamoor applied the endpoint's configured
+// client groups. Group membership decides which scenarios reach an endpoint,
+// so a silently ignored entry would send transactions somewhere the operator
+// deliberately excluded. A "-name" entry (removing a group, e.g. "-default"
+// to keep an endpoint out of the group-less selections) needs a spamoor
+// version that supports removal; older versions treat it as a literal group
+// name, which this check turns into a startup error instead of a surprise.
+func verifyClientGroups(config *execution.ClientConfig, client *spamoor.Client) error {
+	for _, group := range config.Groups {
+		if remove, found := strings.CutPrefix(group, "-"); found {
+			if client.HasGroup(remove) {
+				return fmt.Errorf(
+					"endpoint %q: executionGroups asked to remove client group %q but the client is still in it "+
+						"(the linked spamoor does not support group removal)",
+					config.Name, remove)
+			}
+
+			continue
+		}
+
+		if !client.HasGroup(group) {
+			return fmt.Errorf("endpoint %q: executionGroups requested client group %q but the client is not in it",
+				config.Name, group)
+		}
+	}
+
+	return nil
 }
