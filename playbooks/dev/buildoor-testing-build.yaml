@@ -16,12 +16,15 @@ description: |
 
   So every endpoint spamoor may pick must be the intake. The simple form is to
   give this playbook a config where the intake is the only execution endpoint
-  (it proxies all reads to the EL, so the client checks still work):
+  (it proxies all reads to the EL, so the client checks still work). It still
+  needs the group this test's clientGroup names, since a scenario selecting a
+  group no client is in gets no client at all:
 
     endpoints:
       - name: buildoor-intake
         executionUrl: http://buildoor:8080/rpc
         consensusUrl: http://beacon:5052
+        executionGroups: [builder]
 
   With several execution endpoints, keep the intake in "default" and take the
   others out of it, so the scenario reaches every node it needs while funding

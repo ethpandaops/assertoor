@@ -45,7 +45,19 @@ func NewSpamoor(ctx context.Context, logger logrus.FieldLogger, executionPool *e
 		return nil, err
 	}
 
-	for i, client := range clientPool.GetAllClients() {
+	// InitClients skips options it could not turn into a client, so a short
+	// list would silently pair every later endpoint with another endpoint's
+	// client — wiring transactions to the wrong node and checking the wrong
+	// endpoint's groups. A client only fails to build on a malformed rpchost,
+	// which is a config error worth stopping for.
+	spamoorClients := clientPool.GetAllClients()
+	if len(spamoorClients) != len(endpoints) {
+		return nil, fmt.Errorf("spamoor initialized %d of %d execution endpoints; "+
+			"check the endpoint configuration (executionGroups, headers)",
+			len(spamoorClients), len(endpoints))
+	}
+
+	for i, client := range spamoorClients {
 		if groupErr := verifyClientGroups(endpoints[i].GetEndpointConfig(), client); groupErr != nil {
 			return nil, groupErr
 		}
