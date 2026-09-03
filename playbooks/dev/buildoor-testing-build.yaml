@@ -54,8 +54,10 @@ config:
   # ETH, the YAML fields do not). Too small and the wallets are "funded" with
   # dust, pass the balance check, and every transaction is then skipped for
   # insufficient funds.
-  refillAmountWei: 50000000000000000000   # 50 ETH
-  refillBalanceWei: 10000000000000000000  # 10 ETH
+  # Quoted: jq evaluates configVars as float64, so an unquoted 5e19 reaches
+  # spamoor as "5e+19" and fails its uint256 parse.
+  refillAmountWei: "50000000000000000000"   # 50 ETH
+  refillBalanceWei: "10000000000000000000"  # 10 ETH
 tasks:
 - name: check_clients_are_healthy
   title: "Check if at least one client is ready"
