@@ -110,7 +110,7 @@ func (s *Spamoor) getClientOptions(client *execution.Client) *spamoor.ClientOpti
 	rpcURL := client.GetEndpointConfig().URL
 	rpcURL = fmt.Sprintf("name(%s)%s", client.GetName(), rpcURL)
 
-	if groups := client.GetEndpointConfig().Groups; len(groups) > 0 {
+	if groups := normalizedGroups(client.GetEndpointConfig()); len(groups) > 0 {
 		rpcURL = fmt.Sprintf("group(%s)%s", strings.Join(groups, ","), rpcURL)
 	}
 
@@ -298,7 +298,7 @@ func (s *Spamoor) NewWalletPoolByPrivkey(ctx context.Context, logger logrus.Fiel
 // version that supports removal; older versions treat it as a literal group
 // name, which this check turns into a startup error instead of a surprise.
 func verifyClientGroups(config *execution.ClientConfig, client *spamoor.Client) error {
-	for _, group := range config.Groups {
+	for _, group := range normalizedGroups(config) {
 		if remove, found := strings.CutPrefix(group, "-"); found {
 			if client.HasGroup(remove) {
 				return fmt.Errorf(
@@ -317,4 +317,21 @@ func verifyClientGroups(config *execution.ClientConfig, client *spamoor.Client) 
 	}
 
 	return nil
+}
+
+// normalizedGroups trims the endpoint's configured client groups and drops
+// empty entries, matching what spamoor's own group(...) parser does. Without
+// it a stray space makes the two disagree: spamoor applies the trimmed name
+// while the check compares the raw one, which both fails startup spuriously
+// on an added group and, worse, passes a removal that never took effect.
+func normalizedGroups(config *execution.ClientConfig) []string {
+	groups := make([]string, 0, len(config.Groups))
+
+	for _, group := range config.Groups {
+		if group = strings.TrimSpace(group); group != "" {
+			groups = append(groups, group)
+		}
+	}
+
+	return groups
 }
