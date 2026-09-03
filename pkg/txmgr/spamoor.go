@@ -46,8 +46,8 @@ func NewSpamoor(ctx context.Context, logger logrus.FieldLogger, executionPool *e
 	}
 
 	for i, client := range clientPool.GetAllClients() {
-		if err := verifyClientGroups(endpoints[i].GetEndpointConfig(), client); err != nil {
-			return nil, err
+		if groupErr := verifyClientGroups(endpoints[i].GetEndpointConfig(), client); groupErr != nil {
+			return nil, groupErr
 		}
 
 		s.clients[endpoints[i]] = client
