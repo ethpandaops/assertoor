@@ -47,14 +47,14 @@ func TestVerifyClientGroupsRejectsAnUnappliedEntry(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if err := verifyClientGroups(&execution.ClientConfig{Name: "intake", Groups: []string{"builder"}}, client); err != nil {
-		t.Errorf("an applied group must verify: %v", err)
+	if applied := verifyClientGroups(&execution.ClientConfig{Name: "intake", Groups: []string{"builder"}}, client); applied != nil {
+		t.Errorf("an applied group must verify: %v", applied)
 	}
 
 	// The pinned spamoor keeps the client in "default", so a removal that was
 	// ignored has to be an error rather than silent under-isolation.
-	err = verifyClientGroups(&execution.ClientConfig{Name: "intake", Groups: []string{"-default"}}, client)
-	if client.HasGroup("default") && err == nil {
+	ignored := verifyClientGroups(&execution.ClientConfig{Name: "intake", Groups: []string{"-default"}}, client)
+	if client.HasGroup("default") && ignored == nil {
 		t.Error("an ignored removal must fail verification")
 	}
 
