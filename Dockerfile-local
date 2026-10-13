@@ -7,7 +7,7 @@ COPY web-ui/ ./web-ui/
 COPY pkg/web/static/embed.go ./pkg/web/static/
 RUN cd web-ui && npm run build
 
-FROM golang:1.25 AS builder
+FROM golang:1.26 AS builder
 WORKDIR /src
 COPY go.sum go.mod ./
 RUN go mod download

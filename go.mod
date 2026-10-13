@@ -1,6 +1,6 @@
 module github.com/ethpandaops/assertoor
 
-go 1.25.7
+go 1.26.0
 
 require (
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0
