@@ -1,0 +1,67 @@
+id: beacon-api-error-check
+name: "Validator clients get no beacon API errors"
+description: |
+  Watches the beacon API traffic of every validator client through its
+  rpc-snooper and fails as soon as any request gets a 4xx or 5xx response,
+  naming the client pair, route and status. Needs `snooper_enabled` on the
+  participants, which makes ethereum-package fill `clSnooperMetrics`.
+
+  Catches beacon API incompatibilities between a beacon node and a validator
+  client of a different team that participation checks miss.
+version: 1.0.0
+tags: [consensus, beacon-api, interop]
+timeout: 1h
+config:
+  clSnooperMetrics: []
+  startEpoch: 2
+  watchDuration: 30m
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if all clients are ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: check_consensus_slot_range
+  title: "Skip startup epochs"
+  timeout: 15m
+  configVars:
+    minEpochNumber: "startEpoch"
+
+- name: run_task_background
+  title: "Watch beacon API responses"
+  config:
+    onBackgroundComplete: fail
+    exitOnForegroundSuccess: true
+    backgroundTask:
+      name: run_task_matrix
+      title: "Beacon API errors per client pair"
+      configVars:
+        matrixValues: "clSnooperMetrics"
+      config:
+        runConcurrent: true
+        matrixVar: "snooper"
+        task:
+          name: check_http_metrics
+          title: "No beacon API errors for ${{ .snooper.name }}"
+          configVars:
+            url: "snooper.url"
+          config:
+            continueOnPass: true
+            failOnCheckMiss: true
+            missingMetric: pass
+            missingSeries: pass
+            assertions:
+            - name: beacon_api_errors
+              metric: ngx_request_count
+              labelPatterns:
+                status: "[45].."
+              aggregate: each
+              mode: delta
+              operator: eq
+              value: 0
+    foregroundTask:
+      name: sleep
+      title: "Watch window"
+      configVars:
+        duration: "watchDuration"
