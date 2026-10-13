@@ -491,9 +491,10 @@ func newTestTask(cfg *Config) *Task {
 	}
 
 	return &Task{
-		config:    c,
-		logger:    logger,
-		baselines: make(map[string]float64),
+		config:          c,
+		logger:          logger,
+		baselines:       make(map[string]float64),
+		seriesBaselines: make(map[string]map[string]float64),
 	}
 }
 
@@ -629,7 +630,7 @@ func TestFindMetricValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			task := newTestTask(&Config{})
-			val, err := task.findMetricValue(tt.mf, tt.labels)
+			val, err := task.findMetricValue(tt.mf, tt.labels, nil)
 
 			switch {
 			case tt.wantErr != "" && err == nil:
@@ -663,7 +664,7 @@ func TestHandleMissing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			task := newTestTask(&Config{})
 			result := assertionResult{name: "test"}
-			result = task.handleMissing(result, tt.behavior, "metric not found")
+			result = task.handleMissing(&result, tt.behavior, "metric not found")
 
 			if tt.wantErr && result.err == nil {
 				t.Error("expected error, got nil")
@@ -1336,10 +1337,11 @@ func newTestTaskWithContext(cfg *Config) (*Task, types.Variables, *types.TaskRes
 	}
 
 	task := &Task{
-		ctx:       ctx,
-		config:    config,
-		logger:    logger,
-		baselines: make(map[string]float64),
+		ctx:             ctx,
+		config:          config,
+		logger:          logger,
+		baselines:       make(map[string]float64),
+		seriesBaselines: make(map[string]map[string]float64),
 	}
 
 	return task, outputs, &lastResult
@@ -1689,11 +1691,12 @@ http_requests_total{method="POST",status="200"} 50
 	}
 
 	task := &Task{
-		ctx:        ctx,
-		config:     cfg,
-		logger:     logger,
-		baselines:  make(map[string]float64),
-		httpClient: &http.Client{Timeout: cfg.RequestTimeout.Duration},
+		ctx:             ctx,
+		config:          cfg,
+		logger:          logger,
+		baselines:       make(map[string]float64),
+		seriesBaselines: make(map[string]map[string]float64),
+		httpClient:      &http.Client{Timeout: cfg.RequestTimeout.Duration},
 	}
 
 	// Run check
@@ -1777,11 +1780,12 @@ requests_total %d
 	}
 
 	task := &Task{
-		ctx:        ctx,
-		config:     cfg,
-		logger:     logger,
-		baselines:  make(map[string]float64),
-		httpClient: &http.Client{Timeout: cfg.RequestTimeout.Duration},
+		ctx:             ctx,
+		config:          cfg,
+		logger:          logger,
+		baselines:       make(map[string]float64),
+		seriesBaselines: make(map[string]map[string]float64),
+		httpClient:      &http.Client{Timeout: cfg.RequestTimeout.Duration},
 	}
 
 	// First scrape - records baseline, doesn't complete
@@ -1885,11 +1889,12 @@ memory_usage{host="server1"} 60.0
 	}
 
 	task := &Task{
-		ctx:        ctx,
-		config:     cfg,
-		logger:     logger,
-		baselines:  make(map[string]float64),
-		httpClient: &http.Client{Timeout: cfg.RequestTimeout.Duration},
+		ctx:             ctx,
+		config:          cfg,
+		logger:          logger,
+		baselines:       make(map[string]float64),
+		seriesBaselines: make(map[string]map[string]float64),
+		httpClient:      &http.Client{Timeout: cfg.RequestTimeout.Duration},
 	}
 
 	done, err := task.runCheck(context.Background())
@@ -1927,5 +1932,152 @@ memory_usage{host="server1"} 60.0
 
 	if v := valuesMap["server1_cpu_ok"]; v != 45.5 {
 		t.Errorf("values[server1_cpu_ok] = %v, want 45.5", v)
+	}
+}
+
+func restErrorFamily(values map[string]float64) *dto.MetricFamily {
+	metrics := make([]*dto.Metric, 0, len(values))
+	for route, value := range values {
+		metrics = append(metrics, makeCounter(value, map[string]string{"route": route, "status": "404"}))
+	}
+
+	metrics = append(metrics, makeCounter(1000, map[string]string{"route": "getBlockV2", "status": "200"}))
+
+	return makeCounterFamily(testMetric1, metrics...)
+}
+
+func mustValidAssertion(t *testing.T, a *AssertionConfig) *AssertionConfig {
+	t.Helper()
+
+	cfg := validBaseConfig()
+	cfg.URL = testMetricsURL
+	cfg.Assertions = []AssertionConfig{*a}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("unexpected validation error: %v", err)
+	}
+
+	return &cfg.Assertions[0]
+}
+
+func TestEvaluateAssertion_EachDelta_NamesFailingSeries(t *testing.T) {
+	task := newTestTask(&Config{ResetBehavior: ResetBehaviorFail})
+	assertion := mustValidAssertion(t, &AssertionConfig{
+		Name:          "rest_errors",
+		Metric:        testMetric1,
+		LabelPatterns: map[string]string{"status": "[45].."},
+		Aggregate:     AggregateModeEach,
+		Mode:          AssertionModeDelta,
+		Operator:      OperatorEq,
+		Value:         0,
+	})
+
+	first := task.evaluateAssertion(assertion, map[string]*dto.MetricFamily{
+		testMetric1: restErrorFamily(map[string]float64{"getStateV2": 2}),
+	})
+	if !first.waiting {
+		t.Fatal("first scrape should record baselines and wait")
+	}
+
+	second := task.evaluateAssertion(assertion, map[string]*dto.MetricFamily{
+		testMetric1: restErrorFamily(map[string]float64{"getStateV2": 2, "getAggregatedAttestationV2": 7}),
+	})
+	if second.passed || second.err != nil {
+		t.Fatalf("expected failure, got passed=%v err=%v", second.passed, second.err)
+	}
+
+	want := `1 of 2 series (want eq 0): {route="getAggregatedAttestationV2",status="404"} 7`
+	if second.detail != want {
+		t.Fatalf("detail = %q, want %q", second.detail, want)
+	}
+
+	if second.delta != 7 {
+		t.Fatalf("delta = %v, want 7", second.delta)
+	}
+}
+
+func TestEvaluateAssertion_EachDelta_SeriesMissingAtStart(t *testing.T) {
+	task := newTestTask(&Config{MissingMetric: MissingBehaviorPass, MissingSeries: MissingBehaviorPass})
+	assertion := mustValidAssertion(t, &AssertionConfig{
+		Name:          "rest_errors",
+		Metric:        testMetric1,
+		LabelPatterns: map[string]string{"status": "[45].."},
+		Aggregate:     AggregateModeEach,
+		Mode:          AssertionModeDelta,
+		Operator:      OperatorEq,
+		Value:         0,
+	})
+
+	if r := task.evaluateAssertion(assertion, map[string]*dto.MetricFamily{}); !r.waiting {
+		t.Fatal("first scrape without the metric should still record an empty baseline")
+	}
+
+	if r := task.evaluateAssertion(assertion, map[string]*dto.MetricFamily{}); !r.passed {
+		t.Fatal("missing metric with pass behavior should pass")
+	}
+
+	r := task.evaluateAssertion(assertion, map[string]*dto.MetricFamily{
+		testMetric1: restErrorFamily(map[string]float64{"getAggregatedAttestationV2": 3}),
+	})
+	if r.passed {
+		t.Fatal("series appearing after the baseline should count from zero")
+	}
+}
+
+func TestEvaluateAssertion_SumValue(t *testing.T) {
+	task := newTestTask(&Config{})
+	assertion := mustValidAssertion(t, &AssertionConfig{
+		Name:          "rest_errors",
+		Metric:        testMetric1,
+		LabelPatterns: map[string]string{"status": "[45].."},
+		Aggregate:     AggregateModeSum,
+		Operator:      OperatorLte,
+		Value:         5,
+	})
+
+	r := task.evaluateAssertion(assertion, map[string]*dto.MetricFamily{
+		testMetric1: restErrorFamily(map[string]float64{"a": 2, "b": 4}),
+	})
+	if r.passed || r.value != 6 {
+		t.Fatalf("got passed=%v value=%v, want failure with value 6", r.passed, r.value)
+	}
+
+	want := `sum 6 (want lte 5): {route="a",status="404"} 2, {route="b",status="404"} 4`
+	if r.detail != want {
+		t.Fatalf("detail = %q, want %q", r.detail, want)
+	}
+}
+
+func TestEvaluateAssertion_SingleWithLabelPatterns(t *testing.T) {
+	task := newTestTask(&Config{})
+	assertion := mustValidAssertion(t, &AssertionConfig{
+		Name:          "ok_requests",
+		Metric:        testMetric1,
+		LabelPatterns: map[string]string{"status": "2.."},
+		Operator:      OperatorGt,
+		Value:         0,
+	})
+
+	r := task.evaluateAssertion(assertion, map[string]*dto.MetricFamily{
+		testMetric1: restErrorFamily(map[string]float64{"a": 2}),
+	})
+	if !r.passed || r.value != 1000 {
+		t.Fatalf("got passed=%v value=%v, want pass with value 1000", r.passed, r.value)
+	}
+}
+
+func TestConfig_Validate_AggregateAndPatterns(t *testing.T) {
+	cfg := validBaseConfig()
+	cfg.URL = testMetricsURL
+	cfg.Assertions = []AssertionConfig{{Name: "a", Metric: testMetric1, Operator: OperatorEq, Aggregate: "max"}}
+
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "invalid aggregate") {
+		t.Fatalf("expected invalid aggregate error, got %v", err)
+	}
+
+	cfg.Assertions = []AssertionConfig{{Name: "a", Metric: testMetric1, Operator: OperatorEq, LabelPatterns: map[string]string{"status": "("}}}
+
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "invalid labelPatterns") {
+		t.Fatalf("expected invalid labelPatterns error, got %v", err)
 	}
 }

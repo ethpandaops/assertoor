@@ -3,6 +3,7 @@ package checkhttpmetrics
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -41,6 +42,15 @@ const (
 	AssertionModeDelta AssertionMode = "delta"
 )
 
+// AggregateMode determines how multiple matching series are combined.
+type AggregateMode string
+
+const (
+	AggregateModeSingle AggregateMode = "single"
+	AggregateModeSum    AggregateMode = "sum"
+	AggregateModeEach   AggregateMode = "each"
+)
+
 // Operator specifies the comparison operation between actual and expected values.
 type Operator string
 
@@ -54,17 +64,22 @@ const (
 )
 
 // AssertionConfig defines a single metric assertion to evaluate.
-// Labels are a subset selector that must match exactly one time series;
-// matching zero or multiple series is an error.
+// Labels and labelPatterns are a subset selector. With the default aggregate mode it must
+// match exactly one time series; "sum" adds up all matching series and "each" requires
+// every matching series to pass on its own.
 type AssertionConfig struct {
 	Name          string            `yaml:"name" json:"name" desc:"Unique human-readable assertion name."`
 	Metric        string            `yaml:"metric" json:"metric" desc:"Prometheus metric name."`
-	Labels        map[string]string `yaml:"labels" json:"labels" desc:"Label selector; all specified labels must match and select exactly one time series."`
+	Labels        map[string]string `yaml:"labels" json:"labels" desc:"Label selector; all specified labels must match exactly."`
+	LabelPatterns map[string]string `yaml:"labelPatterns" json:"labelPatterns" desc:"Label selector with regex values; each pattern must match the whole label value."`
+	Aggregate     AggregateMode     `yaml:"aggregate" json:"aggregate" desc:"How matching series are combined: 'single' (exactly one series), 'sum' (sum of all series) or 'each' (every series must pass)."`
 	Mode          AssertionMode     `yaml:"mode" json:"mode" desc:"Evaluation mode: 'value' (current value) or 'delta' (change since baseline)."`
 	Operator      Operator          `yaml:"operator" json:"operator" desc:"Comparison operator: eq, neq, gt, gte, lt, lte."`
 	Value         float64           `yaml:"value" json:"value" desc:"Expected value for comparison."`
 	MissingMetric *MissingBehavior  `yaml:"missingMetric" json:"missingMetric,omitempty" desc:"Override global missingMetric behavior for this assertion."`
 	MissingSeries *MissingBehavior  `yaml:"missingSeries" json:"missingSeries,omitempty" desc:"Override global missingSeries behavior for this assertion."`
+
+	labelRegexps map[string]*regexp.Regexp
 }
 
 // Config holds the task configuration for scraping a Prometheus metrics endpoint
@@ -138,7 +153,9 @@ func (c *Config) Validate() error {
 	// Validate assertions and check for duplicate names
 	seenNames := make(map[string]bool, len(c.Assertions))
 
-	for i, a := range c.Assertions {
+	for i := range c.Assertions {
+		a := &c.Assertions[i]
+
 		if a.Name == "" {
 			return fmt.Errorf("assertion[%d]: name is required", i)
 		}
@@ -160,6 +177,23 @@ func (c *Config) Validate() error {
 		if err := validateOperator(a.Operator); err != nil {
 			return fmt.Errorf("assertion[%d] %q: %w", i, a.Name, err)
 		}
+
+		if err := validateAggregate(a.Aggregate); err != nil {
+			return fmt.Errorf("assertion[%d] %q: %w", i, a.Name, err)
+		}
+
+		labelRegexps := make(map[string]*regexp.Regexp, len(a.LabelPatterns))
+
+		for label, pattern := range a.LabelPatterns {
+			re, err := regexp.Compile("^(?:" + pattern + ")$")
+			if err != nil {
+				return fmt.Errorf("assertion[%d] %q: invalid labelPatterns[%s]: %w", i, a.Name, label, err)
+			}
+
+			labelRegexps[label] = re
+		}
+
+		a.labelRegexps = labelRegexps
 
 		if a.MissingMetric != nil {
 			if err := validateMissingBehavior(*a.MissingMetric); err != nil {
@@ -218,6 +252,15 @@ func validateMode(m AssertionMode) error {
 		return nil
 	default:
 		return fmt.Errorf("invalid mode %q, must be one of: value, delta", m)
+	}
+}
+
+func validateAggregate(m AggregateMode) error {
+	switch m {
+	case AggregateModeSingle, AggregateModeSum, AggregateModeEach, "":
+		return nil
+	default:
+		return fmt.Errorf("invalid aggregate %q, must be one of: single, sum, each", m)
 	}
 }
 
