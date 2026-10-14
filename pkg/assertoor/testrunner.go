@@ -412,6 +412,30 @@ func (c *TestRunner) RunTestCleanup(ctx context.Context, retentionTime time.Dura
 	}
 }
 
-func (c *TestRunner) cleanupTestHistory(_ time.Duration) {
-	// TODO: clean db
+// cleanupTestHistory evicts finished test runs from testRunMap once they are
+// older than retentionTime. Runs that are still pending or running are never
+// touched. Evicting a run here only drops the in-memory reference (and
+// everything it pins: its scheduler, task states, buffered loggers); the
+// persisted result stays in the database and is served from there via
+// test.WrapDBTestRun once the run is no longer in testRunMap.
+func (c *TestRunner) cleanupTestHistory(retentionTime time.Duration) {
+	cutoff := time.Now().Add(-retentionTime)
+
+	c.testRegistryMutex.Lock()
+	defer c.testRegistryMutex.Unlock()
+
+	for runID, testRef := range c.testRunMap {
+		switch testRef.Status() {
+		case types.TestStatusSuccess, types.TestStatusFailure, types.TestStatusAborted, types.TestStatusSkipped:
+		default:
+			continue
+		}
+
+		stopTime := testRef.StopTime()
+		if stopTime.IsZero() || stopTime.After(cutoff) {
+			continue
+		}
+
+		delete(c.testRunMap, runID)
+	}
 }
