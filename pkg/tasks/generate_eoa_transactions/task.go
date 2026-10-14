@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -153,9 +154,9 @@ func (t *Task) Execute(ctx context.Context) error {
 	perBlockCount := 0
 	totalCount := 0
 
-	sucessCount := 0
-	revertCount := 0
-	unknownCount := 0
+	// these counters are incremented from per-transaction receipt callbacks that
+	// run in their own goroutines, so they must be updated atomically.
+	var sucessCount, revertCount, unknownCount atomic.Int64
 
 	t.ctx.ReportProgress(0, "Generating EOA transactions...")
 
@@ -183,18 +184,18 @@ func (t *Task) Execute(ctx context.Context) error {
 				t.logger.Infof("transaction %v confirmed in block %v (nonce: %v, status: %v)", tx.Hash().Hex(), receipt.BlockNumber, tx.Nonce(), receipt.Status)
 
 				if receipt.Status == 0 {
-					revertCount++
+					revertCount.Add(1)
 				} else {
-					sucessCount++
+					sucessCount.Add(1)
 				}
 			case err != nil:
 				t.logger.Errorf("error awaiting transaction receipt: %v", err.Error())
 
-				unknownCount++
+				unknownCount.Add(1)
 			default:
 				t.logger.Warnf("no receipt for transaction: %v (maybe replaced?)", tx.Hash().Hex())
 
-				unknownCount++
+				unknownCount.Add(1)
 			}
 
 			pendingWaitGroup.Done()
@@ -243,18 +244,25 @@ func (t *Task) Execute(ctx context.Context) error {
 		}
 	}
 
-	if t.config.AwaitReceipt {
+	// wait for the receipt callbacks whenever the result depends on their counts,
+	// otherwise the verdict below would read zeroed counters before the receipts
+	// arrive and report success even if every transaction reverted.
+	if awaitReceiptsRequired(t.config) {
 		pendingWaitGroup.Wait()
 	}
 
-	t.logger.Infof("seding complete, total sent: %v, success: %v, reverted: %v, unknown: %v, pending: %v", totalCount, sucessCount, revertCount, unknownCount, totalCount-(sucessCount+revertCount+unknownCount))
+	successTotal := sucessCount.Load()
+	revertTotal := revertCount.Load()
+	unknownTotal := unknownCount.Load()
+
+	t.logger.Infof("seding complete, total sent: %v, success: %v, reverted: %v, unknown: %v, pending: %v", totalCount, successTotal, revertTotal, unknownTotal, int64(totalCount)-(successTotal+revertTotal+unknownTotal))
 
 	switch {
-	case t.config.FailOnSuccess && sucessCount > 0:
-		t.logger.Infof("set task result to failed, %v transactions succeeded unexpectedly (FailOnSuccess)", sucessCount)
+	case t.config.FailOnSuccess && successTotal > 0:
+		t.logger.Infof("set task result to failed, %v transactions succeeded unexpectedly (FailOnSuccess)", successTotal)
 		t.ctx.SetResult(types.TaskResultFailure)
-	case t.config.FailOnReject && revertCount > 0:
-		t.logger.Infof("set task result to failed, %v transactions reverted unexpectedly (FailOnReject)", revertCount)
+	case t.config.FailOnReject && revertTotal > 0:
+		t.logger.Infof("set task result to failed, %v transactions reverted unexpectedly (FailOnReject)", revertTotal)
 		t.ctx.SetResult(types.TaskResultFailure)
 	case totalCount == 0:
 		t.logger.Infof("set task result to failed, no transactions sent")
@@ -262,6 +270,14 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// awaitReceiptsRequired reports whether the task must wait for the per-transaction
+// receipt callbacks before evaluating its result. failOnReject and failOnSuccess
+// derive the result from the receipt counts, so they require the wait even when
+// awaitReceipt is not set on its own.
+func awaitReceiptsRequired(cfg Config) bool {
+	return cfg.AwaitReceipt || cfg.FailOnReject || cfg.FailOnSuccess
 }
 
 // generateTransaction builds and submits a single transaction.
