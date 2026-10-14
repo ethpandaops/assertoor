@@ -37,6 +37,9 @@ The `check_consensus_attestation_stats` task is designed to monitor attestation 
 - **`continueOnPass`**:\
   If set to `true`, the task continues monitoring attestation statistics even after the criteria are met. This is useful for long-running monitoring scenarios. If `false` (default), the task exits immediately on success.
 
+- **`validatorNamePattern`**:\
+  A regex that restricts the check to validators whose names match, e.g. `^2-` for the validators of one client pair. Percentages are then relative to the matching validators only. Combine with `run_task_matrix` over `validatorPairNames` to check every client pair separately. Default: `""` (all validators).
+
 ### Defaults
 
 These are the default settings for the `check_consensus_attestation_stats` task:
@@ -53,6 +56,7 @@ These are the default settings for the `check_consensus_attestation_stats` task:
     failOnCheckMiss: false
     minCheckedEpochs: 1
     continueOnPass: false
+    validatorNamePattern: ""
 ```
 
 ### Outputs

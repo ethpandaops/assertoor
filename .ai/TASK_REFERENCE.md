@@ -410,6 +410,7 @@ Monitors attestation statistics per epoch.
 | `failOnCheckMiss` | bool | false | Fail on condition miss |
 | `minCheckedEpochs` | uint64 | 1 | Min epochs to check first |
 | `continueOnPass` | bool | false | Keep monitoring |
+| `validatorNamePattern` | string | "" | Regex to restrict the check to matching validators |
 
 **Outputs:**
 | Variable | Type | Description |
