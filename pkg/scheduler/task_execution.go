@@ -19,8 +19,10 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 
 	taskLogger := taskState.logger.GetLogger()
 
-	// check if task has already been started/executed
+	// check if the task has already been started/executed, and mark it started
+	taskState.resultMutex.Lock()
 	if taskState.isStarted {
+		taskState.resultMutex.Unlock()
 		return fmt.Errorf("task has already been executed")
 	}
 
@@ -30,20 +32,26 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 	taskState.taskStatusVars.SetVar("started", true)
 	taskState.taskStatusVars.SetVar("running", true)
 
-	if err := taskState.updateTaskState(); err != nil {
-		taskLogger.Errorf("task state update on db failed: %v", err)
+	updateErr := taskState.updateTaskStateLocked()
+	taskState.resultMutex.Unlock()
+
+	if updateErr != nil {
+		taskLogger.Errorf("task state update on db failed: %v", updateErr)
 	}
 
 	// emit task started event
 	ts.emitTaskStarted(taskState)
 
 	defer func() {
+		taskState.resultMutex.Lock()
 		taskState.isRunning = false
 		taskState.stopTime = time.Now()
 		taskState.taskStatusVars.SetVar("running", false)
+		updateErr := taskState.updateTaskStateLocked()
+		taskState.resultMutex.Unlock()
 
-		if err := taskState.updateTaskState(); err != nil {
-			taskLogger.Errorf("task state update on db failed: %v", err)
+		if updateErr != nil {
+			taskLogger.Errorf("task state update on db failed: %v", updateErr)
 		}
 
 		taskState.logger.Flush()
@@ -67,7 +75,9 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 		if !isValid {
 			taskLogger.Infof("task condition not met, skipping task")
 
+			taskState.resultMutex.Lock()
 			taskState.isSkipped = true
+			taskState.resultMutex.Unlock()
 			taskState.setTaskResult(types.TaskResultNone, false)
 
 			return nil
@@ -136,7 +146,9 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 		go func() {
 			select {
 			case <-time.After(taskTimeout):
+				taskState.resultMutex.Lock()
 				taskState.isTimeout = true
+				taskState.resultMutex.Unlock()
 				taskState.taskStatusVars.SetVar("timeout", true)
 
 				taskLogger.Warnf("task timed out")
@@ -152,7 +164,9 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 		if r := recover(); r != nil {
 			pErr, ok := r.(error)
 			if ok {
+				taskState.resultMutex.Lock()
 				taskState.taskError = pErr
+				taskState.resultMutex.Unlock()
 			}
 
 			taskLogger.Errorf("task execution panic: %v, stack: %v", r, string(debug.Stack()))
@@ -172,9 +186,11 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 	if err != nil {
 		taskLogger.Errorf("task execution returned error: %v", err)
 
+		taskState.resultMutex.Lock()
 		if taskState.taskError == nil {
 			taskState.taskError = err
 		}
+		taskState.resultMutex.Unlock()
 	}
 
 	// Persist the shared test-result file (if any task in this run wrote
@@ -187,20 +203,30 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 	}
 
 	// set task result
-	if !taskState.updatedResult || taskState.taskResult == types.TaskResultNone {
+	taskState.resultMutex.RLock()
+	resultUnset := !taskState.updatedResult || taskState.taskResult == types.TaskResultNone
+	timedOut := taskState.isTimeout
+	taskState.resultMutex.RUnlock()
+
+	if resultUnset {
 		// set task result if not already done by task
-		if taskState.isTimeout || err != nil {
+		if timedOut || err != nil {
 			taskState.setTaskResult(types.TaskResultFailure, false)
 		} else {
 			taskState.setTaskResult(types.TaskResultSuccess, false)
 		}
 	}
 
-	if taskState.taskResult == types.TaskResultFailure {
-		taskLogger.Warnf("task failed with failure result: %v", taskState.taskError)
+	taskState.resultMutex.RLock()
+	finalResult := taskState.taskResult
+	finalError := taskState.taskError
+	taskState.resultMutex.RUnlock()
+
+	if finalResult == types.TaskResultFailure {
+		taskLogger.Warnf("task failed with failure result: %v", finalError)
 		ts.emitTaskFailed(taskState)
 
-		return fmt.Errorf("task failed: %w", taskState.taskError)
+		return fmt.Errorf("task failed: %w", finalError)
 	}
 
 	taskLogger.Infof("task completed")

@@ -172,7 +172,10 @@ func (ts *TaskScheduler) newTaskState(options *types.TaskOptions, parentState *t
 	return taskState, nil
 }
 
-func (ts *taskState) updateTaskState() error {
+// updateTaskStateLocked persists the current task state to the database.
+// The caller must hold resultMutex: this method reads the volatile lifecycle
+// fields and mutates dbTaskState.
+func (ts *taskState) updateTaskStateLocked() error {
 	if ts.dbTaskState == nil {
 		return nil
 	}
@@ -289,7 +292,7 @@ func (ts *taskState) setTaskResult(result types.TaskResult, setUpdated bool) {
 	ts.taskResult = result
 	ts.taskStatusVars.SetVar("result", uint8(result))
 
-	if err := ts.updateTaskState(); err != nil {
+	if err := ts.updateTaskStateLocked(); err != nil {
 		ts.logger.GetLogger().Errorf("failed to update task state in db: %v", err)
 	}
 
@@ -300,6 +303,9 @@ func (ts *taskState) setTaskResult(result types.TaskResult, setUpdated bool) {
 }
 
 func (ts *taskState) GetTaskStatus() *types.TaskStatus {
+	ts.resultMutex.RLock()
+	defer ts.resultMutex.RUnlock()
+
 	taskStatus := &types.TaskStatus{
 		Index:           ts.index,
 		ParentIndex:     0,
@@ -350,8 +356,8 @@ func (ts *taskState) GetScopeOwner() types.TaskIndex {
 }
 
 func (ts *taskState) GetTaskResultUpdateChan(oldResult types.TaskResult) <-chan bool {
-	ts.resultMutex.RLock()
-	defer ts.resultMutex.RUnlock()
+	ts.resultMutex.Lock()
+	defer ts.resultMutex.Unlock()
 
 	if ts.taskResult != oldResult {
 		return nil
