@@ -46,6 +46,7 @@ import (
 	runcommand "github.com/ethpandaops/assertoor/pkg/tasks/run_command"
 	runexternaltasks "github.com/ethpandaops/assertoor/pkg/tasks/run_external_tasks"
 	runjavascript "github.com/ethpandaops/assertoor/pkg/tasks/run_javascript"
+	runnetworkdisruption "github.com/ethpandaops/assertoor/pkg/tasks/run_network_disruption"
 	runshell "github.com/ethpandaops/assertoor/pkg/tasks/run_shell"
 	runspamoorscenario "github.com/ethpandaops/assertoor/pkg/tasks/run_spamoor_scenario"
 	runtaskbackground "github.com/ethpandaops/assertoor/pkg/tasks/run_task_background"
@@ -102,6 +103,7 @@ var AvailableTaskDescriptors = []*types.TaskDescriptor{
 	runcommand.TaskDescriptor,
 	runexternaltasks.TaskDescriptor,
 	runjavascript.TaskDescriptor,
+	runnetworkdisruption.TaskDescriptor,
 	runshell.TaskDescriptor,
 	runspamoorscenario.TaskDescriptor,
 	runtaskbackground.TaskDescriptor,
