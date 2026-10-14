@@ -45,7 +45,23 @@ func NewSpamoor(ctx context.Context, logger logrus.FieldLogger, executionPool *e
 		return nil, err
 	}
 
-	for i, client := range clientPool.GetAllClients() {
+	// InitClients skips options it could not turn into a client, so a short
+	// list would silently pair every later endpoint with another endpoint's
+	// client — wiring transactions to the wrong node and checking the wrong
+	// endpoint's groups. A client only fails to build on a malformed rpchost,
+	// which is a config error worth stopping for.
+	spamoorClients := clientPool.GetAllClients()
+	if len(spamoorClients) != len(endpoints) {
+		return nil, fmt.Errorf("spamoor initialized %d of %d execution endpoints; "+
+			"check the endpoint configuration (executionGroups, headers)",
+			len(spamoorClients), len(endpoints))
+	}
+
+	for i, client := range spamoorClients {
+		if groupErr := verifyClientGroups(endpoints[i].GetEndpointConfig(), client); groupErr != nil {
+			return nil, groupErr
+		}
+
 		s.clients[endpoints[i]] = client
 	}
 
@@ -93,6 +109,10 @@ func NewSpamoor(ctx context.Context, logger logrus.FieldLogger, executionPool *e
 func (s *Spamoor) getClientOptions(client *execution.Client) *spamoor.ClientOptions {
 	rpcURL := client.GetEndpointConfig().URL
 	rpcURL = fmt.Sprintf("name(%s)%s", client.GetName(), rpcURL)
+
+	if groups := normalizedGroups(client.GetEndpointConfig()); len(groups) > 0 {
+		rpcURL = fmt.Sprintf("group(%s)%s", strings.Join(groups, ","), rpcURL)
+	}
 
 	if headers := client.GetEndpointConfig().Headers; len(headers) > 0 {
 		headerParts := make([]string, 0, len(headers))
@@ -268,4 +288,50 @@ func (s *Spamoor) NewWalletPoolByPrivkey(ctx context.Context, logger logrus.Fiel
 	walletPool := spamoor.NewWalletPool(ctx, logger, rootWallet, s.clientPool, s.txpool)
 
 	return walletPool, nil
+}
+
+// verifyClientGroups checks that spamoor applied the endpoint's configured
+// client groups. Group membership decides which scenarios reach an endpoint,
+// so a silently ignored entry would send transactions somewhere the operator
+// deliberately excluded. A "-name" entry (removing a group, e.g. "-default"
+// to keep an endpoint out of the group-less selections) needs a spamoor
+// version that supports removal; older versions treat it as a literal group
+// name, which this check turns into a startup error instead of a surprise.
+func verifyClientGroups(config *execution.ClientConfig, client *spamoor.Client) error {
+	for _, group := range normalizedGroups(config) {
+		if remove, found := strings.CutPrefix(group, "-"); found {
+			if client.HasGroup(remove) {
+				return fmt.Errorf(
+					"endpoint %q: executionGroups asked to remove client group %q but the client is still in it "+
+						"(the linked spamoor does not support group removal)",
+					config.Name, remove)
+			}
+
+			continue
+		}
+
+		if !client.HasGroup(group) {
+			return fmt.Errorf("endpoint %q: executionGroups requested client group %q but the client is not in it",
+				config.Name, group)
+		}
+	}
+
+	return nil
+}
+
+// normalizedGroups trims the endpoint's configured client groups and drops
+// empty entries, matching what spamoor's own group(...) parser does. Without
+// it a stray space makes the two disagree: spamoor applies the trimmed name
+// while the check compares the raw one, which both fails startup spuriously
+// on an added group and, worse, passes a removal that never took effect.
+func normalizedGroups(config *execution.ClientConfig) []string {
+	groups := make([]string, 0, len(config.Groups))
+
+	for _, group := range config.Groups {
+		if group = strings.TrimSpace(group); group != "" {
+			groups = append(groups, group)
+		}
+	}
+
+	return groups
 }

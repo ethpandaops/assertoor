@@ -1,0 +1,168 @@
+id: buildoor-testing-build
+name: "buildoor testing build: planned transactions land on chain exactly"
+description: |
+  Switches a buildoor to its testing build source (blocks built from the
+  builder's private tx intake through geth's testing_buildBlockV1), feeds the
+  intake with a spamoor scenario, and requires that every buildoor block after
+  the switch verified as an exact tx plan match: same transactions, same
+  order, same count. A single mismatch, missed payload or unknown block fails
+  the test.
+
+  Endpoint setup. While the builder is on the testing source its blocks are
+  the ONLY way a transaction gets included: anything sent to a normal EL sits
+  in the public txpool forever, because buildoor builds solely from its
+  intake. That includes spamoor's own wallet funding and refills, which use
+  the group-less "default" selection rather than this scenario's client_group.
+
+  So every endpoint spamoor may pick must be the intake. The simple form is to
+  give this playbook a config where the intake is the only execution endpoint
+  (it proxies all reads to the EL, so the client checks still work). It still
+  needs the group this test's clientGroup names, since a scenario selecting a
+  group no client is in gets no client at all:
+
+    endpoints:
+      - name: buildoor-intake
+        executionUrl: http://buildoor:8080/rpc
+        consensusUrl: http://beacon:5052
+        executionGroups: [builder]
+
+  With several execution endpoints, keep the intake in "default" and take the
+  others out of it, so the scenario reaches every node it needs while funding
+  can only land somewhere that gets built (needs a spamoor with group removal,
+  ethpandaops/spamoor#283):
+
+    endpoints:
+      - name: buildoor-intake
+        executionUrl: http://buildoor:8080/rpc
+        consensusUrl: http://beacon:5052
+        executionGroups: [builder]
+      - name: node-2
+        executionUrl: http://node2:8545
+        consensusUrl: http://beacon2:5052
+        executionGroups: ["-default"]
+
+  The buildoor geth must serve the testing namespace (--http.api ...,testing).
+version: 1.0.0
+tags: [buildoor, epbs, load, testing-build]
+timeout: 30m
+config:
+  buildoorUrl: "http://buildoor:8080"
+  spamoorPrivkey: ""
+  clientGroup: "builder"
+  minVerifiedBlocks: 6
+  minTxsPerBlock: 20
+  throughput: 300
+  baseFeeGwei: 100
+  # spamoor's scenarioYaml takes these in WEI (the --refill-* CLI flags take
+  # ETH, the YAML fields do not). Too small and the wallets are "funded" with
+  # dust, pass the balance check, and every transaction is then skipped for
+  # insufficient funds.
+  # Quoted: jq evaluates configVars as float64, so an unquoted 5e19 reaches
+  # spamoor as "5e+19" and fails its uint256 parse.
+  refillAmountWei: "50000000000000000000"   # 50 ETH
+  refillBalanceWei: "10000000000000000000"  # 10 ETH
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+- name: check_http_json
+  title: "Switch buildoor to the testing build source"
+  timeout: 1m
+  configVars:
+    url: ".buildoorUrl + \"/api/config/testing\""
+  config:
+    method: POST
+    body:
+      source: testing
+      fill_gas_pct: 100
+      policy: fifo
+    expectStatus: 200
+    failOnCheckMiss: true
+    assertions:
+      - name: updated
+        query: ".status"
+        operator: eq
+        value: "updated"
+
+- name: run_task_background
+  title: "Feed the intake and verify buildoor's blocks"
+  config:
+    onBackgroundComplete: fail
+    backgroundTask:
+      name: run_spamoor_scenario
+      title: "spamoor eoatx into the builder intake"
+      configVars:
+        privateKey: "spamoorPrivkey"
+        scenarioYaml: ". as $v | {throughput: $v.throughput, max_pending: ($v.throughput * 10), max_wallets: 30, base_fee: $v.baseFeeGwei, tip_fee: 2, refill_amount: $v.refillAmountWei, refill_balance: $v.refillBalanceWei, rebroadcast: 30, client_group: $v.clientGroup}"
+      config:
+        scenarioName: eoatx
+    foregroundTask:
+      name: run_tasks
+      title: "Verify"
+      config:
+        tasks:
+        - name: check_consensus_block_proposals
+          title: "buildoor proposes ${minVerifiedBlocks} blocks with >= ${minTxsPerBlock} transactions"
+          timeout: 20m
+          configVars:
+            blockCount: "minVerifiedBlocks"
+            minTransactionCount: "minTxsPerBlock"
+          config:
+            checkLookback: 64
+            extraDataPattern: "^buildoor"
+
+        # Two checks on purpose. The tally lags the proposals it counts (the
+        # verifier fetches the block from the EL after inclusion), and an
+        # unsatisfied assertion is a FAILURE rather than a wait under
+        # failOnCheckMiss - so the count is polled without it, and only the
+        # must-be-zero counters fail fast.
+        - name: check_http_json
+          title: "Wait for ${minVerifiedBlocks} verified tx plans"
+          timeout: 5m
+          configVars:
+            url: ".buildoorUrl + \"/api/buildoor/tx-queue\""
+            assertions: >-
+              . as $v | [
+                {name: "enough-matches", query: ".plan_checks.match", operator: "gte", value: $v.minVerifiedBlocks}
+              ]
+          config:
+            pollInterval: 5s
+
+        - name: check_http_json
+          title: "No tx plan was mismatched, missed or unverifiable"
+          timeout: 1m
+          configVars:
+            url: ".buildoorUrl + \"/api/buildoor/tx-queue\""
+            # Cumulative counters, so this covers the whole run, not just now.
+            # Leading "." matters: assertoor prepends one to a configVars
+            # expression that lacks it, turning a bare [..] into an index.
+            assertions: >-
+              . | [
+                {name: "no-mismatch", query: ".plan_checks.mismatch", operator: "eq", value: 0},
+                {name: "no-missing-blocks", query: ".plan_checks.block_not_found", operator: "eq", value: 0},
+                {name: "no-missed-payloads", query: ".plan_checks.missed", operator: "eq", value: 0}
+              ]
+          config:
+            failOnCheckMiss: true
+
+        - name: check_consensus_forks
+          title: "No forks"
+          timeout: 1m
+          config:
+            minCheckEpochCount: 1
+            maxForkDistance: 1
+
+cleanupTasks:
+- name: check_http_json
+  title: "Switch buildoor back to the pool build source"
+  timeout: 1m
+  configVars:
+    url: ".buildoorUrl + \"/api/config/testing\""
+  config:
+    method: POST
+    body:
+      source: pool
+    expectStatus: 200

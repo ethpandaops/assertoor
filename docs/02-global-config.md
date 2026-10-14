@@ -25,6 +25,20 @@ endpoints:
   - name: "node-1"
     executionUrl: "http://127.0.0.1:8545"
     consensusUrl: "http://127.0.0.1:5052"
+  # executionGroups puts an endpoint in spamoor client groups, so a scenario
+  # can direct its transactions at it with its client_group option.
+  #
+  # Membership is ADDITIVE: every endpoint is in "default", which is also the
+  # group used by every selection that names none - wallet funding and
+  # refills, contract deployments, and scenarios without client_group. Naming
+  # a group does not stop that traffic. Add "-default" to reserve an endpoint
+  # for the scenarios that ask for it, e.g. a builder's private tx intake that
+  # must hold only one scenario's transactions. Removal needs a spamoor
+  # version that supports it; assertoor fails at startup if it is ignored.
+  - name: "buildoor-intake"
+    executionUrl: "http://127.0.0.1:8085/rpc"
+    consensusUrl: "http://127.0.0.1:5052"
+    executionGroups: ["builder", "-default"]
 
 validatorNames:
   inventoryYaml: "./validator-names.yaml"
