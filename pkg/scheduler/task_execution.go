@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime/debug"
 	"time"
@@ -168,7 +169,7 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 	// execute task
 	taskLogger.Infof("starting task")
 
-	err = task.Execute(taskContext)
+	err = timeoutError(taskState, task.Execute(taskContext))
 	if err != nil {
 		taskLogger.Errorf("task execution returned error: %v", err)
 
@@ -207,6 +208,23 @@ func (ts *TaskScheduler) ExecuteTask(ctx context.Context, taskIndex types.TaskIn
 	ts.emitTaskCompleted(taskState)
 
 	return nil
+}
+
+func timeoutError(taskState *taskState, err error) error {
+	if !taskState.isTimeout && !errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+
+	if !errors.Is(err, context.DeadlineExceeded) {
+		err = fmt.Errorf("task timed out: %w", context.DeadlineExceeded)
+	}
+
+	lastStatus := taskState.GetProgressMessage()
+	if lastStatus == "" {
+		return err
+	}
+
+	return fmt.Errorf("%w, last status: %s", err, lastStatus)
 }
 
 func (ts *TaskScheduler) emitTaskStarted(taskState *taskState) {
