@@ -13,6 +13,7 @@ import (
 	"github.com/ethpandaops/assertoor/pkg/types"
 	v1 "github.com/ethpandaops/go-eth2-client/api/v1"
 	"github.com/ethpandaops/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec/all"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
@@ -346,7 +347,7 @@ func (t *Task) generateSlashing(ctx context.Context, accountIdx uint64, forkStat
 		return 0, fmt.Errorf("validator %v is not active", validator.Index)
 	}
 
-	var attesterSlashing *phase0.AttesterSlashing
+	var attesterSlashing *spec.VersionedAttesterSlashing
 
 	var proposerSlashing *phase0.ProposerSlashing
 
@@ -410,7 +411,7 @@ func (t *Task) mnemonicToSeed(mnemonic string) (seed []byte, err error) {
 	return bip39.NewSeed(mnemonic, ""), nil
 }
 
-func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validatorKey *e2types.BLSPrivateKey, forkState *phase0.Fork) (*phase0.AttesterSlashing, error) {
+func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validatorKey *e2types.BLSPrivateKey, forkState *phase0.Fork) (*spec.VersionedAttesterSlashing, error) {
 	// surround attester slashing case:
 	// different target, different source
 	// source1 < source 2
@@ -493,21 +494,26 @@ func (t *Task) generateSurroundAttesterSlashing(validatorIndex uint64, validator
 	signingRoot2 := common.ComputeSigningRoot(msgRoot2, dom)
 	sig2 := secKey.SignHash(signingRoot2[:])
 
-	att1 := &phase0.IndexedAttestation{
-		AttestingIndices: []uint64{validatorIndex},
-		Data:             attestationData1,
-		Signature:        phase0.BLSSignature(sig1.Serialize()),
-	}
-	att2 := &phase0.IndexedAttestation{
-		AttestingIndices: []uint64{validatorIndex},
-		Data:             attestationData2,
-		Signature:        phase0.BLSSignature(sig2.Serialize()),
-	}
+	// all.AttesterSlashing is fork-agnostic: ToVersioned selects the arm the
+	// fork requires, and go-eth2-client derives the Eth-Consensus-Version
+	// header from the same version. No fork-specific types here.
+	version := specs.DataVersionAtSlot(phase0.Slot(slot1))
 
-	return &phase0.AttesterSlashing{
-		Attestation1: att1,
-		Attestation2: att2,
-	}, nil
+	return (&all.AttesterSlashing{
+		Version: version,
+		Attestation1: &all.IndexedAttestation{
+			Version:          version,
+			AttestingIndices: []uint64{validatorIndex},
+			Data:             attestationData1,
+			Signature:        phase0.BLSSignature(sig1.Serialize()),
+		},
+		Attestation2: &all.IndexedAttestation{
+			Version:          version,
+			AttestingIndices: []uint64{validatorIndex},
+			Data:             attestationData2,
+			Signature:        phase0.BLSSignature(sig2.Serialize()),
+		},
+	}).ToVersioned()
 }
 
 func (t *Task) generateProposerSlashing(validatorIndex uint64, validatorKey *e2types.BLSPrivateKey, forkState *phase0.Fork) (*phase0.ProposerSlashing, error) {
