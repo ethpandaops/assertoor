@@ -23,11 +23,19 @@ type TaskScheduler struct {
 	rootTasks        []types.TaskIndex
 	allCleanupTasks  []types.TaskIndex
 	rootCleanupTasks []types.TaskIndex
-	testRunCtx       context.Context
 	taskStateMutex   sync.RWMutex
 	taskStateMap     map[types.TaskIndex]*taskState
-	cancelTaskCtx    context.CancelFunc
-	cancelCleanupCtx context.CancelFunc
+
+	// runCtxMutex guards testRunCtx, cancelTaskCtx, cancelCleanupCtx, and the
+	// pending-cancel flags below. RunTasks (the test worker goroutine) writes
+	// them; CancelTasks (an HTTP abort handler) and GetTestRunCtx (task
+	// goroutines) read them from other goroutines.
+	runCtxMutex            sync.Mutex
+	testRunCtx             context.Context
+	cancelTaskCtx          context.CancelFunc
+	cancelCleanupCtx       context.CancelFunc
+	cancelRequested        bool
+	cancelRequestedCleanup bool
 
 	testResultMutex sync.Mutex
 	testResultDir   string
@@ -56,6 +64,9 @@ func (ts *TaskScheduler) GetTestRunID() uint64 {
 }
 
 func (ts *TaskScheduler) GetTestRunCtx() context.Context {
+	ts.runCtxMutex.Lock()
+	defer ts.runCtxMutex.Unlock()
+
 	return ts.testRunCtx
 }
 
@@ -167,11 +178,9 @@ func (ts *TaskScheduler) AddCleanupTask(options *types.TaskOptions) (types.TaskI
 func (ts *TaskScheduler) RunTasks(testRunCtx context.Context, timeout time.Duration) error {
 	var cleanupCtx, tasksCtx context.Context
 
+	ts.runCtxMutex.Lock()
+
 	cleanupCtx, ts.cancelCleanupCtx = context.WithCancel(testRunCtx)
-
-	defer ts.cleanupTestResult()
-	defer ts.runCleanupTasks(cleanupCtx)
-
 	ts.testRunCtx = testRunCtx
 
 	if timeout > 0 {
@@ -180,7 +189,27 @@ func (ts *TaskScheduler) RunTasks(testRunCtx context.Context, timeout time.Durat
 		tasksCtx, ts.cancelTaskCtx = context.WithCancel(testRunCtx)
 	}
 
-	defer ts.cancelTaskCtx()
+	cancelTaskCtx, cancelCleanupCtx := ts.cancelTaskCtx, ts.cancelCleanupCtx
+	cancelRequested, cancelRequestedCleanup := ts.cancelRequested, ts.cancelRequestedCleanup
+	ts.cancelRequested, ts.cancelRequestedCleanup = false, false
+
+	ts.runCtxMutex.Unlock()
+
+	defer ts.cleanupTestResult()
+	defer ts.runCleanupTasks(cleanupCtx)
+	defer cancelTaskCtx()
+
+	// Honor an abort that was requested before these contexts existed.
+	// Without this, CancelTasks had nothing to cancel yet and silently
+	// dropped the request, letting every root task run to completion
+	// despite the operator having already asked to stop.
+	if cancelRequested {
+		cancelTaskCtx()
+
+		if cancelRequestedCleanup {
+			cancelCleanupCtx()
+		}
+	}
 
 	for _, task := range ts.rootTasks {
 		err := ts.ExecuteTask(tasksCtx, task, nil)
@@ -211,12 +240,26 @@ func (ts *TaskScheduler) runCleanupTasks(ctx context.Context) {
 }
 
 func (ts *TaskScheduler) CancelTasks(cancelCleanup bool) {
-	if ts.cancelTaskCtx != nil {
-		ts.cancelTaskCtx()
+	ts.runCtxMutex.Lock()
+	defer ts.runCtxMutex.Unlock()
+
+	if ts.cancelTaskCtx == nil {
+		// RunTasks hasn't reached its context setup yet. Record the
+		// request so RunTasks honors it as soon as the contexts exist,
+		// instead of it being silently dropped.
+		ts.cancelRequested = true
 
 		if cancelCleanup {
-			ts.cancelCleanupCtx()
+			ts.cancelRequestedCleanup = true
 		}
+
+		return
+	}
+
+	ts.cancelTaskCtx()
+
+	if cancelCleanup {
+		ts.cancelCleanupCtx()
 	}
 }
 
