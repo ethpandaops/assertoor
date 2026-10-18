@@ -54,6 +54,7 @@ make devnet-run   # Run assertoor against local devnet
 Main config file (YAML):
 - `coordinator` - max concurrent tests, retention
 - `web` - server host/port, API/frontend toggles
+  - `web.frontend.pprof` mounts Go pprof on `/debug/pprof/`. With an `authProviderUrl` it needs the login: a bearer header (tools) or the `assertoor_debug_token` cookie, which the SPA's gate page (`web-ui/src/pages/DebugLogin.tsx`) sets from the session for a browser. Profile downloads are logged with the user; the index page is not.
 - `endpoints` - array of {name, executionUrl, consensusUrl}
 - `validatorNames` - inventory for mapping validator indices to names
 - `globalVars` - variables available to all tests

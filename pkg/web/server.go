@@ -183,15 +183,12 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 	}
 
 	if frontendConfig != nil {
-		if frontendConfig.Pprof {
-			// add pprof handler
-			ws.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
-		}
+		var spaHandler http.Handler
 
 		if frontendConfig.Enabled {
 			// Create SPA handler for React frontend, injecting the runtime
 			// config so the SPA can wire itself to the same authenticatoor.
-			spaHandler, err := handlers.NewSPAHandler(
+			spaHandler, err = handlers.NewSPAHandler(
 				ws.logger.WithField("module", "web-spa"),
 				handlers.RuntimeConfig{
 					AuthProviderURL: webConfig.AuthProviderURL,
@@ -200,7 +197,24 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 			if err != nil {
 				return err
 			}
+		}
 
+		if frontendConfig.Pprof {
+			// pprof registers itself on http.DefaultServeMux via the blank
+			// import above. Profiles need the login (see pprofHandler): a
+			// browser without it gets the SPA, whose gate page hands the
+			// session token over as a cookie. The index lives at the path with
+			// the trailing slash; the bare path is sent there.
+			ws.router.Path(pprofPathPrefix).Handler(http.RedirectHandler(pprofPathPrefix+"/", http.StatusMovedPermanently))
+			ws.router.PathPrefix(pprofPathPrefix + "/").Handler(newPprofHandler(
+				ws.logger.WithField("module", "pprof"),
+				authHandler.CheckAuthToken,
+				spaHandler,
+				http.DefaultServeMux,
+			))
+		}
+
+		if spaHandler != nil {
 			// SPA handles all frontend routes
 			ws.router.PathPrefix("/").Handler(spaHandler)
 		}
