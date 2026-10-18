@@ -53,7 +53,13 @@ func (h *Handler) GetTokenSubject(authHeader, host string) string {
 		return ""
 	}
 
-	token := h.CheckAuthToken(authHeader, host)
+	return TokenSubject(h.CheckAuthToken(authHeader, host))
+}
+
+// TokenSubject extracts the user identity (email, else subject) from a
+// token returned by CheckAuthToken. Returns "" for a missing or invalid
+// token and for the open-mode sentinel, which carries no identity.
+func TokenSubject(token *jwt.Token) string {
 	if token == nil || !token.Valid {
 		return ""
 	}

@@ -12,6 +12,7 @@ const TestPage = lazy(() => import(/* webpackChunkName: "page-test" */ './pages/
 const Clients = lazy(() => import(/* webpackChunkName: "page-clients" */ './pages/Clients'));
 const TestBuilder = lazy(() => import(/* webpackChunkName: "page-builder" */ './pages/TestBuilder'));
 const ApiDocs = lazy(() => import(/* webpackChunkName: "page-api-docs" */ './pages/ApiDocs'));
+const DebugLogin = lazy(() => import(/* webpackChunkName: "page-debug-login" */ './pages/DebugLogin'));
 
 function PageLoader() {
   return (
@@ -87,6 +88,16 @@ function App() {
             element={
               <Suspense fallback={<PageLoader />}>
                 <ApiDocs />
+              </Suspense>
+            }
+          />
+          {/* Login gate of the server's /debug/pprof pages (served here to a
+              browser without the login cookie); not in the nav. */}
+          <Route
+            path="debug/pprof/*"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <DebugLogin />
               </Suspense>
             }
           />
