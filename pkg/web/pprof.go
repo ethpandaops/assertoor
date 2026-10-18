@@ -16,7 +16,7 @@ const pprofPathPrefix = "/debug/pprof"
 // browser. The web UI's gate page sets it from the session, scoped to
 // pprofPathPrefix, SameSite=Strict and expiring with the token (at the
 // latest after 30 minutes); see web-ui/src/pages/DebugLogin.tsx.
-const debugTokenCookie = "assertoor_debug_token"
+const debugTokenCookie = "assertoor_debug_token" //nolint:gosec // G101: the cookie's name, not a credential
 
 // tokenChecker validates a bearer token (with or without the "Bearer "
 // prefix) for a request bound to host; see auth.Handler.CheckAuthToken.

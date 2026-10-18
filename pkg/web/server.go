@@ -188,15 +188,17 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 		if frontendConfig.Enabled {
 			// Create SPA handler for React frontend, injecting the runtime
 			// config so the SPA can wire itself to the same authenticatoor.
-			spaHandler, err = handlers.NewSPAHandler(
+			spa, spaErr := handlers.NewSPAHandler(
 				ws.logger.WithField("module", "web-spa"),
 				handlers.RuntimeConfig{
 					AuthProviderURL: webConfig.AuthProviderURL,
 				},
 			)
-			if err != nil {
-				return err
+			if spaErr != nil {
+				return spaErr
 			}
+
+			spaHandler = spa
 		}
 
 		if frontendConfig.Pprof {
