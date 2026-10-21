@@ -7,6 +7,8 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -80,6 +82,7 @@ type Task struct {
 
 	// State
 	baselines       map[string]float64
+	seriesBaselines map[string]map[string]float64
 	scrapeCount     int
 	scrapeErrors    int
 	assertionErrors int
@@ -87,10 +90,11 @@ type Task struct {
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
 	return &Task{
-		ctx:       ctx,
-		options:   options,
-		logger:    ctx.Logger.GetLogger(),
-		baselines: make(map[string]float64, 8),
+		ctx:             ctx,
+		options:         options,
+		logger:          ctx.Logger.GetLogger(),
+		baselines:       make(map[string]float64, 8),
+		seriesBaselines: make(map[string]map[string]float64, 8),
 	}, nil
 }
 
@@ -154,6 +158,7 @@ type assertionResult struct {
 	value   float64
 	delta   float64
 	err     error
+	detail  string
 	waiting bool // true if we should keep waiting (missing metric/series with wait behavior)
 }
 
@@ -182,7 +187,7 @@ func (t *Task) runCheck(ctx context.Context) (bool, error) {
 	results := t.evaluateAssertions(metricFamilies)
 
 	// Collect results
-	var passedAssertions, failedAssertions []string
+	var passedAssertions, failedAssertions, failedDetails []string
 
 	var anyWaiting, anyFailed bool
 
@@ -208,6 +213,7 @@ func (t *Task) runCheck(ctx context.Context) (bool, error) {
 			t.assertionErrors++
 
 			failedAssertions = append(failedAssertions, r.name)
+			failedDetails = append(failedDetails, fmt.Sprintf("%s: %v", r.name, r.err))
 			anyFailed = true
 
 			t.logger.Warnf("Assertion %q error: %v", r.name, r.err)
@@ -219,6 +225,7 @@ func (t *Task) runCheck(ctx context.Context) (bool, error) {
 			passedAssertions = append(passedAssertions, r.name)
 		} else {
 			failedAssertions = append(failedAssertions, r.name)
+			failedDetails = append(failedDetails, fmt.Sprintf("%s: %s", r.name, r.detail))
 			anyFailed = true
 		}
 	}
@@ -245,7 +252,14 @@ func (t *Task) runCheck(ctx context.Context) (bool, error) {
 	case anyFailed && t.config.FailOnCheckMiss:
 		t.ctx.SetResult(types.TaskResultFailure)
 
-		return true, fmt.Errorf("assertions failed: %v", failedAssertions)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Assertions failed: %s", strings.Join(failedDetails, "; ")))
+
+		return true, fmt.Errorf("assertions failed: %s", strings.Join(failedDetails, "; "))
+
+	case anyFailed:
+		t.ctx.SetResult(types.TaskResultNone)
+		t.ctx.ReportProgress(0, fmt.Sprintf("Waiting... passed=%d failed=%d waiting=%d, failed: %s (attempt %d)",
+			len(passedAssertions), len(failedAssertions), countWaiting(results), strings.Join(failedDetails, "; "), t.scrapeCount))
 
 	default:
 		t.ctx.SetResult(types.TaskResultNone)
@@ -391,17 +405,21 @@ func (t *Task) evaluateAssertion(a *AssertionConfig, metricFamilies map[string]*
 		missingSeriesBehavior = *a.MissingSeries
 	}
 
+	if a.Aggregate == AggregateModeSum || a.Aggregate == AggregateModeEach {
+		return t.evaluateSeries(a, metricFamilies[a.Metric], missingMetricBehavior, missingSeriesBehavior)
+	}
+
 	// Find the metric family
 	mf, ok := metricFamilies[a.Metric]
 	if !ok {
-		return t.handleMissing(result, missingMetricBehavior, fmt.Sprintf("metric %q not found", a.Metric))
+		return t.handleMissing(&result, missingMetricBehavior, fmt.Sprintf("metric %q not found", a.Metric))
 	}
 
 	// Find matching series
-	value, err := t.findMetricValue(mf, a.Labels)
+	value, err := t.findMetricValue(mf, a.Labels, a.labelRegexps)
 	if err != nil {
 		if strings.Contains(err.Error(), "no matching series") {
-			return t.handleMissing(result, missingSeriesBehavior, err.Error())
+			return t.handleMissing(&result, missingSeriesBehavior, err.Error())
 		}
 
 		result.err = err
@@ -471,13 +489,168 @@ func (t *Task) evaluateAssertion(a *AssertionConfig, metricFamilies map[string]*
 	result.passed = evaluateOperator(a.Operator, compareValue, a.Value)
 
 	if !result.passed {
+		result.detail = fmt.Sprintf("%g (want %s %g)", compareValue, a.Operator, a.Value)
 		t.logger.Debugf("Assertion %q failed: %.4f %s %.4f = false", a.Name, compareValue, a.Operator, a.Value)
 	}
 
 	return result
 }
 
-func (t *Task) handleMissing(result assertionResult, behavior MissingBehavior, message string) assertionResult {
+func (t *Task) evaluateSeries(a *AssertionConfig, mf *dto.MetricFamily, missingMetric, missingSeries MissingBehavior) assertionResult {
+	result := assertionResult{
+		name:  a.Name,
+		value: math.NaN(),
+		delta: math.NaN(),
+	}
+
+	series := make(map[string]float64)
+
+	if mf != nil {
+		for _, m := range mf.GetMetric() {
+			if !matchLabels(m.GetLabel(), a.Labels) || !matchLabelPatterns(m.GetLabel(), a.labelRegexps) {
+				continue
+			}
+
+			key := seriesKey(m.GetLabel())
+
+			value, err := getMetricValue(m, mf.GetType())
+			if err != nil {
+				result.err = fmt.Errorf("failed to extract metric value for {%s}: %w", key, err)
+
+				return result
+			}
+
+			if math.IsNaN(value) || math.IsInf(value, 0) {
+				result.err = fmt.Errorf("metric value is non-finite for {%s}: %v", key, value)
+
+				return result
+			}
+
+			series[key] = value
+		}
+	}
+
+	isDelta := a.Mode == AssertionModeDelta
+
+	baselines, hasBaseline := t.seriesBaselines[a.Name]
+	if isDelta && !hasBaseline {
+		t.seriesBaselines[a.Name] = series
+		t.baselines[a.Name] = sumValues(series)
+		result.waiting = true
+
+		t.logger.Debugf("Assertion %q: recorded baseline for %d series", a.Name, len(series))
+
+		return result
+	}
+
+	if mf == nil {
+		return t.handleMissing(&result, missingMetric, fmt.Sprintf("metric %q not found", a.Metric))
+	}
+
+	if len(series) == 0 {
+		return t.handleMissing(&result, missingSeries, fmt.Sprintf("no matching series for labels %v / patterns %v", a.Labels, a.LabelPatterns))
+	}
+
+	isCounter := mf.GetType() == dto.MetricType_COUNTER
+	compare := make(map[string]float64, len(series))
+
+	for key, value := range series {
+		if !isDelta {
+			compare[key] = value
+
+			continue
+		}
+
+		baseline := baselines[key]
+
+		if isCounter && value < baseline {
+			switch t.config.ResetBehavior {
+			case ResetBehaviorFail:
+				result.err = fmt.Errorf("counter reset detected for {%s}: current %.4f < baseline %.4f", key, value, baseline)
+
+				return result
+			case ResetBehaviorRebaseline:
+				baselines[key] = value
+				baseline = value
+
+				t.logger.Warnf("Assertion %q: counter reset detected for {%s}, rebaselining to %.4f", a.Name, key, value)
+			case ResetBehaviorIgnore:
+				t.logger.Warnf("Assertion %q: counter reset detected for {%s}, ignoring", a.Name, key)
+			}
+		}
+
+		compare[key] = value - baseline
+	}
+
+	total := sumValues(compare)
+
+	if isDelta {
+		result.value = sumValues(series)
+		result.delta = total
+	} else {
+		result.value = total
+	}
+
+	keys := make([]string, 0, len(compare))
+	for key := range compare {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	if a.Aggregate == AggregateModeSum {
+		result.passed = evaluateOperator(a.Operator, total, a.Value)
+
+		if !result.passed {
+			parts := make([]string, 0, len(keys))
+			for _, key := range keys {
+				parts = append(parts, fmt.Sprintf("{%s} %g", key, compare[key]))
+			}
+
+			result.detail = fmt.Sprintf("sum %g (want %s %g): %s", total, a.Operator, a.Value, strings.Join(parts, ", "))
+		}
+
+		return result
+	}
+
+	failing := make([]string, 0)
+
+	for _, key := range keys {
+		if !evaluateOperator(a.Operator, compare[key], a.Value) {
+			failing = append(failing, fmt.Sprintf("{%s} %g", key, compare[key]))
+		}
+	}
+
+	result.passed = len(failing) == 0
+
+	if !result.passed {
+		result.detail = fmt.Sprintf("%d of %d series (want %s %g): %s", len(failing), len(keys), a.Operator, a.Value, strings.Join(failing, ", "))
+	}
+
+	return result
+}
+
+func seriesKey(labels []*dto.LabelPair) string {
+	parts := make([]string, 0, len(labels))
+	for _, lp := range labels {
+		parts = append(parts, fmt.Sprintf("%s=%q", lp.GetName(), lp.GetValue()))
+	}
+
+	sort.Strings(parts)
+
+	return strings.Join(parts, ",")
+}
+
+func sumValues(values map[string]float64) float64 {
+	total := 0.0
+	for _, v := range values {
+		total += v
+	}
+
+	return total
+}
+
+func (t *Task) handleMissing(result *assertionResult, behavior MissingBehavior, message string) assertionResult {
 	switch behavior {
 	case MissingBehaviorFail:
 		result.err = errors.New(message)
@@ -489,14 +662,14 @@ func (t *Task) handleMissing(result assertionResult, behavior MissingBehavior, m
 		result.waiting = true
 	}
 
-	return result
+	return *result
 }
 
-func (t *Task) findMetricValue(mf *dto.MetricFamily, labels map[string]string) (float64, error) {
+func (t *Task) findMetricValue(mf *dto.MetricFamily, labels map[string]string, patterns map[string]*regexp.Regexp) (float64, error) {
 	var matchingMetrics []*dto.Metric
 
 	for _, m := range mf.GetMetric() {
-		if matchLabels(m.GetLabel(), labels) {
+		if matchLabels(m.GetLabel(), labels) && matchLabelPatterns(m.GetLabel(), patterns) {
 			matchingMetrics = append(matchingMetrics, m)
 		}
 	}
@@ -530,6 +703,26 @@ func matchLabels(metricLabels []*dto.LabelPair, wantLabels map[string]string) bo
 
 	for k, v := range wantLabels {
 		if labelMap[k] != v {
+			return false
+		}
+	}
+
+	return true
+}
+
+func matchLabelPatterns(metricLabels []*dto.LabelPair, patterns map[string]*regexp.Regexp) bool {
+	if len(patterns) == 0 {
+		return true
+	}
+
+	labelMap := make(map[string]string, len(metricLabels))
+
+	for _, lp := range metricLabels {
+		labelMap[lp.GetName()] = lp.GetValue()
+	}
+
+	for k, re := range patterns {
+		if !re.MatchString(labelMap[k]) {
 			return false
 		}
 	}

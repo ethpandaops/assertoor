@@ -48,7 +48,9 @@ The `check_http_metrics` task fetches metrics from an HTTP Prometheus endpoint a
 
 - **`name`**: Unique assertion name. Required.
 - **`metric`**: Prometheus metric name. Required.
-- **`labels`**: Label selector (subset matching). Must match exactly one series.
+- **`labels`**: Label selector (subset matching, exact values).
+- **`labelPatterns`**: Label selector with regex values, each matching the whole label value (e.g. `status: "[45].."`). Combined with `labels`.
+- **`aggregate`**: How matching series are combined. `single` (default): the selector must match exactly one series. `sum`: the sum of all matching series is compared. `each`: every matching series must pass on its own, failures name the offending series.
 - **`mode`**: `value` (current value) or `delta` (change since baseline). Default: `value`.
 - **`operator`**: Comparison operator: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`. Required.
 - **`value`**: Expected numeric value. Required.
@@ -63,10 +65,32 @@ In `delta` mode, the task tracks changes over time:
 
 Negative deltas are valid for GAUGE and UNTYPED metrics. For COUNTER metrics, a decrease triggers `resetBehavior`.
 
+With `aggregate: sum` or `each`, baselines are kept per series. The first scrape records every matching series (even if there are none yet), and a series that first appears later counts from zero, so an error counter created during the run is still caught.
+
 #### Examples
 
 ```yaml
 assertions:
+  # Fail on any new 4xx/5xx REST response, naming each route and status that occurred
+  - name: no_rest_errors
+    metric: lodestar_api_rest_errors_total
+    aggregate: each
+    mode: delta
+    operator: eq
+    value: 0
+    missingMetric: pass
+    missingSeries: pass
+
+  # Sum all error responses across routes
+  - name: few_errors
+    metric: ngx_request_count
+    labelPatterns:
+      status: "[45].."
+    aggregate: sum
+    mode: delta
+    operator: lte
+    value: 5
+
   # Check counter increased by at least 1
   - name: counter_increased
     metric: my_counter
