@@ -332,6 +332,13 @@ func (ts *taskState) SetProgress(percent float64, message string) {
 	ts.taskStatusVars.SetVar("progressMessage", message)
 }
 
+func (ts *taskState) GetProgressMessage() string {
+	ts.resultMutex.RLock()
+	defer ts.resultMutex.RUnlock()
+
+	return ts.progressMessage
+}
+
 func (ts *taskState) GetTaskStatusVars() types.Variables {
 	return ts.taskStatusVars
 }

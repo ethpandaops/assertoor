@@ -101,7 +101,7 @@ func (t *Task) Execute(ctx context.Context) error {
 
 	for {
 		checkCount++
-		checkResult := t.runFinalityCheck()
+		checkResult, status := t.runFinalityCheck()
 
 		switch {
 		case checkResult:
@@ -113,12 +113,12 @@ func (t *Task) Execute(ctx context.Context) error {
 			}
 		case t.config.FailOnCheckMiss:
 			t.ctx.SetResult(types.TaskResultFailure)
-			t.ctx.ReportProgress(0, fmt.Sprintf("Finality check failed (attempt %d)", checkCount))
+			t.ctx.ReportProgress(0, fmt.Sprintf("Finality check failed: %s (attempt %d)", status, checkCount))
 
-			return fmt.Errorf("finality check failed")
+			return fmt.Errorf("finality check failed: %s", status)
 		default:
 			t.ctx.SetResult(types.TaskResultNone)
-			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for finality... (attempt %d)", checkCount))
+			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for finality, %s (attempt %d)", status, checkCount))
 		}
 
 		select {
@@ -132,13 +132,13 @@ func (t *Task) Execute(ctx context.Context) error {
 	}
 }
 
-func (t *Task) runFinalityCheck() bool {
+func (t *Task) runFinalityCheck() (passed bool, status string) {
 	consensusPool := t.ctx.Scheduler.GetServices().ClientPool().GetConsensusPool()
 
 	_, currentEpoch, err := consensusPool.GetBlockCache().GetWallclock().Now()
 	if err != nil {
 		t.logger.Warnf("failed fetching wallclock: %v", err.Error())
-		return false
+		return false, fmt.Sprintf("failed fetching wallclock: %v", err)
 	}
 
 	finalizedEpoch, finalizedRoot := consensusPool.GetBlockCache().GetFinalizedCheckpoint()
@@ -149,19 +149,25 @@ func (t *Task) runFinalityCheck() bool {
 	t.ctx.Outputs.SetVar("unfinalizedEpochs", unfinalizedEpochs)
 
 	if t.config.MinUnfinalizedEpochs > 0 && unfinalizedEpochs < t.config.MinUnfinalizedEpochs {
-		t.logger.Infof("check failed: minUnfinalizedEpochs (have: %v, want >= %v)", unfinalizedEpochs, t.config.MinUnfinalizedEpochs)
-		return false
+		msg := fmt.Sprintf("%v unfinalized epochs < %v (finalized epoch %v, current epoch %v)", unfinalizedEpochs, t.config.MinUnfinalizedEpochs, finalizedEpoch, currentEpoch.Number())
+		t.logger.Infof("check failed: %v", msg)
+
+		return false, msg
 	}
 
 	if t.config.MaxUnfinalizedEpochs > 0 && unfinalizedEpochs > t.config.MaxUnfinalizedEpochs {
-		t.logger.Infof("check failed: maxUnfinalizedEpochs (have: %v, want <= %v)", unfinalizedEpochs, t.config.MaxUnfinalizedEpochs)
-		return false
+		msg := fmt.Sprintf("%v unfinalized epochs > %v (finalized epoch %v, current epoch %v)", unfinalizedEpochs, t.config.MaxUnfinalizedEpochs, finalizedEpoch, currentEpoch.Number())
+		t.logger.Infof("check failed: %v", msg)
+
+		return false, msg
 	}
 
 	if t.config.MinFinalizedEpochs > 0 && uint64(finalizedEpoch) < t.config.MinFinalizedEpochs {
-		t.logger.Infof("check failed: minFinalizedEpochs (have: %v, want >= %v)", finalizedEpoch, t.config.MinFinalizedEpochs)
-		return false
+		msg := fmt.Sprintf("finalized epoch %v < %v (current epoch %v)", finalizedEpoch, t.config.MinFinalizedEpochs, currentEpoch.Number())
+		t.logger.Infof("check failed: %v", msg)
+
+		return false, msg
 	}
 
-	return true
+	return true, ""
 }

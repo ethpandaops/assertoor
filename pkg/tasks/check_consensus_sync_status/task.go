@@ -3,6 +3,7 @@ package checkconsensussyncstatus
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/clients"
@@ -168,7 +169,7 @@ func (t *Task) processCheck(ctx context.Context, checkCount int) bool {
 	}
 
 	t.ctx.SetResult(types.TaskResultNone)
-	t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for sync... %d/%d (attempt %d)", len(goodClients), len(goodClients)+len(failedClients), checkCount))
+	t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for sync... %d/%d, not synced: %v (attempt %d)", len(goodClients), len(goodClients)+len(failedClients), strings.Join(failedClientNames, ", "), checkCount))
 
 	return false
 }
