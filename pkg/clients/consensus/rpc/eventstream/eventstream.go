@@ -77,8 +77,9 @@ func SubscribeWithRequest(lastEventID string, request *http.Request) (*Stream, e
 // SubscribeWith takes a http client and request providing customization over both headers and
 // control over the http client settings (timeouts, tls, etc)
 func SubscribeWith(lastEventID string, client *http.Client, request *http.Request) (*Stream, error) {
+	streamClient := *client
 	stream := &Stream{
-		c:           client,
+		c:           &streamClient,
 		req:         request,
 		lastEventID: lastEventID,
 		retry:       time.Millisecond * 3000,
