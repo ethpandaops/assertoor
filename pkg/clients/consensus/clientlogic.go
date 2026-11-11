@@ -137,7 +137,7 @@ func (client *Client) runClientLogic() error {
 	}
 
 	// start event stream
-	blockStream := client.rpcClient.NewBlockStream(client.clientCtx, rpc.StreamBlockEvent|rpc.StreamFinalizedEvent|rpc.StreamExecutionPayloadEvent)
+	blockStream := client.rpcClient.NewBlockStream(client.clientCtx, rpc.StreamBlockEvent|rpc.StreamHeadEvent|rpc.StreamFinalizedEvent|rpc.StreamExecutionPayloadEvent)
 	defer blockStream.Close()
 
 	// process events
@@ -163,6 +163,14 @@ func (client *Client) runClientLogic() error {
 					err := client.processBlockEvent(blockEvent)
 					if err != nil {
 						client.logger.Warnf("failed processing block event: %v", err)
+					}
+				}
+
+			case rpc.StreamHeadEvent:
+				if headEvent, ok := evt.Data.(*v1.HeadEvent); ok {
+					err := client.processHeadEvent(headEvent)
+					if err != nil {
+						client.logger.Warnf("failed processing head event: %v", err)
 					}
 				}
 
@@ -209,16 +217,23 @@ func (client *Client) runClientLogic() error {
 }
 
 func (client *Client) processBlockEvent(evt *v1.BlockEvent) error {
-	err := client.processBlock(evt.Block, evt.Slot, nil, "streamed")
+	_, err := client.processBlock(evt.Block, evt.Slot, nil, "streamed")
 	if err != nil {
 		return fmt.Errorf("could not process block: %v", err)
 	}
 
-	client.headMutex.Lock()
-	client.headSlot = evt.Slot
-	client.headRoot = evt.Block
-	client.headMutex.Unlock()
 	client.pool.resetHeadForkCache()
+
+	return nil
+}
+
+func (client *Client) processHeadEvent(evt *v1.HeadEvent) error {
+	block, err := client.processBlock(evt.Block, evt.Slot, nil, "head")
+	if err != nil {
+		return fmt.Errorf("could not process head block: %v", err)
+	}
+
+	client.setHead(block)
 
 	return nil
 }
@@ -271,10 +286,12 @@ func (client *Client) pollClientHead() error {
 		return fmt.Errorf("could not find latest header")
 	}
 
-	err = client.processBlock(latestHeader.Root, latestHeader.Header.Message.Slot, latestHeader.Header, "polled")
+	block, err := client.processBlock(latestHeader.Root, latestHeader.Header.Message.Slot, latestHeader.Header, "polled")
 	if err != nil {
 		return fmt.Errorf("could not get process block: %v", err)
 	}
+
+	client.setHead(block)
 
 	finalityCheckpoint, err := client.rpcClient.GetFinalityCheckpoints(ctx)
 	if err != nil {
@@ -284,10 +301,10 @@ func (client *Client) pollClientHead() error {
 	return client.setFinalizedHead(finalityCheckpoint.Finalized.Epoch, finalityCheckpoint.Finalized.Root)
 }
 
-func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *phase0.SignedBeaconBlockHeader, source string) error {
+func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *phase0.SignedBeaconBlockHeader, source string) (*Block, error) {
 	cachedBlock, isNewBlock := client.pool.blockCache.AddBlock(root, slot)
 	if cachedBlock == nil {
-		return fmt.Errorf("could not add block to cache %v [0x%x]", slot, root)
+		return nil, fmt.Errorf("could not add block to cache %v [0x%x]", slot, root)
 	}
 
 	cachedBlock.SetSeenBy(client)
@@ -314,7 +331,7 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 		return header.Header, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	loaded, err := cachedBlock.EnsureBlock(func() (*spec.VersionedSignedBeaconBlock, error) {
@@ -329,7 +346,7 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 		return block, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if loaded {
@@ -342,21 +359,23 @@ func (client *Client) processBlock(root phase0.Root, slot phase0.Slot, header *p
 		}
 	}
 
+	return cachedBlock, nil
+}
+
+func (client *Client) setHead(block *Block) {
 	client.headMutex.Lock()
 
-	if bytes.Equal(client.headRoot[:], root[:]) {
+	if bytes.Equal(client.headRoot[:], block.Root[:]) {
 		client.headMutex.Unlock()
-		return nil
+		return
 	}
 
-	client.headSlot = slot
-	client.headRoot = root
+	client.headSlot = block.Slot
+	client.headRoot = block.Root
 	client.headMutex.Unlock()
 
 	client.pool.resetHeadForkCache()
-	client.blockDispatcher.Fire(cachedBlock)
-
-	return nil
+	client.blockDispatcher.Fire(block)
 }
 
 func (client *Client) loadBlockPayload(cachedBlock *Block) {
