@@ -3,6 +3,7 @@ package db
 import (
 	"embed"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -88,7 +89,21 @@ func (db *Database) initSqlite(config *SqliteDatabaseConfig) error {
 
 	db.logger.Infof("initializing sqlite connection to %v with %v/%v conn limit", config.File, config.MaxIdleConns, config.MaxOpenConns)
 
-	dbConn, err := sqlx.Open("sqlite", fmt.Sprintf("%s?_pragma=journal_mode(WAL)", config.File))
+	dsn := config.File
+	if dsn == ":memory:" {
+		dsn += "?cache=shared"
+	}
+
+	if strings.HasPrefix(dsn, ":memory:?") {
+		dsn = "file:" + dsn
+	}
+
+	separator := "?"
+	if strings.Contains(dsn, "?") {
+		separator = "&"
+	}
+
+	dbConn, err := sqlx.Open("sqlite", fmt.Sprintf("%s%s_pragma=journal_mode(WAL)", dsn, separator))
 	if err != nil {
 		return fmt.Errorf("error opening sqlite database: %v", err)
 	}
