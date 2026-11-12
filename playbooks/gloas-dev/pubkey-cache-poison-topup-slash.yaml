@@ -1,0 +1,360 @@
+id: pubkey-cache-poison-topup-slash
+name: "GLOAS: Validator pubkey-cache poisoning (topup + slash across the fork)"
+description: |
+  Regression test for the validator pubkey-cache poisoning attack fixed in
+  lighthouse#10569 (https://github.com/sigp/lighthouse/pull/10569).
+
+  The bug: a client that eagerly imports keys from state.pending_deposits into a
+  GLOBAL validator-pubkey cache (assuming finalized deposits yield the same
+  validators on every chain) can be poisoned around the GLOAS fork. A top-up for
+  an existing validator consumes the per-epoch deposit churn; if that validator
+  is then SLASHED before the fork, its pending top-up is skipped at the epoch
+  boundary, which frees the churn and changes WHICH queued deposit consumes the
+  next validator index. The eager cache binds the wrong pubkey (the 0xB0 builder,
+  processed early on the side where the top-up was skipped) to that index, so the
+  regular validator deposit queued behind it is rejected on the canonical chain.
+  Affected nodes then reject all valid signatures from that validator and fork
+  off -> finality stalls. The fix only adds keys to the global cache once their
+  activation_eligibility_epoch is finalized.
+
+  What this playbook builds, entirely inside the UNFINALIZED window just before
+  GLOAS activates (so all three deposits are still in state.pending_deposits at
+  the fork), in this order so they queue behind each other:
+
+    1. A large top-up (topupAmount ETH) for an existing active validator V0.
+       This consumes the deposit churn.
+    2. A builder deposit (pubkey A) via the STANDARD deposit contract with 0xB0
+       (builder) withdrawal credentials. Onboarded as a builder at the fork.
+    3. A regular validator deposit (pubkey B) via the STANDARD deposit contract
+       with 0x01 (execution) withdrawal credentials. Consumes a validator index.
+
+  Then, still before the fork boundary, V0 is SLASHED. On a correct client this
+  all resolves into one consistent registry across every node. On a client with
+  the pre-fix eager/global pubkey cache, slashing the topped-up V0 reorders which
+  of A/B takes the next index, the cache binds the wrong pubkey, B's signatures
+  are rejected, and the affected nodes fork off.
+
+  Pass/fail (the catch):
+    - The network must keep FINALIZING past the pre-attack checkpoint and show no
+      unexpected consensus forks. A poisoned node forks off and finality stalls;
+      that is the primary failure symptom.
+    - Builder A must be onboarded as a builder.
+    - Validator B must be onboarded AND go active (its index/pubkey mapping is
+      correct and its attestations are accepted network-wide).
+
+  TIMING IS LOAD-BEARING (same constraint as builder-prefork-onboard):
+  process_pending_deposits only drains FINALIZED deposits
+  (`if deposit.slot > finalized_slot: break`), and finality lags >= 2 epochs. The
+  deposits must land late enough (~1 epoch before the fork) to still be UNfinalized
+  (hence still pending) at the fork, and the slash must land after the deposits but
+  before the fork. If the pre-fork window has already passed when the test starts,
+  it fails fast rather than silently passing.
+
+  WARNING: this SLASHES validator V0 (derived from victimMnemonic / victimIndex),
+  removing it from the devnet permanently. Point victimMnemonic at a disposable
+  genesis validator on a throwaway devnet, not at anything you want to keep.
+version: 1.0.0
+tags: [gloas, builder, deposit, slashing, pubkey-cache, poisoning, prefork, eip-8282, security]
+timeout: 2h
+config:
+  walletPrivkey: ''
+  # Regular validator deposit contract (also used for the 0xB0 builder deposit,
+  # which is verified under the ordinary DOMAIN_DEPOSIT pre-fork).
+  depositContract: '0x00000000219ab540356cBB839Cbe05303d7705Fa'
+
+  # Victim validator V0: an existing, ACTIVE validator we top up and then slash.
+  # Must be a validator whose keys we control (genesis validator mnemonic).
+  victimMnemonic: "apple topic worth benefit wet tragic toe essence table bleak fancy account current current canvas universe often dry law toilet about mimic hood south"
+  victimIndex: 0
+  # Large top-up to consume the per-epoch deposit churn (PR example: +128 ETH).
+  topupAmount: 128
+
+  # Fresh keys for the two queued deposits (A = builder, B = regular validator).
+  # Leave testMnemonic empty to generate a random one. Index 0 = builder A,
+  # index 1 = validator B.
+  testMnemonic: ''
+  builderAmount: 5
+  validatorAmount: 32
+
+tasks:
+- name: check_clients_are_healthy
+  title: "Check if at least one client is ready"
+  timeout: 5m
+  config:
+    minClientCount: 1
+
+##
+## PHASE 0: specs, current slot, fork-relative timing
+##
+
+- name: get_consensus_specs
+  id: get_specs
+  title: "Get consensus chain specs"
+
+- name: check_consensus_slot_range
+  id: current_slot
+  title: "Get current slot"
+
+- name: run_shell
+  id: calc_slots
+  title: "Calculate the pre-fork attack window (deposits + slash must stay unfinalized at the fork)"
+  config:
+    envVars:
+      GLOAS_FORK_EPOCH: "tasks.get_specs.outputs.specs.GLOAS_FORK_EPOCH"
+      SLOTS_PER_EPOCH: "tasks.get_specs.outputs.specs.SLOTS_PER_EPOCH"
+      CURRENT_SLOT: "tasks.current_slot.outputs.currentSlot"
+    command: |
+      set -e
+      GLOAS_FORK_EPOCH=$(echo "$GLOAS_FORK_EPOCH" | jq -r .)
+      SLOTS_PER_EPOCH=$(echo "$SLOTS_PER_EPOCH" | jq -r .)
+      CURRENT_SLOT=$(echo "$CURRENT_SLOT" | jq -r .)
+
+      ACTIVATION_SLOT=$((GLOAS_FORK_EPOCH * SLOTS_PER_EPOCH))
+
+      # Deposit ~1 epoch before the fork: late enough to stay unfinalized (still
+      # in state.pending_deposits at the fork), early enough to actually land as
+      # pending first.
+      DEPOSIT_SLOT=$((ACTIVATION_SLOT - SLOTS_PER_EPOCH))
+      if [ "$DEPOSIT_SLOT" -lt 0 ]; then DEPOSIT_SLOT=0; fi
+
+      # Slash V0 a few slots after the deposits are in, but still before the fork,
+      # so its pending top-up is skipped at the epoch boundary and the queued
+      # deposits reorder.
+      SLASH_SLOT=$((ACTIVATION_SLOT - 4))
+      if [ "$SLASH_SLOT" -lt "$DEPOSIT_SLOT" ]; then SLASH_SLOT=$DEPOSIT_SLOT; fi
+
+      # Need headroom before the fork to land both the deposits and the slash.
+      LATEST_DEPOSIT_SLOT=$((ACTIVATION_SLOT - 3))
+      if [ "$CURRENT_SLOT" -ge "$LATEST_DEPOSIT_SLOT" ]; then
+        echo "ERROR: too late to stage the pre-fork pending deposits + slash."
+        echo "  current slot:        $CURRENT_SLOT"
+        echo "  latest deposit slot: $LATEST_DEPOSIT_SLOT"
+        echo "  GLOAS activation:    slot $ACTIVATION_SLOT (epoch $GLOAS_FORK_EPOCH)"
+        echo "Start the test earlier so the deposits are still pending (and"
+        echo "unfinalized) and the slash lands before GLOAS activates."
+        exit 1
+      fi
+
+      # First GLOAS block (+1 slot margin): onboarding is observable here.
+      ONBOARD_SLOT=$((ACTIVATION_SLOT + 1))
+      ACTIVE_EPOCH=$((GLOAS_FORK_EPOCH + 4))
+
+      echo "Current slot:       $CURRENT_SLOT"
+      echo "GLOAS activation:   epoch $GLOAS_FORK_EPOCH (slot $ACTIVATION_SLOT)"
+      echo "Pre-fork deposit:   slot $DEPOSIT_SLOT (latest safe: $LATEST_DEPOSIT_SLOT)"
+      echo "Pre-fork slash:     slot $SLASH_SLOT"
+      echo "Onboard check:      slot $ONBOARD_SLOT"
+      echo "Active wait epoch:  $ACTIVE_EPOCH"
+
+      echo "::set-output-json depositSlot $DEPOSIT_SLOT"
+      echo "::set-output-json slashSlot $SLASH_SLOT"
+      echo "::set-output-json onboardSlot $ONBOARD_SLOT"
+      echo "::set-output-json activeEpoch $ACTIVE_EPOCH"
+
+##
+## PHASE 1: wallet + keys
+##
+
+- name: generate_child_wallet
+  id: test_wallet
+  title: "Generate funding wallet for deposits"
+  config:
+    walletSeed: pubkey-cache-poison-topup-slash
+    prefundMinBalance: 300000000000000000000  # 300 ETH (covers topup + A + B)
+  configVars:
+    privateKey: walletPrivkey
+
+- name: get_random_mnemonic
+  id: test_mnemonic
+  title: "Generate fallback mnemonic for the A/B keys"
+
+- name: get_pubkeys_from_mnemonic
+  id: victim_pubkey
+  title: "Derive victim validator V0 pubkey"
+  configVars:
+    mnemonic: victimMnemonic
+    startIndex: victimIndex
+    count: "| 1"
+
+- name: get_pubkeys_from_mnemonic
+  id: test_pubkeys
+  title: "Derive A (builder) and B (validator) pubkeys"
+  configVars:
+    mnemonic: '| if .testMnemonic != "" then .testMnemonic else .tasks.test_mnemonic.outputs.mnemonic end'
+    startIndex: "| 0"
+    count: "| 2"
+
+# Confirm V0 is actually active before we top it up and slash it.
+- name: check_consensus_validator_status
+  id: victim_status
+  title: "Confirm victim V0 is active"
+  timeout: 10m
+  config:
+    validatorStatus: ["active_ongoing"]
+  configVars:
+    validatorPubKey: "tasks.victim_pubkey.outputs.pubkeys[0]"
+
+##
+## PHASE 2: baseline finality (what the poisoning must NOT regress past)
+##
+
+- name: check_consensus_finality
+  id: baseline_finality
+  title: "Capture pre-attack finalized checkpoint"
+  timeout: 40m
+  config:
+    minFinalizedEpochs: 2
+    maxUnfinalizedEpochs: 3
+
+##
+## PHASE 3: stage the three pending deposits in the unfinalized pre-fork window,
+##          in order so they queue behind each other.
+##
+
+- name: check_consensus_slot_range
+  title: "Wait for pre-fork deposit slot (${{ tasks.calc_slots.outputs.depositSlot }})"
+  timeout: 2h
+  configVars:
+    minSlotNumber: "tasks.calc_slots.outputs.depositSlot"
+
+# (1) Large top-up for V0 -> consumes the per-epoch deposit churn.
+- name: generate_deposits
+  id: topup_deposit
+  title: "Top up victim V0 with ${topupAmount} ETH (consumes churn)"
+  timeout: 20m
+  config:
+    limitTotal: 1
+    limitPerSlot: 1
+    indexCount: 1
+    topUpDeposit: true
+    awaitReceipt: true
+    awaitInclusion: true
+    failOnReject: true
+  configVars:
+    publicKey: "tasks.victim_pubkey.outputs.pubkeys[0]"
+    depositAmount: topupAmount
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    depositContract: depositContract
+
+# (2) Builder deposit A (0xB0 credentials) queued behind the top-up.
+- name: generate_deposits
+  id: builder_deposit
+  title: "Deposit builder A (0xB0 creds), queued behind the top-up"
+  timeout: 20m
+  config:
+    limitTotal: 1
+    limitPerSlot: 1
+    indexCount: 1
+    startIndex: 0
+    awaitReceipt: true
+    awaitInclusion: true
+    failOnReject: true
+  configVars:
+    depositAmount: builderAmount
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    mnemonic: '| if .testMnemonic != "" then .testMnemonic else .tasks.test_mnemonic.outputs.mnemonic end'
+    depositContract: depositContract
+    # 0xB0 builder credentials: version byte + 11 zero bytes + 20-byte address.
+    withdrawalCredentials: '| "0xB0" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+
+# (3) Regular validator deposit B (0x01 credentials) queued behind A.
+- name: generate_deposits
+  id: validator_deposit
+  title: "Deposit validator B (0x01 creds), queued behind builder A"
+  timeout: 20m
+  config:
+    limitTotal: 1
+    limitPerSlot: 1
+    indexCount: 1
+    startIndex: 1
+    awaitReceipt: true
+    awaitInclusion: true
+    failOnReject: true
+  configVars:
+    depositAmount: validatorAmount
+    walletPrivkey: "tasks.test_wallet.outputs.childWallet.privkey"
+    mnemonic: '| if .testMnemonic != "" then .testMnemonic else .tasks.test_mnemonic.outputs.mnemonic end'
+    depositContract: depositContract
+    # 0x01 execution withdrawal credentials: version byte + 11 zero bytes + address.
+    withdrawalCredentials: '| "0x01" + ("00" * 11) + (.tasks.test_wallet.outputs.childWallet.address | ltrimstr("0x"))'
+
+##
+## PHASE 4: slash V0 while its top-up is still pending (pre-fork) -> triggers the
+##          deposit reorder that poisons a buggy global pubkey cache.
+##
+
+- name: check_consensus_slot_range
+  title: "Wait for pre-fork slash slot (${{ tasks.calc_slots.outputs.slashSlot }})"
+  timeout: 2h
+  configVars:
+    minSlotNumber: "tasks.calc_slots.outputs.slashSlot"
+
+- name: generate_slashings
+  id: slash_victim
+  title: "Slash victim V0 (skips its pending top-up, reorders the queue)"
+  timeout: 20m
+  config:
+    slashingType: "proposer"
+    limitTotal: 1
+    limitPerSlot: 1
+    indexCount: 1
+    awaitInclusion: true
+  configVars:
+    mnemonic: victimMnemonic
+    startIndex: victimIndex
+
+##
+## PHASE 5: verify the network survived the poisoning attempt
+##
+
+- name: check_consensus_slot_range
+  title: "Wait for first GLOAS block (slot ${{ tasks.calc_slots.outputs.onboardSlot }})"
+  timeout: 2h
+  configVars:
+    minSlotNumber: "tasks.calc_slots.outputs.onboardSlot"
+
+# Primary catch: a poisoned node rejects B's sigs and forks off -> finality
+# stalls and a fork appears. Require a FRESH finalized checkpoint past the
+# baseline, and assert there is no unexpected fork.
+- name: run_tasks_concurrent
+  title: "Network must stay healthy across the fork (no poisoning-induced split)"
+  timeout: 40m
+  config:
+    failureThreshold: 1
+    tasks:
+    - name: check_consensus_finality
+      title: "Require fresh finality past the pre-attack checkpoint"
+      timeout: 40m
+      configVars:
+        minFinalizedEpochs: "| (.tasks.baseline_finality.outputs.finalizedEpoch | tonumber) + 1"
+        maxUnfinalizedEpochs: "| 6"
+    - name: check_consensus_forks
+      title: "No unexpected consensus fork during the attack window"
+      timeout: 40m
+      config:
+        maxForkDistance: 1
+        maxForkCount: 0
+
+# Builder A must have been onboarded as a builder.
+- name: check_consensus_builder_status
+  title: "Verify builder A was onboarded"
+  timeout: 20m
+  configVars:
+    builderPubKey: "tasks.test_pubkeys.outputs.pubkeys[0]"
+
+# Validator B must be onboarded and go active -- i.e. its index/pubkey mapping is
+# correct and its signatures are accepted network-wide (the exact thing a poisoned
+# cache breaks).
+- name: check_consensus_slot_range
+  title: "Wait until validator B should be active (epoch ${{ tasks.calc_slots.outputs.activeEpoch }})"
+  timeout: 2h
+  configVars:
+    minEpochNumber: "tasks.calc_slots.outputs.activeEpoch"
+
+- name: check_consensus_validator_status
+  title: "Verify validator B is active (signatures accepted => cache not poisoned)"
+  timeout: 30m
+  config:
+    validatorStatus: ["active_ongoing"]
+  configVars:
+    validatorPubKey: "tasks.test_pubkeys.outputs.pubkeys[1]"
