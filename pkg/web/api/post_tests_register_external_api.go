@@ -36,13 +36,14 @@ type PostTestsRegisterExternalResponse struct {
 // @Param externalTestConfig body PostTestsRegisterExternalRequest true "Test configuration (json or yaml)"
 // @Success 200 {object} Response{data=PostTestsRegisterExternalResponse} "Success"
 // @Failure 400 {object} Response "Failure"
+// @Failure 401 {object} Response "Unauthorized"
+// @Failure 403 {object} Response "Login lacks the test_registry feature"
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/tests/register_external [post]
 func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
-	if !ah.checkAuth(r) {
-		ah.sendUnauthorizedResponse(w, r.URL.String())
+	if !ah.requireTestRegistry(w, r) {
 		return
 	}
 

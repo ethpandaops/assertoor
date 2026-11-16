@@ -28,6 +28,10 @@ func openMode(_, _ string) *jwt.Token {
 	return &jwt.Token{Valid: true}
 }
 
+func allowFeature(_ *jwt.Token, _ string) bool { return true }
+
+func denyFeature(_ *jwt.Token, _ string) bool { return false }
+
 func TestPprofHandler(t *testing.T) {
 	t.Parallel()
 
@@ -41,6 +45,7 @@ func TestPprofHandler(t *testing.T) {
 	tests := []struct {
 		name       string
 		checkToken tokenChecker
+		hasFeature featureChecker
 		gate       http.Handler
 		method     string
 		path       string
@@ -74,6 +79,25 @@ func TestPprofHandler(t *testing.T) {
 			cookie:     testToken,
 			wantStatus: http.StatusOK,
 			wantBody:   bodyPprof,
+		},
+		{
+			name:       "login without the pprof feature gets 403",
+			checkToken: acceptToken,
+			hasFeature: denyFeature,
+			gate:       gate,
+			path:       "/debug/pprof/heap",
+			cookie:     testToken,
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "browser login without the pprof feature gets 403, not the gate",
+			checkToken: acceptToken,
+			hasFeature: denyFeature,
+			gate:       gate,
+			path:       "/debug/pprof/",
+			header:     http.Header{"Accept": {"text/html"}},
+			cookie:     testToken,
+			wantStatus: http.StatusForbidden,
 		},
 		{
 			name:       "invalid header is not rescued by cookie",
@@ -123,7 +147,12 @@ func TestPprofHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			handler := newPprofHandler(logrus.New(), tt.checkToken, tt.gate, pprofMux)
+			hasFeature := tt.hasFeature
+			if hasFeature == nil {
+				hasFeature = allowFeature
+			}
+
+			handler := newPprofHandler(logrus.New(), tt.checkToken, hasFeature, tt.gate, pprofMux)
 
 			method := tt.method
 			if method == "" {

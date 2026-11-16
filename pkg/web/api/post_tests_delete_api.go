@@ -27,13 +27,14 @@ type PostTestsDeleteResponse struct {
 // @Param testConfig body PostTestsDeleteRequest true "Test configuration (json or yaml)"
 // @Success 200 {object} Response{data=PostTestsDeleteResponse} "Success"
 // @Failure 400 {object} Response "Failure"
+// @Failure 401 {object} Response "Unauthorized"
+// @Failure 403 {object} Response "Login lacks the test_registry feature"
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/tests/delete [post]
 func (ah *APIHandler) PostTestsDelete(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
-	if !ah.checkAuth(r) {
-		ah.sendUnauthorizedResponse(w, r.URL.String())
+	if !ah.requireTestRegistry(w, r) {
 		return
 	}
 

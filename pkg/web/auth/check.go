@@ -75,6 +75,33 @@ func TokenSubject(token *jwt.Token) string {
 	return ""
 }
 
+// HasFeature reports whether a token returned by CheckAuthToken allows a
+// privileged feature (FeatureTestRegistry, FeaturePprof). Features need an
+// explicit grant ("assertoor:<feature>" or "assertoor:all") in the token's
+// services claim. In open mode every feature is allowed.
+func (h *Handler) HasFeature(token *jwt.Token, feature string) bool {
+	if h.verifier == nil {
+		return true
+	}
+
+	if token == nil || !token.Valid {
+		return false
+	}
+
+	claims, ok := token.Claims.(*authpkg.Claims)
+	if !ok {
+		return false
+	}
+
+	// An authenticatoor without grants mints no services claim; its logins
+	// keep the full access they had before features existed.
+	if claims.Services == "" {
+		return true
+	}
+
+	return claims.HasFeature(serviceName, feature, authpkg.FeatureDefaultDeny)
+}
+
 // StripPort removes a trailing ":port" from a request Host header value
 // so it can be passed to CheckAuthToken. Handles bracketed IPv6 hosts.
 func StripPort(host string) string {

@@ -22,6 +22,10 @@ const debugTokenCookie = "assertoor_debug_token" //nolint:gosec // G101: the coo
 // prefix) for a request bound to host; see auth.Handler.CheckAuthToken.
 type tokenChecker func(tokenStr, host string) *jwt.Token
 
+// featureChecker reports whether a token from a tokenChecker allows a
+// feature; see auth.Handler.HasFeature.
+type featureChecker func(token *jwt.Token, feature string) bool
+
 // pprofHandler gates the pprof pages behind the login. A profile exposes
 // the process memory (RPC credentials, private keys, ...) and costs CPU to
 // collect, so unlike the rest of the UI it is never public once an auth
@@ -31,11 +35,13 @@ type tokenChecker func(tokenStr, host string) *jwt.Token
 // pprof) or from debugTokenCookie (a browser). A browser without a valid
 // login gets the web UI instead, whose page for this path sets the cookie
 // from the session and reloads, or asks for a login; everything else gets
-// a 401. Every profile download is logged with the requesting user; the
-// index page with its counts is not.
+// a 401. A login without the pprof feature gets a 403. Every profile
+// download is logged with the requesting user; the index page with its
+// counts is not.
 type pprofHandler struct {
 	logger     logrus.FieldLogger
 	checkToken tokenChecker
+	hasFeature featureChecker
 	gate       http.Handler // the web UI; nil when the frontend is disabled
 	next       http.Handler
 }
@@ -44,10 +50,11 @@ var _ http.Handler = (*pprofHandler)(nil)
 
 // newPprofHandler wraps next (the pprof mux) in the login gate. gate is the
 // web UI served to a browser without a login, or nil when there is none.
-func newPprofHandler(logger logrus.FieldLogger, checkToken tokenChecker, gate, next http.Handler) http.Handler {
+func newPprofHandler(logger logrus.FieldLogger, checkToken tokenChecker, hasFeature featureChecker, gate, next http.Handler) http.Handler {
 	return &pprofHandler{
 		logger:     logger,
 		checkToken: checkToken,
+		hasFeature: hasFeature,
 		gate:       gate,
 		next:       next,
 	}
@@ -63,6 +70,12 @@ func (h *pprofHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if token := h.checkToken(tokenStr, auth.StripPort(r.Host)); token != nil && token.Valid {
+		if !h.hasFeature(token, auth.FeaturePprof) {
+			http.Error(w, "forbidden: this login lacks the assertoor feature "+auth.FeaturePprof, http.StatusForbidden)
+
+			return
+		}
+
 		h.serveProfile(w, r, token)
 
 		return

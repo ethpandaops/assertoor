@@ -1152,6 +1152,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/web_api.Response'
+        "403":
+          description: Login lacks the test_registry feature
+          schema:
+            $ref: '#/definitions/web_api.Response'
         "404":
           description: Test not found
           schema:
@@ -1664,6 +1668,14 @@ paths:
           description: Failure
           schema:
             $ref: '#/definitions/web_api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "403":
+          description: Login lacks the test_registry feature
+          schema:
+            $ref: '#/definitions/web_api.Response'
         "500":
           description: Server Error
           schema:
@@ -1701,6 +1713,14 @@ paths:
           description: Failure
           schema:
             $ref: '#/definitions/web_api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "403":
+          description: Login lacks the test_registry feature
+          schema:
+            $ref: '#/definitions/web_api.Response'
         "500":
           description: Server Error
           schema:
@@ -1735,6 +1755,14 @@ paths:
               type: object
         "400":
           description: Failure
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web_api.Response'
+        "403":
+          description: Login lacks the test_registry feature
           schema:
             $ref: '#/definitions/web_api.Response'
         "500":
