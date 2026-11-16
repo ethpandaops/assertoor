@@ -8,7 +8,7 @@ require (
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/ethpandaops/go-eth2-client v0.1.6
-	github.com/ethpandaops/service-authenticatoor v0.0.2
+	github.com/ethpandaops/service-authenticatoor v0.0.4-0.20261116121942-b69364b3c7ff
 	github.com/ethpandaops/spamoor v1.2.2
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/golang-jwt/jwt/v5 v5.3.1

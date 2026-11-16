@@ -124,6 +124,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/web_api.Response"
                         }
                     },
+                    "403": {
+                        "description": "Login lacks the write feature",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
                     "500": {
                         "description": "Server Error",
                         "schema": {
@@ -662,6 +668,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/web_api.Response"
                         }
                     },
+                    "403": {
+                        "description": "Login lacks the test_registry feature",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
                     "404": {
                         "description": "Test not found",
                         "schema": {
@@ -880,6 +892,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Login lacks the write feature",
                         "schema": {
                             "$ref": "#/definitions/web_api.Response"
                         }
@@ -1296,6 +1320,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/web_api.Response"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Login lacks the write feature",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
                     "500": {
                         "description": "Server Error",
                         "schema": {
@@ -1348,6 +1384,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Login lacks the write feature",
                         "schema": {
                             "$ref": "#/definitions/web_api.Response"
                         }
@@ -1460,6 +1508,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/web_api.Response"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Login lacks the test_registry feature",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
                     "500": {
                         "description": "Server Error",
                         "schema": {
@@ -1520,6 +1580,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/web_api.Response"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Login lacks the test_registry feature",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
                     "500": {
                         "description": "Server Error",
                         "schema": {
@@ -1575,6 +1647,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Failure",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/web_api.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Login lacks the test_registry feature",
                         "schema": {
                             "$ref": "#/definitions/web_api.Response"
                         }

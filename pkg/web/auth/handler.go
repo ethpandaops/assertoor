@@ -20,6 +20,19 @@ import (
 // name are rejected.
 const serviceName = "assertoor"
 
+// Privileged features, granted per login as "assertoor:<feature>" in the
+// token's services claim. Everything else needs basic access only.
+const (
+	// FeatureTestRegistry registers, deletes and reschedules test
+	// definitions. Tests can run shell tasks, so this is code execution.
+	FeatureTestRegistry = "test_registry"
+	// FeatureWrite schedules, cancels and deletes test runs, edits the
+	// dashboard config and starts AI chats. Without it a login can only read.
+	FeatureWrite = "write"
+	// FeaturePprof downloads Go runtime profiles from /debug/pprof.
+	FeaturePprof = "pprof"
+)
+
 // Handler validates incoming bearer tokens. When verifier is nil the API
 // is treated as open (no authentication required); CheckAuthToken always
 // returns a non-nil "valid" token.

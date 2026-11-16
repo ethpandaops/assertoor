@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -75,6 +76,33 @@ func TokenSubject(token *jwt.Token) string {
 	return ""
 }
 
+// HasFeature reports whether a token returned by CheckAuthToken allows a
+// privileged feature (FeatureTestRegistry, FeaturePprof). Features need an
+// explicit grant ("assertoor:<feature>" or "assertoor:all") in the token's
+// services claim. In open mode every feature is allowed.
+func (h *Handler) HasFeature(token *jwt.Token, feature string) bool {
+	if h.verifier == nil {
+		return true
+	}
+
+	if token == nil || !token.Valid {
+		return false
+	}
+
+	claims, ok := token.Claims.(*authpkg.Claims)
+	if !ok {
+		return false
+	}
+
+	// An authenticatoor without grants mints no services claim; its logins
+	// keep the full access they had before features existed.
+	if claims.Services == "" {
+		return true
+	}
+
+	return claims.HasFeature(serviceName, feature, authpkg.FeatureDefaultDeny)
+}
+
 // StripPort removes a trailing ":port" from a request Host header value
 // so it can be passed to CheckAuthToken. Handles bracketed IPv6 hosts.
 func StripPort(host string) string {
@@ -95,4 +123,24 @@ func StripPort(host string) string {
 	}
 
 	return host
+}
+
+// FeatureStatus answers whether the request may use a feature: http.StatusOK,
+// http.StatusUnauthorized without a valid login, or http.StatusForbidden when
+// the login lacks the feature. Open mode always answers http.StatusOK.
+func (h *Handler) FeatureStatus(r *http.Request, feature string) int {
+	if h == nil || h.IsOpen() {
+		return http.StatusOK
+	}
+
+	token := h.CheckAuthToken(r.Header.Get("Authorization"), StripPort(r.Host))
+	if token == nil || !token.Valid {
+		return http.StatusUnauthorized
+	}
+
+	if !h.HasFeature(token, feature) {
+		return http.StatusForbidden
+	}
+
+	return http.StatusOK
 }

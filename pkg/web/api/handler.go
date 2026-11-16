@@ -56,6 +56,22 @@ func (ah *APIHandler) checkAuth(r *http.Request) bool {
 	return true
 }
 
+// requireFeature is checkAuth for an endpoint behind a feature (auth.Feature*):
+// it answers 401 without a valid login and 403 when the login lacks the
+// feature, and returns false in both cases.
+func (ah *APIHandler) requireFeature(w http.ResponseWriter, r *http.Request, feature string) bool {
+	switch ah.authHandler.FeatureStatus(r, feature) {
+	case http.StatusOK:
+		return true
+	case http.StatusUnauthorized:
+		ah.sendUnauthorizedResponse(w, r.URL.String())
+	default:
+		ah.sendErrorResponse(w, r.URL.String(), "forbidden: this login lacks the assertoor feature "+feature, http.StatusForbidden)
+	}
+
+	return false
+}
+
 func (ah *APIHandler) sendUnauthorizedResponse(w http.ResponseWriter, route string) {
 	ah.sendErrorResponse(w, route, "unauthorized", http.StatusUnauthorized)
 }

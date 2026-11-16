@@ -211,6 +211,7 @@ func (ws *Server) ConfigureRoutes(webConfig *types.WebConfig, aiConfig *types.AI
 			ws.router.PathPrefix(pprofPathPrefix + "/").Handler(newPprofHandler(
 				ws.logger.WithField("module", "pprof"),
 				authHandler.CheckAuthToken,
+				authHandler.HasFeature,
 				spaHandler,
 				http.DefaultServeMux,
 			))

@@ -13,6 +13,9 @@ const (
 	testToken = "valid-token"
 	bodyPprof = "pprof"
 	bodyGate  = "gate"
+	pathIndex = "/debug/pprof/"
+	hdrAccept = "Accept"
+	mimeHTML  = "text/html"
 )
 
 // acceptToken accepts testToken, bare or as a bearer header.
@@ -28,6 +31,10 @@ func openMode(_, _ string) *jwt.Token {
 	return &jwt.Token{Valid: true}
 }
 
+func allowFeature(_ *jwt.Token, _ string) bool { return true }
+
+func denyFeature(_ *jwt.Token, _ string) bool { return false }
+
 func TestPprofHandler(t *testing.T) {
 	t.Parallel()
 
@@ -41,6 +48,7 @@ func TestPprofHandler(t *testing.T) {
 	tests := []struct {
 		name       string
 		checkToken tokenChecker
+		hasFeature featureChecker
 		gate       http.Handler
 		method     string
 		path       string
@@ -76,6 +84,25 @@ func TestPprofHandler(t *testing.T) {
 			wantBody:   bodyPprof,
 		},
 		{
+			name:       "login without the pprof feature gets 403",
+			checkToken: acceptToken,
+			hasFeature: denyFeature,
+			gate:       gate,
+			path:       "/debug/pprof/heap",
+			cookie:     testToken,
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "browser login without the pprof feature gets 403, not the gate",
+			checkToken: acceptToken,
+			hasFeature: denyFeature,
+			gate:       gate,
+			path:       pathIndex,
+			header:     http.Header{hdrAccept: {mimeHTML}},
+			cookie:     testToken,
+			wantStatus: http.StatusForbidden,
+		},
+		{
 			name:       "invalid header is not rescued by cookie",
 			checkToken: acceptToken,
 			gate:       gate,
@@ -89,15 +116,15 @@ func TestPprofHandler(t *testing.T) {
 			checkToken: acceptToken,
 			gate:       gate,
 			path:       "/debug/pprof/heap",
-			header:     http.Header{"Accept": {"*/*"}},
+			header:     http.Header{hdrAccept: {"*/*"}},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:       "browser without token gets the gate",
 			checkToken: acceptToken,
 			gate:       gate,
-			path:       "/debug/pprof/",
-			header:     http.Header{"Accept": {"text/html,application/xhtml+xml"}},
+			path:       pathIndex,
+			header:     http.Header{hdrAccept: {"text/html,application/xhtml+xml"}},
 			wantStatus: http.StatusOK,
 			wantBody:   bodyGate,
 		},
@@ -106,15 +133,15 @@ func TestPprofHandler(t *testing.T) {
 			checkToken: acceptToken,
 			gate:       gate,
 			method:     http.MethodPost,
-			path:       "/debug/pprof/",
-			header:     http.Header{"Accept": {"text/html"}},
+			path:       pathIndex,
+			header:     http.Header{hdrAccept: {mimeHTML}},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:       "browser without gate gets 401",
 			checkToken: acceptToken,
-			path:       "/debug/pprof/",
-			header:     http.Header{"Accept": {"text/html"}},
+			path:       pathIndex,
+			header:     http.Header{hdrAccept: {mimeHTML}},
 			wantStatus: http.StatusUnauthorized,
 		},
 	}
@@ -123,7 +150,12 @@ func TestPprofHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			handler := newPprofHandler(logrus.New(), tt.checkToken, tt.gate, pprofMux)
+			hasFeature := tt.hasFeature
+			if hasFeature == nil {
+				hasFeature = allowFeature
+			}
+
+			handler := newPprofHandler(logrus.New(), tt.checkToken, hasFeature, tt.gate, pprofMux)
 
 			method := tt.method
 			if method == "" {

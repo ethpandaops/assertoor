@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/ethpandaops/assertoor/pkg/web/auth"
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"
 )
@@ -31,13 +32,14 @@ type PostTestRunCancelResponse struct {
 // @Param cancelOptions body PostTestRunCancelRequest true "Test cancellation options"
 // @Success 200 {object} Response{data=PostTestRunCancelResponse} "Success"
 // @Failure 400 {object} Response "Failure"
+// @Failure 401 {object} Response "Unauthorized"
+// @Failure 403 {object} Response "Login lacks the write feature"
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/test_run/{runId}/cancel [post]
 func (ah *APIHandler) PostTestRunCancel(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
-	if !ah.checkAuth(r) {
-		ah.sendUnauthorizedResponse(w, r.URL.String())
+	if !ah.requireFeature(w, r, auth.FeatureWrite) {
 		return
 	}
 
