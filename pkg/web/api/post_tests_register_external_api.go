@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethpandaops/assertoor/pkg/helper"
 	"github.com/ethpandaops/assertoor/pkg/types"
+	"github.com/ethpandaops/assertoor/pkg/web/auth"
 	"gopkg.in/yaml.v3"
 )
 
@@ -43,7 +44,7 @@ type PostTestsRegisterExternalResponse struct {
 func (ah *APIHandler) PostTestsRegisterExternal(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
-	if !ah.requireTestRegistry(w, r) {
+	if !ah.requireFeature(w, r, auth.FeatureTestRegistry) {
 		return
 	}
 

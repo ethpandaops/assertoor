@@ -13,6 +13,9 @@ const (
 	testToken = "valid-token"
 	bodyPprof = "pprof"
 	bodyGate  = "gate"
+	pathIndex = "/debug/pprof/"
+	hdrAccept = "Accept"
+	mimeHTML  = "text/html"
 )
 
 // acceptToken accepts testToken, bare or as a bearer header.
@@ -94,8 +97,8 @@ func TestPprofHandler(t *testing.T) {
 			checkToken: acceptToken,
 			hasFeature: denyFeature,
 			gate:       gate,
-			path:       "/debug/pprof/",
-			header:     http.Header{"Accept": {"text/html"}},
+			path:       pathIndex,
+			header:     http.Header{hdrAccept: {mimeHTML}},
 			cookie:     testToken,
 			wantStatus: http.StatusForbidden,
 		},
@@ -113,15 +116,15 @@ func TestPprofHandler(t *testing.T) {
 			checkToken: acceptToken,
 			gate:       gate,
 			path:       "/debug/pprof/heap",
-			header:     http.Header{"Accept": {"*/*"}},
+			header:     http.Header{hdrAccept: {"*/*"}},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:       "browser without token gets the gate",
 			checkToken: acceptToken,
 			gate:       gate,
-			path:       "/debug/pprof/",
-			header:     http.Header{"Accept": {"text/html,application/xhtml+xml"}},
+			path:       pathIndex,
+			header:     http.Header{hdrAccept: {"text/html,application/xhtml+xml"}},
 			wantStatus: http.StatusOK,
 			wantBody:   bodyGate,
 		},
@@ -130,15 +133,15 @@ func TestPprofHandler(t *testing.T) {
 			checkToken: acceptToken,
 			gate:       gate,
 			method:     http.MethodPost,
-			path:       "/debug/pprof/",
-			header:     http.Header{"Accept": {"text/html"}},
+			path:       pathIndex,
+			header:     http.Header{hdrAccept: {mimeHTML}},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:       "browser without gate gets 401",
 			checkToken: acceptToken,
-			path:       "/debug/pprof/",
-			header:     http.Header{"Accept": {"text/html"}},
+			path:       pathIndex,
+			header:     http.Header{hdrAccept: {mimeHTML}},
 			wantStatus: http.StatusUnauthorized,
 		},
 	}

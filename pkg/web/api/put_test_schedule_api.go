@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/types"
+	"github.com/ethpandaops/assertoor/pkg/web/auth"
 	"github.com/gorhill/cronexpr"
 	"github.com/gorilla/mux"
 )
@@ -41,7 +42,7 @@ type PutTestScheduleRequest struct {
 func (ah *APIHandler) PutTestSchedule(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
-	if !ah.requireTestRegistry(w, r) {
+	if !ah.requireFeature(w, r, auth.FeatureTestRegistry) {
 		return
 	}
 

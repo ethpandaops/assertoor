@@ -26,6 +26,9 @@ const (
 	// FeatureTestRegistry registers, deletes and reschedules test
 	// definitions. Tests can run shell tasks, so this is code execution.
 	FeatureTestRegistry = "test_registry"
+	// FeatureWrite schedules, cancels and deletes test runs, edits the
+	// dashboard config and starts AI chats. Without it a login can only read.
+	FeatureWrite = "write"
 	// FeaturePprof downloads Go runtime profiles from /debug/pprof.
 	FeaturePprof = "pprof"
 )

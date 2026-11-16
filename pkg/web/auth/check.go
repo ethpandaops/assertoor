@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -122,4 +123,24 @@ func StripPort(host string) string {
 	}
 
 	return host
+}
+
+// FeatureStatus answers whether the request may use a feature: http.StatusOK,
+// http.StatusUnauthorized without a valid login, or http.StatusForbidden when
+// the login lacks the feature. Open mode always answers http.StatusOK.
+func (h *Handler) FeatureStatus(r *http.Request, feature string) int {
+	if h == nil || h.IsOpen() {
+		return http.StatusOK
+	}
+
+	token := h.CheckAuthToken(r.Header.Get("Authorization"), StripPort(r.Host))
+	if token == nil || !token.Valid {
+		return http.StatusUnauthorized
+	}
+
+	if !h.HasFeature(token, feature) {
+		return http.StatusForbidden
+	}
+
+	return http.StatusOK
 }

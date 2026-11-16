@@ -70,15 +70,17 @@ func TestHasFeature(t *testing.T) {
 		wantService  bool // passes the verifier's "assertoor" service gate
 		wantRegistry bool
 		wantPprof    bool
+		wantWrite    bool
 	}{
-		{"no services claim (authenticatoor without grants)", "", true, true, true},
-		{"staff: every service and feature", "+all,+all:all", true, true, true},
-		{"basic access only", "-all,+assertoor", true, false, false},
-		{"test_registry granted", "-all,+assertoor,+assertoor:test_registry", true, true, false},
-		{"all assertoor features", "-all,+assertoor,+assertoor:all", true, true, true},
-		{"all but pprof", "-all,+assertoor,+assertoor:all:-pprof", true, true, false},
-		{"faucet only", "-all,+faucet,+faucet:drop_100eth", false, false, false},
-		{"no grant at all", "-all", false, false, false},
+		{"no services claim (authenticatoor without grants)", "", true, true, true, true},
+		{"staff: every service and feature", "+all,+all:all", true, true, true, true},
+		{"basic access only: read-only", "-all,+assertoor", true, false, false, false},
+		{"write granted", "-all,+assertoor,+assertoor:write", true, false, false, true},
+		{"test_registry granted", "-all,+assertoor,+assertoor:test_registry", true, true, false, false},
+		{"all assertoor features", "-all,+assertoor,+assertoor:all", true, true, true, true},
+		{"all but pprof", "-all,+assertoor,+assertoor:all:-pprof", true, true, false, true},
+		{"faucet only", "-all,+faucet,+faucet:drop_100eth", false, false, false, false},
+		{"no grant at all", "-all", false, false, false, false},
 	}
 
 	for _, tt := range tests {
@@ -102,6 +104,26 @@ func TestHasFeature(t *testing.T) {
 			if got := handler.HasFeature(token, FeaturePprof); got != tt.wantPprof {
 				t.Errorf("HasFeature(%s) = %v, want %v", FeaturePprof, got, tt.wantPprof)
 			}
+
+			if got := handler.HasFeature(token, FeatureWrite); got != tt.wantWrite {
+				t.Errorf("HasFeature(%s) = %v, want %v", FeatureWrite, got, tt.wantWrite)
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "http://"+testHost+"/api/v1/test_runs/schedule", http.NoBody)
+			req.Header.Set("Authorization", "Bearer "+tokenStr)
+
+			wantStatus := http.StatusOK
+
+			switch {
+			case !tt.wantService:
+				wantStatus = http.StatusUnauthorized
+			case !tt.wantWrite:
+				wantStatus = http.StatusForbidden
+			}
+
+			if got := handler.FeatureStatus(req, FeatureWrite); got != wantStatus {
+				t.Errorf("FeatureStatus(%s) = %d, want %d", FeatureWrite, got, wantStatus)
+			}
 		})
 	}
 }
@@ -115,7 +137,17 @@ func TestHasFeatureOpenMode(t *testing.T) {
 	}
 
 	token := handler.CheckAuthToken("", testHost)
-	if !handler.HasFeature(token, FeatureTestRegistry) || !handler.HasFeature(token, FeaturePprof) {
+	if !handler.HasFeature(token, FeatureTestRegistry) || !handler.HasFeature(token, FeaturePprof) || !handler.HasFeature(token, FeatureWrite) {
 		t.Fatal("open mode must allow every feature")
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "http://"+testHost+"/api/v1/test_runs/schedule", http.NoBody)
+	if got := handler.FeatureStatus(req, FeatureWrite); got != http.StatusOK {
+		t.Fatalf("open mode FeatureStatus = %d, want %d", got, http.StatusOK)
+	}
+
+	var nilHandler *Handler
+	if got := nilHandler.FeatureStatus(req, FeatureWrite); got != http.StatusOK {
+		t.Fatalf("nil handler FeatureStatus = %d, want %d", got, http.StatusOK)
 	}
 }

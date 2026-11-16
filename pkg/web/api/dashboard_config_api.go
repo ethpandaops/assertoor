@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/ethpandaops/assertoor/pkg/web/auth"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -68,14 +69,13 @@ func (ah *APIHandler) GetDashboardConfig(w http.ResponseWriter, r *http.Request)
 // @Success 200 {object} Response "Saved"
 // @Failure 400 {object} Response "Bad Request"
 // @Failure 401 {object} Response "Unauthorized"
+// @Failure 403 {object} Response "Login lacks the write feature"
 // @Failure 500 {object} Response "Server Error"
 // @Router /api/v1/dashboard_config [put]
 func (ah *APIHandler) PutDashboardConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
-	if !ah.checkAuth(r) {
-		ah.sendUnauthorizedResponse(w, r.URL.String())
-
+	if !ah.requireFeature(w, r, auth.FeatureWrite) {
 		return
 	}
 

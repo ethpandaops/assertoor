@@ -56,26 +56,20 @@ func (ah *APIHandler) checkAuth(r *http.Request) bool {
 	return true
 }
 
-// requireTestRegistry is checkAuth for the endpoints that change test
-// definitions: it answers 401 without a valid login and 403 when the login
-// lacks the test_registry feature, and returns false in both cases.
-func (ah *APIHandler) requireTestRegistry(w http.ResponseWriter, r *http.Request) bool {
-	if ah.authHandler == nil || ah.authHandler.IsOpen() {
+// requireFeature is checkAuth for an endpoint behind a feature (auth.Feature*):
+// it answers 401 without a valid login and 403 when the login lacks the
+// feature, and returns false in both cases.
+func (ah *APIHandler) requireFeature(w http.ResponseWriter, r *http.Request, feature string) bool {
+	switch ah.authHandler.FeatureStatus(r, feature) {
+	case http.StatusOK:
 		return true
-	}
-
-	token := ah.authHandler.CheckAuthToken(r.Header.Get("Authorization"), auth.StripPort(r.Host))
-	if token == nil || !token.Valid {
+	case http.StatusUnauthorized:
 		ah.sendUnauthorizedResponse(w, r.URL.String())
-		return false
+	default:
+		ah.sendErrorResponse(w, r.URL.String(), "forbidden: this login lacks the assertoor feature "+feature, http.StatusForbidden)
 	}
 
-	if !ah.authHandler.HasFeature(token, auth.FeatureTestRegistry) {
-		ah.sendErrorResponse(w, r.URL.String(), "forbidden: this login lacks the assertoor feature "+auth.FeatureTestRegistry, http.StatusForbidden)
-		return false
-	}
-
-	return true
+	return false
 }
 
 func (ah *APIHandler) sendUnauthorizedResponse(w http.ResponseWriter, route string) {

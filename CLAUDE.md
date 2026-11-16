@@ -55,7 +55,7 @@ Main config file (YAML):
 - `coordinator` - max concurrent tests, retention
 - `web` - server host/port, API/frontend toggles
   - `web.frontend.pprof` mounts Go pprof on `/debug/pprof/`. With an `authProviderUrl` it needs the login: a bearer header (tools) or the `assertoor_debug_token` cookie, which the SPA's gate page (`web-ui/src/pages/DebugLogin.tsx`) sets from the session for a browser. Profile downloads are logged with the user; the index page is not.
-  - Privileged features (`pkg/web/auth/handler.go`): `test_registry` (register, delete and reschedule tests) and `pprof` need an explicit `assertoor:<feature>` grant in the token's services claim. A token without the claim (an authenticatoor without grants) keeps every feature.
+  - Features (`pkg/web/auth/handler.go`): `write` (schedule, cancel and delete test runs, edit the dashboard config, start AI chats), `test_registry` (register, delete and reschedule tests) and `pprof` need an explicit `assertoor:<feature>` grant in the token's services claim; basic access is read-only. A token without the claim (an authenticatoor without grants) keeps every feature.
 - `endpoints` - array of {name, executionUrl, consensusUrl}
 - `validatorNames` - inventory for mapping validator indices to names
 - `globalVars` - variables available to all tests

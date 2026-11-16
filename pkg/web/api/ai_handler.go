@@ -198,8 +198,13 @@ type AIChatStartResponse struct {
 func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 
-	if !h.checkAuth(r) {
+	switch h.authHandler.FeatureStatus(r, auth.FeatureWrite) {
+	case http.StatusOK:
+	case http.StatusUnauthorized:
 		h.sendUnauthorizedResponse(w, "/api/v1/ai/chat")
+		return
+	default:
+		h.sendErrorResponse(w, "/api/v1/ai/chat", "forbidden: this login lacks the assertoor feature "+auth.FeatureWrite, http.StatusForbidden)
 		return
 	}
 
