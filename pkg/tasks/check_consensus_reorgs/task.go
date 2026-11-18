@@ -96,11 +96,16 @@ func (t *Task) Execute(ctx context.Context) error {
 		select {
 		case block := <-blockSubscription.Channel():
 			blockHeader := block.AwaitHeader(ctx, 500*time.Millisecond)
-			if blockHeader == nil {
-				break
-			}
 
-			if lastBlock != nil && !bytes.Equal(blockHeader.Message.ParentRoot[:], lastBlock.Root[:]) {
+			switch {
+			case blockHeader == nil:
+				// The header didn't arrive in time, so we can't tell what
+				// this block's parent is and can't check it for a reorg.
+				// lastBlock still advances to this block below: comparing
+				// the *next* block's parent against a stale, older head
+				// would otherwise report a reorg that never happened.
+				t.logger.Warnf("timed out waiting for header of block %v [0x%x], skipping reorg check for it", block.Slot, block.Root)
+			case lastBlock != nil && !bytes.Equal(blockHeader.Message.ParentRoot[:], lastBlock.Root[:]):
 				// chain reorg
 				t.processChainReorg(lastBlock, block)
 
