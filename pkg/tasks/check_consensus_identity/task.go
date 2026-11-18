@@ -187,7 +187,10 @@ func (t *Task) processCheck(checkCount int) (bool, error) {
 		requiredPassCount = totalClientCount
 	}
 
-	resultPass := passResultCount >= requiredPassCount
+	// A pattern that matches no clients must never pass: with minClientCount
+	// explicitly set to 0, requiredPassCount would otherwise collapse to 0
+	// and 0 >= 0 reports the check passed having checked no clients.
+	resultPass := totalClientCount > 0 && passResultCount >= requiredPassCount
 
 	// Set output variables using context.Outputs
 	if matchingClientsData, err := vars.GeneralizeData(matchingClients); err == nil {
