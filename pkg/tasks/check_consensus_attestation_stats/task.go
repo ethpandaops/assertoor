@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/ethpandaops/assertoor/pkg/clients/consensus"
@@ -79,6 +80,7 @@ type Task struct {
 	logger          logrus.FieldLogger
 	attesterDutyMap map[uint64]map[phase0.Root]*attesterDuties
 	passedEpochs    uint64
+	namePattern     *regexp.Regexp
 }
 
 type attesterDuties struct {
@@ -90,6 +92,7 @@ type attesterDuties struct {
 type attesterDuty struct {
 	validator uint64
 	balance   uint64
+	matches   bool
 }
 
 func NewTask(ctx *types.TaskContext, options *types.TaskOptions) (types.Task, error) {
@@ -130,6 +133,10 @@ func (t *Task) LoadConfig() error {
 	}
 
 	t.config = config
+
+	if config.ValidatorNamePattern != "" {
+		t.namePattern = regexp.MustCompile(config.ValidatorNamePattern)
+	}
 
 	return nil
 }
@@ -239,7 +246,11 @@ func (t *Task) processBlock(ctx context.Context, block *consensus.Block) {
 		duties: map[string][]*attesterDuty{},
 	}
 
-	for _, validator := range validators {
+	for valIndex, validator := range validators {
+		if !t.matchesValidator(uint64(valIndex)) {
+			continue
+		}
+
 		if uint64(validator.Validator.ActivationEpoch) <= currentBlockEpoch && currentBlockEpoch < uint64(validator.Validator.ExitEpoch) {
 			attesterDuties.validatorCount++
 			attesterDuties.validatorBalance += uint64(validator.Validator.EffectiveBalance)
@@ -259,11 +270,20 @@ func (t *Task) processBlock(ctx context.Context, block *consensus.Block) {
 			attesterDuties.duties[k] = append(attesterDuties.duties[k], &attesterDuty{
 				validator: valIndexU64,
 				balance:   uint64(validator.Validator.EffectiveBalance),
+				matches:   t.matchesValidator(valIndexU64),
 			})
 		}
 	}
 
 	t.attesterDutyMap[currentBlockEpoch][parentBlock.Root] = attesterDuties
+}
+
+func (t *Task) matchesValidator(index uint64) bool {
+	if t.namePattern == nil {
+		return true
+	}
+
+	return t.namePattern.MatchString(t.ctx.Scheduler.GetServices().ValidatorNames().GetValidatorName(index))
 }
 
 func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64, checkCount int) (bool, error) {
@@ -279,7 +299,7 @@ func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64, check
 			continue
 		}
 
-		result := t.checkEpochVotes(epoch, epochVote)
+		result, reason := t.checkEpochVotes(epoch, epochVote)
 
 		if result {
 			t.passedEpochs++
@@ -299,15 +319,15 @@ func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64, check
 			t.passedEpochs = 0
 			if t.config.FailOnCheckMiss {
 				t.ctx.SetResult(types.TaskResultFailure)
-				t.ctx.ReportProgress(0, fmt.Sprintf("Attestation stats check failed for epoch %d (attempt %d)", epoch, checkCount))
+				t.ctx.ReportProgress(0, fmt.Sprintf("Attestation stats check failed for epoch %d: %s", epoch, reason))
 
 				t.logger.Infof("epoch %v attestation check result: %v. passed checks: %v, want: %v", epoch, result, t.passedEpochs, t.config.MinCheckedEpochs)
 
-				return true, fmt.Errorf("attestation stats check failed for epoch %d", epoch)
+				return true, fmt.Errorf("attestation stats check failed for epoch %d: %s", epoch, reason)
 			}
 
 			t.ctx.SetResult(types.TaskResultNone)
-			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for attestation stats... (attempt %d)", checkCount))
+			t.ctx.ReportProgress(0, fmt.Sprintf("Waiting for attestation stats, epoch %d failed: %s (attempt %d)", epoch, reason, checkCount))
 		}
 
 		t.logger.Infof("epoch %v attestation check result: %v. passed checks: %v, want: %v", epoch, result, t.passedEpochs, t.config.MinCheckedEpochs)
@@ -318,7 +338,11 @@ func (t *Task) runAttestationStatsCheck(ctx context.Context, epoch uint64, check
 	return false, nil
 }
 
-func (t *Task) checkEpochVotes(epoch uint64, epochVote *epochVotes) bool {
+func (t *Task) checkEpochVotes(epoch uint64, epochVote *epochVotes) (passed bool, reason string) {
+	if epochVote.attesterDuties.validatorBalance == 0 {
+		return false, "no active validators match"
+	}
+
 	targetPercent := float64(epochVote.currentEpoch.targetVoteAmount+epochVote.nextEpoch.targetVoteAmount) * 100.0 / float64(epochVote.attesterDuties.validatorBalance)
 	headPercent := float64(epochVote.currentEpoch.headVoteAmount+epochVote.nextEpoch.headVoteAmount) * 100.0 / float64(epochVote.attesterDuties.validatorBalance)
 	totalPercent := float64(epochVote.currentEpoch.totalVoteAmount+epochVote.nextEpoch.totalVoteAmount) * 100.0 / float64(epochVote.attesterDuties.validatorBalance)
@@ -340,36 +364,30 @@ func (t *Task) checkEpochVotes(epoch uint64, epochVote *epochVotes) bool {
 	t.ctx.Outputs.SetVar("totalVotesPercent", totalPercent)
 
 	if t.config.MinTargetPercent > 0 && targetPercent < float64(t.config.MinTargetPercent) {
-		t.logger.Debugf("check failed for epoch %v: target vote percent (want: >= %v, have: %.2f%)", epoch, t.config.MinTargetPercent, targetPercent)
-		return false
+		return false, fmt.Sprintf("target votes %.2f%% < %v%%", targetPercent, t.config.MinTargetPercent)
 	}
 
 	if t.config.MaxTargetPercent < 100 && targetPercent > float64(t.config.MaxTargetPercent) {
-		t.logger.Debugf("check failed for epoch %v: target vote percent (want: <= %v, have: %.2f%)", epoch, t.config.MaxTargetPercent, targetPercent)
-		return false
+		return false, fmt.Sprintf("target votes %.2f%% > %v%%", targetPercent, t.config.MaxTargetPercent)
 	}
 
 	if t.config.MinHeadPercent > 0 && headPercent < float64(t.config.MinHeadPercent) {
-		t.logger.Debugf("check failed for epoch %v: head vote percent (want: >= %v, have: %.2f%)", epoch, t.config.MinHeadPercent, headPercent)
-		return false
+		return false, fmt.Sprintf("head votes %.2f%% < %v%%", headPercent, t.config.MinHeadPercent)
 	}
 
 	if t.config.MaxHeadPercent < 100 && headPercent > float64(t.config.MaxHeadPercent) {
-		t.logger.Debugf("check failed for epoch %v: head vote percent (want: <= %v, have: %.2f%)", epoch, t.config.MaxHeadPercent, headPercent)
-		return false
+		return false, fmt.Sprintf("head votes %.2f%% > %v%%", headPercent, t.config.MaxHeadPercent)
 	}
 
 	if t.config.MinTotalPercent > 0 && totalPercent < float64(t.config.MinTotalPercent) {
-		t.logger.Debugf("check failed for epoch %v: total vote percent (want: >= %v, have: %.2f%)", epoch, t.config.MinTotalPercent, totalPercent)
-		return false
+		return false, fmt.Sprintf("total votes %.2f%% < %v%%", totalPercent, t.config.MinTotalPercent)
 	}
 
 	if t.config.MaxTotalPercent < 100 && totalPercent > float64(t.config.MaxTotalPercent) {
-		t.logger.Debugf("check failed for epoch %v: total vote percent (want: <= %v, have: %.2f%)", epoch, t.config.MaxTotalPercent, totalPercent)
-		return false
+		return false, fmt.Sprintf("total votes %.2f%% > %v%%", totalPercent, t.config.MaxTotalPercent)
 	}
 
-	return true
+	return true, ""
 }
 
 type epochVotes struct {
@@ -576,7 +594,7 @@ func (t *Task) aggregateAttestationVotes(votes *epochVotes, slot, committee uint
 
 	for bitIdx, attDuty := range voteValidators {
 		validatorIdx := attDuty.validator
-		if aggregationBits.BitAt(uint64(bitIdx) + aggregationBitsOffset) {
+		if attDuty.matches && aggregationBits.BitAt(uint64(bitIdx)+aggregationBitsOffset) {
 			if votes.activityMap[validatorIdx] {
 				continue
 			}

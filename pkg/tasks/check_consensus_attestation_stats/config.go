@@ -1,5 +1,10 @@
 package checkconsensusattestationstats
 
+import (
+	"fmt"
+	"regexp"
+)
+
 type Config struct {
 	MinTargetPercent uint64 `yaml:"minTargetPercent" json:"minTargetPercent" desc:"Minimum percentage of correct target votes required."`
 	MaxTargetPercent uint64 `yaml:"maxTargetPercent" json:"maxTargetPercent" desc:"Maximum percentage of correct target votes allowed."`
@@ -10,6 +15,8 @@ type Config struct {
 	FailOnCheckMiss  bool   `yaml:"failOnCheckMiss" json:"failOnCheckMiss" desc:"If true, fail the task when attestation stats condition is not met."`
 	MinCheckedEpochs uint64 `yaml:"minCheckedEpochs" json:"minCheckedEpochs" desc:"Minimum number of epochs to check before evaluating conditions."`
 	ContinueOnPass   bool   `yaml:"continueOnPass" json:"continueOnPass" desc:"If true, continue monitoring after the check passes instead of completing immediately."`
+
+	ValidatorNamePattern string `yaml:"validatorNamePattern" json:"validatorNamePattern" desc:"Regex pattern to restrict the check to validators with matching names."`
 }
 
 func DefaultConfig() Config {
@@ -22,5 +29,11 @@ func DefaultConfig() Config {
 }
 
 func (c *Config) Validate() error {
+	if c.ValidatorNamePattern != "" {
+		if _, err := regexp.Compile(c.ValidatorNamePattern); err != nil {
+			return fmt.Errorf("invalid validatorNamePattern: %w", err)
+		}
+	}
+
 	return nil
 }
