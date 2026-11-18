@@ -247,6 +247,9 @@ func (ts *TaskScheduler) GetTaskCount() uint64 {
 		return 0
 	}
 
+	ts.taskStateMutex.RLock()
+	defer ts.taskStateMutex.RUnlock()
+
 	return uint64(len(ts.allTasks))
 }
 
