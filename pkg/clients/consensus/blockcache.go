@@ -153,9 +153,9 @@ func (cache *BlockCache) SetClientSpecs(specValues map[string]interface{}) error
 	cache.specMutex.Lock()
 	defer cache.specMutex.Unlock()
 
-	specs := ChainSpec{}
+	specs := NewChainSpec()
 
-	err := smapping.FillStructByTags(&specs, specValues, "yaml")
+	err := smapping.FillStructByTags(specs, specValues, "yaml")
 	if err != nil {
 		return err
 	}
@@ -169,13 +169,13 @@ func (cache *BlockCache) SetClientSpecs(specValues map[string]interface{}) error
 	}
 
 	if cache.specs != nil {
-		mismatches := cache.specs.CheckMismatch(&specs)
+		mismatches := cache.specs.CheckMismatch(specs)
 		if len(mismatches) > 0 {
 			return fmt.Errorf("spec mismatch: %v", strings.Join(mismatches, ", "))
 		}
 	}
 
-	cache.specs = &specs
+	cache.specs = specs
 	cache.fullSpecs = specValues
 
 	return nil
