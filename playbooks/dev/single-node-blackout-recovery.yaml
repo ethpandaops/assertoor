@@ -1,0 +1,136 @@
+id: single-node-blackout-recovery
+name: "Single-Node Blackout & Recovery"
+description: |
+  Fully isolates one participant's beacon node from the rest of a
+  Kurtosis-launched devnet, keeps the blackout active for a configurable
+  number of slots, heals it, then verifies the node re-syncs and the
+  network regains fresh finality.
+
+  The blackout is a single disruptoor isolation applied through the
+  run_network_disruption task: the target beacon node loses ALL traffic —
+  p2p and control traffic to every other participant AND to its own
+  execution and validator client (scope `[cl_p2p, el_p2p, include_control]`).
+  Disruptoor computes the counterparty group as the complement of the
+  target, so no participant enumeration is needed and the playbook works
+  unchanged on any topology. This reproduces client behaviour under sudden
+  total network loss — e.g. a silent stall followed by a missed proposal
+  during catch-up.
+
+  The blackout is gated on `minStartEpoch` so fork-activation devnets can
+  schedule it safely after the fork (set it to fork epoch + 2 or later).
+  The target participant is selected by its 1-based `node-index` label via
+  `targetParticipantIndex`. Choose a topology where the remaining nodes
+  retain a 2/3 finality majority (e.g. 4 nodes, blackout 1). A disruptoor
+  service is expected at `disruptoorApiUrl` (default
+  `http://disruptoor:7700`).
+version: 1.1.0
+tags: [disruptoor, kurtosis, blackout, node-isolation, recovery, consensus]
+timeout: 120m
+config:
+  disruptoorApiUrl: "http://disruptoor:7700" # Disruptoor HTTP API used to apply and clear the blackout.
+  targetParticipantIndex: 1 # 1-based participant index (node-index label) whose beacon node gets blacked out.
+  blackoutDurationSlots: 5 # Number of slots to keep the blackout active (5 slots = 30s on the 6s-slot minimal preset).
+  minStartEpoch: 3 # Do not start the blackout before this epoch (set to fork epoch + 2 or later on fork-activation devnets).
+  minimumClientCount: 2 # Minimum number of healthy clients required before starting the blackout.
+  minFinalizedEpochIncreaseAfterRecovery: 1 # Required finalized epoch increase after healing to prove fresh finality.
+  maxUnfinalizedEpochsAfterRecovery: 6 # Maximum finality lag allowed after healing.
+tasks:
+- name: run_network_disruption
+  title: "Wait for disruptoor and clear stale disruptions"
+  timeout: 5m
+  configVars:
+    disruptoorUrl: "disruptoorApiUrl"
+  config:
+    action: clear
+    awaitApiTimeout: 2m
+
+- name: check_clients_are_healthy
+  title: "Wait for all devnet clients to be healthy"
+  timeout: 20m
+  configVars:
+    minClientCount: "minimumClientCount"
+  config:
+    maxUnhealthyCount: 0
+
+- name: check_consensus_finality
+  id: initial_finality
+  title: "Wait for initial finality"
+  timeout: 40m
+  config:
+    minFinalizedEpochs: 2
+    maxUnfinalizedEpochs: 3
+
+- name: check_consensus_slot_range
+  title: "Wait for the configured blackout start epoch"
+  timeout: 30m
+  configVars:
+    minEpochNumber: "minStartEpoch"
+
+- name: check_consensus_slot_range
+  id: blackout_start
+  title: "Capture blackout start slot"
+  timeout: 1m
+  config: {}
+
+- name: run_network_disruption
+  title: "Black out the target beacon node"
+  timeout: 3m
+  configVars:
+    disruptoorUrl: "disruptoorApiUrl"
+    # A single isolation: the target CL vs everything else (other
+    # participants AND its own EL + VC). include_control extends the cut
+    # beyond p2p to RPC/engine/API traffic.
+    isolations: >-
+      | [{
+        name: "assertoor-blackout-target-cl",
+        target: {"node-index": (.targetParticipantIndex | tonumber), "client-type": "beacon"},
+        scope: ["cl_p2p", "el_p2p", "include_control"]
+      }]
+  config: {}
+
+- name: check_consensus_slot_range
+  title: "Keep the blackout active for the configured duration"
+  timeout: 15m
+  configVars:
+    minSlotNumber: "| (.tasks.blackout_start.outputs.currentSlot | tonumber) + (.blackoutDurationSlots | tonumber)"
+
+- name: run_network_disruption
+  title: "Heal the blackout"
+  timeout: 2m
+  configVars:
+    disruptoorUrl: "disruptoorApiUrl"
+  config:
+    action: clear
+
+- name: check_clients_are_healthy
+  title: "Wait for all clients to report healthy after healing"
+  timeout: 10m
+  configVars:
+    minClientCount: "minimumClientCount"
+  config:
+    maxUnhealthyCount: 0
+
+- name: check_consensus_sync_status
+  title: "Wait for all clients to report synced after healing"
+  timeout: 10m
+  config:
+    expectSyncing: false
+    expectMinPercent: 100
+
+- name: check_consensus_finality
+  title: "Poll for fresh finality after recovery"
+  timeout: 25m
+  configVars:
+    # Require a fresh finalized checkpoint after the blackout. maxUnfinalizedEpochs
+    # alone can pass on stale pre-blackout finality when the current epoch is close.
+    minFinalizedEpochs: "| (.tasks.initial_finality.outputs.finalizedEpoch | tonumber) + (.minFinalizedEpochIncreaseAfterRecovery | tonumber)"
+    maxUnfinalizedEpochs: "maxUnfinalizedEpochsAfterRecovery"
+
+cleanupTasks:
+- name: run_network_disruption
+  title: "Clear disruptoor state"
+  timeout: 2m
+  configVars:
+    disruptoorUrl: "disruptoorApiUrl"
+  config:
+    action: clear
