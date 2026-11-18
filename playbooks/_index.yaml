@@ -1,8 +1,8 @@
 # Auto-generated playbook index
-# Generated: 2026-07-07T07:50:04Z
+# Generated: 2026-07-13T13:47:28Z
 # DO NOT EDIT MANUALLY - regenerate via `make generate-playbook-index`.
 
-generated: 2026-07-07T07:50:04Z
+generated: 2026-07-13T13:47:28Z
 folders:
   - path: api-compatibility
     name: API Compatibility
@@ -219,6 +219,38 @@ playbooks:
     tags:
       - utility
     timeout: 4h
+  - file: dev/single-node-blackout-recovery.yaml
+    id: single-node-blackout-recovery
+    name: Single-Node Blackout & Recovery
+    description: |-
+      Fully isolates one participant's beacon node from the rest of a
+      Kurtosis-launched devnet through the disruptoor HTTP API, keeps the
+      blackout active for a configurable number of slots, heals it, then
+      verifies the node re-syncs and the network regains fresh finality.
+
+      "Fully" means the target beacon node loses ALL traffic: p2p and control
+      traffic to every other participant AND to its own execution and validator
+      client (scope `[cl_p2p, el_p2p, include_control]` on both partitions).
+      This reproduces client behaviour under sudden total network loss —
+      e.g. a silent stall followed by a missed proposal during catch-up.
+
+      The blackout is gated on `minStartEpoch` so fork-activation devnets can
+      schedule it safely after the fork (set it to fork epoch + 2 or later).
+      The target participant is selected by its 1-based `node-index` label via
+      `targetParticipantIndex`; the counterparty group is computed dynamically
+      from the assertoor client pool. Choose a topology where the remaining
+      nodes retain a 2/3 finality majority (e.g. 4 nodes, blackout 1). A
+      disruptoor service is expected at `disruptoorApiUrl` (default
+      `http://disruptoor:7700`).
+    version: 1.0.0
+    tags:
+      - disruptoor
+      - kurtosis
+      - blackout
+      - node-isolation
+      - recovery
+      - consensus
+    timeout: 120m
   - file: dev/synchronized-check.yaml
     id: synchronized-check
     name: Check client pairs are in sync
@@ -655,6 +687,43 @@ playbooks:
       - queue
       - eip-8282
     timeout: 1h
+  - file: gloas-dev/deploy-eip8282-contracts.yaml
+    id: deploy-eip8282-contracts
+    name: 'GLOAS: Deploy EIP-8282 builder request contracts (pre-fork)'
+    description: |-
+      Deploys the EIP-8282 builder deposit (request type 0x03) and builder exit
+      (request type 0x04) system contracts onto a running devnet BEFORE the GLOAS
+      fork activates.
+
+      glamsterdam-devnet-7 deliberately omits these predeploys from genesis
+      (DEPLOY_EIP8282_CONTRACTS=false in the genesis generator) to exercise the
+      mainnet-like deployment workflow: from GLOAS activation onward every block
+      is INVALID unless both contracts exist, so they must be deployed as regular
+      transactions pre-fork. Intended to be registered as a startup test so the
+      contracts land right after the devnet comes up.
+
+      Deployment goes through the deterministic CREATE2 factory (predeployed in
+      devnet genesis as a well-known contract) using the vanity-mined salts from
+      ethereum/execution-specs#3091 — CREATE2(factory, salt, initcode) yields the
+      canonical ...8282 addresses the clients expect. The factory REVERTS when
+      CREATE2 fails (including the already-deployed collision case), so a
+      successful receipt is proof of deployment.
+
+      Idempotent: an eth_call precheck against the builder deposit contract's fee
+      getter detects existing code and skips deployment, so restarts of a
+      startup-scheduled run stay green. The exit contract cannot be prechecked the
+      same way — its constructor arms the slot-0 excess inhibitor, which makes its
+      fee getter revert by design until the first post-GLOAS system call — so its
+      deployment is asserted via the deploy receipt (both contracts only ever
+      deploy as a pair).
+    version: 1.0.0
+    tags:
+      - gloas
+      - builder
+      - eip-8282
+      - deployment
+      - prefork
+    timeout: 30m
   - file: gloas-dev/exit-builders.yaml
     id: exit-builders
     name: 'GLOAS: Exit builders deposited by prefork-queue-fill-public'
