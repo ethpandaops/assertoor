@@ -159,6 +159,11 @@ func (t *Task) runCheck() types.TaskResult {
 
 	epochCount := currentEpoch.Number() - t.startEpoch
 
+	return t.evaluateReorgs(epochCount)
+}
+
+// evaluateReorgs applies the configured reorg thresholds to the observed counts.
+func (t *Task) evaluateReorgs(epochCount uint64) types.TaskResult {
 	if t.config.MinCheckEpochCount > 0 && epochCount < t.config.MinCheckEpochCount {
 		t.logger.Warnf("Check missed: checked %v epochs, but need >= %v", epochCount, t.config.MinCheckEpochCount)
 		return types.TaskResultNone
@@ -166,6 +171,11 @@ func (t *Task) runCheck() types.TaskResult {
 
 	if t.config.MaxReorgsPerEpoch > 0 && epochCount > 0 && float64(t.totalReorgs)/float64(epochCount) > t.config.MaxReorgsPerEpoch {
 		t.logger.Warnf("check failed: max reorgs per epoch exceeded. (have: %v, want <= %v)", float64(t.totalReorgs)/float64(epochCount), t.config.MaxReorgsPerEpoch)
+		return types.TaskResultFailure
+	}
+
+	if t.config.MaxTotalReorgs > 0 && t.totalReorgs > t.config.MaxTotalReorgs {
+		t.logger.Warnf("check failed: max total reorgs exceeded. (have: %v, want <= %v)", t.totalReorgs, t.config.MaxTotalReorgs)
 		return types.TaskResultFailure
 	}
 
