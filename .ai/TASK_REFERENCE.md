@@ -259,6 +259,31 @@ Monitors consensus blocks for ones matching specific criteria. Waits until enoug
 
 ---
 
+### check_consensus_blob_count
+
+Monitors consensus blocks for ones that reach the target or max number of blobs. The limits are read from the execution client's `eth_config` (EIP-7910), so they follow fork changes instead of being pinned in the playbook.
+
+**Config:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `checkLookback` | int | 1 | Slots to look back for matching blocks |
+| `blockCount` | int | 1 | Number of matching blocks required, at least 1 |
+| `blobLimit` | string | target | Limit a block must reach: `target` or `max` |
+| `validatorNamePattern` | string | "" | Regex for validator name |
+| `clientPattern` | string | "" | Regex for the execution client serving eth_config |
+| `excludeClientPattern` | string | "" | Regex excluding execution clients |
+| `failOnOverMax` | bool | true | Fail when a block carries more blobs than the max |
+
+**Outputs:**
+| Variable | Type | Description |
+|----------|------|-------------|
+| `matchingBlockRoots` | array | Block roots that reached the blob limit |
+| `blobTarget` | uint64 | Target blobs per block reported by the execution client |
+| `blobMax` | uint64 | Max blobs per block reported by the execution client |
+| `maxBlobCount` | int | Highest blob count seen in any checked block |
+
+---
+
 ### check_consensus_finality
 
 Monitors chain finality status.
