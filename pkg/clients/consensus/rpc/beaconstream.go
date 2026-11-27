@@ -64,7 +64,7 @@ func (bs *BeaconStream) startStream() {
 		bs.running = false
 	}()
 
-	// Start advanced stream (execution_payload_available) in a separate goroutine
+	// Start advanced stream (execution_payload) in a separate goroutine
 	// if requested. This runs independently since CL clients may not support it yet.
 	if bs.events&StreamExecutionPayloadEvent > 0 {
 		go bs.runAdvancedStream()
@@ -128,8 +128,8 @@ func (bs *BeaconStream) runAdvancedStreamEvents(stream *eventstream.Stream) {
 		case <-bs.ctx.Done():
 			return
 		case evt := <-stream.Events:
-			if evt.Event() == "execution_payload_available" {
-				bs.processExecutionPayloadAvailableEvent(evt)
+			if evt.Event() == "execution_payload" {
+				bs.processExecutionPayloadEvent(evt)
 			}
 		case <-stream.Ready:
 			// advanced stream ready, nothing to signal
@@ -181,7 +181,7 @@ func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventst
 			fmt.Fprintf(&topics, ",")
 		}
 
-		fmt.Fprintf(&topics, "execution_payload_available")
+		fmt.Fprintf(&topics, "execution_payload")
 
 		topicsCount++
 	}
@@ -264,12 +264,12 @@ func (bs *BeaconStream) processFinalizedEvent(evt eventsource.Event) {
 	}
 }
 
-func (bs *BeaconStream) processExecutionPayloadAvailableEvent(evt eventsource.Event) {
-	var parsed v1.ExecutionPayloadAvailableEvent
+func (bs *BeaconStream) processExecutionPayloadEvent(evt eventsource.Event) {
+	var parsed v1.ExecutionPayloadEvent
 
 	err := json.Unmarshal([]byte(evt.Data()), &parsed)
 	if err != nil {
-		logger.WithField("client", bs.client.name).Warnf("beacon block stream failed to decode execution_payload_available event: %v", err)
+		logger.WithField("client", bs.client.name).Warnf("beacon block stream failed to decode execution_payload event: %v", err)
 		return
 	}
 
