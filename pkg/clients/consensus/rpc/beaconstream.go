@@ -20,6 +20,11 @@ const (
 	StreamHeadEvent             uint16 = 0x02
 	StreamFinalizedEvent        uint16 = 0x04
 	StreamExecutionPayloadEvent uint16 = 0x08
+	// StreamExecutionPayloadImportedEvent subscribes to `execution_payload`, which fires once the
+	// envelope is imported and can be fetched. Its events are delivered as StreamExecutionPayloadEvent.
+	StreamExecutionPayloadImportedEvent uint16 = 0x10
+
+	advancedStreamEvents = StreamExecutionPayloadEvent | StreamExecutionPayloadImportedEvent
 )
 
 type BeaconStreamEvent struct {
@@ -64,14 +69,16 @@ func (bs *BeaconStream) startStream() {
 		bs.running = false
 	}()
 
-	// Start advanced stream (execution_payload_available) in a separate goroutine
-	// if requested. This runs independently since CL clients may not support it yet.
-	if bs.events&StreamExecutionPayloadEvent > 0 {
-		go bs.runAdvancedStream()
+	// Start each advanced stream (execution_payload_available, execution_payload) in a separate
+	// goroutine if requested. These run independently since CL clients may not support them yet.
+	for _, event := range []uint16{StreamExecutionPayloadEvent, StreamExecutionPayloadImportedEvent} {
+		if bs.events&event > 0 {
+			go bs.runAdvancedStream(event)
+		}
 	}
 
 	// Basic stream: block, head, finalized_checkpoint
-	basicEvents := bs.events &^ StreamExecutionPayloadEvent
+	basicEvents := bs.events &^ advancedStreamEvents
 
 	stream := bs.subscribeStream(bs.client.endpoint, basicEvents)
 	if stream != nil {
@@ -104,9 +111,9 @@ func (bs *BeaconStream) startStream() {
 	}
 }
 
-func (bs *BeaconStream) runAdvancedStream() {
+func (bs *BeaconStream) runAdvancedStream(event uint16) {
 	for {
-		stream := bs.subscribeStream(bs.client.endpoint, StreamExecutionPayloadEvent)
+		stream := bs.subscribeStream(bs.client.endpoint, event)
 		if stream == nil {
 			return
 		}
@@ -128,8 +135,11 @@ func (bs *BeaconStream) runAdvancedStreamEvents(stream *eventstream.Stream) {
 		case <-bs.ctx.Done():
 			return
 		case evt := <-stream.Events:
-			if evt.Event() == "execution_payload_available" {
+			switch evt.Event() {
+			case "execution_payload_available":
 				bs.processExecutionPayloadAvailableEvent(evt)
+			case "execution_payload":
+				bs.processExecutionPayloadImportedEvent(evt)
 			}
 		case <-stream.Ready:
 			// advanced stream ready, nothing to signal
@@ -182,6 +192,16 @@ func (bs *BeaconStream) subscribeStream(endpoint string, events uint16) *eventst
 		}
 
 		fmt.Fprintf(&topics, "execution_payload_available")
+
+		topicsCount++
+	}
+
+	if events&StreamExecutionPayloadImportedEvent > 0 {
+		if topicsCount > 0 {
+			fmt.Fprintf(&topics, ",")
+		}
+
+		fmt.Fprintf(&topics, "execution_payload")
 
 		topicsCount++
 	}
@@ -276,6 +296,27 @@ func (bs *BeaconStream) processExecutionPayloadAvailableEvent(evt eventsource.Ev
 	bs.EventChan <- &BeaconStreamEvent{
 		Event: StreamExecutionPayloadEvent,
 		Data:  &parsed,
+	}
+}
+
+// processExecutionPayloadImportedEvent forwards an `execution_payload` event like an
+// `execution_payload_available` one. `execution_payload_available` can fire before the envelope
+// is stored, so fetching it right away may 404, while `execution_payload` fires after the import.
+func (bs *BeaconStream) processExecutionPayloadImportedEvent(evt eventsource.Event) {
+	var parsed v1.ExecutionPayloadEvent
+
+	err := json.Unmarshal([]byte(evt.Data()), &parsed)
+	if err != nil {
+		logger.WithField("client", bs.client.name).Warnf("beacon block stream failed to decode execution_payload event: %v", err)
+		return
+	}
+
+	bs.EventChan <- &BeaconStreamEvent{
+		Event: StreamExecutionPayloadEvent,
+		Data: &v1.ExecutionPayloadAvailableEvent{
+			BlockRoot: parsed.BlockRoot,
+			Slot:      parsed.Slot,
+		},
 	}
 }
 
