@@ -15,10 +15,10 @@ func (e testStreamEvent) Id() string    { return "" } //nolint:revive // name re
 func (e testStreamEvent) Event() string { return e.event }
 func (e testStreamEvent) Data() string  { return e.data }
 
-func TestProcessExecutionPayloadImportedEvent(t *testing.T) {
+func TestProcessExecutionPayloadEvent(t *testing.T) {
 	bs := &BeaconStream{EventChan: make(chan *BeaconStreamEvent, 1)}
 
-	bs.processExecutionPayloadImportedEvent(testStreamEvent{
+	bs.processExecutionPayloadEvent(testStreamEvent{
 		event: "execution_payload",
 		data:  `{"slot":"10","builder_index":"42","block_hash":"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef","block_root":"0x9a2fefd2fdb57f74993c7780ea5b9030d2897b615b89f808011ca5aebed54eaf","execution_optimistic":false}`,
 	})
@@ -29,7 +29,7 @@ func TestProcessExecutionPayloadImportedEvent(t *testing.T) {
 			t.Fatalf("unexpected event type %v", evt.Event)
 		}
 
-		payloadEvent, ok := evt.Data.(*v1.ExecutionPayloadAvailableEvent)
+		payloadEvent, ok := evt.Data.(*v1.ExecutionPayloadEvent)
 		if !ok {
 			t.Fatalf("unexpected event data %T", evt.Data)
 		}

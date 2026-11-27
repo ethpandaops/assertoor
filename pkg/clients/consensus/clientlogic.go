@@ -137,7 +137,7 @@ func (client *Client) runClientLogic() error {
 	}
 
 	// start event stream
-	blockStream := client.rpcClient.NewBlockStream(client.clientCtx, rpc.StreamBlockEvent|rpc.StreamFinalizedEvent|rpc.StreamExecutionPayloadEvent|rpc.StreamExecutionPayloadImportedEvent)
+	blockStream := client.rpcClient.NewBlockStream(client.clientCtx, rpc.StreamBlockEvent|rpc.StreamFinalizedEvent|rpc.StreamExecutionPayloadEvent)
 	defer blockStream.Close()
 
 	// process events
@@ -175,7 +175,7 @@ func (client *Client) runClientLogic() error {
 				}
 
 			case rpc.StreamExecutionPayloadEvent:
-				if payloadEvent, ok := evt.Data.(*v1.ExecutionPayloadAvailableEvent); ok {
+				if payloadEvent, ok := evt.Data.(*v1.ExecutionPayloadEvent); ok {
 					err := client.processPayloadEvent(payloadEvent)
 					if err != nil {
 						client.logger.Warnf("failed processing payload event: %v", err)
@@ -228,7 +228,7 @@ func (client *Client) processFinalizedEvent(evt *v1.FinalizedCheckpointEvent) er
 	return client.setFinalizedHead(evt.Epoch, evt.Block)
 }
 
-func (client *Client) processPayloadEvent(evt *v1.ExecutionPayloadAvailableEvent) error {
+func (client *Client) processPayloadEvent(evt *v1.ExecutionPayloadEvent) error {
 	cachedBlock := client.pool.blockCache.GetCachedBlockByRoot(evt.BlockRoot)
 	if cachedBlock == nil {
 		client.logger.Debugf("received payload event for unknown block [0x%x]", evt.BlockRoot)
