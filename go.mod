@@ -7,7 +7,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/ethpandaops/ethwallclock v0.4.0
-	github.com/ethpandaops/go-eth2-client v0.1.6
+	github.com/ethpandaops/go-eth2-client v0.1.12
 	github.com/ethpandaops/service-authenticatoor v0.0.2
 	github.com/ethpandaops/spamoor v1.2.2
 	github.com/glebarez/go-sqlite v1.22.0
@@ -55,7 +55,6 @@ require (
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.24.4 // indirect
-	github.com/casbin/govaluate v1.10.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/consensys/gnark-crypto v0.20.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
@@ -91,8 +90,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/pk910/dynamic-ssz v1.3.2 // indirect
-	github.com/pk910/hashtree-bindings v0.2.2 // indirect
+	github.com/pk910/dynamic-ssz v1.3.3-0.20260921152246-990798fa9718 // indirect
+	github.com/pk910/hashtree-bindings v0.2.6 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/protolambda/bls12-381-util v0.1.0 // indirect

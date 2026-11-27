@@ -39,7 +39,7 @@ func GetExecutionExtraData(v *spec.VersionedSignedBeaconBlock) ([]byte, error) {
 		}
 
 		return v.Fulu.Message.Body.ExecutionPayload.ExtraData, nil
-	case spec.DataVersionGloas:
+	case spec.DataVersionGloas, spec.DataVersionHeze:
 		return nil, errors.New("gloas extra data is in separate payload")
 	default:
 		return nil, errors.New("unknown version")
@@ -73,6 +73,8 @@ func GetBlockBody(v *spec.VersionedSignedBeaconBlock) any {
 		return v.Fulu
 	case spec.DataVersionGloas:
 		return v.Gloas
+	case spec.DataVersionHeze:
+		return v.Heze
 	default:
 		return nil
 	}
